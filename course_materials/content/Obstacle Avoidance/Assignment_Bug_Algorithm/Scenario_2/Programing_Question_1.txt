@@ -1,0 +1,18 @@
+Math Question: Calculating the Path Length using the Bug Algorithm
+
+Suppose a mobile robot uses the Bug2 obstacle avoidance algorithm to navigate in a 2D environment. The robot starts at the origin point O(0,0) and needs to reach a goal point G(10,0). However, there is a rectangular obstacle in the robot's environment with vertices at A(4,−1), B(6,−1), C(6,1), and D(4,1).
+
+When the robot encounters this obstacle, it follows the edge of the obstacle until it can resume its path to the goal. Assume the robot always turns right when it encounters the obstacle and follows the Bug2 algorithm perfectly. 
+
+Question:
+Calculate the total path length that the robot will travel to reach the goal, including the detour around the obstacle. Provide your answer in the form of an expression that includes the perimeter of the obstacle that the robot follows and the straight-line paths before and after the detour.
+
+Hints:
+Calculate the straight-line distance the robot travels before encountering the obstacle.
+Add the distance the robot travels around the obstacle (consider the robot will follow a right turn when encountering the edges of the obstacle).
+Calculate the straight-line distance from the point where the robot leaves the obstacle to the goal.
+Sum these distances to get the total path length.
+
+Assumptions:
+The robot can detect the obstacle as soon as it is in line with it.
+The robot can travel in straight lines and can turn with perfect right angles.
