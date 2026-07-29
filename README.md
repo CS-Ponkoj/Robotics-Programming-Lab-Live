@@ -1,4 +1,4 @@
-# IUSE Robotics Learning Platform
+# Robotics Programming Lab
 
 An interactive robotics-education prototype with a Flask API, a Flutter web interface, automated Python assignment grading, and optional AI-generated hints.
 

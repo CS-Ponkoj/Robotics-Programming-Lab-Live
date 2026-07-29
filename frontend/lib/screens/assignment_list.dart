@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/api_config.dart';
-import 'package:iuse_demo/main.dart'; // ← brings in the shared `lastAttemptAccuracy` map
+import 'package:iuse_demo/models/assignment_progress.dart';
+import 'package:iuse_demo/screens/assignment_workspace.dart';
+import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
@@ -272,7 +274,7 @@ class AssignmentCollection extends StatelessWidget {
                   delegate: assignmentDelegate,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisExtent: 280,
+                    mainAxisExtent: 290,
                   ),
                 ),
               )
@@ -321,7 +323,7 @@ class ProgressSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final completedAssignments = lastAttemptAccuracy.values
+    final completedAssignments = learningProgress.bestScores.values
         .where((accuracy) => accuracy == 100)
         .length
         .clamp(0, totalAssignments);
@@ -513,11 +515,17 @@ class ListAssignment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final state = learningProgress.assignmentState(
+      a.id,
+      starterCode: a.code,
+    );
     final hasAccuracy = lastAttemptAccuracy.containsKey(a.id);
     final accuracyText = hasAccuracy
-        ? "✅ Last Accuracy: ${lastAttemptAccuracy[a.id]}%"
-        : "No attempts yet";
-    final accuracyColor = hasAccuracy ? Colors.green : Colors.grey[600];
+        ? '${state.label} • Last score: ${lastAttemptAccuracy[a.id]}%'
+        : state.label;
+    final accuracyColor = state == AssignmentProgressState.completed
+        ? AppColors.success
+        : theme.colorScheme.onSurfaceVariant;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -602,16 +610,23 @@ class AssignmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final progressState = learningProgress.assignmentState(
+      a.id,
+      starterCode: a.code,
+    );
     final hasAccuracy = lastAttemptAccuracy.containsKey(a.id);
     final solutionRevealed = solutionRevealedAssignments.contains(a.id);
-    final statusText = hasAccuracy
-        ? 'Last score: ${lastAttemptAccuracy[a.id]}%'
-        : 'Not started';
-    final statusColor =
-        hasAccuracy ? AppColors.success : theme.colorScheme.onSurfaceVariant;
-    final statusBackground = hasAccuracy
+    final statusText = progressState.label;
+    final statusColor = progressState == AssignmentProgressState.completed
+        ? AppColors.success
+        : progressState == AssignmentProgressState.inProgress
+            ? theme.colorScheme.primary
+            : theme.colorScheme.onSurfaceVariant;
+    final statusBackground = progressState == AssignmentProgressState.completed
         ? AppColors.successContainer
-        : theme.colorScheme.surfaceContainerHighest;
+        : progressState == AssignmentProgressState.inProgress
+            ? theme.colorScheme.primaryContainer
+            : theme.colorScheme.surfaceContainerHighest;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -695,9 +710,16 @@ class AssignmentCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            hasAccuracy
-                                ? Icons.check_circle_rounded
-                                : Icons.schedule_rounded,
+                            switch (progressState) {
+                              AssignmentProgressState.completed =>
+                                Icons.check_circle_rounded,
+                              AssignmentProgressState.attempted =>
+                                Icons.science_outlined,
+                              AssignmentProgressState.inProgress =>
+                                Icons.edit_outlined,
+                              AssignmentProgressState.notStarted =>
+                                Icons.schedule_rounded,
+                            },
                             size: 16,
                             color: statusColor,
                           ),
@@ -712,6 +734,25 @@ class AssignmentCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (hasAccuracy)
+                      Container(
+                        key: const Key('latest-score-badge'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          'Last score: ${lastAttemptAccuracy[a.id]}%',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onSecondaryContainer,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     if (solutionRevealed)
                       Container(
                         key: const Key('solution-viewed-badge'),
