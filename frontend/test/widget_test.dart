@@ -168,7 +168,7 @@ void main() {
     expect(find.text('01'), findsOneWidget);
     expect(find.text('Obstacle Avoidance'), findsOneWidget);
     expect(find.text('Not submitted'), findsOneWidget);
-    expect(find.text('Guided feedback'), findsOneWidget);
+    expect(find.text('AI tutoring'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Back to assignments'));
     expect(backCount, 1);
@@ -721,22 +721,48 @@ void main() {
       codeOutput: '',
       execSuccess: false,
       hint: 'Define total_distance before printing it.',
+      tutorSource: 'openai',
     );
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(body: app.NoFeedback(data: feedback)),
+        home: Scaffold(body: app.Feedback(data: feedback)),
       ),
     );
 
+    expect(find.byKey(const Key('result-summary')), findsOneWidget);
     expect(find.text('Execution error'), findsOneWidget);
     expect(find.textContaining('NameError'), findsOneWidget);
     expect(find.byKey(const Key('guided-hint')), findsOneWidget);
-    expect(find.text('Guided hint'), findsOneWidget);
+    expect(find.text('OpenAI tutor hint'), findsOneWidget);
+    expect(find.text('Hint level 1 of 4'), findsOneWidget);
+    expect(find.byKey(const Key('next-hint-button')), findsOneWidget);
     expect(
       find.text('Define total_distance before printing it.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('test run error explains how to recover and retries',
+      (WidgetTester tester) async {
+    var retryCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: app.TestRunErrorState(
+            onRetry: () => retryCount += 1,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('test-run-error-state')), findsOneWidget);
+    expect(find.text('Grading service unavailable'), findsOneWidget);
+    expect(find.textContaining('http://127.0.0.1:5000'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('retry-test-run-button')));
+    expect(retryCount, 1);
   });
 
   testWidgets('results remain readable and overflow-free on a narrow screen',

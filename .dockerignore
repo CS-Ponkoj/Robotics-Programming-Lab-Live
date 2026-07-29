@@ -1,0 +1,14 @@
+.git
+.gitignore
+.pytest_cache
+.runtime
+.vscode
+env
+venv
+**/__pycache__
+**/*.pyc
+backend/*.db
+backend/.env
+backend/managed_assets
+frontend/.dart_tool
+frontend/build

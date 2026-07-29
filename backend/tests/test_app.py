@@ -1,9 +1,10 @@
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
+from fastapi.testclient import TestClient
 
-from app import app
+from app import create_app
+from config import Settings
 
 
 CORRECT_ASSIGNMENT_2 = """
@@ -49,112 +50,316 @@ OFFICIAL_SOLUTIONS = {
 
 @pytest.fixture()
 def client():
-    app.config.update(TESTING=True)
-    return app.test_client()
+    settings = Settings(
+        database_url="sqlite://",
+        admin_api_token="test-admin",
+        openai_api_key=None,
+    )
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as value:
+        yield value
 
 
-def test_lists_all_assignments(client):
-    response = client.get("/assignments/")
-
+def test_health_reports_fastapi_platform(client):
+    response = client.get("/health")
     assert response.status_code == 200
-    assert response.is_json
-    assignments = response.get_json()["assignments"]
+    assert response.json() == {
+        "status": "ok",
+        "api_version": "2.0.0",
+        "database": "sqlite",
+        "sandbox": "subprocess",
+    }
+
+
+def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
+    response = client.get("/assignments")
+    assert response.status_code == 200
+    assignments = response.json()["assignments"]
     assert [assignment["id"] for assignment in assignments] == [1, 2, 3, 4]
+    assert [assignment["version"] for assignment in assignments] == [3, 2, 3, 2]
+    assert all(assignment["stable_id"] for assignment in assignments)
+    assert all(assignment["solution_html"] == "" for assignment in assignments)
+    assert all(assignment["vals"] == {} for assignment in assignments)
+    assert all(assignment["has_solution"] for assignment in assignments)
+    assert all(
+        "<strong>solution" not in assignment["assignment_html"].lower()
+        for assignment in assignments
+    )
 
 
 @pytest.mark.parametrize("assignment_id", [1, 2, 3, 4])
-def test_gets_each_assignment(client, assignment_id):
+def test_gets_each_assignment_without_hidden_grader_data(client, assignment_id):
     response = client.get(f"/assignments/{assignment_id}")
-
     assert response.status_code == 200
-    assignment = response.get_json()
+    assignment = response.json()
     assert assignment["id"] == assignment_id
-    assert assignment["solution_html"].strip()
+    assert assignment["learning_objectives"]
+    assert assignment["rubric"]
+    assert "grader_config" not in assignment
+    assert "common_misconceptions" not in assignment
 
 
 def test_serves_assignment_image(client):
     response = client.get("/images/1")
-
     assert response.status_code == 200
-    assert response.content_type == "image/png"
-    assert response.data.startswith(b"\x89PNG")
+    assert response.headers["content-type"] == "image/png"
+    assert response.content.startswith(b"\x89PNG")
 
 
 def test_missing_assignment_and_image_return_json_404(client):
     assignment_response = client.get("/assignments/999")
     image_response = client.get("/images/999")
-
     assert assignment_response.status_code == 404
-    assert assignment_response.get_json()["error"] == "Assignment not found."
+    assert assignment_response.json()["error"] == "Assignment not found."
     assert image_response.status_code == 404
-    assert image_response.get_json()["error"] == "Image not found."
+    assert image_response.json()["error"] == "Image not found."
 
 
-def test_grade_rejects_unknown_assignment(client):
-    response = client.post("/grade/999", json={"code": "answer = 1"})
-
-    assert response.status_code == 404
-    assert response.get_json()["error"] == "Assignment not found."
-
-
-def test_grade_rejects_oversized_submission(client):
-    response = client.post("/grade/2", json={"code": "x" * 50_001})
-
-    assert response.status_code == 413
-    assert response.get_json()["error"] == "Submitted code is too large."
+def test_submit_rejects_unknown_oversized_and_missing_code(client):
+    unknown = client.post("/assignments/999/submit", json={"code": "answer = 1"})
+    oversized = client.post("/assignments/2/submit", json={"code": "x" * 50_001})
+    missing = client.post("/assignments/2/submit", json={"code": ""})
+    assert unknown.status_code == 404
+    assert oversized.status_code == 413
+    assert missing.status_code == 400
 
 
-def test_correct_submission_passes_without_requesting_hint(client):
-    with patch("app.get_one_sentence_hint") as hint:
-        response = client.post("/grade/2", json={"code": CORRECT_ASSIGNMENT_2})
+def test_public_run_executes_without_revealing_hidden_grading(client):
+    response = client.post(
+        "/assignments/2/run",
+        json={"code": "print('hello')"},
+    )
+    body = response.json()
+    assert response.status_code == 200
+    assert body["pass"] is True
+    assert body["tested_vals"] == []
+    assert body["score"] == 100
+    assert body["evidence"][0]["visibility"] == "public"
 
-    body = response.get_json()
+
+def test_correct_submission_passes_and_records_assignment_version(client):
+    response = client.post(
+        "/assignments/2/submit", json={"code": CORRECT_ASSIGNMENT_2}
+    )
+    body = response.json()
     assert response.status_code == 200
     assert body["pass"] is True
     assert body["ex_success"] is True
+    assert body["assignment_version"] == 2
+    assert body["submission_id"]
     assert body["unittest_pass_results"] == [True, True, True, True]
-    hint.assert_not_called()
+    assert body["hint"] == ""
 
 
 @pytest.mark.parametrize("assignment_id", [1, 2, 3, 4])
-def test_official_solution_passes(client, assignment_id):
+def test_official_solution_passes_every_modular_grader(client, assignment_id):
     code = OFFICIAL_SOLUTIONS[assignment_id].read_text(encoding="utf-8")
-
-    with patch("app.get_one_sentence_hint") as hint:
-        response = client.post(f"/grade/{assignment_id}", json={"code": code})
-
-    body = response.get_json()
+    response = client.post(
+        f"/assignments/{assignment_id}/submit", json={"code": code}
+    )
+    body = response.json()
     assert response.status_code == 200
     assert body["pass"] is True
     assert all(body["unittest_pass_results"])
-    hint.assert_not_called()
 
 
-def test_incorrect_submission_fails_and_requests_hint(client):
-    with patch("app.get_one_sentence_hint", return_value="Try the perimeter again.") as hint:
-        response = client.post("/grade/2", json={"code": INCORRECT_ASSIGNMENT_2})
-
-    body = response.get_json()
-    assert response.status_code == 200
+def test_incorrect_submission_returns_structured_progressive_feedback(client):
+    response = client.post(
+        "/assignments/2/submit",
+        json={"code": INCORRECT_ASSIGNMENT_2, "use_ai_tutor": True},
+    )
+    body = response.json()
     assert body["pass"] is False
     assert body["ex_success"] is True
-    assert body["unittest_pass_results"] == [False, False, False, False]
-    assert body["hint"] == "Try the perimeter again."
-    hint.assert_called_once()
+    assert body["score"] == 0
+    assert body["hint"]
+    assert body["tutor_feedback"]["hint_level"] == 1
+    assert body["tutor_feedback"]["solution_revealed"] is False
+    assert all(
+        "expected" not in item["message"].lower() for item in body["evidence"]
+    )
+
+    next_hint = client.post(
+        "/assignments/2/hint",
+        json={"submission_id": body["submission_id"], "hint_level": 2},
+    )
+    assert next_hint.status_code == 200
+    assert next_hint.json()["hint_level"] == 2
 
 
-@pytest.mark.parametrize(
-    ("payload", "content_type"),
-    [
-        ("{}", "text/plain"),
-        ({}, "application/json"),
-        ({"code": ""}, "application/json"),
-    ],
-)
-def test_rejects_missing_code(client, payload, content_type):
-    if isinstance(payload, dict):
-        response = client.post("/grade/2", json=payload)
-    else:
-        response = client.post("/grade/2", data=payload, content_type=content_type)
-
+@pytest.mark.parametrize("hint_level", [0, 5])
+def test_progressive_hint_rejects_levels_outside_policy(client, hint_level):
+    response = client.post(
+        "/assignments/2/hint",
+        json={"submission_id": "unused", "hint_level": hint_level},
+    )
     assert response.status_code == 400
+
+
+def test_progressive_hint_cannot_use_a_submission_from_another_assignment(client):
+    submission = client.post(
+        "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
+    ).json()
+    response = client.post(
+        "/assignments/1/hint",
+        json={"submission_id": submission["submission_id"], "hint_level": 2},
+    )
+    assert response.status_code == 404
+
+
+def test_ai_tutoring_is_opt_in_for_fast_default_grading(client):
+    response = client.post(
+        "/assignments/2/submit",
+        json={"code": INCORRECT_ASSIGNMENT_2},
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["score"] == 0
+    assert body["hint"] == ""
+    assert body["tutor_feedback"] is None
+
+
+def test_solution_requires_a_submission_for_current_assignment_version(client):
+    blocked = client.post(
+        "/assignments/2/solution", json={"submission_id": "not-a-submission"}
+    )
+    assert blocked.status_code == 403
+
+    submission = client.post(
+        "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
+    ).json()
+    revealed = client.post(
+        "/assignments/2/solution",
+        json={"submission_id": submission["submission_id"]},
+    )
+    assert revealed.status_code == 200
+    assert "14 units" in revealed.json()["solution_html"]
+
+
+def test_solution_reveal_rejects_a_submission_from_an_old_assignment_version(
+    client,
+):
+    submission = client.post(
+        "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
+    ).json()
+    headers = {"X-Admin-Token": "test-admin"}
+    assignment = client.get("/admin/assignments", headers=headers).json()[
+        "assignments"
+    ][1]
+    assignment["description"] = "A revised assignment description."
+
+    updated = client.put(
+        "/admin/assignments/2",
+        headers=headers,
+        json=assignment,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["version"] == 3
+    validation = client.post(
+        "/admin/assignments/2/validate",
+        headers=headers,
+    )
+    assert validation.status_code == 200
+    assert validation.json()["valid"] is True
+    published = client.post(
+        "/admin/assignments/2/publish",
+        headers=headers,
+    )
+    assert published.status_code == 200
+
+    revealed = client.post(
+        "/assignments/2/solution",
+        json={"submission_id": submission["submission_id"]},
+    )
+    assert revealed.status_code == 403
+
+
+def test_legacy_grade_route_preserves_flutter_contract(client):
+    response = client.post("/grade/2", json={"code": CORRECT_ASSIGNMENT_2})
+    assert response.status_code == 200
+    assert response.json()["pass"] is True
+
+
+def test_admin_requires_token_and_validates_before_publish(client):
+    unauthorized = client.get("/admin/assignments")
+    assert unauthorized.status_code == 401
+
+    headers = {"X-Admin-Token": "test-admin"}
+    assignments = client.get("/admin/assignments", headers=headers).json()[
+        "assignments"
+    ]
+    assert assignments[0]["grader_config"]["expected_values"]
+    validation = client.post(
+        "/admin/assignments/1/validate", headers=headers
+    )
+    assert validation.status_code == 200
+    assert validation.json() == {"valid": True, "errors": []}
+
+
+def test_admin_content_update_increments_version_and_preserves_stable_id(client):
+    headers = {"X-Admin-Token": "test-admin"}
+    original = client.get("/admin/assignments", headers=headers).json()[
+        "assignments"
+    ][0]
+    original["description"] = "Updated instructor-authored description"
+
+    response = client.put(
+        "/admin/assignments/1",
+        headers=headers,
+        json=original,
+    )
+    assert response.status_code == 200
+    updated = response.json()
+    assert updated["stable_id"] == original["stable_id"]
+    assert updated["version"] == 4
+    assert updated["status"] == "draft"
+
+    assert client.get("/assignments/1").status_code == 404
+    publish = client.post("/admin/assignments/1/publish", headers=headers)
+    assert publish.status_code == 200
+    student_copy = client.get("/assignments/1").json()
+    assert student_copy["version"] == 4
+    assert "grader_config" not in student_copy
+
+
+def test_admin_update_cannot_bypass_publish_validation_or_force_version(client):
+    headers = {"X-Admin-Token": "test-admin"}
+    original = client.get("/admin/assignments", headers=headers).json()[
+        "assignments"
+    ][0]
+    original["description"] = "A draft change"
+    draft = client.put(
+        "/admin/assignments/1",
+        headers=headers,
+        json=original,
+    ).json()
+    assert draft["status"] == "draft"
+    assert draft["version"] == 4
+
+    draft["status"] = "published"
+    draft["version"] = 999
+    attempted_bypass = client.put(
+        "/admin/assignments/1",
+        headers=headers,
+        json=draft,
+    )
+    assert attempted_bypass.status_code == 200
+    assert attempted_bypass.json()["status"] == "draft"
+    assert attempted_bypass.json()["version"] == 4
+
+
+def test_admin_rejects_duplicate_stable_assignment_id(client):
+    headers = {"X-Admin-Token": "test-admin"}
+    existing = client.get("/admin/assignments", headers=headers).json()[
+        "assignments"
+    ][0]
+    existing["id"] = None
+
+    response = client.post(
+        "/admin/assignments",
+        headers=headers,
+        json=existing,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"] == "Assignment ID or stable ID already exists."

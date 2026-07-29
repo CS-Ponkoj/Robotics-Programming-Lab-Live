@@ -1,11 +1,11 @@
 {
-    "name": "iuse_demo",
-    "short_name": "iuse_demo",
+    "name": "Robotics Programming Lab",
+    "short_name": "Robotics Lab",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Interactive robotics programming assignments with automated feedback.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

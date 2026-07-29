@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: robotics_lab
+      POSTGRES_USER: robotics
+      POSTGRES_PASSWORD: robotics
+    ports:
+      - "5432:5432"
+    volumes:
+      - robotics_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U robotics -d robotics_lab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - robotics_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    working_dir: /app/backend
+    env_file:
+      - backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://robotics:robotics@postgres:5432/robotics_lab
+      REDIS_URL: redis://redis:6379/0
+      SANDBOX_BACKEND: ${SANDBOX_BACKEND:-docker}
+      SANDBOX_IMAGE: robotics-lab-sandbox:latest
+    ports:
+      - "5000:5000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - robotics_assets:/app/backend/managed_assets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  sandbox-image:
+    image: robotics-lab-sandbox:latest
+    build:
+      context: backend
+      dockerfile: Dockerfile.sandbox
+    profiles: ["build"]
+
+volumes:
+  robotics_postgres_data:
+  robotics_redis_data:
+  robotics_assets:

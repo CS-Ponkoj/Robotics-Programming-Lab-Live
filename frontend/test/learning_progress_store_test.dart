@@ -12,6 +12,7 @@ void main() {
     await firstStore.saveDraft(2, 'total_path_length = 14');
     await firstStore.recordAttempt(2, 50);
     await firstStore.recordAttempt(2, 100);
+    await firstStore.recordSubmission(2, 'submission-abc');
     await firstStore.recordSolutionReveal(2);
 
     final reloadedStore = LearningProgressStore();
@@ -22,6 +23,7 @@ void main() {
     expect(reloadedStore.bestScores[2], 100);
     expect(reloadedStore.attemptCounts[2], 2);
     expect(reloadedStore.hasAttempted(2), isTrue);
+    expect(reloadedStore.submissionIds[2], 'submission-abc');
     expect(reloadedStore.revealedSolutions, contains(2));
   });
 
@@ -34,6 +36,19 @@ void main() {
 
     expect(store.latestScores[1], 25);
     expect(store.bestScores[1], 100);
+  });
+
+  test('an invalidated solution reveal is removed from persistence', () async {
+    final storage = InMemoryProgressStorage();
+    final store = LearningProgressStore();
+    await store.load(storage: storage);
+
+    await store.recordSolutionReveal(3);
+    await store.clearSolutionReveal(3);
+
+    final reloadedStore = LearningProgressStore();
+    await reloadedStore.load(storage: storage);
+    expect(reloadedStore.revealedSolutions, isNot(contains(3)));
   });
 
   test('assignment progress resolves every learner state distinctly', () async {

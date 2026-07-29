@@ -32,10 +32,12 @@ class _MyHomePageState extends State<MyHomePage> {
   late Future<UnittestFeedbackDto> _feedback;
   late CodeController _controller;
   String _code = "";
-  bool _enableFeedback = true;
+  bool _enableFeedback = false;
   bool _submitted = false;
   bool _isRunning = false;
   bool _init = true;
+  String _submissionId = '';
+  String _revealedSolutionHtml = '';
   int _selectedWorkspaceTab = 0;
   double _editorWidthFraction = 0.5;
   AssignmentWorkspaceFocus _workspaceFocus = AssignmentWorkspaceFocus.none;
@@ -48,6 +50,11 @@ class _MyHomePageState extends State<MyHomePage> {
         CodeController(language: python, params: EditorParams(tabSpaces: 4));
     _assignment = fetchAssignment(widget.id);
     _feedback = fetchUnittestFeedback(widget.id, "");
+    _submissionId = learningProgress.submissionIds[widget.id] ?? '';
+    if (solutionRevealedAssignments.contains(widget.id) &&
+        _submissionId.isNotEmpty) {
+      unawaited(_loadPreviouslyRevealedSolution());
+    }
   }
 
   @override
@@ -73,7 +80,11 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _submitted = true;
       _isRunning = true;
-      _feedback = fetchUnittestFeedback(widget.id, _code);
+      _feedback = fetchUnittestFeedback(
+        widget.id,
+        _code,
+        useAiTutor: _enableFeedback,
+      );
     });
 
     _feedback.then(
@@ -93,8 +104,15 @@ class _MyHomePageState extends State<MyHomePage> {
         final score = total > 0 ? ((passed / total) * 100).round() : 0;
         setState(() {
           lastAttemptAccuracy[widget.id] = score;
+          _submissionId = feedback.submissionId;
           _isRunning = false;
         });
+        unawaited(
+          learningProgress.recordSubmission(
+            widget.id,
+            feedback.submissionId,
+          ),
+        );
         unawaited(learningProgress.recordAttempt(widget.id, score));
       },
       onError: (_) {
@@ -103,6 +121,43 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       },
     );
+  }
+
+  Future<void> _loadPreviouslyRevealedSolution() async {
+    try {
+      final html = await fetchWorkedSolution(widget.id, _submissionId);
+      if (mounted) {
+        setState(() => _revealedSolutionHtml = html);
+      }
+    } on Object {
+      // The assignment may have advanced to a new version. The learner can
+      // run that version once and explicitly reveal it again.
+      solutionRevealedAssignments.remove(widget.id);
+      await learningProgress.clearSolutionReveal(widget.id);
+      if (mounted) {
+        setState(() => _revealedSolutionHtml = '');
+      }
+    }
+  }
+
+  Future<void> _revealSolution() async {
+    try {
+      final html = await fetchWorkedSolution(widget.id, _submissionId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _revealedSolutionHtml = html;
+        solutionRevealedAssignments.add(widget.id);
+      });
+      await learningProgress.recordSolutionReveal(widget.id);
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    }
   }
 
   void _toggleWorkspaceFocus(AssignmentWorkspaceFocus target) {
@@ -335,7 +390,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                                 "http://127.0.0.1:5000",
                                                 apiBaseUrl,
                                               ),
-                                          solutionHtml: snap.data!.solutionHtml,
+                                          solutionHtml:
+                                              _revealedSolutionHtml.isNotEmpty
+                                                  ? _revealedSolutionHtml
+                                                  : snap.data!.solutionHtml,
+                                          hasSolution: snap.data!.hasSolution,
                                           solutionRevealed:
                                               solutionRevealedAssignments
                                                   .contains(
@@ -345,19 +404,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                               learningProgress.hasAttempted(
                                             widget.id,
                                           ),
-                                          onSolutionRevealed: () {
-                                            setState(() {
-                                              solutionRevealedAssignments.add(
-                                                widget.id,
-                                              );
-                                            });
-                                            unawaited(
-                                              learningProgress
-                                                  .recordSolutionReveal(
-                                                widget.id,
-                                              ),
-                                            );
-                                          },
+                                          onSolutionRevealed: () =>
+                                              unawaited(_revealSolution()),
                                         );
                                       }
                                       if (snap.hasError) {
@@ -405,16 +453,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                                         CircularProgressIndicator());
                                               }
                                               if (snap.hasError) {
-                                                return const Center(
-                                                    child: Text(
-                                                        "Error running tests"));
+                                                return TestRunErrorState(
+                                                  onRetry: _runTests,
+                                                );
                                               }
                                               if (snap.hasData) {
-                                                // **HERE** we now call your `Feedback` widget
-                                                return _enableFeedback
-                                                    ? Feedback(data: snap.data!)
-                                                    : NoFeedback(
-                                                        data: snap.data!);
+                                                return Feedback(
+                                                  data: snap.data!,
+                                                );
                                               }
                                               return const SizedBox.shrink();
                                             },
@@ -441,6 +487,7 @@ class AssignmentInstructions extends StatelessWidget {
     required this.html,
     this.assignmentId = 1,
     this.solutionHtml = '',
+    this.hasSolution = false,
     this.solutionRevealed = false,
     this.canRevealSolution = true,
     this.onSolutionRevealed,
@@ -449,6 +496,7 @@ class AssignmentInstructions extends StatelessWidget {
   final String html;
   final int assignmentId;
   final String solutionHtml;
+  final bool hasSolution;
   final bool solutionRevealed;
   final bool canRevealSolution;
   final VoidCallback? onSolutionRevealed;
@@ -489,7 +537,7 @@ class AssignmentInstructions extends StatelessWidget {
             html: sections.support,
           ),
         ],
-        if (displayedSolutionHtml.isNotEmpty) ...[
+        if (hasSolution || displayedSolutionHtml.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           _SolutionSection(
             html: displayedSolutionHtml,
@@ -1147,7 +1195,7 @@ class AssignmentPageHeader extends StatelessWidget
           ),
         const SizedBox(width: AppSpacing.xs),
         Semantics(
-          label: 'Guided feedback',
+          label: 'AI tutoring',
           toggled: feedbackEnabled,
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1155,7 +1203,7 @@ class AssignmentPageHeader extends StatelessWidget
               const Icon(Icons.lightbulb_outline_rounded, size: 18),
               if (showFeedbackLabel) ...[
                 const SizedBox(width: AppSpacing.sm),
-                const Text('Guided feedback'),
+                const Text('AI tutoring'),
               ],
               Switch(
                 value: feedbackEnabled,
@@ -1255,24 +1303,56 @@ class _EmptyResultsState extends StatelessWidget {
   }
 }
 
-class NoFeedback extends StatelessWidget {
-  const NoFeedback({super.key, required this.data});
+class TestRunErrorState extends StatelessWidget {
+  const TestRunErrorState({super.key, required this.onRetry});
 
-  final UnittestFeedbackDto data;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _TerminalOutput(data: data),
-          if (data.hint.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _HintCallout(hint: data.hint),
-          ],
-        ],
+    final theme = Theme.of(context);
+
+    return Center(
+      key: const Key('test-run-error-state'),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.cloud_off_rounded,
+                size: 40,
+                color: theme.colorScheme.error,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Grading service unavailable',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Your code was not graded. Confirm that the backend is running '
+                'at $apiBaseUrl, then try again.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              FilledButton.icon(
+                key: const Key('retry-test-run-button'),
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry test run'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1332,7 +1412,7 @@ class Feedback extends StatelessWidget {
           _TerminalOutput(data: data),
           if (data.hint.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
-            _HintCallout(hint: data.hint),
+            _TutorHintPanel(data: data),
           ],
           const SizedBox(height: AppSpacing.lg),
           Text(
@@ -1788,9 +1868,13 @@ class _TerminalOutput extends StatelessWidget {
 }
 
 class _HintCallout extends StatelessWidget {
-  const _HintCallout({required this.hint});
+  const _HintCallout({
+    required this.hint,
+    required this.source,
+  });
 
   final String hint;
+  final String source;
 
   @override
   Widget build(BuildContext context) {
@@ -1817,7 +1901,11 @@ class _HintCallout extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Guided hint',
+                  source == 'openai'
+                      ? 'OpenAI tutor hint'
+                      : source == 'fallback'
+                          ? 'Built-in tutor hint'
+                          : 'Guided hint',
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: Colors.brown.shade900,
                     fontWeight: FontWeight.w800,
@@ -1835,6 +1923,125 @@ class _HintCallout extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TutorHintPanel extends StatefulWidget {
+  const _TutorHintPanel({required this.data});
+
+  final UnittestFeedbackDto data;
+
+  @override
+  State<_TutorHintPanel> createState() => _TutorHintPanelState();
+}
+
+class _TutorHintPanelState extends State<_TutorHintPanel> {
+  late String _hint;
+  late String _source;
+  int _hintLevel = 1;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _reset();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TutorHintPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.data.submissionId != widget.data.submissionId) {
+      _reset();
+    }
+  }
+
+  void _reset() {
+    _hint = widget.data.hint;
+    _source = widget.data.tutorSource;
+    _hintLevel = 1;
+    _loading = false;
+    _error = null;
+  }
+
+  Future<void> _requestNextHint() async {
+    if (_loading || _hintLevel >= 4 || widget.data.submissionId.isEmpty) {
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final feedback = await fetchProgressiveHint(
+        widget.data.id,
+        widget.data.submissionId,
+        _hintLevel + 1,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _hint = feedback['hint']?.toString() ?? _hint;
+        _source = feedback['source']?.toString() ?? 'fallback';
+        _hintLevel = feedback['hint_level'] is int
+            ? feedback['hint_level'] as int
+            : _hintLevel + 1;
+        _loading = false;
+      });
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'The next hint is temporarily unavailable. Try again.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _HintCallout(hint: _hint, source: _source),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            Text(
+              'Hint level $_hintLevel of 4',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+            FilledButton.tonalIcon(
+              key: const Key('next-hint-button'),
+              onPressed: _loading || _hintLevel >= 4 ? null : _requestNextHint,
+              icon: _loading
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.arrow_forward_rounded, size: 18),
+              label: Text(
+                _hintLevel >= 4
+                    ? 'Maximum guidance reached'
+                    : 'Get another hint',
+              ),
+            ),
+          ],
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            _error!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -10,6 +10,9 @@
 .svn/
 migrate_working_dir/
 
+# Local environment values, including API keys
+.env
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -30,6 +33,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/.flutter_build/
 
 # Symbolication related
 app.*.symbols

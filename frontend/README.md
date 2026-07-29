@@ -8,7 +8,7 @@ flutter pub get
 
 ## Run for web
 
-Start the Flask backend first, then run:
+Start the FastAPI backend first, then run:
 
 ```powershell
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000

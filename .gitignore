@@ -47,6 +47,8 @@ app.*.map.json
 # Ignore virtual environment folders
 venv/
 env/
+backend/*.db
+backend/managed_assets/
 
 # Ignore Python cache files
 __pycache__/

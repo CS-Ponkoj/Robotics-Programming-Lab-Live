@@ -10,12 +10,14 @@ class LearningProgressStore {
   static const _draftsKey = 'learning.code_drafts.v1';
   static const _attemptCountsKey = 'learning.attempt_counts.v1';
   static const _revealedSolutionsKey = 'learning.revealed_solutions.v1';
+  static const _submissionIdsKey = 'learning.submission_ids.v1';
 
   final Map<int, int> latestScores = {};
   final Map<int, int> bestScores = {};
   final Map<int, String> codeDrafts = {};
   final Map<int, int> attemptCounts = {};
   final Set<int> revealedSolutions = {};
+  final Map<int, String> submissionIds = {};
 
   ProgressStorage? _storage;
 
@@ -58,6 +60,9 @@ class LearningProgressStore {
             .map(int.tryParse)
             .whereType<int>(),
       );
+    submissionIds
+      ..clear()
+      ..addAll(_decodeStringMap(_getStringSafely(_submissionIdsKey)));
   }
 
   Future<void> saveDraft(int assignmentId, String code) async {
@@ -86,8 +91,27 @@ class LearningProgressStore {
     ]);
   }
 
+  Future<void> recordSubmission(int assignmentId, String submissionId) async {
+    if (submissionId.isEmpty) {
+      return;
+    }
+    submissionIds[assignmentId] = submissionId;
+    await _storage?.setString(
+      _submissionIdsKey,
+      _encodeMap(submissionIds),
+    );
+  }
+
   Future<void> recordSolutionReveal(int assignmentId) async {
     revealedSolutions.add(assignmentId);
+    await _storage?.setString(
+      _revealedSolutionsKey,
+      jsonEncode(revealedSolutions.toList()..sort()),
+    );
+  }
+
+  Future<void> clearSolutionReveal(int assignmentId) async {
+    revealedSolutions.remove(assignmentId);
     await _storage?.setString(
       _revealedSolutionsKey,
       jsonEncode(revealedSolutions.toList()..sort()),

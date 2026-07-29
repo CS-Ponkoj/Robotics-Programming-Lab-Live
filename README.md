@@ -1,95 +1,119 @@
 # Robotics Programming Lab
 
-An interactive robotics-education prototype with a Flask API, a Flutter web interface, automated Python assignment grading, and optional AI-generated hints.
+A configurable robotics-education platform with a Flutter student/instructor
+interface and a FastAPI assignment, grading, simulation, and tutoring API.
 
-## Project layout
+## What is implemented
 
-- `backend/`: Flask API, assignment data, grading worker, and pytest suite
-- `frontend/`: Flutter application for web and other Flutter targets
-- `course_materials/`: source documents, exercises, and official solution files
+- Versioned, database-backed assignment definitions
+- Stable assignment IDs and automatic version capture on every submission
+- Generic student endpoints for run, submit, hints, and protected solutions
+- Modular `AssignmentGrader` implementations
+- Server-only hidden grader configuration and reference solutions
+- Progressive deterministic tutoring with an optional OpenAI enhancement
+- Assignment-specific objectives, rubrics, misconceptions, tutor policies, and
+  simulation configuration
+- Instructor assignment studio with validation-before-publish
+- PostgreSQL and Redis production services through Docker Compose
+- Docker submission-sandbox adapter with a local subprocess development fallback
+- Legacy `/grade/{id}` and `/assignments/` compatibility routes
+- Persistent Flutter drafts, scores, attempts, submission IDs, and solution state
 
-## Prerequisites
+## Repository layout
 
-- Python 3.10 or 3.11
-- Flutter 3.32 or another compatible stable release with web support
-- Chrome or Edge for the Flutter web target
+- `backend/`: FastAPI application, database models, graders, tutor, sandbox, and tests
+- `frontend/`: Flutter web/mobile student and instructor interface
+- `course_materials/`: controlled reference solutions and course source files
+- `docker-compose.yml`: PostgreSQL, Redis, FastAPI, and persistent storage
 
-Android builds additionally require the Android SDK. Windows desktop builds require Visual Studio with the Desktop development with C++ workload. Neither is required for the web application.
+## Local development
 
-## First-time setup
+The default local backend uses an ignored SQLite database so the project remains
+easy to run without Docker. Production and team environments should set
+`DATABASE_URL` to PostgreSQL.
 
-From the repository root:
-
-### Windows PowerShell
+### Install
 
 ```powershell
 python -m venv venv
 .\venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
 Set-Location .\frontend
 flutter pub get
+Set-Location ..
 ```
 
-### Linux or macOS
+### Run
 
-```bash
-python3 -m venv venv
-./venv/bin/python -m pip install -r ./backend/requirements.txt
-cd frontend
-flutter pub get
-```
-
-## Optional AI hints
-
-The grader works without an API key. Failed submissions return a fallback hint when OpenAI is unavailable.
-
-To enable generated hints, provide `OPENAI_API_KEY` in the backend process environment or in an ignored `backend/.env` file. `OPENAI_HINT_MODEL` is optional and defaults to `gpt-4.1-mini`. Never commit a populated `.env` file.
-
-## Run the application
-
-Open two terminals from the repository root.
-
-Backend on Windows:
+Backend terminal:
 
 ```powershell
 Set-Location .\backend
 ..\venv\Scripts\python.exe run.py
 ```
 
-Backend on Linux or macOS:
-
-```bash
-cd backend
-../venv/bin/python run.py
-```
-
-Frontend:
+Flutter terminal:
 
 ```powershell
 Set-Location .\frontend
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000
 ```
 
-For a backend on another host, replace `API_BASE_URL` with the URL reachable from the device running the frontend.
+The backend seeds the four existing assignments into the database on first start.
+
+## PostgreSQL, Redis, and Docker
+
+Copy `backend/.env.example` to the ignored `backend/.env` file, replace the
+instructor token, and add the optional OpenAI key there. Compose loads this
+server-only file automatically. Then:
+
+```powershell
+docker compose --profile build build sandbox-image
+docker compose up --build postgres redis backend
+```
+
+Compose defaults to `SANDBOX_BACKEND=docker`, executing every submission in a
+short-lived container with no network, capped memory/CPU, and a process limit.
+For zero-Docker local development, run `backend/run.py` directly; it uses the
+restricted subprocess fallback from `backend/.env`.
+
+## Assignment API
+
+```text
+GET  /assignments
+GET  /assignments/{assignment_id}
+POST /assignments/{assignment_id}/run
+POST /assignments/{assignment_id}/submit
+POST /assignments/{assignment_id}/hint
+POST /assignments/{assignment_id}/solution
+```
+
+Instructor routes live under `/admin/assignments` and require `X-Admin-Token`.
+The Flutter landing-page shield icon opens the instructor assignment studio.
+
+The student assignment endpoints never return `grader_config`, expected values,
+misconceptions used internally by the tutor, reference-solution paths, or the
+worked solution. A solution can be retrieved only using a submission ID for the
+current assignment version.
+
+## AI tutoring
+
+Without an API key, the tutor produces deterministic progressive hints from
+sanitized grader evidence. With `OPENAI_API_KEY` in an ignored backend environment
+file, the same tutor boundary can enhance that feedback. Hidden tests, expected
+values, and official solutions are never included in the model input.
 
 ## Verification
-
-Backend:
 
 ```powershell
 Set-Location .\backend
 ..\venv\Scripts\python.exe -m pytest -q
 ..\venv\Scripts\python.exe -m pip check
-```
 
-Frontend:
-
-```powershell
-Set-Location .\frontend
+Set-Location ..\frontend
 flutter analyze
 flutter test
 flutter build web --dart-define=API_BASE_URL=http://127.0.0.1:5000
 ```
 
-## Execution safety
-
-Student submissions run in a short-lived isolated Python worker with an import allowlist, execution timeout, output cap, and request-size limit. This protects the Flask server from common mistakes and runaway code. An internet-facing or multi-tenant deployment should add an OS-level sandbox or container with restricted filesystem, network, CPU, and memory access.
+Native Android builds additionally require Android Studio and the Android SDK.
+Windows desktop builds require the Visual Studio C++ desktop workload.

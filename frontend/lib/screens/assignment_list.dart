@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_progress.dart';
 import 'package:iuse_demo/screens/assignment_workspace.dart';
+import 'package:iuse_demo/screens/instructor_assignment_admin.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
 
 const landingPageBackgroundColor = AppColors.pageBackground;
+const _assignmentListTimeout = Duration(seconds: 15);
 
 class AssignmentListPage extends StatefulWidget {
   const AssignmentListPage({super.key});
@@ -19,7 +21,8 @@ class AssignmentListPage extends StatefulWidget {
 
 Future<List<AssignmentDto>> fetchAssignments() async {
   const newUri = "$apiBaseUrl/assignments/";
-  final response = await http.get(Uri.parse(newUri));
+  final response =
+      await http.get(Uri.parse(newUri)).timeout(_assignmentListTimeout);
   if (response.statusCode == 200) {
     final data = jsonDecode(response.body)['assignments'] as List;
     return data.map((e) => AssignmentDto.fromJson(e)).toList();
@@ -497,6 +500,22 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
           ),
         ],
       ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: AppSpacing.md),
+          child: IconButton(
+            tooltip: 'Instructor assignment studio',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const InstructorAssignmentAdmin(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+          ),
+        ),
+      ],
     );
   }
 }
