@@ -3,6 +3,7 @@ class AssignmentDto {
   final String title;
   final String description;
   final String htmlDesc;
+  final String solutionHtml;
   final String code;
   final Map<dynamic, dynamic> vals;
 
@@ -11,6 +12,7 @@ class AssignmentDto {
       required this.title,
       required this.description,
       required this.htmlDesc,
+      this.solutionHtml = '',
       required this.code,
       required this.vals});
 
@@ -29,6 +31,9 @@ class AssignmentDto {
             title: title,
             description: description,
             htmlDesc: htmlDesc,
+            solutionHtml: json['solution_html'] is String
+                ? json['solution_html'] as String
+                : '',
             code: code,
             vals: vals),
       _ => throw const FormatException('Failed to load assignment.'),

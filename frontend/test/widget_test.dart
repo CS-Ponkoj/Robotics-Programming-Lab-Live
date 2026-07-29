@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iuse_demo/main.dart' as app;
 import 'package:iuse_demo/models/assignment_dto.dart';
@@ -55,6 +56,58 @@ void main() {
       find.byKey(const Key('assignment-instructions-panel')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workspace-resize-handle')),
+      findsOneWidget,
+    );
+
+    final initialEditorWidth =
+        tester.getSize(find.byKey(const Key('assignment-editor-panel'))).width;
+    await tester.drag(
+      find.byKey(const Key('workspace-resize-handle')),
+      const Offset(120, 0),
+    );
+    await tester.pump();
+    expect(
+      tester.getSize(find.byKey(const Key('assignment-editor-panel'))).width,
+      greaterThan(initialEditorWidth),
+    );
+
+    await tester.tap(find.byKey(const Key('focus-editor-button')));
+    await tester.pump();
+    expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
+    expect(
+      find.byKey(const Key('assignment-instructions-panel')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
+    expect(find.byTooltip('Restore workspace'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('focus-editor-button')));
+    await tester.pump();
+    expect(
+      find.byKey(const Key('assignment-instructions-panel')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+    await tester.pump();
+    expect(
+      find.byKey(const Key('assignment-instructions-panel')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('assignment-editor-panel')), findsNothing);
+    expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
     expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
 
     await tester.pumpWidget(workspaceApp(const Size(390, 844)));
@@ -125,6 +178,36 @@ void main() {
 
     await tester.tap(find.byType(Switch));
     expect(feedbackEnabled, isTrue);
+  });
+
+  testWidgets('control enter runs assignment tests from the keyboard',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: const MediaQuery(
+          data: MediaQueryData(size: Size(1200, 900)),
+          child: app.MyHomePage(
+            title: 'Assignment 1: Navigation',
+            id: 1,
+          ),
+        ),
+      ),
+    );
+    addTearDown(() {
+      app.learningProgress.latestScores.clear();
+      app.learningProgress.bestScores.clear();
+      app.learningProgress.attemptCounts.clear();
+    });
+
+    expect(find.text('Ready when you are'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ready when you are'), findsNothing);
   });
 
   testWidgets('editor toolbar runs tests once and exposes running state',
@@ -262,6 +345,14 @@ void main() {
     await tester.tap(find.byKey(const Key('reveal-solution-button')));
     await tester.pumpAndSettle();
 
+    expect(find.text('Reveal worked solution?'), findsOneWidget);
+    expect(solutionRevealed, isFalse);
+
+    await tester.tap(
+      find.byKey(const Key('confirm-solution-reveal-button')),
+    );
+    await tester.pumpAndSettle();
+
     expect(solutionRevealed, isTrue);
     expect(find.text('Solution viewed'), findsOneWidget);
     expect(
@@ -271,15 +362,48 @@ void main() {
     semantics.dispose();
   });
 
-  test('every assignment has a worked solution source', () {
-    expect(app.workedSolutionHtmlFor(1), isNotEmpty);
-    expect(app.workedSolutionHtmlFor(2), isNotEmpty);
-    expect(app.workedSolutionHtmlFor(3), isNotEmpty);
-    expect(app.workedSolutionHtmlFor(4), isNotEmpty);
+  testWidgets('worked solution stays locked until a test run is completed',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            child: app.AssignmentInstructions(
+              html: '<p>Scenario details</p>',
+              assignmentId: 2,
+              solutionHtml: '<p>The total path is 14 units.</p>',
+              canRevealSolution: false,
+            ),
+          ),
+        ),
+      ),
+    );
 
-    final assignmentOneSolution = app.workedSolutionHtmlFor(1);
-    expect(assignmentOneSolution, contains('16.82842712474619 units'));
-    expect(assignmentOneSolution, isNot(contains('= 16 units')));
+    expect(find.text('Complete one test run first'), findsOneWidget);
+    expect(
+      find.text('Run the tests once to unlock the solution'),
+      findsOneWidget,
+    );
+
+    final revealButton = tester.widget<FilledButton>(
+      find.byKey(const Key('reveal-solution-button')),
+    );
+    expect(revealButton.onPressed, isNull);
+  });
+
+  test('assignment DTO parses its maintained worked solution', () {
+    final assignment = AssignmentDto.fromJson({
+      'id': 1,
+      'title': 'Assignment 1',
+      'description': 'Description',
+      'assignment_html': '<p>Scenario</p>',
+      'solution_html': '<p>Total: 16.82842712474619 units</p>',
+      'starter_code': 'answer = 0',
+      'vals': <String, dynamic>{'answer': 16.82842712474619},
+    });
+
+    expect(assignment.solutionHtml, contains('16.82842712474619 units'));
   });
 
   testWidgets('landing page header presents the robotics lab identity',
@@ -369,10 +493,16 @@ void main() {
 
   testWidgets('progress summary reflects completed assignments',
       (WidgetTester tester) async {
-    app.lastAttemptAccuracy
+    app.learningProgress.latestScores
+      ..clear()
+      ..addAll({1: 60, 2: 60});
+    app.learningProgress.bestScores
       ..clear()
       ..addAll({1: 100, 2: 60});
-    addTearDown(app.lastAttemptAccuracy.clear);
+    addTearDown(() {
+      app.learningProgress.latestScores.clear();
+      app.learningProgress.bestScores.clear();
+    });
 
     await tester.pumpWidget(
       const MaterialApp(
@@ -505,6 +635,43 @@ void main() {
 
     expect(find.byKey(const Key('solution-viewed-badge')), findsOneWidget);
     expect(find.text('Solution viewed'), findsOneWidget);
+  });
+
+  testWidgets('assignment card distinguishes progress state from score',
+      (WidgetTester tester) async {
+    const assignment = AssignmentDto(
+      id: 3,
+      title: 'Assignment 3: Navigation',
+      description: 'Plan a safe route.',
+      htmlDesc: '<p>Assignment details</p>',
+      code: 'answer = 0',
+      vals: {},
+    );
+    app.learningProgress.attemptCounts[3] = 1;
+    app.learningProgress.latestScores[3] = 60;
+    app.learningProgress.bestScores[3] = 60;
+    addTearDown(() {
+      app.learningProgress.attemptCounts.clear();
+      app.learningProgress.latestScores.clear();
+      app.learningProgress.bestScores.clear();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: AssignmentCard(
+              a: assignment,
+              theme: Theme.of(context),
+              onReturn: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Attempted'), findsOneWidget);
+    expect(find.text('Last score: 60%'), findsOneWidget);
   });
 
   testWidgets('feedback uses boolean results for pass and accuracy counts',

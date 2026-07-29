@@ -67,7 +67,9 @@ def test_gets_each_assignment(client, assignment_id):
     response = client.get(f"/assignments/{assignment_id}")
 
     assert response.status_code == 200
-    assert response.get_json()["id"] == assignment_id
+    assignment = response.get_json()
+    assert assignment["id"] == assignment_id
+    assert assignment["solution_html"].strip()
 
 
 def test_serves_assignment_image(client):

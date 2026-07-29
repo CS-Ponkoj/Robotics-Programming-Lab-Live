@@ -43,6 +43,7 @@ dependencies:
   flutter_code_editor: ^0.3.2
   flutter_highlight: ^0.7.0
   highlight: 
+  shared_preferences: ^2.5.3
 
 
 dev_dependencies:
