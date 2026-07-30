@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
+import 'package:iuse_demo/services/auth_api.dart';
 
 const _requestTimeout = Duration(seconds: 15);
 
@@ -11,6 +12,7 @@ Future<AssignmentDto> fetchAssignment(int id) async {
   final response = await http
       .get(
         Uri.parse('$apiBaseUrl/assignments/$id'),
+        headers: AuthApi.authorizedHeaders(),
       )
       .timeout(_requestTimeout);
   if (response.statusCode == 200) {
@@ -41,7 +43,7 @@ Future<UnittestFeedbackDto> fetchUnittestFeedback(int id, String code,
   final response = await http
       .post(
         Uri.parse('$apiBaseUrl/assignments/$id/submit'),
-        headers: {'content-type': 'application/json'},
+        headers: AuthApi.authorizedHeaders(json: true),
         body: jsonEncode({
           'code': code,
           'use_ai_tutor': useAiTutor,
@@ -64,7 +66,7 @@ Future<String> fetchWorkedSolution(
   final response = await http
       .post(
         Uri.parse('$apiBaseUrl/assignments/$assignmentId/solution'),
-        headers: {'content-type': 'application/json'},
+        headers: AuthApi.authorizedHeaders(json: true),
         body: jsonEncode({'submission_id': submissionId}),
       )
       .timeout(_requestTimeout);
@@ -83,7 +85,7 @@ Future<Map<String, dynamic>> fetchProgressiveHint(
   final response = await http
       .post(
         Uri.parse('$apiBaseUrl/assignments/$assignmentId/hint'),
-        headers: {'content-type': 'application/json'},
+        headers: AuthApi.authorizedHeaders(json: true),
         body: jsonEncode({
           'submission_id': submissionId,
           'hint_level': hintLevel,

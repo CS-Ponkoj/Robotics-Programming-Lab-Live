@@ -39,7 +39,7 @@ ThemeData buildAppTheme() {
     appBarTheme: const AppBarTheme(
       elevation: 0,
       foregroundColor: Colors.white,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.brandDark,
     ),
     cardTheme: CardThemeData(
       elevation: 0,

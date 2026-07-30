@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_progress.dart';
+import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/screens/assignment_workspace.dart';
 import 'package:iuse_demo/screens/instructor_assignment_admin.dart';
+import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
@@ -13,7 +15,14 @@ const landingPageBackgroundColor = AppColors.pageBackground;
 const _assignmentListTimeout = Duration(seconds: 15);
 
 class AssignmentListPage extends StatefulWidget {
-  const AssignmentListPage({super.key});
+  const AssignmentListPage({
+    super.key,
+    required this.user,
+    required this.onLogout,
+  });
+
+  final AuthenticatedUser user;
+  final Future<void> Function() onLogout;
 
   @override
   State<AssignmentListPage> createState() => _AssignmentListPageState();
@@ -21,8 +30,12 @@ class AssignmentListPage extends StatefulWidget {
 
 Future<List<AssignmentDto>> fetchAssignments() async {
   const newUri = "$apiBaseUrl/assignments/";
-  final response =
-      await http.get(Uri.parse(newUri)).timeout(_assignmentListTimeout);
+  final response = await http
+      .get(
+        Uri.parse(newUri),
+        headers: AuthApi.authorizedHeaders(),
+      )
+      .timeout(_assignmentListTimeout);
   if (response.statusCode == 200) {
     final data = jsonDecode(response.body)['assignments'] as List;
     return data.map((e) => AssignmentDto.fromJson(e)).toList();
@@ -51,6 +64,8 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
     final theme = Theme.of(context);
 
     return LandingPageFrame(
+      user: widget.user,
+      onLogout: widget.onLogout,
       body: FutureBuilder<List<AssignmentDto>>(
         future: assignments,
         builder: (context, snap) {
@@ -298,17 +313,21 @@ class AssignmentCollection extends StatelessWidget {
 
 class LandingPageFrame extends StatelessWidget {
   final Widget body;
+  final AuthenticatedUser user;
+  final Future<void> Function() onLogout;
 
   const LandingPageFrame({
     super.key,
     required this.body,
+    required this.user,
+    required this.onLogout,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('landing-page-scaffold'),
-      appBar: const LandingPageHeader(),
+      appBar: LandingPageHeader(user: user, onLogout: onLogout),
       backgroundColor: landingPageBackgroundColor,
       body: body,
     );
@@ -425,7 +444,14 @@ class LandingPageContent extends StatelessWidget {
 }
 
 class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
-  const LandingPageHeader({super.key});
+  const LandingPageHeader({
+    super.key,
+    required this.user,
+    required this.onLogout,
+  });
+
+  final AuthenticatedUser user;
+  final Future<void> Function() onLogout;
 
   @override
   Size get preferredSize => const Size.fromHeight(116);
@@ -501,10 +527,9 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: AppSpacing.md),
-          child: IconButton(
-            tooltip: 'Instructor assignment studio',
+        if (user.isInstructor)
+          IconButton(
+            tooltip: 'Instructor studio',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -513,6 +538,35 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
               );
             },
             icon: const Icon(Icons.admin_panel_settings_outlined),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(right: AppSpacing.md),
+          child: PopupMenuButton<String>(
+            tooltip: 'Account menu',
+            onSelected: (value) {
+              if (value == 'logout') {
+                onLogout();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem<String>(
+                enabled: false,
+                child: Text(
+                  '${user.loginId} (${user.role})',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.logout_rounded),
+                  title: Text('Sign out'),
+                ),
+              ),
+            ],
+            icon: const Icon(Icons.account_circle_outlined),
           ),
         ),
       ],

@@ -3,9 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iuse_demo/main.dart' as app;
 import 'package:iuse_demo/models/assignment_dto.dart';
+import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/screens/assignment_list.dart';
+import 'package:iuse_demo/screens/login_page.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+
+const testAuthenticatedUser = AuthenticatedUser(
+  id: 'test-user-id',
+  loginId: 'student',
+  role: 'student',
+);
+
+Future<void> testLogout() async {}
 
 void main() {
   testWidgets('shared app theme defines the visual system',
@@ -410,7 +420,12 @@ void main() {
       (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(appBar: LandingPageHeader()),
+        home: Scaffold(
+          appBar: LandingPageHeader(
+            user: testAuthenticatedUser,
+            onLogout: testLogout,
+          ),
+        ),
       ),
     );
 
@@ -422,6 +437,41 @@ void main() {
       findsOneWidget,
     );
     expect(find.byIcon(Icons.memory_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.admin_panel_settings_outlined), findsNothing);
+  });
+
+  testWidgets('instructor header exposes role-authorized management',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          appBar: LandingPageHeader(
+            user: AuthenticatedUser(
+              id: 'instructor-id',
+              loginId: 'instructor',
+              role: 'instructor',
+            ),
+            onLogout: testLogout,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.admin_panel_settings_outlined), findsOneWidget);
+  });
+
+  testWidgets('login page asks for study credentials',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LoginPage(onAuthenticated: (_) {}),
+      ),
+    );
+
+    expect(find.byKey(const Key('login-id-field')), findsOneWidget);
+    expect(find.byKey(const Key('login-password-field')), findsOneWidget);
+    expect(find.byKey(const Key('login-submit-button')), findsOneWidget);
+    expect(find.textContaining('Student: student / student'), findsOneWidget);
   });
 
   testWidgets('landing page content is centered and width constrained',
@@ -449,7 +499,11 @@ void main() {
       (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: LandingPageFrame(body: SizedBox()),
+        home: LandingPageFrame(
+          user: testAuthenticatedUser,
+          onLogout: testLogout,
+          body: SizedBox(),
+        ),
       ),
     );
 

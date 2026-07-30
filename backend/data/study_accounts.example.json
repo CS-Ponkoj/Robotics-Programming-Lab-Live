@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "accounts": [
+    {
+      "login_id": "instructor",
+      "temporary_password": "instructor",
+      "role": "instructor",
+      "email": "",
+      "participant_code": null,
+      "active": true,
+      "demo": true
+    },
+    {
+      "login_id": "student",
+      "temporary_password": "student",
+      "role": "student",
+      "email": "",
+      "participant_code": "DEMO",
+      "active": true,
+      "demo": true
+    },
+    {
+      "login_id": "STU-001",
+      "temporary_password": "replace-before-import",
+      "role": "student",
+      "email": "student@example.com",
+      "participant_code": "P001",
+      "active": true,
+      "demo": false
+    }
+  ]
+}

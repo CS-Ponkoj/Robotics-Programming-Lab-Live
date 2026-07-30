@@ -49,11 +49,12 @@ OFFICIAL_SOLUTIONS = {
 
 
 @pytest.fixture()
-def client():
+def client(tmp_path):
     settings = Settings(
         database_url="sqlite://",
         admin_api_token="test-admin",
         openai_api_key=None,
+        study_accounts_file=tmp_path / "study_accounts.json",
     )
     with TestClient(create_app(settings=settings, database_url="sqlite://")) as value:
         yield value

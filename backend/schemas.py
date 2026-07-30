@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -98,3 +99,74 @@ class AdminAssignmentPayload(BaseModel):
     grader_config: dict[str, Any] = Field(default_factory=dict)
     solution_html: str = ""
     reference_solution_path: str | None = None
+
+
+class LoginRequest(BaseModel):
+    login_id: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class AuthenticatedUser(BaseModel):
+    id: str
+    login_id: str
+    role: Literal["student", "instructor"]
+    email: str | None = None
+    participant_code: str | None = None
+    is_demo: bool = False
+    must_change_password: bool = False
+
+
+class LoginResponse(BaseModel):
+    token: str
+    expires_at: datetime
+    user: AuthenticatedUser
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ForgotPasswordRequest(BaseModel):
+    identifier: str = Field(min_length=1, max_length=320)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=500)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class EmailTestRequest(BaseModel):
+    recipient: str = Field(min_length=3, max_length=320)
+
+
+class AdminStudentCreate(BaseModel):
+    login_id: str = Field(min_length=1, max_length=120)
+    temporary_password: str | None = Field(default=None, min_length=8, max_length=128)
+    email: str | None = Field(default=None, max_length=320)
+    participant_code: str | None = Field(default=None, max_length=120)
+    active: bool = True
+    send_invitation_email: bool = False
+
+
+class AdminStudentUpdate(BaseModel):
+    email: str | None = Field(default=None, max_length=320)
+    participant_code: str | None = Field(default=None, max_length=120)
+    active: bool | None = None
+
+
+class AdminPasswordReset(BaseModel):
+    temporary_password: str | None = Field(default=None, min_length=8, max_length=128)
+    send_email: bool = False
+
+
+class AdminUserResponse(AuthenticatedUser):
+    is_active: bool
+    created_at: datetime
+    last_login_at: datetime | None = None
+
+
+class AdminStudentCreated(BaseModel):
+    user: AdminUserResponse
+    temporary_password: str | None = None
+    email_sent: bool = False

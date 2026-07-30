@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/screens/student_accounts_page.dart';
+import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
 
 class InstructorAssignmentAdmin extends StatefulWidget {
@@ -12,15 +14,14 @@ class InstructorAssignmentAdmin extends StatefulWidget {
 }
 
 class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
-  final _tokenController = TextEditingController();
   List<Map<String, dynamic>> _assignments = [];
-  bool _loading = false;
+  bool _loading = true;
   String? _error;
 
   @override
-  void dispose() {
-    _tokenController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _load();
   }
 
   Future<void> _load() async {
@@ -29,7 +30,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
       _error = null;
     });
     try {
-      final values = await fetchAdminAssignments(_tokenController.text.trim());
+      final values = await fetchAdminAssignments(AuthApi.token ?? '');
       if (mounted) {
         setState(() => _assignments = values);
       }
@@ -48,7 +49,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => AssignmentEditorPage(
-          adminToken: _tokenController.text.trim(),
+          adminToken: AuthApi.token ?? '',
           assignment: assignment,
         ),
       ),
@@ -65,9 +66,19 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
         title: const Text('Instructor assignment studio'),
         actions: [
           IconButton(
+            tooltip: 'Manage student accounts',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const StudentAccountsPage(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.manage_accounts_outlined),
+          ),
+          IconButton(
             tooltip: 'Create assignment',
-            onPressed:
-                _tokenController.text.trim().isEmpty ? null : () => _edit(),
+            onPressed: _loading ? null : () => _edit(),
             icon: const Icon(Icons.add_rounded),
           ),
         ],
@@ -86,39 +97,25 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Use the ADMIN_API_TOKEN configured in backend/.env. '
-                  'This is your private instructor access token, not your '
-                  'OpenAI API key. The token is kept only in this screen. '
+                  'Your instructor login authorizes assignment and student '
+                  'management. '
                   'Publishing is blocked until the reference solution passes '
                   'the hidden grader.',
                 ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _tokenController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Instructor access token',
-                          helperText:
-                              'Copy the value after ADMIN_API_TOKEN= in backend/.env',
-                          border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const StudentAccountsPage(),
                         ),
-                        onChanged: (_) => setState(() {}),
-                        onSubmitted: (_) => _load(),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton.icon(
-                      onPressed:
-                          _loading || _tokenController.text.trim().isEmpty
-                              ? null
-                              : _load,
-                      icon: const Icon(Icons.login_rounded),
-                      label: const Text('Connect'),
-                    ),
-                  ],
+                      );
+                    },
+                    icon: const Icon(Icons.manage_accounts_outlined),
+                    label: const Text('Manage student accounts'),
+                  ),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
@@ -131,7 +128,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
                       : _assignments.isEmpty
                           ? const Center(
                               child: Text(
-                                'Enter your instructor access token to load assignments.',
+                                'No assignments are available yet.',
                               ),
                             )
                           : ListView.separated(
@@ -166,13 +163,11 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
           ),
         ),
       ),
-      floatingActionButton: _tokenController.text.trim().isEmpty
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _edit(),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('New assignment'),
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _loading ? null : () => _edit(),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('New assignment'),
+      ),
     );
   }
 }

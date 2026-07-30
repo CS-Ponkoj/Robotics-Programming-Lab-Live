@@ -49,6 +49,12 @@ venv/
 env/
 backend/*.db
 backend/managed_assets/
+backend/data/study_accounts.json
+backend/data/study_accounts_import_report.json
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/*.sqlite3
+backend/study_exports/
 
 # Ignore Python cache files
 __pycache__/

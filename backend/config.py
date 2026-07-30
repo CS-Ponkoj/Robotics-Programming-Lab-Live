@@ -21,6 +21,17 @@ class Settings(BaseSettings):
     openai_timeout_seconds: float = 7.0
     openai_max_retries: int = 0
     admin_api_token: str | None = None
+    enable_demo_accounts: bool = True
+    study_accounts_file: Path = BASE_DIR / "data" / "study_accounts.json"
+    public_app_url: str = "http://127.0.0.1:8080"
+    auth_session_hours: int = 12
+    password_reset_minutes: int = 30
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str = "Robotics Programming Lab <no-reply@example.invalid>"
+    smtp_use_tls: bool = True
     sandbox_backend: str = "subprocess"
     sandbox_image: str = "robotics-lab-sandbox:latest"
     object_storage_root: Path = BASE_DIR / "managed_assets"

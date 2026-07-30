@@ -7,7 +7,7 @@ const _adminTimeout = Duration(seconds: 20);
 
 Map<String, String> _headers(String token) => {
       'content-type': 'application/json',
-      'X-Admin-Token': token,
+      'Authorization': 'Bearer $token',
     };
 
 Future<List<Map<String, dynamic>>> fetchAdminAssignments(String token) async {
@@ -89,7 +89,8 @@ Future<void> publishAdminAssignment(
 String _errorMessage(http.Response response) {
   try {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return data['error']?.toString() ??
+    return data['detail']?.toString() ??
+        data['error']?.toString() ??
         'Request failed (${response.statusCode}).';
   } on Object {
     return 'Request failed (${response.statusCode}).';

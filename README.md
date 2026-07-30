@@ -14,6 +14,9 @@ interface and a FastAPI assignment, grading, simulation, and tutoring API.
 - Assignment-specific objectives, rubrics, misconceptions, tutor policies, and
   simulation configuration
 - Instructor assignment studio with validation-before-publish
+- Student and instructor login with server-side sessions and role checks
+- Instructor student-account creation, email invitation, reset, and deactivation
+- Optional `study_accounts.json` import for manually managed prototype cohorts
 - PostgreSQL and Redis production services through Docker Compose
 - Docker submission-sandbox adapter with a local subprocess development fallback
 - Legacy `/grade/{id}` and `/assignments/` compatibility routes
@@ -58,13 +61,22 @@ Set-Location .\frontend
 flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000
 ```
 
-The backend seeds the four existing assignments into the database on first start.
+The backend seeds the four existing assignments and two prototype accounts into
+the database on first start:
+
+```text
+Student:    student / student
+Instructor: instructor / instructor
+```
+
+These credentials are for local prototype use only. Create separate accounts
+and deactivate the demo users before a real study or deployment.
 
 ## PostgreSQL, Redis, and Docker
 
-Copy `backend/.env.example` to the ignored `backend/.env` file, replace the
-instructor token, and add the optional OpenAI key there. Compose loads this
-server-only file automatically. Then:
+Copy `backend/.env.example` to the ignored `backend/.env` file and add database,
+email, and optional OpenAI settings. Compose loads this server-only file
+automatically. Then:
 
 ```powershell
 docker compose --profile build build sandbox-image
@@ -87,13 +99,38 @@ POST /assignments/{assignment_id}/hint
 POST /assignments/{assignment_id}/solution
 ```
 
-Instructor routes live under `/admin/assignments` and require `X-Admin-Token`.
-The Flutter landing-page shield icon opens the instructor assignment studio.
+Authentication routes live under `/auth`. Instructor routes under `/admin`
+require an authenticated instructor account. A legacy `X-Admin-Token` remains
+available temporarily for older API clients, but the Flutter interface no
+longer asks for it.
 
 The student assignment endpoints never return `grader_config`, expected values,
 misconceptions used internally by the tutor, reference-solution paths, or the
 worked solution. A solution can be retrieved only using a submission ID for the
 current assignment version.
+
+## Study accounts
+
+Instructors can create, edit, reset, deactivate, and reactivate students from
+the instructor studio. Deactivation preserves attempts and study records.
+Password-reset and activation emails contain one-time links, never reusable
+passwords.
+
+Real email delivery requires the `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+`SMTP_PASSWORD`, and `SMTP_FROM` values supplied by the chosen mail provider in
+the ignored `backend/.env` file. Restart the backend after changing them. The
+Student Accounts screen reports whether delivery is configured and provides a
+**Send test** action. Invitation and instructor-initiated email reset actions
+are blocked when SMTP is missing, so the interface never reports a development
+outbox message as a delivered email.
+
+For small prototype cohorts, copy
+`backend/data/study_accounts.example.json` to the ignored
+`backend/data/study_accounts.json`, edit it in VS Code, and use **Import
+study_accounts.json** on the Student Accounts screen. The database remains the
+login source of truth. Setting `"active": false` deactivates an account;
+removing a row from JSON does not delete it. Any `temporary_password` is hashed
+and cleared from the JSON file after import.
 
 ## AI tutoring
 
