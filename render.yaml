@@ -49,7 +49,10 @@ services:
       - key: SANDBOX_BACKEND
         value: remote
       - key: SANDBOX_URL
-        sync: false
+        fromService:
+          type: web
+          name: robotics-programming-lab-sandbox
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
       - key: SANDBOX_API_TOKEN
         fromService:
           type: web

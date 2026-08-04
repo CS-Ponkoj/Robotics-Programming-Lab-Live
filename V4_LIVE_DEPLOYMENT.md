@@ -36,9 +36,10 @@ Sync the root [`render.yaml`](render.yaml). It defines two services:
 2. `robotics-programming-lab-api`, the authenticated application API.
 
 Render generates and shares `SANDBOX_API_TOKEN` between the services. Because
-Render Free web services cannot receive private-network traffic, copy the
-sandbox service's public HTTPS URL into the API service's `SANDBOX_URL` secret
-when the Blueprint prompts for it. Do not put the token or URL in source.
+Render Free web services cannot receive private-network traffic, the Blueprint
+derives `SANDBOX_URL` from the sandbox service's generated
+`RENDER_EXTERNAL_HOSTNAME`. The backend upgrades that Render hostname to HTTPS.
+Do not put the token or a deployment-specific URL in source.
 
 Supply these values in Render without committing them:
 
@@ -50,7 +51,6 @@ Supply these values in Render without committing them:
 | `PUBLIC_APP_URL` | The same exact Vercel URL |
 | `DEMO_STUDENT_PASSWORD` | Password shared privately with the professor |
 | `DEMO_INSTRUCTOR_PASSWORD` | Password shared privately with the professor |
-| `SANDBOX_URL` | Exact sandbox HTTPS URL, such as `https://robotics-programming-lab-sandbox.onrender.com` |
 
 Render runs `alembic upgrade head` before starting FastAPI. Both services use
 `/health`. Mutable state is stored in Neon, never Render's ephemeral filesystem.

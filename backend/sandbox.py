@@ -161,7 +161,8 @@ class RemoteSandbox:
     ):
         normalized_url = url.strip().rstrip("/")
         if normalized_url and "://" not in normalized_url:
-            normalized_url = f"http://{normalized_url}"
+            scheme = "https" if normalized_url.endswith(".onrender.com") else "http"
+            normalized_url = f"{scheme}://{normalized_url}"
         self.url = normalized_url
         self.api_token = api_token
         self.timeout_seconds = timeout_seconds

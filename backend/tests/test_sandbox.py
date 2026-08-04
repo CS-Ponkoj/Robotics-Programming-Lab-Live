@@ -82,6 +82,33 @@ def test_remote_sandbox_sends_only_execution_data_and_auth_token(monkeypatch):
     }
 
 
+def test_remote_sandbox_uses_https_for_render_external_hostname(monkeypatch):
+    captured = {}
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"success": True, "error": "", "output": "", "values": {}}
+
+    def fake_post(url, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return Response()
+
+    monkeypatch.setattr("sandbox.httpx.post", fake_post)
+    result = RemoteSandbox(
+        "robotics-programming-lab-sandbox.onrender.com",
+        "test-sandbox-token",
+    ).execute("x = 1", ["x"])
+
+    assert result["success"] is True
+    assert captured["url"] == (
+        "https://robotics-programming-lab-sandbox.onrender.com/execute"
+    )
+
+
 def test_remote_sandbox_returns_safe_error_without_leaking_provider_details(
     monkeypatch,
 ):
