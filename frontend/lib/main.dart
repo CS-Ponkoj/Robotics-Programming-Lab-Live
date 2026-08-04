@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
+import 'package:iuse_demo/navigation/browser_entry_stub.dart'
+    if (dart.library.js_interop) 'package:iuse_demo/navigation/browser_entry_web.dart';
 import 'package:iuse_demo/screens/assignment_list.dart';
 import 'package:iuse_demo/screens/login_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
@@ -17,7 +19,12 @@ Future<void> main() async {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+  const MyApp({
+    super.key,
+    this.forceFreshLoginOnStart,
+  });
+
+  final bool? forceFreshLoginOnStart;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -30,7 +37,20 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    _restoreSession();
+    final forceFreshLogin =
+        widget.forceFreshLoginOnStart ?? shouldStartWithFreshLogin(Uri.base);
+    if (forceFreshLogin) {
+      _showFreshLogin();
+    } else {
+      _restoreSession();
+    }
+  }
+
+  Future<void> _showFreshLogin() async {
+    await AuthApi.clearLocalSession();
+    if (mounted) {
+      setState(() => _restoringSession = false);
+    }
   }
 
   Future<void> _restoreSession() async {
@@ -46,8 +66,14 @@ class _MyAppState extends State<MyApp> {
   Future<void> _logout() async {
     await AuthApi.logout();
     if (mounted) {
+      markLoggedOutBrowserEntry();
       setState(() => _user = null);
     }
+  }
+
+  void _onAuthenticated(AuthenticatedUser user) {
+    markAuthenticatedBrowserEntry();
+    setState(() => _user = user);
   }
 
   @override
@@ -73,7 +99,7 @@ class _MyAppState extends State<MyApp> {
             )
           : _user == null
               ? LoginPage(
-                  onAuthenticated: (user) => setState(() => _user = user),
+                  onAuthenticated: _onAuthenticated,
                 )
               : AssignmentListPage(
                   user: _user!,

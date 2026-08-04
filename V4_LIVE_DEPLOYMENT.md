@@ -60,6 +60,15 @@ No database password or OpenAI key belongs in Vercel. After Vercel assigns the
 final URL, update `ALLOWED_ORIGINS` and `PUBLIC_APP_URL` in Render to that exact
 origin and redeploy the backend.
 
+### Browser entry and session behavior
+
+- Opening the public live URL at `/` always clears an old local session and
+  shows the login page.
+- Successful login changes the browser entry to `/#/app`. Refreshing that URL
+  restores the current authenticated session.
+- Signing out returns the browser to `/`, so the next person sees login first.
+- Demo credentials remain private and are never printed on the login page.
+
 ## Release verification
 
 Before promoting a commit:
@@ -77,7 +86,8 @@ flutter build web --release --dart-define=API_BASE_URL=https://api.example.test
 
 Then verify on the live URL:
 
-1. Student and instructor logins work, but credentials are absent from the page.
+1. The public root always opens at login; student and instructor logins work,
+   but credentials are absent from the page.
 2. All four assignments load, including Assignment 1's image.
 3. Run and submit complete once, errors stop correctly, and repeated clicks are bounded.
 4. Hidden grader data and solutions are absent from assignment responses.

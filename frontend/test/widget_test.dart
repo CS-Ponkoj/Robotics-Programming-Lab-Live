@@ -5,9 +5,11 @@ import 'package:iuse_demo/main.dart' as app;
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
+import 'package:iuse_demo/navigation/app_entry_policy.dart';
 import 'package:iuse_demo/screens/assignment_list.dart';
 import 'package:iuse_demo/screens/login_page.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const testAuthenticatedUser = AuthenticatedUser(
   id: 'test-user-id',
@@ -18,6 +20,43 @@ const testAuthenticatedUser = AuthenticatedUser(
 Future<void> testLogout() async {}
 
 void main() {
+  test('only the authenticated app URL restores a browser session', () {
+    expect(
+      isAuthenticatedAppEntry(
+        Uri.parse('https://robotics-programming-lab.vercel.app/'),
+      ),
+      isFalse,
+    );
+    expect(
+      isAuthenticatedAppEntry(
+        Uri.parse('https://robotics-programming-lab.vercel.app/#/app'),
+      ),
+      isTrue,
+    );
+    expect(
+      isAuthenticatedAppEntry(
+        Uri.parse('https://robotics-programming-lab.vercel.app/app'),
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('the public root clears a saved session and shows login',
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'auth_session_token': 'previous-demo-session',
+    });
+
+    await tester.pumpWidget(
+      const app.MyApp(forceFreshLoginOnStart: true),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginPage), findsOneWidget);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getString('auth_session_token'), isNull);
+  });
+
   testWidgets('shared app theme defines the visual system',
       (WidgetTester tester) async {
     await tester.pumpWidget(
