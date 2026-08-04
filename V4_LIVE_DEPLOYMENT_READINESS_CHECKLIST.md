@@ -7,7 +7,7 @@ Target repository: `CS-Ponkoj/Robotics-Programming-Lab`
 Target release: v4 live professor-review prototype
 
 Checklist owner: project developer / SQA reviewer
-Current release decision: **NO-GO until all P0 and P1 items are complete**
+Current release decision: **LIVE for a controlled professor review; NO-GO for broad student or public use until the remaining P0/P1 exceptions are closed**
 
 This is the release gate for putting the current v3 application online without removing working functionality. The existing `Robotics_Programming_Lab_Master_SQA_Checklist.xlsx` remains the general feature checklist; this document adds the v4 hosting, security, persistence, and live-parity gates.
 
@@ -66,6 +66,22 @@ V4 must use the same source code and approved Git SHA locally and online. Hostin
 
 ## 2. Current baseline evidence
 
+### Live deployment evidence added 2026-08-03
+
+| Area | Result | Live evidence |
+|---|---:|---|
+| Release identity | [x] PASS | Render deploys `v4-live` backend release `f54cada6`; Vercel production tracks `v4-live` and serves corrected deployment commit `da0e9a10`. GitHub `v4 verification` passed for both commits. |
+| Live frontend | [x] PASS | `https://robotics-programming-lab.vercel.app` returns HTTP 200 over HTTPS with the SPA rewrite and configured security headers. |
+| Live backend | [x] PASS | `https://robotics-programming-lab-api.onrender.com/health` returns HTTP 200 with API `4.0.0`. |
+| Exact-origin CORS | [x] PASS | Preflight from the production Vercel origin returns the exact `Access-Control-Allow-Origin` value and permits the required methods/headers. |
+| Student smoke | [x] PASS | The login page shows no demo credentials or password-reset link; the student demo logs in, exactly four assignments load, Assignment 1's image loads, AI is OFF, and Run Tests stops with structured evidence (`0 passed`, `4 failed`) for the starter placeholders. |
+| Instructor smoke | [x] PASS | The instructor demo logs in; the assignment studio lists four published versioned assignments; the student-account screen loads the active demo student and exposes the instructor management controls. |
+| Student API contract | [x] PASS | Authenticated live assignment listing returns four assignments and contains none of `hidden_tests`, `official_solution`, or `reference_solution`. |
+| Hosting defect 1 | [x] FIXED | The first Flutter deployment compiled but Vercel could not find the configured artifact. `vercel.json` was corrected from `frontend/.flutter_build/web` to the clean-run output `frontend/build/web`; the next production build passed. |
+| Hosting defect 2 | [x] STABILIZED | One login attempt during the Render redeploy transition received a failed preflight. After the service became healthy, exact-origin preflight and a clean student login passed. The free-tier cold-start/redeploy disclosure remains required. |
+| Demo-password exception | [ ] ACCEPTANCE REQUIRED | The live demo currently preserves the previously requested simple passwords (`student` and `instructor`). Credentials are not displayed, but these passwords are not suitable for an unrestricted public service. Replace them with private strong Render secrets before any real participant study. |
+| Remaining SQA | [ ] OPEN | Full correct-solution coverage for Assignments 1-4, mutation/persistence after restart, mobile/accessibility, hostile-submission live probes, AI-on provider behavior, rollback/restore, and an independent clean-device round remain open. |
+
 ### V4 implementation evidence added 2026-08-03
 
 | Area | Check | Current evidence |
@@ -78,13 +94,13 @@ V4 must use the same source code and approved Git SHA locally and online. Hostin
 | Neon persistence layer | [x] PASS | TLS pooled Neon connection succeeds, Alembic baseline applied, production health returns PostgreSQL, both demo logins seed, and four assignments load. Restart persistence remains a post-deploy test. |
 | Migration compatibility | [x] PASS | Alembic tests pass for both a fresh schema and adoption of an existing v3 schema. SQLite remains the local default. |
 | Production configuration | [x] PASS | Production rejects SQLite, automatic schema creation, and wildcard CORS. Public health is minimal and OpenAPI/docs are disabled. |
-| Render configuration | [x] IMPLEMENTED | `render.yaml` pins Python 3.11 and defines migration, start, health, secret, quota, and feature-flag settings. Live deployment remains pending. |
-| Vercel configuration | [x] IMPLEMENTED | `vercel.json` and a pinned Flutter 3.32.8 build script define the static artifact, SPA fallback, and security headers. Live deployment remains pending. |
+| Render configuration | [x] LIVE | `render.yaml` deployed from `v4-live`; migrations, startup, health, Neon, exact-origin CORS, auth, and assignment APIs passed the live smoke. |
+| Vercel configuration | [x] LIVE | `vercel.json` and the pinned Flutter 3.32.8 script produced the corrected production artifact and the final Vercel domain serves v4. |
 | CI | [x] IMPLEMENTED | GitHub Actions verifies backend tests/dependencies/PostgreSQL migration plus Flutter dependencies/analyzer/tests/release build. First hosted run remains pending. |
 | Local automated gate | [x] PASS | 59 backend tests, `pip check`, 30 Flutter tests, analyzer, and release web build pass. The OneDrive-safe script also completes outside the synced build directory. |
 | Local browser SQA | [x] PASS | Student/instructor login, four assignments, Assignment 1 image, Run Tests completion/error, AI-off default, logout, assignment studio, and email-free student account UI pass with zero browser console warnings/errors. |
 | Secret audit | [x] PASS | No tracked environment folders/files and no OpenAI/Neon credential patterns in tracked files or active `origin/main` history. Ignored `.env` remains untracked. |
-| Remaining go-live gates | [ ] PENDING | Push approved SHA, use strong private live demo passwords, deploy Render/Vercel, exact-origin CORS, live feature matrix, cold-start/restart persistence, and final Excel/SQA report. |
+| Remaining go-live gates | [ ] PENDING | Use strong private live demo passwords, complete the remaining live feature matrix, cold-start/restart persistence, hostile-execution checks, independent SQA, rollback/restore, and the final Excel/SQA report. |
 
 These checks describe the current local version. They do not by themselves approve the live release.
 
