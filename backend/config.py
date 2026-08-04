@@ -14,7 +14,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    environment: str = "development"
     database_url: str = f"sqlite:///{(BASE_DIR / 'robotics_lab.db').as_posix()}"
+    auto_create_schema: bool = True
     redis_url: str = "redis://127.0.0.1:6379/0"
     openai_api_key: str | None = None
     openai_hint_model: str = "gpt-4.1-mini"
@@ -22,6 +24,10 @@ class Settings(BaseSettings):
     openai_max_retries: int = 0
     admin_api_token: str | None = None
     enable_demo_accounts: bool = True
+    enable_password_reset: bool = False
+    enable_email_features: bool = False
+    demo_student_password: str = "student"
+    demo_instructor_password: str = "instructor"
     study_accounts_file: Path = BASE_DIR / "data" / "study_accounts.json"
     public_app_url: str = "http://127.0.0.1:8080"
     auth_session_hours: int = 12
@@ -36,7 +42,11 @@ class Settings(BaseSettings):
     sandbox_image: str = "robotics-lab-sandbox:latest"
     object_storage_root: Path = BASE_DIR / "managed_assets"
     max_submission_chars: int = 50_000
+    max_request_bytes: int = 100_000
     execution_timeout_seconds: float = 5.0
+    max_concurrent_executions: int = 2
+    execution_requests_per_minute: int = 30
+    tutor_requests_per_minute: int = 10
     allowed_origins: str = "*"
 
     @property
@@ -48,6 +58,21 @@ class Settings(BaseSettings):
             for origin in self.allowed_origins.split(",")
             if origin.strip()
         ]
+
+    def validate_runtime(self) -> None:
+        if self.environment.lower() != "production":
+            return
+        problems = []
+        if self.database_url.startswith("sqlite"):
+            problems.append("DATABASE_URL must use PostgreSQL")
+        if self.auto_create_schema:
+            problems.append("AUTO_CREATE_SCHEMA must be false")
+        if self.allowed_origins.strip() == "*":
+            problems.append("ALLOWED_ORIGINS must name the deployed frontend")
+        if problems:
+            raise RuntimeError(
+                "Invalid production configuration: " + "; ".join(problems)
+            )
 
 
 @lru_cache

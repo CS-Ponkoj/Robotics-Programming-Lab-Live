@@ -11,7 +11,16 @@ class Base(DeclarativeBase):
     pass
 
 
+def normalize_database_url(database_url: str) -> str:
+    if database_url.startswith("postgresql://"):
+        return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    return database_url
+
+
 def build_engine(database_url: str):
+    database_url = normalize_database_url(database_url)
     arguments = {}
     poolclass = None
     if database_url.startswith("sqlite"):

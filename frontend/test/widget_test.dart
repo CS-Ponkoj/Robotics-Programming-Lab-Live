@@ -440,6 +440,31 @@ void main() {
     expect(find.byIcon(Icons.admin_panel_settings_outlined), findsNothing);
   });
 
+  testWidgets('account menu waits for logout without leaving a popup route',
+      (WidgetTester tester) async {
+    var logoutCalls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          appBar: LandingPageHeader(
+            user: testAuthenticatedUser,
+            onLogout: () async {
+              logoutCalls += 1;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Account menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(logoutCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('instructor header exposes role-authorized management',
       (WidgetTester tester) async {
     await tester.pumpWidget(
@@ -471,7 +496,9 @@ void main() {
     expect(find.byKey(const Key('login-id-field')), findsOneWidget);
     expect(find.byKey(const Key('login-password-field')), findsOneWidget);
     expect(find.byKey(const Key('login-submit-button')), findsOneWidget);
-    expect(find.textContaining('Student: student / student'), findsOneWidget);
+    expect(find.textContaining('student / student'), findsNothing);
+    expect(find.textContaining('instructor / instructor'), findsNothing);
+    expect(find.text('Forgot password?'), findsNothing);
   });
 
   testWidgets('landing page content is centered and width constrained',

@@ -15,7 +15,7 @@ interface and a FastAPI assignment, grading, simulation, and tutoring API.
   simulation configuration
 - Instructor assignment studio with validation-before-publish
 - Student and instructor login with server-side sessions and role checks
-- Instructor student-account creation, email invitation, reset, and deactivation
+- Instructor student-account creation, manual password reset, and deactivation
 - Optional `study_accounts.json` import for manually managed prototype cohorts
 - PostgreSQL and Redis production services through Docker Compose
 - Docker submission-sandbox adapter with a local subprocess development fallback
@@ -69,8 +69,12 @@ Student:    student / student
 Instructor: instructor / instructor
 ```
 
-These credentials are for local prototype use only. Create separate accounts
-and deactivate the demo users before a real study or deployment.
+The login page does not display these credentials. Override both passwords with
+server-side environment variables before sharing a live URL beyond the approved
+professor demo.
+
+The v4 deployment and local-parity instructions are in
+[`V4_LIVE_DEPLOYMENT.md`](V4_LIVE_DEPLOYMENT.md).
 
 ## PostgreSQL, Redis, and Docker
 
@@ -113,13 +117,14 @@ current assignment version.
 
 Instructors can create, edit, reset, deactivate, and reactivate students from
 the instructor studio. Deactivation preserves attempts and study records.
-Password-reset and activation emails contain one-time links, never reusable
-passwords.
+The v4 professor demo uses instructor-managed passwords. Self-service reset and
+email-delivery controls remain implemented but disabled by default.
 
-Real email delivery requires the `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+If those deferred features are enabled later, real email delivery requires the
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
 `SMTP_PASSWORD`, and `SMTP_FROM` values supplied by the chosen mail provider in
 the ignored `backend/.env` file. Restart the backend after changing them. The
-Student Accounts screen reports whether delivery is configured and provides a
+Student Accounts screen can report whether delivery is configured and provide a
 **Send test** action. Invitation and instructor-initiated email reset actions
 are blocked when SMTP is missing, so the interface never reports a development
 outbox message as a delivered email.

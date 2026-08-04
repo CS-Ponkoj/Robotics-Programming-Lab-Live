@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/feature_flags.dart';
 import 'package:iuse_demo/services/student_admin_api.dart';
 
 class StudentAccountsPage extends StatefulWidget {
@@ -27,7 +28,9 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     });
     try {
       final students = await fetchStudents();
-      final emailStatus = await fetchEmailStatus();
+      final emailStatus = instructorEmailToolsEnabled
+          ? await fetchEmailStatus()
+          : const <String, dynamic>{'configured': false};
       if (mounted) {
         setState(() {
           _students = students;
@@ -74,7 +77,8 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                 final created = await createStudent(
                   loginId: loginController.text.trim(),
                   temporaryPassword: sendEmail ? null : passwordController.text,
-                  email: emailController.text,
+                  email:
+                      instructorEmailToolsEnabled ? emailController.text : null,
                   participantCode: participantController.text,
                   sendInvitationEmail: sendEmail,
                 );
@@ -121,28 +125,30 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                             border: OutlineInputBorder(),
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: emailController,
-                          enabled: !saving,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: sendEmail
-                                ? 'Email address'
-                                : 'Email (optional)',
-                            border: const OutlineInputBorder(),
+                        if (instructorEmailToolsEnabled) ...[
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: emailController,
+                            enabled: !saving,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              labelText: sendEmail
+                                  ? 'Email address'
+                                  : 'Email (optional)',
+                              border: const OutlineInputBorder(),
+                            ),
+                            validator: (value) {
+                              final email = value?.trim() ?? '';
+                              if (sendEmail && email.isEmpty) {
+                                return 'Email is required for an invitation.';
+                              }
+                              if (email.isNotEmpty && !email.contains('@')) {
+                                return 'Enter a valid email address.';
+                              }
+                              return null;
+                            },
                           ),
-                          validator: (value) {
-                            final email = value?.trim() ?? '';
-                            if (sendEmail && email.isEmpty) {
-                              return 'Email is required for an invitation.';
-                            }
-                            if (email.isNotEmpty && !email.contains('@')) {
-                              return 'Enter a valid email address.';
-                            }
-                            return null;
-                          },
-                        ),
+                        ],
                         const SizedBox(height: 14),
                         TextFormField(
                           controller: passwordController,
@@ -164,21 +170,22 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                             return null;
                           },
                         ),
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          value: sendEmail,
-                          onChanged: saving || !emailConfigured
-                              ? null
-                              : (value) => setDialogState(
-                                    () => sendEmail = value ?? false,
-                                  ),
-                          title: const Text('Send one-time activation link'),
-                          subtitle: Text(
-                            emailConfigured
-                                ? 'No reusable password is sent by email.'
-                                : 'Configure SMTP in backend/.env first.',
+                        if (instructorEmailToolsEnabled)
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: sendEmail,
+                            onChanged: saving || !emailConfigured
+                                ? null
+                                : (value) => setDialogState(
+                                      () => sendEmail = value ?? false,
+                                    ),
+                            title: const Text('Send one-time activation link'),
+                            subtitle: Text(
+                              emailConfigured
+                                  ? 'No reusable password is sent by email.'
+                                  : 'Email delivery is not configured.',
+                            ),
                           ),
-                        ),
                         if (dialogError != null)
                           Text(
                             dialogError!,
@@ -289,7 +296,8 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
             try {
               await updateStudent(
                 student['id'] as String,
-                email: emailController.text,
+                email:
+                    instructorEmailToolsEnabled ? emailController.text : null,
                 participantCode: participantController.text,
               );
               if (dialogContext.mounted) {
@@ -320,21 +328,23 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: emailController,
-                      enabled: !saving,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
+                    if (instructorEmailToolsEnabled) ...[
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: emailController,
+                        enabled: !saving,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          final email = value?.trim() ?? '';
+                          return email.isNotEmpty && !email.contains('@')
+                              ? 'Enter a valid email address.'
+                              : null;
+                        },
                       ),
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
-                        return email.isNotEmpty && !email.contains('@')
-                            ? 'Enter a valid email address.'
-                            : null;
-                      },
-                    ),
+                    ],
                     if (dialogError != null) ...[
                       const SizedBox(height: 12),
                       Text(
@@ -435,19 +445,20 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                       border: OutlineInputBorder(),
                     ),
                   ),
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: sendEmail,
-                    onChanged: saving || !emailConfigured
-                        ? null
-                        : (value) => setDialogState(
-                              () => sendEmail = value ?? false,
-                            ),
-                    title: const Text('Send one-time reset link by email'),
-                    subtitle: emailConfigured
-                        ? null
-                        : const Text('Configure SMTP in backend/.env first.'),
-                  ),
+                  if (instructorEmailToolsEnabled)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: sendEmail,
+                      onChanged: saving || !emailConfigured
+                          ? null
+                          : (value) => setDialogState(
+                                () => sendEmail = value ?? false,
+                              ),
+                      title: const Text('Send one-time reset link by email'),
+                      subtitle: emailConfigured
+                          ? null
+                          : const Text('Email delivery is not configured.'),
+                    ),
                   if (dialogError != null)
                     Text(
                       dialogError!,
@@ -653,47 +664,51 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Create login credentials, connect optional participant '
-                  'codes and email addresses, reset access, or deactivate an '
-                  'account while preserving its study data.',
+                Text(
+                  instructorEmailToolsEnabled
+                      ? 'Create login credentials, connect optional participant '
+                          'codes and email addresses, reset access, or deactivate '
+                          'an account while preserving its study data.'
+                      : 'Create login credentials, connect optional participant '
+                          'codes, reset access, or deactivate an account while '
+                          'preserving its study data.',
                 ),
-                const SizedBox(height: 16),
-                Card(
-                  color: emailConfigured
-                      ? Colors.green.shade50
-                      : Colors.orange.shade50,
-                  child: ListTile(
-                    leading: Icon(
-                      emailConfigured
-                          ? Icons.mark_email_read_outlined
-                          : Icons.mark_email_unread_outlined,
-                      color: emailConfigured
-                          ? Colors.green.shade800
-                          : Colors.orange.shade900,
+                if (instructorEmailToolsEnabled) ...[
+                  const SizedBox(height: 16),
+                  Card(
+                    color: emailConfigured
+                        ? Colors.green.shade50
+                        : Colors.orange.shade50,
+                    child: ListTile(
+                      leading: Icon(
+                        emailConfigured
+                            ? Icons.mark_email_read_outlined
+                            : Icons.mark_email_unread_outlined,
+                        color: emailConfigured
+                            ? Colors.green.shade800
+                            : Colors.orange.shade900,
+                      ),
+                      title: Text(
+                        emailConfigured
+                            ? 'Real email delivery is configured'
+                            : 'Real email delivery is not configured',
+                      ),
+                      subtitle: Text(
+                        emailConfigured
+                            ? '${_emailStatus['host']}:${_emailStatus['port']} • '
+                                '${_emailStatus['sender']}'
+                            : 'Configure email delivery before using invitations.',
+                      ),
+                      trailing: emailConfigured
+                          ? TextButton.icon(
+                              onPressed: _loading ? null : _testEmailDelivery,
+                              icon: const Icon(Icons.outgoing_mail),
+                              label: const Text('Send test'),
+                            )
+                          : null,
                     ),
-                    title: Text(
-                      emailConfigured
-                          ? 'Real email delivery is configured'
-                          : 'Real email delivery is not configured',
-                    ),
-                    subtitle: Text(
-                      emailConfigured
-                          ? '${_emailStatus['host']}:${_emailStatus['port']} • '
-                              '${_emailStatus['sender']}'
-                          : 'Add SMTP_HOST, SMTP_PORT, SMTP_USERNAME, '
-                              'SMTP_PASSWORD, and SMTP_FROM to backend/.env, '
-                              'then restart the backend.',
-                    ),
-                    trailing: emailConfigured
-                        ? TextButton.icon(
-                            onPressed: _loading ? null : _testEmailDelivery,
-                            icon: const Icon(Icons.outgoing_mail),
-                            label: const Text('Send test'),
-                          )
-                        : null,
                   ),
-                ),
+                ],
                 const SizedBox(height: 20),
                 if (_error != null) ...[
                   Text(
@@ -742,7 +757,8 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                       subtitle: Text(
                                         [
                                           student['participant_code'],
-                                          student['email'],
+                                          if (instructorEmailToolsEnabled)
+                                            student['email'],
                                           active ? 'Active' : 'Inactive',
                                         ]
                                             .where(

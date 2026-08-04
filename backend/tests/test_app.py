@@ -57,6 +57,14 @@ def client(tmp_path):
         study_accounts_file=tmp_path / "study_accounts.json",
     )
     with TestClient(create_app(settings=settings, database_url="sqlite://")) as value:
+        login = value.post(
+            "/auth/login",
+            json={"login_id": "student", "password": "student"},
+        )
+        assert login.status_code == 200
+        value.headers.update(
+            {"Authorization": f"Bearer {login.json()['token']}"}
+        )
         yield value
 
 
@@ -65,10 +73,140 @@ def test_health_reports_fastapi_platform(client):
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "api_version": "2.0.0",
+        "api_version": "4.0.0",
         "database": "sqlite",
         "sandbox": "subprocess",
     }
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+
+
+def test_production_configuration_rejects_ephemeral_or_open_defaults(tmp_path):
+    settings = Settings(
+        environment="production",
+        database_url=f"sqlite:///{(tmp_path / 'unsafe.db').as_posix()}",
+        auto_create_schema=True,
+        allowed_origins="*",
+    )
+
+    with pytest.raises(RuntimeError, match="Invalid production configuration"):
+        create_app(settings=settings)
+
+
+def test_cors_allows_only_the_configured_frontend(tmp_path):
+    settings = Settings(
+        database_url="sqlite://",
+        allowed_origins="https://approved.example.test",
+        study_accounts_file=tmp_path / "study_accounts.json",
+    )
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as value:
+        allowed = value.options(
+            "/auth/login",
+            headers={
+                "Origin": "https://approved.example.test",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        rejected = value.options(
+            "/auth/login",
+            headers={
+                "Origin": "https://untrusted.example.test",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+
+    assert allowed.status_code == 200
+    assert (
+        allowed.headers["Access-Control-Allow-Origin"]
+        == "https://approved.example.test"
+    )
+    assert "Access-Control-Allow-Origin" not in rejected.headers
+
+
+def test_assignment_routes_require_authentication(client):
+    authorization = client.headers.pop("Authorization")
+    try:
+        requests = [
+            client.get("/assignments"),
+            client.get("/assignments/2"),
+            client.post("/assignments/2/run", json={"code": "print('hello')"}),
+            client.post("/assignments/2/submit", json={"code": "answer = 1"}),
+            client.post(
+                "/assignments/2/hint",
+                json={"submission_id": "missing", "hint_level": 1},
+            ),
+            client.post(
+                "/assignments/2/solution",
+                json={"submission_id": "missing"},
+            ),
+        ]
+    finally:
+        client.headers["Authorization"] = authorization
+
+    assert all(response.status_code == 401 for response in requests)
+
+
+def test_execution_rate_limit_returns_retry_guidance(tmp_path):
+    settings = Settings(
+        database_url="sqlite://",
+        openai_api_key=None,
+        study_accounts_file=tmp_path / "study_accounts.json",
+        execution_requests_per_minute=2,
+    )
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as value:
+        login = value.post(
+            "/auth/login",
+            json={"login_id": "student", "password": "student"},
+        )
+        headers = {"Authorization": f"Bearer {login.json()['token']}"}
+        first = value.post(
+            "/assignments/2/run",
+            headers=headers,
+            json={"code": "print('first')"},
+        )
+        second = value.post(
+            "/assignments/2/run",
+            headers=headers,
+            json={"code": "print('second')"},
+        )
+        blocked = value.post(
+            "/assignments/2/run",
+            headers=headers,
+            json={"code": "print('third')"},
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert blocked.status_code == 429
+    assert blocked.headers["Retry-After"]
+    assert blocked.json()["error"] == "Too many requests. Please wait and try again."
+
+
+def test_execution_concurrency_limit_fails_fast(client):
+    assert client.app.state.execution_slots.acquire(blocking=False)
+    assert client.app.state.execution_slots.acquire(blocking=False)
+    try:
+        blocked = client.post(
+            "/assignments/2/run",
+            json={"code": "print('busy')"},
+        )
+    finally:
+        client.app.state.execution_slots.release()
+        client.app.state.execution_slots.release()
+
+    assert blocked.status_code == 503
+    assert blocked.headers["Retry-After"] == "2"
+
+
+def test_request_body_limit_rejects_oversized_payload_before_parsing(client):
+    response = client.post(
+        "/auth/login",
+        headers={"content-length": "100001"},
+        json={"login_id": "student", "password": "student"},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["error"] == "Request body is too large."
 
 
 def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
@@ -282,7 +420,11 @@ def test_legacy_grade_route_preserves_flutter_contract(client):
 
 
 def test_admin_requires_token_and_validates_before_publish(client):
-    unauthorized = client.get("/admin/assignments")
+    authorization = client.headers.pop("Authorization")
+    try:
+        unauthorized = client.get("/admin/assignments")
+    finally:
+        client.headers["Authorization"] = authorization
     assert unauthorized.status_code == 401
 
     headers = {"X-Admin-Token": "test-admin"}

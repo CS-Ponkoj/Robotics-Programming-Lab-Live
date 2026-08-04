@@ -1,4 +1,7 @@
 import logging
+import os
+import threading
+import time
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -76,16 +79,23 @@ def create_app(
     database_url: str | None = None,
 ) -> FastAPI:
     configured = settings or get_settings()
+    configured.validate_runtime()
     selected_database_url = database_url or configured.database_url
     engine = build_engine(selected_database_url)
     local_session = sessionmaker(bind=engine, expire_on_commit=False)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
-        Base.metadata.create_all(engine)
+        if configured.auto_create_schema:
+            Base.metadata.create_all(engine)
         with local_session() as session:
             AssignmentRepository(session).sync_seed_assignments()
-            seed_demo_accounts(session, configured.enable_demo_accounts)
+            seed_demo_accounts(
+                session,
+                configured.enable_demo_accounts,
+                student_password=configured.demo_student_password,
+                instructor_password=configured.demo_instructor_password,
+            )
             application.state.account_import_report = sync_accounts_from_json(
                 session, configured.study_accounts_file
             )
@@ -94,13 +104,25 @@ def create_app(
 
     application = FastAPI(
         title="Robotics Programming Lab API",
-        version="2.0.0",
+        version="4.0.0",
         lifespan=lifespan,
+        docs_url=None if configured.environment.lower() == "production" else "/docs",
+        redoc_url=None if configured.environment.lower() == "production" else "/redoc",
+        openapi_url=(
+            None
+            if configured.environment.lower() == "production"
+            else "/openapi.json"
+        ),
     )
     application.state.settings = configured
     application.state.SessionLocal = local_session
     application.state.email_outbox = []
     application.state.login_failures = {}
+    application.state.rate_limits = {}
+    application.state.rate_limit_lock = threading.Lock()
+    application.state.execution_slots = threading.BoundedSemaphore(
+        configured.max_concurrent_executions
+    )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=configured.cors_origins,
@@ -109,11 +131,37 @@ def create_app(
         allow_headers=["*"],
     )
 
+    @application.middleware("http")
+    async def security_headers(request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                request_bytes = int(content_length)
+            except ValueError:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Invalid Content-Length header."},
+                )
+            if request_bytes > configured.max_request_bytes:
+                return JSONResponse(
+                    status_code=413,
+                    content={"error": "Request body is too large."},
+                )
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=()"
+        )
+        return response
+
     @application.exception_handler(HTTPException)
     async def http_error(_request: Request, error: HTTPException):
         return JSONResponse(
             status_code=error.status_code,
             content={"error": str(error.detail)},
+            headers=error.headers,
         )
 
     @application.exception_handler(RequestValidationError)
@@ -143,18 +191,58 @@ def create_app(
             raise HTTPException(401, "Authentication required.")
         return user
 
-    def optional_user(
-        request: Request,
-        session: Session = Depends(session_dependency),
-    ) -> User | None:
-        return user_for_session_token(session, bearer_token(request))
-
     def instructor_user(
         user: User = Depends(current_user),
     ) -> User:
         if user.role != "instructor":
             raise HTTPException(403, "Instructor access required.")
         return user
+
+    def enforce_rate_limit(
+        request: Request,
+        user: User,
+        *,
+        bucket: str,
+        requests_per_minute: int,
+    ) -> None:
+        if requests_per_minute <= 0:
+            return
+        forwarded = request.headers.get("x-forwarded-for", "")
+        client_ip = forwarded.split(",", 1)[0].strip()
+        if not client_ip:
+            client_ip = request.client.host if request.client else "unknown"
+        key = f"{bucket}:{user.id}:{client_ip}"
+        now = time.monotonic()
+        cutoff = now - 60.0
+        with request.app.state.rate_limit_lock:
+            recent = [
+                timestamp
+                for timestamp in request.app.state.rate_limits.get(key, [])
+                if timestamp >= cutoff
+            ]
+            if len(recent) >= requests_per_minute:
+                retry_after = max(1, int(60 - (now - recent[0])))
+                request.app.state.rate_limits[key] = recent
+                raise HTTPException(
+                    429,
+                    "Too many requests. Please wait and try again.",
+                    headers={"Retry-After": str(retry_after)},
+                )
+            recent.append(now)
+            request.app.state.rate_limits[key] = recent
+
+    def execute_with_capacity(request: Request, operation):
+        slots = request.app.state.execution_slots
+        if not slots.acquire(blocking=False):
+            raise HTTPException(
+                503,
+                "The grader is busy. Please try again shortly.",
+                headers={"Retry-After": "2"},
+            )
+        try:
+            return operation()
+        finally:
+            slots.release()
 
     def admin_dependency(
         request: Request,
@@ -254,7 +342,7 @@ def create_app(
         body: SubmissionRequest,
         mode: str,
         result,
-        user: User | None = None,
+        user: User,
     ) -> Submission:
         evidence = {
             "execution_succeeded": result.execution_succeeded,
@@ -268,7 +356,7 @@ def create_app(
         submission = Submission(
             assignment_id=assignment.id,
             assignment_version=assignment.version,
-            student_id=user.login_id if user is not None else body.student_id,
+            student_id=user.login_id,
             mode=mode,
             code=body.code,
             execution_succeeded=result.execution_succeeded,
@@ -310,12 +398,26 @@ def create_app(
 
     @application.get("/health")
     def health():
-        return {
+        try:
+            with engine.connect() as connection:
+                connection.execute(select(1))
+        except Exception as error:
+            logger.exception("Database health check failed.")
+            raise HTTPException(503, "Database unavailable.") from error
+        response = {
             "status": "ok",
-            "api_version": "2.0.0",
-            "database": engine.dialect.name,
-            "sandbox": configured.sandbox_backend,
+            "api_version": "4.0.0",
         }
+        if configured.environment.lower() == "production":
+            response["release"] = os.getenv("RENDER_GIT_COMMIT", "unknown")[:12]
+        else:
+            response.update(
+                {
+                    "database": engine.dialect.name,
+                    "sandbox": configured.sandbox_backend,
+                }
+            )
+        return response
 
     @application.post("/auth/login", response_model=LoginResponse)
     def login(
@@ -400,6 +502,8 @@ def create_app(
         request: Request,
         session: Session = Depends(session_dependency),
     ):
+        if not request.app.state.settings.enable_password_reset:
+            raise HTTPException(404, "Not found.")
         identifier = body.identifier.strip().lower()
         user = session.scalar(
             select(User).where(
@@ -431,8 +535,11 @@ def create_app(
     @application.post("/auth/reset-password")
     def reset_password(
         body: ResetPasswordRequest,
+        request: Request,
         session: Session = Depends(session_dependency),
     ):
+        if not request.app.state.settings.enable_password_reset:
+            raise HTTPException(404, "Not found.")
         consumed = consume_password_reset_token(session, body.token)
         if consumed is None:
             raise HTTPException(400, "The password reset link is invalid or expired.")
@@ -456,7 +563,10 @@ def create_app(
         response_model=AssignmentListResponse,
         include_in_schema=False,
     )
-    def list_assignments(session: Session = Depends(session_dependency)):
+    def list_assignments(
+        session: Session = Depends(session_dependency),
+        _user: User = Depends(current_user),
+    ):
         assignments = AssignmentRepository(session).list_published()
         return {"assignments": [to_student_assignment(item) for item in assignments]}
 
@@ -465,7 +575,9 @@ def create_app(
         response_model=AssignmentStudent,
     )
     def get_assignment(
-        assignment_id: int, session: Session = Depends(session_dependency)
+        assignment_id: int,
+        session: Session = Depends(session_dependency),
+        _user: User = Depends(current_user),
     ):
         return to_student_assignment(get_assignment_or_404(session, assignment_id))
 
@@ -475,11 +587,21 @@ def create_app(
         body: SubmissionRequest,
         request: Request,
         session: Session = Depends(session_dependency),
-        user: User | None = Depends(optional_user),
+        user: User = Depends(current_user),
     ):
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="execution",
+            requests_per_minute=request.app.state.settings.execution_requests_per_minute,
+        )
         require_code(body, request)
         assignment = get_assignment_or_404(session, assignment_id)
-        result = grader_for(assignment, request).run(assignment, body.code)
+        grader = grader_for(assignment, request)
+        result = execute_with_capacity(
+            request,
+            lambda: grader.run(assignment, body.code),
+        )
         submission = store_submission(
             session, assignment, body, "run", result, user=user
         )
@@ -490,11 +612,28 @@ def create_app(
         body: SubmissionRequest,
         request: Request,
         session: Session,
-        user: User | None = None,
+        user: User,
     ):
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="execution",
+            requests_per_minute=request.app.state.settings.execution_requests_per_minute,
+        )
+        if body.use_ai_tutor:
+            enforce_rate_limit(
+                request,
+                user,
+                bucket="tutor",
+                requests_per_minute=request.app.state.settings.tutor_requests_per_minute,
+            )
         require_code(body, request)
         assignment = get_assignment_or_404(session, assignment_id)
-        result = grader_for(assignment, request).grade(assignment, body.code)
+        grader = grader_for(assignment, request)
+        result = execute_with_capacity(
+            request,
+            lambda: grader.grade(assignment, body.code),
+        )
         submission = store_submission(
             session, assignment, body, "submit", result, user=user
         )
@@ -519,7 +658,7 @@ def create_app(
         body: SubmissionRequest,
         request: Request,
         session: Session = Depends(session_dependency),
-        user: User | None = Depends(optional_user),
+        user: User = Depends(current_user),
     ):
         return submit_core(assignment_id, body, request, session, user)
 
@@ -529,7 +668,7 @@ def create_app(
         body: SubmissionRequest,
         request: Request,
         session: Session = Depends(session_dependency),
-        user: User | None = Depends(optional_user),
+        user: User = Depends(current_user),
     ):
         return submit_core(assignment_id, body, request, session, user)
 
@@ -539,8 +678,14 @@ def create_app(
         body: HintRequest,
         request: Request,
         session: Session = Depends(session_dependency),
-        user: User | None = Depends(optional_user),
+        user: User = Depends(current_user),
     ):
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="tutor",
+            requests_per_minute=request.app.state.settings.tutor_requests_per_minute,
+        )
         assignment = get_assignment_or_404(session, assignment_id)
         submission = session.scalar(
             select(Submission).where(
@@ -550,7 +695,7 @@ def create_app(
         )
         if submission is None:
             raise HTTPException(404, "Submission not found.")
-        if user is not None and submission.student_id != user.login_id:
+        if submission.student_id != user.login_id:
             raise HTTPException(404, "Submission not found.")
         feedback = TutorService(request.app.state.settings).feedback(
             assignment, submission, hint_level=body.hint_level
@@ -570,7 +715,7 @@ def create_app(
         assignment_id: int,
         body: SolutionRequest,
         session: Session = Depends(session_dependency),
-        user: User | None = Depends(optional_user),
+        user: User = Depends(current_user),
     ):
         assignment = get_assignment_or_404(session, assignment_id)
         submission = session.scalar(
@@ -585,7 +730,7 @@ def create_app(
                 403,
                 "Run or submit this assignment version before revealing its solution.",
             )
-        if user is not None and submission.student_id != user.login_id:
+        if submission.student_id != user.login_id:
             raise HTTPException(
                 403,
                 "Run or submit this assignment version before revealing its solution.",
@@ -718,6 +863,8 @@ def create_app(
         session: Session = Depends(session_dependency),
         actor: User | None = Depends(admin_dependency),
     ):
+        if body.send_invitation_email and not request.app.state.settings.enable_email_features:
+            raise HTTPException(404, "Not found.")
         email = normalize_email(body.email)
         if email and ("@" not in email or email.startswith("@") or email.endswith("@")):
             raise HTTPException(400, "Enter a valid email address.")
@@ -848,6 +995,8 @@ def create_app(
         if user is None or user.role != "student":
             raise HTTPException(404, "Student account not found.")
         if body.send_email:
+            if not request.app.state.settings.enable_email_features:
+                raise HTTPException(404, "Not found.")
             if not user.email:
                 raise HTTPException(400, "The student has no email address.")
             email_service = EmailService(
@@ -916,6 +1065,8 @@ def create_app(
         request: Request,
         _actor: User | None = Depends(admin_dependency),
     ):
+        if not request.app.state.settings.enable_email_features:
+            raise HTTPException(404, "Not found.")
         return EmailService(
             request.app.state.settings, request.app.state.email_outbox
         ).status()
@@ -927,6 +1078,8 @@ def create_app(
         actor: User | None = Depends(admin_dependency),
         session: Session = Depends(session_dependency),
     ):
+        if not request.app.state.settings.enable_email_features:
+            raise HTTPException(404, "Not found.")
         recipient = normalize_email(body.recipient)
         if not recipient or "@" not in recipient:
             raise HTTPException(400, "Enter a valid recipient email address.")

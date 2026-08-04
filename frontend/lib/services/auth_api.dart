@@ -5,7 +5,7 @@ import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const _authTimeout = Duration(seconds: 15);
+const _authTimeout = Duration(seconds: 75);
 const _tokenStorageKey = 'auth_session_token';
 
 class AuthSession {

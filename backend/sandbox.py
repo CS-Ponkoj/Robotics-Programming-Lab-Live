@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 from typing import Protocol
 
 
@@ -21,16 +22,34 @@ class SubprocessSandbox:
     def execute(self, code: str, result_names: list[str]) -> dict:
         request_data = json.dumps({"code": code, "result_names": result_names})
         creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        child_environment = {
+            key: value
+            for key, value in os.environ.items()
+            if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR"}
+        }
+        child_environment.update(
+            {
+                "OPENBLAS_NUM_THREADS": "1",
+                "OMP_NUM_THREADS": "1",
+                "PYTHONHASHSEED": "0",
+                "PYTHONIOENCODING": "utf-8",
+            }
+        )
+        resource_limits = _linux_resource_limits if os.name != "nt" else None
         try:
-            completed = subprocess.run(
-                [sys.executable, "-I", str(WORKER_PATH)],
-                input=request_data,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_seconds,
-                check=False,
-                creationflags=creation_flags,
-            )
+            with tempfile.TemporaryDirectory(prefix="robotics-submission-") as workdir:
+                completed = subprocess.run(
+                    [sys.executable, "-I", str(WORKER_PATH)],
+                    input=request_data,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout_seconds,
+                    check=False,
+                    cwd=workdir,
+                    env=child_environment,
+                    creationflags=creation_flags,
+                    preexec_fn=resource_limits,
+                )
         except subprocess.TimeoutExpired:
             return {
                 "success": False,
@@ -57,6 +76,19 @@ class SubprocessSandbox:
                 "output": "",
                 "values": {},
             }
+
+
+def _linux_resource_limits() -> None:
+    """Apply defense-in-depth limits inside the short-lived Linux worker."""
+    import resource
+
+    memory_bytes = 384 * 1024 * 1024
+    resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
+    resource.setrlimit(resource.RLIMIT_CPU, (6, 6))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (1024 * 1024, 1024 * 1024))
+    resource.setrlimit(resource.RLIMIT_NOFILE, (32, 32))
+    if hasattr(resource, "RLIMIT_NPROC"):
+        resource.setrlimit(resource.RLIMIT_NPROC, (16, 16))
 
 
 class DockerSandbox:

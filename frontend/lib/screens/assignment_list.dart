@@ -543,9 +543,10 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
           padding: const EdgeInsets.only(right: AppSpacing.md),
           child: PopupMenuButton<String>(
             tooltip: 'Account menu',
-            onSelected: (value) {
+            onSelected: (value) async {
               if (value == 'logout') {
-                onLogout();
+                await Future<void>.delayed(Duration.zero);
+                await onLogout();
               }
             },
             itemBuilder: (context) => [

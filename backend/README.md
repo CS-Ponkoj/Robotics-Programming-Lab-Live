@@ -42,7 +42,8 @@ row does nothing, while `"active": false` deactivates an account.
 `temporary_password` values are hashed and removed from the JSON file after a
 successful import.
 
-Configure SMTP settings in `.env` to deliver one-time activation and reset
+Email/reset features are disabled by default for the v4 professor demo. If they
+are enabled in a later release, configure SMTP settings in `.env` to deliver one-time activation and reset
 links. When SMTP is not configured, development messages stay in the in-memory
 test outbox and no email is delivered. `GET /admin/email/status` reports the
 configuration without exposing credentials, and `POST /admin/email/test` sends

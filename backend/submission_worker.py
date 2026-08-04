@@ -1,5 +1,6 @@
 """Execute one student submission in a short-lived isolated Python process."""
 
+import ast
 from contextlib import redirect_stdout
 import io
 import json
@@ -9,6 +10,91 @@ import traceback
 
 ALLOWED_IMPORTS = frozenset({"math", "numpy", "scipy"})
 MAX_OUTPUT_CHARS = 20_000
+ALLOWED_MODULE_ATTRIBUTES = {
+    "math": {
+        "acos", "asin", "atan", "atan2", "ceil", "cos", "degrees", "e",
+        "exp", "fabs", "floor", "hypot", "inf", "isclose", "log", "log10",
+        "pi", "radians", "sin", "sqrt", "tan", "tau",
+    },
+    "numpy": {
+        "abs", "arange", "cos", "degrees", "e", "exp", "linspace", "pi",
+        "radians", "sin", "sqrt", "tan",
+    },
+    "scipy.spatial": {"distance"},
+    "scipy.spatial.distance": {"euclidean"},
+}
+ALLOWED_VALUE_METHODS = {
+    "append", "clear", "copy", "count", "endswith", "extend", "get",
+    "index", "insert", "items", "join", "keys", "lower", "pop", "remove",
+    "replace", "reverse", "sort", "split", "startswith", "strip", "upper",
+    "values",
+}
+
+
+class SubmissionSyntaxValidator(ast.NodeVisitor):
+    """Reject access to Python introspection and unsafe scientific APIs."""
+
+    def __init__(self):
+        self.module_aliases = {}
+
+    def visit_Import(self, node):
+        for alias in node.names:
+            root = alias.name.split(".", 1)[0]
+            if root not in ALLOWED_IMPORTS:
+                raise ImportError(f"Import of '{alias.name}' is not allowed")
+            self.module_aliases[alias.asname or root] = alias.name
+
+    def visit_ImportFrom(self, node):
+        module = node.module or ""
+        root = module.split(".", 1)[0]
+        if node.level or root not in ALLOWED_IMPORTS:
+            raise ImportError(f"Import of '{module}' is not allowed")
+        allowed = ALLOWED_MODULE_ATTRIBUTES.get(module, set())
+        for alias in node.names:
+            if alias.name == "*" or alias.name not in allowed:
+                raise ImportError(
+                    f"Import of '{module}.{alias.name}' is not allowed"
+                )
+            self.module_aliases[alias.asname or alias.name] = (
+                f"{module}.{alias.name}"
+            )
+
+    def visit_Name(self, node):
+        if node.id.startswith("_"):
+            raise ValueError(f"Name '{node.id}' is not allowed")
+
+    def visit_Attribute(self, node):
+        if node.attr.startswith("_"):
+            raise ValueError(f"Attribute '{node.attr}' is not allowed")
+        path = self._attribute_path(node)
+        if path:
+            imported = self.module_aliases.get(path[0])
+            if imported:
+                canonical = ".".join([imported, *path[1:-1]])
+                if node.attr not in ALLOWED_MODULE_ATTRIBUTES.get(canonical, set()):
+                    raise ValueError(
+                        f"Use of '{'.'.join(path)}' is not allowed"
+                    )
+            elif node.attr not in ALLOWED_VALUE_METHODS:
+                raise ValueError(f"Attribute '{node.attr}' is not allowed")
+        self.generic_visit(node)
+
+    @staticmethod
+    def _attribute_path(node):
+        parts = []
+        current = node
+        while isinstance(current, ast.Attribute):
+            parts.append(current.attr)
+            current = current.value
+        if not isinstance(current, ast.Name):
+            return None
+        return [current.id, *reversed(parts)]
+
+
+def validate_submission(code):
+    tree = ast.parse(code, filename="<submission>", mode="exec")
+    SubmissionSyntaxValidator().visit(tree)
+    return tree
 
 
 class CappedOutput(io.TextIOBase):
@@ -107,8 +193,9 @@ def execute(request):
     output = CappedOutput()
 
     try:
+        tree = validate_submission(request["code"])
         with redirect_stdout(output):
-            exec(request["code"], namespace, namespace)
+            exec(compile(tree, "<submission>", "exec"), namespace, namespace)
     except BaseException as error:
         return {
             "success": False,

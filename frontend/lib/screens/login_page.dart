@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/feature_flags.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
@@ -168,8 +169,10 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final resetMode =
-        _resetToken != null && _resetToken!.isNotEmpty && !_resetComplete;
+    final resetMode = selfServicePasswordResetEnabled &&
+        _resetToken != null &&
+        _resetToken!.isNotEmpty &&
+        !_resetComplete;
     return Scaffold(
       backgroundColor: AppColors.pageBackground,
       body: Center(
@@ -332,17 +335,17 @@ class _LoginPageState extends State<LoginPage> {
                                   : 'Sign in',
                         ),
                       ),
-                      if (!resetMode) ...[
+                      if (_working) ...[
+                        const SizedBox(height: 10),
+                        const Text(
+                          'The free demo server may take up to one minute to wake.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      if (!resetMode && selfServicePasswordResetEnabled) ...[
                         TextButton(
                           onPressed: _working ? null : _showForgotPassword,
                           child: const Text('Forgot password?'),
-                        ),
-                        const Divider(height: 28),
-                        const Text(
-                          'Prototype demo accounts\n'
-                          'Student: student / student\n'
-                          'Instructor: instructor / instructor',
-                          textAlign: TextAlign.center,
                         ),
                       ],
                     ],

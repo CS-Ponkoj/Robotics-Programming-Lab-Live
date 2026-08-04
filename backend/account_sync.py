@@ -19,24 +19,26 @@ from auth_service import (
 from models import User
 
 
-DEMO_ACCOUNTS = (
-    {
-        "login_id": "instructor",
-        "password": "instructor",
-        "role": "instructor",
-    },
-    {
-        "login_id": "student",
-        "password": "student",
-        "role": "student",
-    },
+DEMO_ACCOUNT_ROLES = (
+    {"login_id": "instructor", "role": "instructor"},
+    {"login_id": "student", "role": "student"},
 )
 
 
-def seed_demo_accounts(session: Session, enabled: bool) -> None:
+def seed_demo_accounts(
+    session: Session,
+    enabled: bool,
+    *,
+    student_password: str,
+    instructor_password: str,
+) -> None:
     if not enabled:
         return
-    for account in DEMO_ACCOUNTS:
+    passwords = {
+        "student": student_password,
+        "instructor": instructor_password,
+    }
+    for account in DEMO_ACCOUNT_ROLES:
         existing = session.scalar(
             select(User).where(User.login_id == account["login_id"])
         )
@@ -44,7 +46,7 @@ def seed_demo_accounts(session: Session, enabled: bool) -> None:
             user = create_user(
                 session,
                 login_id=account["login_id"],
-                password=account["password"],
+                password=passwords[account["role"]],
                 role=account["role"],
                 participant_code="DEMO" if account["role"] == "student" else None,
                 is_demo=True,

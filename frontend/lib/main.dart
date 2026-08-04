@@ -57,7 +57,19 @@ class _MyAppState extends State<MyApp> {
       theme: buildAppTheme(),
       home: _restoringSession
           ? const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Connecting to the robotics lab...'),
+                    SizedBox(height: 6),
+                    Text(
+                        'The free demo server may take up to one minute to wake.'),
+                  ],
+                ),
+              ),
             )
           : _user == null
               ? LoginPage(

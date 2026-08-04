@@ -16,6 +16,8 @@ def auth_client(tmp_path):
         database_url="sqlite://",
         admin_api_token="legacy-admin",
         openai_api_key=None,
+        enable_password_reset=True,
+        enable_email_features=True,
         study_accounts_file=tmp_path / "study_accounts.json",
         public_app_url="http://study.test",
     )
@@ -180,6 +182,32 @@ def test_forgot_password_sends_single_use_link_and_revokes_sessions(auth_client)
     login(auth_client, created["user"]["login_id"], "Changed-Password-5827")
 
 
+def test_deferred_email_and_self_service_reset_routes_are_disabled_by_default(
+    tmp_path,
+):
+    settings = Settings(
+        database_url="sqlite://",
+        study_accounts_file=tmp_path / "study_accounts.json",
+    )
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        instructor = login(client, "instructor", "instructor")
+        headers = bearer(instructor["token"])
+
+        assert client.post(
+            "/auth/forgot-password", json={"identifier": "student"}
+        ).status_code == 404
+        assert client.post(
+            "/auth/reset-password",
+            json={"token": "x" * 20, "new_password": "Changed-Password-5827"},
+        ).status_code == 404
+        assert client.get("/admin/email/status", headers=headers).status_code == 404
+        assert client.post(
+            "/admin/email/test",
+            headers=headers,
+            json={"recipient": "student@example.test"},
+        ).status_code == 404
+
+
 def test_unconfigured_email_is_reported_and_invitation_is_blocked(auth_client):
     instructor = login(auth_client, "instructor", "instructor")
     headers = bearer(instructor["token"])
@@ -243,6 +271,7 @@ def test_configured_smtp_sends_real_test_message(tmp_path, monkeypatch):
         smtp_password="test-only-password",
         smtp_from="Robotics Lab <mailer@example.test>",
         smtp_use_tls=True,
+        enable_email_features=True,
     )
     with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
         instructor = login(client, "instructor", "instructor")
