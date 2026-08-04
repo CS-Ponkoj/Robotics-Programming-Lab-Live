@@ -48,7 +48,7 @@ Render runs `alembic upgrade head` before starting FastAPI. The health check is
 
 Import the GitHub repository and leave the root directory at the repository
 root. The root [`vercel.json`](vercel.json) runs the pinned Flutter build and
-serves `frontend/.flutter_build/web`.
+serves `frontend/build/web`.
 
 Add one Vercel environment variable before deploying:
 
