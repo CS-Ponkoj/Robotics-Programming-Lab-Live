@@ -70,7 +70,7 @@ V4 must use the same source code and approved Git SHA locally and online. Hostin
 
 | Area | Result | Live evidence |
 |---|---:|---|
-| Release identity | [x] PASS | Render deploys `v4-live` backend release `f54cada6`; Vercel production tracks `v4-live` and serves corrected deployment commit `da0e9a10`. GitHub `v4 verification` passed for both commits. |
+| Release identity | [x] PASS | Render deploys the unchanged `v4-live` backend; Vercel production tracks `v4-live` and serves the public-entry application release `a16292c`. GitHub `v4 verification` passed for the final application release. |
 | Live frontend | [x] PASS | `https://robotics-programming-lab.vercel.app` returns HTTP 200 over HTTPS with the SPA rewrite and configured security headers. |
 | Live backend | [x] PASS | `https://robotics-programming-lab-api.onrender.com/health` returns HTTP 200 with API `4.0.0`. |
 | Exact-origin CORS | [x] PASS | Preflight from the production Vercel origin returns the exact `Access-Control-Allow-Origin` value and permits the required methods/headers. |
@@ -99,7 +99,7 @@ V4 must use the same source code and approved Git SHA locally and online. Hostin
 | CI | [x] IMPLEMENTED | GitHub Actions verifies backend tests/dependencies/PostgreSQL migration plus Flutter dependencies/analyzer/tests/release build. First hosted run remains pending. |
 | Local automated gate | [x] PASS | 59 backend tests, `pip check`, 30 Flutter tests, analyzer, and release web build pass. The OneDrive-safe script also completes outside the synced build directory. |
 | Local browser SQA | [x] PASS | Student/instructor login, four assignments, Assignment 1 image, Run Tests completion/error, AI-off default, logout, assignment studio, and email-free student account UI pass with zero browser console warnings/errors. |
-| Public entry policy | [x] LOCAL PASS | Opening `/` clears a saved browser session and shows login; successful login uses `/app`, while the older `/#/app` form remains compatible. Focused widget tests, the full 32-test Flutter suite, analyzer, and release web build pass. Live verification is required after deployment. |
+| Public entry policy | [x] LIVE PASS | Opening `/` with a saved student session shows login; student and instructor demos both authenticate into `/app`; refreshing `/app` restores the signed-in assignment page. Credentials remain absent from login. Focused tests, all 32 Flutter tests, analyzer, release build, GitHub CI, Vercel deployment, and live browser SQA pass. |
 | Secret audit | [x] PASS | No tracked environment folders/files and no OpenAI/Neon credential patterns in tracked files or active `origin/main` history. Ignored `.env` remains untracked. |
 | Remaining go-live gates | [ ] PENDING | Use strong private live demo passwords, complete the remaining live feature matrix, cold-start/restart persistence, hostile-execution checks, independent SQA, rollback/restore, and the final Excel/SQA report. |
 
