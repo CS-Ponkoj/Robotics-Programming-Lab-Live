@@ -1,13 +1,13 @@
 # Robotics Programming Lab v4 Live Deployment Readiness Checklist
 
-Last audited: 2026-08-03
+Last audited: 2026-08-04
 
 Target repository: `CS-Ponkoj/Robotics-Programming-Lab`
 
 Target release: v4 live professor-review prototype
 
 Checklist owner: project developer / SQA reviewer
-Current release decision: **LIVE for a controlled professor review; NO-GO for broad student or public use until the remaining P0/P1 exceptions are closed**
+Current release decision: **CLASSROOM CANDIDATE LOCALLY; deploy and complete the live sandbox/restart/restore gates before giving the URL to students.**
 
 This is the release gate for putting the current v3 application online without removing working functionality. The existing `Robotics_Programming_Lab_Master_SQA_Checklist.xlsx` remains the general feature checklist; this document adds the v4 hosting, security, persistence, and live-parity gates.
 
@@ -35,6 +35,11 @@ FastAPI application - Render Free Web Service
         |
         +---- PostgreSQL - Neon Free
         +---- OpenAI API - optional, backend secret only
+        |
+        v
+Dedicated grading container - Render Docker Web Service
+        +---- no database or OpenAI secrets
+        +---- authenticated requests and restricted workers
 ```
 
 Initial assignment images and reference files will be bundled with the backend deployment. Instructor-uploaded files should use object storage in a later release; the Render filesystem must never be treated as persistent storage. Redis/background workers are intentionally deferred until grading or simulation jobs exceed the current short synchronous request window. Self-service password reset and email delivery are also deferred for the professor demo. Their existing code will be preserved, but the live demo will hide/disable those entry points and use instructor-managed demo accounts.
@@ -139,8 +144,8 @@ These checks describe the current local version. They do not by themselves appro
 | V4-FIX-001 | P0 | [ ] | Demo credentials are hardcoded in backend seeding and printed on the login page. | Remove the login-page credential block. Seed fixed IDs with deployment-only password secrets. Test that credentials are absent from source/build and both accounts still exist. |
 | V4-FIX-002 | P0 | [ ] | Student run, submit, hint, and solution endpoints allow anonymous access. | Require an authenticated student/instructor on all attempt routes; retain public assignment reading only if intentionally approved. Add 401, ownership, and instructor-access tests. |
 | V4-FIX-003 | P0 | [ ] | Anonymous or non-owning users can address a submission if they learn its UUID. | Bind every submission/hint/solution read to the authenticated user; permit instructor access through a separately tested role rule. |
-| V4-FIX-004 | P0 | [ ] | The subprocess executor has a timeout but no strong OS isolation, memory/CPU limit, network isolation, or AST allowlist. Python attribute traversal can bypass a builtins-only policy. | For the professor demo, add a strict assignment-aware AST allowlist, reject private/dunder attributes and dangerous syntax, enforce Linux CPU/memory/file/process limits, require auth, and rate-limit execution. Keep the site private/control-distributed. A broad student release requires a separate container/microVM grader service. |
-| V4-FIX-005 | P0 | [ ] | No execution rate limit or concurrency guard protects the free backend. | Add per-user and per-IP run/submit quotas, `429` + `Retry-After`, a small concurrency semaphore, request-size limits, and audit logging. Verify burst, timeout, and recovery tests. |
+| V4-FIX-004 | P0 | [x] | The production API previously executed student code in its own subprocess. | A separate authenticated Docker sandbox service now contains no database/OpenAI credentials; worker environments are scrubbed and CPU/memory/file/process/output/time limits plus the AST allowlist remain. Contract and secret-exclusion tests pass. Live deployment proof remains required. |
+| V4-FIX-005 | P0 | [x] | Execution limits previously relied on client-IP buckets that could be changed with forwarding headers. | Run/submit quotas now follow the authenticated account, cannot be bypassed with `X-Forwarded-For`, return `429` + `Retry-After`, and retain global API/sandbox concurrency and request-size ceilings. |
 | V4-FIX-006 | P0 | [ ] | SQLite and local JSON/files would be lost on Render restarts or idle spin-down. | Use Neon PostgreSQL for users, sessions, assignments, attempts, feedback, and progress. Keep only immutable bundled assets on disk. Verify persistence after redeploy/restart. |
 | V4-FIX-007 | P0 | [ ] | The backend uses `Base.metadata.create_all` and has no versioned production migrations. | Add Alembic baseline and forward migration. Test a fresh database, upgrade from the v3 schema, rollback procedure, and idempotent assignment/demo-account seed. |
 | V4-FIX-008 | P2 | [ ] | Self-service password reset and email delivery are deferred for the professor demo. | Preserve the existing reset/email code for a future release. Add a production feature flag that hides the Forgot password and email-status/test UI and disables public reset endpoints while instructor-managed password reset remains available. |
@@ -204,7 +209,10 @@ The professor demo does not require an email provider or self-service password r
 
 ## 6. Code-execution and grader safety gate
 
-The current subprocess is suitable only after layered restrictions for a controlled demo. It is not equivalent to a Docker/microVM security boundary.
+Production grading now crosses an authenticated boundary into a dedicated Docker
+service that has no database or OpenAI secrets. The student worker remains a
+short-lived restricted subprocess inside that container; this is a controlled
+classroom boundary, not approval for anonymous public code execution.
 
 | ID | Priority | Check | Requirement | Acceptance evidence |
 |---|---|---:|---|---|
@@ -212,11 +220,11 @@ The current subprocess is suitable only after layered restrictions for a control
 | V4-RUN-002 | P0 | [ ] | Parse and validate the AST before execution using an assignment-aware allowlist. | Tests reject dunder/private access, dynamic class traversal, unsafe imports, `eval`/`exec`, filesystem, process, socket/network, reflection, and resource-abuse patterns. |
 | V4-RUN-003 | P0 | [ ] | Restrict module and attribute access to the minimum required by each assignment. | Assignments 1-4 official solutions pass; malicious import/attribute suite fails. |
 | V4-RUN-004 | P0 | [ ] | Enforce wall time, CPU time, memory, output, file size, and child-process limits on Render Linux. | Infinite loop, memory growth, output flood, and process-spawn tests terminate within limits. |
-| V4-RUN-005 | P0 | [ ] | Add per-user/IP quotas and a global concurrency ceiling. | Load test cannot starve health/login/admin requests. |
+| V4-RUN-005 | P0 | [x] | Add per-account quotas and global API/sandbox concurrency ceilings. | Burst, capacity, retry, and forwarded-header bypass tests pass. |
 | V4-RUN-006 | P0 | [ ] | Never send grader configuration, expected values, official solutions, or reference paths to student APIs. | Contract tests scan every student response for hidden fields. |
 | V4-RUN-007 | P1 | [ ] | Validate every assignment's official solution before publish and on every CI run. | All four current assignments and future fixtures pass their versioned grader. |
 | V4-RUN-008 | P1 | [ ] | Save stable assignment ID and version with every run/submit. | Database/API test confirms version retention after assignment edit. |
-| V4-RUN-009 | P1 | [ ] | Add a future migration gate: before broad student use, move execution to an isolated container/microVM grader service with no network and hard resource limits. | Architecture/security review approves the external runner. |
+| V4-RUN-009 | P1 | [x] | Before classroom use, move execution outside the API into a dedicated secret-free grading container with hard worker limits. | Remote contract, service authentication, invalid-response, resource, and secret-exclusion tests pass locally; live Render proof remains open. |
 
 ## 7. Live functional-parity matrix
 
@@ -332,7 +340,7 @@ Provider limits were checked against official documentation on 2026-08-03 and mu
 | Render sleeps after 15 minutes idle and may take about one minute to wake. | First API request may feel broken or time out. | Add explicit wake/retry UI and rehearse before professor review. Do not use artificial keep-alive traffic as the primary solution. | Acceptable for professor demo only after V4-WEB-007 passes. |
 | Render Free filesystem is ephemeral and free services can restart. | SQLite, uploads, mutable JSON, and local study data disappear. | Neon for all mutable data; immutable bundled assets only; future uploads go to object storage. | Not acceptable until V4-FIX-006 passes. |
 | Render Free blocks outbound SMTP ports 25/465/587. | Current email/reset delivery cannot work on the free backend. | Email/reset is disabled for the professor demo; use an HTTPS email provider in a future student-study release. | Accepted for the v4 demo because email is out of scope. |
-| Render Free does not provide persistent disk, SSH, one-off jobs, scaling, or an isolated Docker daemon for this app. | Operations and safe arbitrary-code execution are limited. | CI migrations, database-backed state, strict restricted executor for controlled demo, and future external sandbox service. | Controlled-demo acceptance required; not acceptable for broad public use. |
+| Render Free does not provide persistent disk, SSH, one-off jobs, scaling, or a nested Docker daemon. Free web services also cannot receive private-network traffic. | The sandbox must be a separate public-HTTPS Docker service and both services can cold-start. | Shared-secret authentication, no application secrets in the sandbox, strict worker controls, bounded 90-second UI wait, and exact URL configuration. | Acceptable for a controlled classroom study after live sandbox verification; not for anonymous public use. |
 | Render grants 750 free instance hours/workspace/month and can suspend at limits. | No uptime guarantee; other free services in the workspace share capacity. | One backend service, monitor usage, retain rollback/local demo. | Acceptable for scheduled professor review, not a production SLA. |
 | Vercel Hobby is personal/non-commercial and caps CLI static uploads at 100 MB. | Terms or artifact growth may force a plan/host change. | Confirm academic use; current build is 26.3 MiB; enforce size gate. | Acceptable after owner confirmation. |
 | Neon Free currently provides 0.5 GB and 100 CU-hours per project/month and can scale to zero. | Cold DB connection and eventual capacity limit. | Pooling/retry, usage alerts, export/archive plan. | Acceptable for prototype volume. |

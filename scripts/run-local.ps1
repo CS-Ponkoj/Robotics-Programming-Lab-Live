@@ -1,0 +1,194 @@
+param(
+    [string]$DatabaseUrl = "sqlite:///robotics_lab_staging.db",
+    [switch]$EnableAi,
+    [int]$FrontendPort = 8080,
+    [int]$BackendPort = 5000,
+    [int]$SandboxPort = 5001
+)
+
+$ErrorActionPreference = "Stop"
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+$backendRoot = Join-Path $repositoryRoot "backend"
+$python = Join-Path $repositoryRoot "venv\Scripts\python.exe"
+$stateRoot = Join-Path $repositoryRoot ".local-run"
+$stateFile = Join-Path $stateRoot "state.json"
+$logRoot = Join-Path $stateRoot "logs"
+$safeFrontendRoot = Join-Path $env:LOCALAPPDATA "RoboticsProgrammingLab\frontend"
+
+if (-not (Test-Path -LiteralPath $python)) {
+    throw "Python environment not found. Run: python -m venv venv; .\venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt"
+}
+if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
+    throw "Flutter is not available on PATH. Install Flutter or open a terminal where 'flutter --version' works."
+}
+$requestedPorts = @($FrontendPort, $BackendPort, $SandboxPort)
+$occupiedPorts = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+    Where-Object { $_.LocalPort -in $requestedPorts } |
+    Select-Object -Unique LocalPort, OwningProcess)
+if ($occupiedPorts.Count -gt 0) {
+    $details = $occupiedPorts | ForEach-Object { "port $($_.LocalPort) (PID $($_.OwningProcess))" }
+    throw "A requested local port is already in use: $($details -join ', '). Stop the older project process or select different port parameters."
+}
+if (Test-Path -LiteralPath $stateFile) {
+    $existing = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
+    $running = @($existing.processes | Where-Object { Get-Process -Id $_.id -ErrorAction SilentlyContinue })
+    if ($running.Count -gt 0) {
+        throw "The local application is already running. Use .\scripts\stop-local.ps1 first."
+    }
+    Remove-Item -LiteralPath $stateFile -Force
+}
+
+New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
+
+function New-LocalToken {
+    $bytes = New-Object byte[] 32
+    $generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $generator.GetBytes($bytes)
+    } finally {
+        $generator.Dispose()
+    }
+    return ([BitConverter]::ToString($bytes) -replace '-', '').ToLowerInvariant()
+}
+
+function Start-ProjectProcess {
+    param(
+        [string]$Name,
+        [string]$FilePath,
+        [string[]]$ArgumentList,
+        [string]$WorkingDirectory,
+        [hashtable]$Environment = @{}
+    )
+
+    $previous = @{}
+    foreach ($key in $Environment.Keys) {
+        $previous[$key] = [System.Environment]::GetEnvironmentVariable($key, "Process")
+        [System.Environment]::SetEnvironmentVariable($key, [string]$Environment[$key], "Process")
+    }
+    try {
+        $stdout = Join-Path $logRoot "$Name.stdout.log"
+        $stderr = Join-Path $logRoot "$Name.stderr.log"
+        return Start-Process -FilePath $FilePath -ArgumentList $ArgumentList `
+            -WorkingDirectory $WorkingDirectory -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    } finally {
+        foreach ($key in $Environment.Keys) {
+            [System.Environment]::SetEnvironmentVariable($key, $previous[$key], "Process")
+        }
+    }
+}
+
+function Stop-ProjectProcessTree {
+    param([int]$ProcessId)
+    if (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) {
+        & taskkill.exe /PID $ProcessId /T /F 2>$null | Out-Null
+    }
+}
+
+function Wait-ForEndpoint {
+    param(
+        [string]$Name,
+        [string]$Url,
+        [int]$Attempts = 60,
+        [switch]$AcceptAnySuccess
+    )
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        try {
+            if ($AcceptAnySuccess) {
+                $response = Invoke-WebRequest -Uri $Url -TimeoutSec 2 -UseBasicParsing
+                if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400) { return }
+            } else {
+                $response = Invoke-RestMethod -Uri $Url -TimeoutSec 2
+                if ($response.status -eq "ok") { return }
+            }
+        } catch {
+            Start-Sleep -Milliseconds 500
+        }
+    }
+    throw "$Name did not become healthy at $Url. Review .local-run\logs."
+}
+
+$token = New-LocalToken
+$processes = @()
+try {
+    $sandbox = Start-ProjectProcess -Name "sandbox" -FilePath $python `
+        -ArgumentList @("-m", "uvicorn", "sandbox_service:app", "--host", "127.0.0.1", "--port", "$SandboxPort", "--no-server-header") `
+        -WorkingDirectory $backendRoot -Environment @{
+            SANDBOX_API_TOKEN = $token
+            SANDBOX_MAX_CONCURRENT_EXECUTIONS = "2"
+        }
+    $processes += [pscustomobject]@{ name = "sandbox"; id = $sandbox.Id }
+    Wait-ForEndpoint -Name "Sandbox" -Url "http://127.0.0.1:$SandboxPort/health"
+
+    $backendEnvironment = @{
+        ENVIRONMENT = "development"
+        DATABASE_URL = $DatabaseUrl
+        AUTO_CREATE_SCHEMA = "true"
+        PUBLIC_APP_URL = "http://127.0.0.1:$FrontendPort"
+        ALLOWED_ORIGINS = "http://127.0.0.1:$FrontendPort,http://localhost:$FrontendPort"
+        SANDBOX_BACKEND = "remote"
+        SANDBOX_URL = "http://127.0.0.1:$SandboxPort"
+        SANDBOX_API_TOKEN = $token
+        OPENAI_API_KEY = ""
+    }
+    if ($EnableAi) {
+        $backendEnvironment.Remove("OPENAI_API_KEY")
+    }
+    $backend = Start-ProjectProcess -Name "backend" -FilePath $python `
+        -ArgumentList @("-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "$BackendPort", "--no-server-header") `
+        -WorkingDirectory $backendRoot -Environment $backendEnvironment
+    $processes += [pscustomobject]@{ name = "backend"; id = $backend.Id }
+    Wait-ForEndpoint -Name "Backend" -Url "http://127.0.0.1:$BackendPort/health"
+
+    $resolvedSafeRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "RoboticsProgrammingLab"))
+    $resolvedFrontend = [System.IO.Path]::GetFullPath($safeFrontendRoot)
+    if (-not $resolvedFrontend.StartsWith($resolvedSafeRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to prepare a Flutter copy outside the expected LOCALAPPDATA folder."
+    }
+    if (Test-Path -LiteralPath $resolvedFrontend) {
+        Remove-Item -LiteralPath $resolvedFrontend -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $resolvedFrontend | Out-Null
+    foreach ($directory in @("fonts", "lib", "web")) {
+        Copy-Item -LiteralPath (Join-Path $repositoryRoot "frontend\$directory") -Destination $resolvedFrontend -Recurse
+    }
+    foreach ($file in @(".metadata", "analysis_options.yaml", "pubspec.lock", "pubspec.yaml")) {
+        Copy-Item -LiteralPath (Join-Path $repositoryRoot "frontend\$file") -Destination $resolvedFrontend
+    }
+    Push-Location $resolvedFrontend
+    try {
+        & flutter pub get
+        if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed." }
+    } finally {
+        Pop-Location
+    }
+    $flutterCommand = (Get-Command flutter).Source
+    $frontend = Start-ProjectProcess -Name "frontend" -FilePath $flutterCommand `
+        -ArgumentList @("run", "-d", "chrome", "--web-port", "$FrontendPort", "--dart-define=API_BASE_URL=http://127.0.0.1:$BackendPort") `
+        -WorkingDirectory $resolvedFrontend
+    $processes += [pscustomobject]@{ name = "frontend"; id = $frontend.Id }
+    Wait-ForEndpoint -Name "Frontend" -Url "http://localhost:$FrontendPort" -Attempts 240 -AcceptAnySuccess
+
+    [pscustomobject]@{
+        repository = $repositoryRoot
+        startedAt = (Get-Date).ToString("o")
+        processes = $processes
+        frontendUrl = "http://localhost:$FrontendPort"
+        backendUrl = "http://127.0.0.1:$BackendPort"
+        sandboxUrl = "http://127.0.0.1:$SandboxPort"
+        databaseUrl = $DatabaseUrl
+        aiEnabled = [bool]$EnableAi
+    } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8
+
+    Write-Output "Robotics Programming Lab is starting."
+    Write-Output "Frontend: http://localhost:$FrontendPort"
+    Write-Output "Backend:  http://127.0.0.1:$BackendPort/health"
+    Write-Output "Sandbox:  http://127.0.0.1:$SandboxPort/health"
+    Write-Output "AI enabled: $([bool]$EnableAi)"
+    Write-Output "Stop with: .\scripts\stop-local.ps1"
+} catch {
+    foreach ($process in $processes) {
+        Stop-ProjectProcessTree -ProcessId $process.id
+    }
+    throw
+}

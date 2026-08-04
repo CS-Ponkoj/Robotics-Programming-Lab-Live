@@ -1,4 +1,7 @@
-from sandbox import SubprocessSandbox
+import httpx
+import subprocess
+
+from sandbox import RemoteSandbox, SubprocessSandbox, build_sandbox
 
 
 def test_subprocess_sandbox_rejects_python_object_introspection():
@@ -35,3 +38,127 @@ value = math.sqrt(9) + np.sin(np.radians(90)) + distance.euclidean((0, 0), (3, 4
 
     assert result["success"] is True
     assert result["values"]["value"] == 9.0
+
+
+def test_remote_sandbox_sends_only_execution_data_and_auth_token(monkeypatch):
+    captured = {}
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {
+                "success": True,
+                "error": "",
+                "output": "hello\n",
+                "values": {"answer": 42},
+            }
+
+    def fake_post(url, *, headers, json, timeout):
+        captured.update(
+            {"url": url, "headers": headers, "json": json, "timeout": timeout}
+        )
+        return Response()
+
+    monkeypatch.setattr("sandbox.httpx.post", fake_post)
+    result = RemoteSandbox(
+        "sandbox.internal:10000",
+        "test-sandbox-token",
+        timeout_seconds=4,
+        http_timeout_seconds=20,
+    ).execute("answer = 42", ["answer"])
+
+    assert result["success"] is True
+    assert captured == {
+        "url": "http://sandbox.internal:10000/execute",
+        "headers": {"Authorization": "Bearer test-sandbox-token"},
+        "json": {
+            "code": "answer = 42",
+            "result_names": ["answer"],
+            "timeout_seconds": 4,
+        },
+        "timeout": 20,
+    }
+
+
+def test_remote_sandbox_returns_safe_error_without_leaking_provider_details(
+    monkeypatch,
+):
+    def unavailable(*_args, **_kwargs):
+        raise httpx.ConnectError("internal-hostname: secret-token")
+
+    monkeypatch.setattr("sandbox.httpx.post", unavailable)
+    result = RemoteSandbox(
+        "https://sandbox.example.test",
+        "secret-token",
+    ).execute("answer = 42", ["answer"])
+
+    assert result["success"] is False
+    assert result["values"] == {}
+    assert "internal-hostname" not in result["error"]
+    assert "secret-token" not in result["error"]
+
+
+def test_remote_sandbox_rejects_malformed_success_response(monkeypatch):
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"success": "yes", "values": []}
+
+    monkeypatch.setattr("sandbox.httpx.post", lambda *_args, **_kwargs: Response())
+    result = RemoteSandbox(
+        "https://sandbox.example.test",
+        "secret-token",
+    ).execute("answer = 42", ["answer"])
+
+    assert result["success"] is False
+    assert result["error"] == "The secure grader returned an invalid response."
+
+
+def test_build_remote_sandbox_requires_url_and_token():
+    try:
+        build_sandbox("remote", "unused", 5)
+    except RuntimeError as error:
+        assert "SANDBOX_URL" in str(error)
+    else:
+        raise AssertionError("Missing remote sandbox configuration was accepted")
+
+
+def test_build_sandbox_rejects_unknown_backend():
+    try:
+        build_sandbox("typo", "unused", 5)
+    except RuntimeError as error:
+        assert "Unsupported sandbox backend" in str(error)
+    else:
+        raise AssertionError("Unknown sandbox backend was accepted")
+
+
+def test_subprocess_worker_environment_excludes_application_secrets(
+    monkeypatch,
+    tmp_path,
+):
+    captured = {}
+
+    def fake_run(*_args, **kwargs):
+        captured["env"] = kwargs["env"]
+        return subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout='{"success": true, "error": "", "output": "", "values": {}}',
+            stderr="",
+        )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "must-not-reach-worker")
+    monkeypatch.setenv("DATABASE_URL", "must-not-reach-worker")
+    monkeypatch.setenv("SANDBOX_API_TOKEN", "must-not-reach-worker")
+    monkeypatch.setattr("sandbox.subprocess.run", fake_run)
+
+    result = SubprocessSandbox().execute("answer = 42", [])
+
+    assert result["success"] is True
+    assert "OPENAI_API_KEY" not in captured["env"]
+    assert "DATABASE_URL" not in captured["env"]
+    assert "SANDBOX_API_TOKEN" not in captured["env"]

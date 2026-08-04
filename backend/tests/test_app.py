@@ -93,6 +93,33 @@ def test_production_configuration_rejects_ephemeral_or_open_defaults(tmp_path):
         create_app(settings=settings)
 
 
+def test_production_configuration_requires_isolated_execution():
+    settings = Settings(
+        environment="production",
+        database_url="postgresql+psycopg://user:pass@database.test/study",
+        auto_create_schema=False,
+        allowed_origins="https://study.example.test",
+        sandbox_backend="subprocess",
+    )
+
+    with pytest.raises(RuntimeError, match="remote or docker isolation"):
+        settings.validate_runtime()
+
+
+def test_production_configuration_accepts_complete_remote_sandbox():
+    settings = Settings(
+        environment="production",
+        database_url="postgresql+psycopg://user:pass@database.test/study",
+        auto_create_schema=False,
+        allowed_origins="https://study.example.test",
+        sandbox_backend="remote",
+        sandbox_url="sandbox.internal:10000",
+        sandbox_api_token="sandbox-token-with-safe-length",
+    )
+
+    settings.validate_runtime()
+
+
 def test_cors_allows_only_the_configured_frontend(tmp_path):
     settings = Settings(
         database_url="sqlite://",
@@ -180,6 +207,40 @@ def test_execution_rate_limit_returns_retry_guidance(tmp_path):
     assert blocked.status_code == 429
     assert blocked.headers["Retry-After"]
     assert blocked.json()["error"] == "Too many requests. Please wait and try again."
+
+
+def test_execution_rate_limit_cannot_be_bypassed_with_forwarded_ip(tmp_path):
+    settings = Settings(
+        database_url="sqlite://",
+        openai_api_key=None,
+        study_accounts_file=tmp_path / "study_accounts.json",
+        execution_requests_per_minute=1,
+    )
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as value:
+        login = value.post(
+            "/auth/login",
+            json={"login_id": "student", "password": "student"},
+        )
+        authorization = f"Bearer {login.json()['token']}"
+        first = value.post(
+            "/assignments/2/run",
+            headers={
+                "Authorization": authorization,
+                "X-Forwarded-For": "198.51.100.1",
+            },
+            json={"code": "print('first')"},
+        )
+        blocked = value.post(
+            "/assignments/2/run",
+            headers={
+                "Authorization": authorization,
+                "X-Forwarded-For": "203.0.113.2",
+            },
+            json={"code": "print('second')"},
+        )
+
+    assert first.status_code == 200
+    assert blocked.status_code == 429
 
 
 def test_execution_concurrency_limit_fails_fast(client):

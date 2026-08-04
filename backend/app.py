@@ -207,11 +207,9 @@ def create_app(
     ) -> None:
         if requests_per_minute <= 0:
             return
-        forwarded = request.headers.get("x-forwarded-for", "")
-        client_ip = forwarded.split(",", 1)[0].strip()
-        if not client_ip:
-            client_ip = request.client.host if request.client else "unknown"
-        key = f"{bucket}:{user.id}:{client_ip}"
+        # Authenticated quotas follow the account. Client-controlled forwarding
+        # headers must not allow a student to bypass the execution limit.
+        key = f"{bucket}:{user.id}"
         now = time.monotonic()
         cutoff = now - 60.0
         with request.app.state.rate_limit_lock:
@@ -327,6 +325,11 @@ def create_app(
             settings_value.sandbox_backend,
             settings_value.sandbox_image,
             timeout,
+            remote_url=settings_value.sandbox_url,
+            remote_api_token=settings_value.sandbox_api_token,
+            remote_http_timeout_seconds=(
+                settings_value.sandbox_http_timeout_seconds
+            ),
         )
         return PythonVariableGrader(sandbox)
 

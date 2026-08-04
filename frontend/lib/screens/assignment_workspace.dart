@@ -448,9 +448,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                             builder: (ctx, snap) {
                                               if (snap.connectionState ==
                                                   ConnectionState.waiting) {
-                                                return const Center(
-                                                    child:
-                                                        CircularProgressIndicator());
+                                                return const SecureGraderLoadingState();
                                               }
                                               if (snap.hasError) {
                                                 return TestRunErrorState(
@@ -1352,6 +1350,42 @@ class TestRunErrorState extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class SecureGraderLoadingState extends StatelessWidget {
+  const SecureGraderLoadingState({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      key: const Key('secure-grader-loading-state'),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Starting secure grader…',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'The first run can take up to one minute on the free hosting tier.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -885,6 +885,20 @@ void main() {
     expect(retryCount, 1);
   });
 
+  testWidgets('secure grader loading state explains free-tier startup delay',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: app.SecureGraderLoadingState()),
+      ),
+    );
+
+    expect(
+        find.byKey(const Key('secure-grader-loading-state')), findsOneWidget);
+    expect(find.text('Starting secure grader…'), findsOneWidget);
+    expect(find.textContaining('up to one minute'), findsOneWidget);
+  });
+
   testWidgets('results remain readable and overflow-free on a narrow screen',
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 700));

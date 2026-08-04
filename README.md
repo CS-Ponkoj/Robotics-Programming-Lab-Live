@@ -18,7 +18,8 @@ interface and a FastAPI assignment, grading, simulation, and tutoring API.
 - Instructor student-account creation, manual password reset, and deactivation
 - Optional `study_accounts.json` import for manually managed prototype cohorts
 - PostgreSQL and Redis production services through Docker Compose
-- Docker submission-sandbox adapter with a local subprocess development fallback
+- Dedicated secret-free sandbox service for live grading, plus Docker and
+  restricted-subprocess local adapters
 - Legacy `/grade/{id}` and `/assignments/` compatibility routes
 - Persistent Flutter drafts, scores, attempts, submission IDs, and solution state
 
@@ -35,6 +36,11 @@ The default local backend uses an ignored SQLite database so the project remains
 easy to run without Docker. Production and team environments should set
 `DATABASE_URL` to PostgreSQL.
 
+The project now uses a two-repository release workflow. All changes and SQA are
+performed in `Robotics-Programming-Lab-Staging`; the live
+`Robotics-Programming-Lab` repository receives only the exact approved commit.
+See [`STAGING_AND_RELEASE_WORKFLOW.md`](STAGING_AND_RELEASE_WORKFLOW.md).
+
 ### Install
 
 ```powershell
@@ -46,6 +52,21 @@ Set-Location ..
 ```
 
 ### Run
+
+Recommended one-command local staging run:
+
+```powershell
+.\scripts\run-local.ps1
+```
+
+This starts the dedicated sandbox, backend, and Flutter web application while
+keeping AI off by default. Stop them with:
+
+```powershell
+.\scripts\stop-local.ps1
+```
+
+The manual commands below remain available for troubleshooting.
 
 Backend terminal:
 
@@ -91,6 +112,12 @@ Compose defaults to `SANDBOX_BACKEND=docker`, executing every submission in a
 short-lived container with no network, capped memory/CPU, and a process limit.
 For zero-Docker local development, run `backend/run.py` directly; it uses the
 restricted subprocess fallback from `backend/.env`.
+
+The live classroom deployment uses a second Render Docker web service defined
+in `render.yaml`. The main API sends only student code, requested result names,
+and an execution timeout to that service. The sandbox has no database or OpenAI
+credentials, and its short-lived worker environment excludes the service token.
+Production startup rejects the local subprocess backend.
 
 ## Assignment API
 

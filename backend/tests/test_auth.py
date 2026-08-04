@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app import create_app
 from config import Settings
-from models import Submission, User
+from models import AuditEvent, Submission, User
 
 
 @pytest.fixture()
@@ -311,6 +311,112 @@ def test_authenticated_submission_uses_logged_in_student_id(auth_client):
             )
         )
         assert submission.student_id == "student"
+
+
+def test_student_password_is_hashed_and_never_stored_as_plain_text(auth_client):
+    instructor = login(auth_client, "instructor", "instructor")
+    response = auth_client.post(
+        "/admin/students",
+        headers=bearer(instructor["token"]),
+        json={
+            "login_id": "HASHED-STUDENT",
+            "temporary_password": "Study-Password-4827",
+        },
+    )
+
+    assert response.status_code == 201
+    with auth_client.app.state.SessionLocal() as session:
+        user = session.scalar(
+            select(User).where(User.login_id == "hashed-student")
+        )
+        assert user.password_hash != "Study-Password-4827"
+        assert "Study-Password-4827" not in user.password_hash
+
+
+def test_students_cannot_access_each_others_submission_feedback_or_solution(
+    auth_client,
+):
+    instructor = login(auth_client, "instructor", "instructor")
+    instructor_headers = bearer(instructor["token"])
+    credentials = {}
+    for login_id in ("ISOLATION-A", "ISOLATION-B"):
+        created = auth_client.post(
+            "/admin/students",
+            headers=instructor_headers,
+            json={
+                "login_id": login_id,
+                "temporary_password": "Study-Password-4827",
+            },
+        )
+        assert created.status_code == 201
+        credentials[login_id] = login(
+            auth_client,
+            login_id,
+            "Study-Password-4827",
+        )
+
+    owner_headers = bearer(credentials["ISOLATION-A"]["token"])
+    other_headers = bearer(credentials["ISOLATION-B"]["token"])
+    submission = auth_client.post(
+        "/assignments/2/submit",
+        headers=owner_headers,
+        json={"code": "total_path_length = 0"},
+    ).json()
+
+    owner_hint = auth_client.post(
+        "/assignments/2/hint",
+        headers=owner_headers,
+        json={"submission_id": submission["submission_id"], "hint_level": 1},
+    )
+    other_hint = auth_client.post(
+        "/assignments/2/hint",
+        headers=other_headers,
+        json={"submission_id": submission["submission_id"], "hint_level": 1},
+    )
+    other_solution = auth_client.post(
+        "/assignments/2/solution",
+        headers=other_headers,
+        json={"submission_id": submission["submission_id"]},
+    )
+
+    assert owner_hint.status_code == 200
+    assert other_hint.status_code == 404
+    assert other_solution.status_code == 403
+
+
+def test_assignment_attempt_and_instructor_action_are_persisted_for_audit(
+    auth_client,
+):
+    student = login(auth_client, "student", "student")
+    instructor = login(auth_client, "instructor", "instructor")
+    submission_response = auth_client.post(
+        "/assignments/2/submit",
+        headers=bearer(student["token"]),
+        json={"code": "total_path_length = 0"},
+    )
+    created = auth_client.post(
+        "/admin/students",
+        headers=bearer(instructor["token"]),
+        json={
+            "login_id": "AUDIT-STUDENT",
+            "temporary_password": "Study-Password-4827",
+        },
+    )
+
+    assert submission_response.status_code == 200
+    assert created.status_code == 201
+    with auth_client.app.state.SessionLocal() as session:
+        submission = session.get(
+            Submission,
+            submission_response.json()["submission_id"],
+        )
+        audit_event = session.scalar(
+            select(AuditEvent).where(AuditEvent.action == "student.created")
+        )
+        assert submission.student_id == "student"
+        assert submission.assignment_version == 2
+        assert submission.evidence["tests"]
+        assert audit_event.actor_user_id == instructor["user"]["id"]
 
 
 def test_json_file_creates_updates_and_sanitizes_accounts(tmp_path):

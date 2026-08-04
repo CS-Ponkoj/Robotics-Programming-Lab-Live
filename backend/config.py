@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     sandbox_backend: str = "subprocess"
     sandbox_image: str = "robotics-lab-sandbox:latest"
+    sandbox_url: str | None = None
+    sandbox_api_token: str | None = None
+    sandbox_http_timeout_seconds: float = 75.0
     object_storage_root: Path = BASE_DIR / "managed_assets"
     max_submission_chars: int = 50_000
     max_request_bytes: int = 100_000
@@ -69,6 +72,17 @@ class Settings(BaseSettings):
             problems.append("AUTO_CREATE_SCHEMA must be false")
         if self.allowed_origins.strip() == "*":
             problems.append("ALLOWED_ORIGINS must name the deployed frontend")
+        if self.sandbox_backend not in {"remote", "docker"}:
+            problems.append(
+                "SANDBOX_BACKEND must use remote or docker isolation"
+            )
+        if self.sandbox_backend == "remote":
+            if not self.sandbox_url:
+                problems.append("SANDBOX_URL is required for remote isolation")
+            if not self.sandbox_api_token or len(self.sandbox_api_token) < 24:
+                problems.append(
+                    "SANDBOX_API_TOKEN must contain at least 24 characters"
+                )
         if problems:
             raise RuntimeError(
                 "Invalid production configuration: " + "; ".join(problems)

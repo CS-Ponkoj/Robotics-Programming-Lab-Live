@@ -27,10 +27,20 @@ flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000
 
 The local default remains SQLite. Do not set `ENVIRONMENT=production` locally.
 
-## Live backend on Render
+## Live backend and secure grader on Render
 
-Create the service from the root [`render.yaml`](render.yaml). Supply these
-values in Render without committing them:
+Sync the root [`render.yaml`](render.yaml). It defines two services:
+
+1. `robotics-programming-lab-sandbox`, a Docker service that contains no
+   database or OpenAI credentials.
+2. `robotics-programming-lab-api`, the authenticated application API.
+
+Render generates and shares `SANDBOX_API_TOKEN` between the services. Because
+Render Free web services cannot receive private-network traffic, copy the
+sandbox service's public HTTPS URL into the API service's `SANDBOX_URL` secret
+when the Blueprint prompts for it. Do not put the token or URL in source.
+
+Supply these values in Render without committing them:
 
 | Variable | Value |
 |---|---|
@@ -40,9 +50,12 @@ values in Render without committing them:
 | `PUBLIC_APP_URL` | The same exact Vercel URL |
 | `DEMO_STUDENT_PASSWORD` | Password shared privately with the professor |
 | `DEMO_INSTRUCTOR_PASSWORD` | Password shared privately with the professor |
+| `SANDBOX_URL` | Exact sandbox HTTPS URL, such as `https://robotics-programming-lab-sandbox.onrender.com` |
 
-Render runs `alembic upgrade head` before starting FastAPI. The health check is
+Render runs `alembic upgrade head` before starting FastAPI. Both services use
 `/health`. Mutable state is stored in Neon, never Render's ephemeral filesystem.
+Production refuses to start with `SANDBOX_BACKEND=subprocess` or an incomplete
+remote-sandbox configuration.
 
 ## Live frontend on Vercel
 
@@ -89,7 +102,9 @@ Then verify on the live URL:
 1. The public root always opens at login; student and instructor logins work,
    but credentials are absent from the page.
 2. All four assignments load, including Assignment 1's image.
-3. Run and submit complete once, errors stop correctly, and repeated clicks are bounded.
+3. Run and submit pass through the dedicated sandbox, errors stop correctly,
+   and repeated clicks are bounded. The first run may take up to 90 seconds
+   while the free sandbox service wakes.
 4. Hidden grader data and solutions are absent from assignment responses.
 5. AI is initially off; enabling it produces either OpenAI-enhanced or clearly
    labeled deterministic feedback without revealing hidden tests.
@@ -101,9 +116,11 @@ Then verify on the live URL:
 - Render free web services sleep after 15 idle minutes and can take about one
   minute to wake. The Flutter UI must tolerate that first slow response.
 - Render storage is ephemeral; Neon is required for all mutable study data.
-- The restricted subprocess runner is acceptable only for this controlled
-  professor prototype. Before broad student or anonymous use, move grading to a
-  dedicated network-disabled container or microVM execution service.
+- Live grading is separated into a dedicated Docker service with no database or
+  OpenAI secrets. Each submission still uses a restricted subprocess inside
+  that container. This is appropriate for the controlled classroom study, not
+  for anonymous public code execution; a per-submission microVM remains the
+  stronger future option.
 - Vercel Hobby is for personal/non-commercial use and applies usage limits.
 - Monitor Neon storage and compute usage and export study data regularly.
 

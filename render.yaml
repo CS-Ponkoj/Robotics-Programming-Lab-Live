@@ -1,5 +1,20 @@
 services:
   - type: web
+    name: robotics-programming-lab-sandbox
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile.sandbox-service
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: SANDBOX_API_TOKEN
+        generateValue: true
+      - key: SANDBOX_MAX_CONCURRENT_EXECUTIONS
+        value: "2"
+
+  - type: web
     name: robotics-programming-lab-api
     runtime: python
     plan: free
@@ -32,7 +47,16 @@ services:
       - key: ENABLE_EMAIL_FEATURES
         value: "false"
       - key: SANDBOX_BACKEND
-        value: subprocess
+        value: remote
+      - key: SANDBOX_URL
+        sync: false
+      - key: SANDBOX_API_TOKEN
+        fromService:
+          type: web
+          name: robotics-programming-lab-sandbox
+          envVarKey: SANDBOX_API_TOKEN
+      - key: SANDBOX_HTTP_TIMEOUT_SECONDS
+        value: "75"
       - key: EXECUTION_REQUESTS_PER_MINUTE
         value: "30"
       - key: TUTOR_REQUESTS_PER_MINUTE

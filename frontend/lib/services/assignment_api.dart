@@ -7,6 +7,7 @@ import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 
 const _requestTimeout = Duration(seconds: 15);
+const _executionTimeout = Duration(seconds: 90);
 
 Future<AssignmentDto> fetchAssignment(int id) async {
   final response = await http
@@ -49,7 +50,7 @@ Future<UnittestFeedbackDto> fetchUnittestFeedback(int id, String code,
           'use_ai_tutor': useAiTutor,
         }),
       )
-      .timeout(_requestTimeout);
+      .timeout(_executionTimeout);
   if (response.statusCode == 200) {
     return UnittestFeedbackDto.fromJson(jsonDecode(response.body));
   }
