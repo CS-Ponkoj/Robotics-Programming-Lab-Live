@@ -64,7 +64,7 @@ origin and redeploy the backend.
 
 - Opening the public live URL at `/` always clears an old local session and
   shows the login page.
-- Successful login changes the browser entry to `/#/app`. Refreshing that URL
+- Successful login changes the browser entry to `/app`. Refreshing that URL
   restores the current authenticated session.
 - Signing out returns the browser to `/`, so the next person sees login first.
 - Demo credentials remain private and are never printed on the login page.

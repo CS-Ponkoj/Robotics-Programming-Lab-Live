@@ -7,7 +7,7 @@ bool shouldStartWithFreshLogin(Uri location) {
 }
 
 void markAuthenticatedBrowserEntry() {
-  web.window.history.replaceState(null, '', '/#/app');
+  web.window.history.replaceState(null, '', '/app');
 }
 
 void markLoggedOutBrowserEntry() {
