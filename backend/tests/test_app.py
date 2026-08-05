@@ -73,7 +73,7 @@ def test_health_reports_fastapi_platform(client):
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "api_version": "4.0.0",
+        "api_version": "4.1.0",
         "database": "sqlite",
         "sandbox": "subprocess",
     }

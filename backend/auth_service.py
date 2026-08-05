@@ -26,6 +26,11 @@ def normalize_email(value: str | None) -> str | None:
     return normalized or None
 
 
+def normalize_participant_code(value: str | None) -> str | None:
+    normalized = (value or "").strip()
+    return normalized or None
+
+
 def hash_password(password: str) -> str:
     return password_hasher.hash(password)
 
@@ -70,18 +75,26 @@ def create_user(
     if role not in VALID_ROLES:
         raise ValueError("Role must be student or instructor.")
     normalized_email = normalize_email(email)
+    normalized_participant_code = normalize_participant_code(participant_code)
     if session.scalar(select(User).where(User.login_id == normalized_login)):
         raise ValueError("Login ID already exists.")
     if normalized_email and session.scalar(
         select(User).where(User.email == normalized_email)
     ):
         raise ValueError("Email address already exists.")
+    if role == "student" and normalized_participant_code and session.scalar(
+        select(User).where(
+            User.role == "student",
+            User.participant_code == normalized_participant_code,
+        )
+    ):
+        raise ValueError("Participant code already exists.")
     user = User(
         login_id=normalized_login,
         password_hash=hash_password(password),
         role=role,
         email=normalized_email,
-        participant_code=(participant_code or "").strip() or None,
+        participant_code=normalized_participant_code,
         is_active=is_active,
         is_demo=is_demo,
         must_change_password=must_change_password,

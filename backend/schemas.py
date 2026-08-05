@@ -30,6 +30,7 @@ class SubmissionRequest(BaseModel):
     code: str = Field(min_length=1)
     student_id: str = Field(default="anonymous", max_length=120)
     use_ai_tutor: bool = False
+    study_session_id: str | None = Field(default=None, max_length=36)
 
 
 class TestEvidence(BaseModel):
@@ -170,3 +171,34 @@ class AdminStudentCreated(BaseModel):
     user: AdminUserResponse
     temporary_password: str | None = None
     email_sent: bool = False
+
+
+class StudySessionStartRequest(BaseModel):
+    client_session_id: str = Field(min_length=8, max_length=120)
+
+
+class StudySessionResponse(BaseModel):
+    id: str
+    participant_code: str | None = None
+    started_at: datetime
+    last_active_at: datetime
+    ended_at: datetime | None = None
+    active_seconds: int
+
+
+class StudyHeartbeatRequest(BaseModel):
+    active_seconds: int = Field(ge=1, le=60)
+    assignment_id: int | None = Field(default=None, ge=1)
+    assignment_version: int | None = Field(default=None, ge=1)
+
+
+class LearningEventRequest(BaseModel):
+    event_type: Literal[
+        "assignment_opened",
+        "ai_tutor_toggled",
+        "workspace_tab_changed",
+    ]
+    assignment_id: int | None = Field(default=None, ge=1)
+    assignment_version: int | None = Field(default=None, ge=1)
+    event_data: dict[str, Any] = Field(default_factory=dict)
+    client_occurred_at: datetime | None = None

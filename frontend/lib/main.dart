@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/navigation/browser_entry_stub.dart'
@@ -5,6 +7,7 @@ import 'package:iuse_demo/navigation/browser_entry_stub.dart'
 import 'package:iuse_demo/screens/assignment_list.dart';
 import 'package:iuse_demo/screens/login_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
+import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 
@@ -55,6 +58,9 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _restoreSession() async {
     final user = await AuthApi.restore();
+    if (user != null && !user.isInstructor) {
+      unawaited(researchTracker.startSafely());
+    }
     if (mounted) {
       setState(() {
         _user = user;
@@ -64,6 +70,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _logout() async {
+    await researchTracker.stop();
     await AuthApi.logout();
     if (mounted) {
       markLoggedOutBrowserEntry();
@@ -73,6 +80,9 @@ class _MyAppState extends State<MyApp> {
 
   void _onAuthenticated(AuthenticatedUser user) {
     markAuthenticatedBrowserEntry();
+    if (!user.isInstructor) {
+      unawaited(researchTracker.startSafely());
+    }
     setState(() => _user = user);
   }
 

@@ -22,12 +22,15 @@ interface and a FastAPI assignment, grading, simulation, and tutoring API.
   restricted-subprocess local adapters
 - Legacy `/grade/{id}` and `/assignments/` compatibility routes
 - Persistent Flutter drafts, scores, attempts, submission IDs, and solution state
+- Privacy-safe study sessions, active-time capture, learning events, participant
+  analytics, and authenticated CSV/Excel research exports
 
 ## Repository layout
 
 - `backend/`: FastAPI application, database models, graders, tutor, sandbox, and tests
 - `frontend/`: Flutter web/mobile student and instructor interface
 - `course_materials/`: controlled reference solutions and course source files
+- `manual_sqa_answers/`: instructor-only answer files for manual grader checks
 - `docker-compose.yml`: PostgreSQL, Redis, FastAPI, and persistent storage
 
 ## Local development
@@ -96,6 +99,8 @@ professor demo.
 
 The v4 deployment and local-parity instructions are in
 [`V4_LIVE_DEPLOYMENT.md`](V4_LIVE_DEPLOYMENT.md).
+The V4.1 research dataset and dashboard are documented in
+[`V4_1_RESEARCH_DATA_GUIDE.md`](V4_1_RESEARCH_DATA_GUIDE.md).
 
 ## PostgreSQL, Redis, and Docker
 
@@ -163,6 +168,24 @@ study_accounts.json** on the Student Accounts screen. The database remains the
 login source of truth. Setting `"active": false` deactivates an account;
 removing a row from JSON does not delete it. Any `temporary_password` is hashed
 and cleared from the JSON file after import.
+
+Participant codes must be unique for student accounts. They are the identifiers
+shown in the research dashboard and exports; login IDs are intentionally
+excluded from those datasets.
+
+## Research study data
+
+PostgreSQL (or the local SQLite fallback) is the authoritative store for study
+sessions, active time, assignment attempts, hint/solution use, and learning
+events. The Flutter application sends a heartbeat every 30 seconds only while
+the page is visible. Code is saved only with an intentional run/submit and is
+not included in research dashboards or exports.
+
+Students can open **My study progress** from the account menu. Instructors can
+open **Research study dashboard** from the instructor studio, inspect a
+participant timeline, and download summary, attempt, or event CSV files plus a
+complete Excel workbook. All timestamps are stored in UTC and every assignment
+record includes its version.
 
 ## AI tutoring
 

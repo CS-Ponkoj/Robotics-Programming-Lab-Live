@@ -1,7 +1,16 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -58,6 +67,12 @@ class Submission(Base):
     assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"), index=True)
     assignment_version: Mapped[int] = mapped_column(Integer)
     student_id: Mapped[str] = mapped_column(String(120), default="anonymous", index=True)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    study_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("study_sessions.id"), nullable=True, index=True
+    )
     mode: Mapped[str] = mapped_column(String(20), default="submit")
     code: Mapped[str] = mapped_column(Text)
     execution_succeeded: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -128,6 +143,72 @@ class User(Base):
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    study_sessions: Mapped[list["StudySession"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    learning_events: Mapped[list["LearningEvent"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class StudySession(Base):
+    __tablename__ = "study_sessions"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "client_session_id", name="uq_study_session_user_client"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    client_session_id: Mapped[str] = mapped_column(String(120), index=True)
+    participant_code: Mapped[str | None] = mapped_column(
+        String(120), nullable=True, index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    last_active_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    ended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    active_seconds: Mapped[int] = mapped_column(Integer, default=0)
+
+    user: Mapped[User] = relationship(back_populates="study_sessions")
+    events: Mapped[list["LearningEvent"]] = relationship(
+        back_populates="study_session", cascade="all, delete-orphan"
+    )
+
+
+class LearningEvent(Base):
+    __tablename__ = "learning_events"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+    study_session_id: Mapped[str] = mapped_column(
+        ForeignKey("study_sessions.id"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    assignment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("assignments.id"), nullable=True, index=True
+    )
+    assignment_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(80), index=True)
+    event_data: Mapped[dict] = mapped_column(JSON, default=dict)
+    client_occurred_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+
+    user: Mapped[User] = relationship(back_populates="learning_events")
+    study_session: Mapped[StudySession] = relationship(back_populates="events")
 
 
 class AuthSession(Base):

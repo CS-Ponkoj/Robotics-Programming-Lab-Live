@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -29,6 +29,7 @@ from auth_service import (
     generate_temporary_password,
     normalize_email,
     normalize_login_id,
+    normalize_participant_code,
     record_audit,
     revoke_session_token,
     revoke_user_sessions,
@@ -39,7 +40,23 @@ from config import Settings, get_settings
 from database import Base, build_engine
 from email_service import EmailService
 from graders import PythonVariableGrader
-from models import Assignment, HintInteraction, Submission, User, utc_now
+from models import (
+    Assignment,
+    HintInteraction,
+    StudySession,
+    Submission,
+    User,
+    utc_now,
+)
+from research_service import (
+    build_research_dataset,
+    csv_bytes,
+    get_user_study_session,
+    participant_label,
+    record_learning_event,
+    student_research_payload,
+    xlsx_bytes,
+)
 from sandbox import build_sandbox
 from schemas import (
     AdminAssignmentPayload,
@@ -57,8 +74,12 @@ from schemas import (
     HintRequest,
     LoginRequest,
     LoginResponse,
+    LearningEventRequest,
     ResetPasswordRequest,
     SolutionRequest,
+    StudyHeartbeatRequest,
+    StudySessionResponse,
+    StudySessionStartRequest,
     SubmissionRequest,
     SubmissionResponse,
 )
@@ -104,7 +125,7 @@ def create_app(
 
     application = FastAPI(
         title="Robotics Programming Lab API",
-        version="4.0.0",
+        version="4.1.0",
         lifespan=lifespan,
         docs_url=None if configured.environment.lower() == "production" else "/docs",
         redoc_url=None if configured.environment.lower() == "production" else "/redoc",
@@ -346,6 +367,7 @@ def create_app(
         mode: str,
         result,
         user: User,
+        study_session: StudySession | None,
     ) -> Submission:
         evidence = {
             "execution_succeeded": result.execution_succeeded,
@@ -360,6 +382,8 @@ def create_app(
             assignment_id=assignment.id,
             assignment_version=assignment.version,
             student_id=user.login_id,
+            user_id=user.id,
+            study_session_id=study_session.id if study_session else None,
             mode=mode,
             code=body.code,
             execution_succeeded=result.execution_succeeded,
@@ -371,6 +395,43 @@ def create_app(
         session.commit()
         session.refresh(submission)
         return submission
+
+    def study_session_for_submission(
+        session: Session, body: SubmissionRequest, user: User
+    ) -> StudySession | None:
+        value = get_user_study_session(session, body.study_session_id, user)
+        if body.study_session_id and value is None:
+            raise HTTPException(404, "Study session not found.")
+        return value
+
+    def record_submission_event(
+        session: Session,
+        *,
+        study_session: StudySession | None,
+        user: User,
+        assignment: Assignment,
+        submission: Submission,
+        ai_tutor_requested: bool,
+    ) -> None:
+        if study_session is None:
+            return
+        record_learning_event(
+            session,
+            study_session=study_session,
+            user=user,
+            event_type=(
+                "assignment_run" if submission.mode == "run" else "assignment_submitted"
+            ),
+            assignment_id=assignment.id,
+            assignment_version=assignment.version,
+            event_data={
+                "submission_id": submission.id,
+                "execution_succeeded": submission.execution_succeeded,
+                "passed": submission.passed,
+                "score": submission.score,
+                "ai_tutor_requested": ai_tutor_requested,
+            },
+        )
 
     def response_for(
         assignment: Assignment,
@@ -409,7 +470,7 @@ def create_app(
             raise HTTPException(503, "Database unavailable.") from error
         response = {
             "status": "ok",
-            "api_version": "4.0.0",
+            "api_version": "4.1.0",
         }
         if configured.environment.lower() == "production":
             response["release"] = os.getenv("RENDER_GIT_COMMIT", "unknown")[:12]
@@ -557,6 +618,197 @@ def create_app(
         )
         return {"password_reset": True, "login_required": True}
 
+    @application.post(
+        "/research/sessions",
+        response_model=StudySessionResponse,
+        status_code=201,
+    )
+    def start_study_session(
+        body: StudySessionStartRequest,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        if user.role != "student":
+            raise HTTPException(403, "Student access required.")
+        client_session_id = body.client_session_id.strip()
+        existing = session.scalar(
+            select(StudySession).where(
+                StudySession.user_id == user.id,
+                StudySession.client_session_id == client_session_id,
+            )
+        )
+        if existing is not None:
+            return existing
+        study_session = StudySession(
+            user_id=user.id,
+            client_session_id=client_session_id,
+            participant_code=user.participant_code,
+        )
+        session.add(study_session)
+        session.commit()
+        session.refresh(study_session)
+        return study_session
+
+    @application.post(
+        "/research/sessions/{study_session_id}/heartbeat",
+        response_model=StudySessionResponse,
+    )
+    def study_heartbeat(
+        study_session_id: str,
+        body: StudyHeartbeatRequest,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        study_session = get_user_study_session(session, study_session_id, user)
+        if study_session is None:
+            raise HTTPException(404, "Study session not found.")
+        if study_session.ended_at is not None:
+            raise HTTPException(409, "Study session has ended.")
+        if body.assignment_id is not None:
+            assignment = get_assignment_or_404(session, body.assignment_id)
+            if (
+                body.assignment_version is not None
+                and body.assignment_version != assignment.version
+            ):
+                raise HTTPException(409, "Assignment version is no longer current.")
+        study_session.active_seconds += body.active_seconds
+        study_session.last_active_at = utc_now()
+        session.commit()
+        session.refresh(study_session)
+        return study_session
+
+    @application.post(
+        "/research/sessions/{study_session_id}/events",
+        status_code=201,
+    )
+    def create_learning_event(
+        study_session_id: str,
+        body: LearningEventRequest,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        import json
+
+        study_session = get_user_study_session(session, study_session_id, user)
+        if study_session is None:
+            raise HTTPException(404, "Study session not found.")
+        if study_session.ended_at is not None:
+            raise HTTPException(409, "Study session has ended.")
+        if len(json.dumps(body.event_data)) > 4_000:
+            raise HTTPException(413, "Learning event data is too large.")
+        if body.assignment_id is not None:
+            assignment = get_assignment_or_404(session, body.assignment_id)
+            if body.assignment_version not in {None, assignment.version}:
+                raise HTTPException(409, "Assignment version is no longer current.")
+        event = record_learning_event(
+            session,
+            study_session=study_session,
+            user=user,
+            event_type=body.event_type,
+            assignment_id=body.assignment_id,
+            assignment_version=body.assignment_version,
+            event_data=body.event_data,
+            client_occurred_at=body.client_occurred_at,
+        )
+        return {"event_id": event.id, "recorded": True}
+
+    @application.post(
+        "/research/sessions/{study_session_id}/end",
+        response_model=StudySessionResponse,
+    )
+    def end_study_session(
+        study_session_id: str,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        study_session = get_user_study_session(session, study_session_id, user)
+        if study_session is None:
+            raise HTTPException(404, "Study session not found.")
+        if study_session.ended_at is None:
+            study_session.ended_at = utc_now()
+            study_session.last_active_at = utc_now()
+            session.commit()
+            session.refresh(study_session)
+        return study_session
+
+    @application.get("/research/me")
+    def my_research_data(
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        if user.role != "student":
+            raise HTTPException(403, "Student access required.")
+        return student_research_payload(session, user)
+
+    @application.get("/admin/research/summary")
+    def admin_research_summary(
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        dataset = build_research_dataset(session)
+        students = session.scalars(
+            select(User).where(User.role == "student")
+        ).all()
+        ids_by_participant = {
+            participant_label(student): student.id
+            for student in students
+        }
+        return {
+            "participants": [
+                {
+                    **row,
+                    "student_id": ids_by_participant.get(row["participant_code"]),
+                }
+                for row in dataset["student_summary"]
+            ]
+        }
+
+    @application.get("/admin/research/students/{student_id}")
+    def admin_student_research_data(
+        student_id: str,
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        student = session.get(User, student_id)
+        if student is None or student.role != "student":
+            raise HTTPException(404, "Student account not found.")
+        return student_research_payload(session, student)
+
+    @application.get("/admin/research/export")
+    def admin_research_export(
+        dataset_name: str = "student_summary",
+        format: str = "csv",
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        dataset = build_research_dataset(session)
+        if format == "xlsx":
+            content = xlsx_bytes(dataset)
+            return Response(
+                content=content,
+                media_type=(
+                    "application/vnd.openxmlformats-officedocument."
+                    "spreadsheetml.sheet"
+                ),
+                headers={
+                    "Content-Disposition": (
+                        'attachment; filename="robotics_study_dataset.xlsx"'
+                    )
+                },
+            )
+        if format != "csv" or dataset_name not in dataset:
+            raise HTTPException(400, "Choose a supported research export.")
+        content = csv_bytes(dataset[dataset_name])
+        return Response(
+            content=content,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{dataset_name}.csv"'
+                )
+            },
+        )
+
     @application.get(
         "/assignments",
         response_model=AssignmentListResponse,
@@ -600,13 +852,28 @@ def create_app(
         )
         require_code(body, request)
         assignment = get_assignment_or_404(session, assignment_id)
+        study_session = study_session_for_submission(session, body, user)
         grader = grader_for(assignment, request)
         result = execute_with_capacity(
             request,
             lambda: grader.run(assignment, body.code),
         )
         submission = store_submission(
-            session, assignment, body, "run", result, user=user
+            session,
+            assignment,
+            body,
+            "run",
+            result,
+            user=user,
+            study_session=study_session,
+        )
+        record_submission_event(
+            session,
+            study_session=study_session,
+            user=user,
+            assignment=assignment,
+            submission=submission,
+            ai_tutor_requested=body.use_ai_tutor,
         )
         return response_for(assignment, submission)
 
@@ -632,13 +899,20 @@ def create_app(
             )
         require_code(body, request)
         assignment = get_assignment_or_404(session, assignment_id)
+        study_session = study_session_for_submission(session, body, user)
         grader = grader_for(assignment, request)
         result = execute_with_capacity(
             request,
             lambda: grader.grade(assignment, body.code),
         )
         submission = store_submission(
-            session, assignment, body, "submit", result, user=user
+            session,
+            assignment,
+            body,
+            "submit",
+            result,
+            user=user,
+            study_session=study_session,
         )
         tutor_feedback = None
         if body.use_ai_tutor and not result.passed:
@@ -653,6 +927,14 @@ def create_app(
                 )
             )
             session.commit()
+        record_submission_event(
+            session,
+            study_session=study_session,
+            user=user,
+            assignment=assignment,
+            submission=submission,
+            ai_tutor_requested=body.use_ai_tutor,
+        )
         return response_for(assignment, submission, tutor_feedback)
 
     @application.post("/assignments/{assignment_id}/submit")
@@ -711,6 +993,23 @@ def create_app(
             )
         )
         session.commit()
+        study_session = get_user_study_session(
+            session, submission.study_session_id, user
+        )
+        if study_session is not None:
+            record_learning_event(
+                session,
+                study_session=study_session,
+                user=user,
+                event_type="hint_requested",
+                assignment_id=assignment.id,
+                assignment_version=submission.assignment_version,
+                event_data={
+                    "submission_id": submission.id,
+                    "hint_level": body.hint_level,
+                    "source": feedback.source,
+                },
+            )
         return feedback
 
     @application.post("/assignments/{assignment_id}/solution")
@@ -737,6 +1036,19 @@ def create_app(
             raise HTTPException(
                 403,
                 "Run or submit this assignment version before revealing its solution.",
+            )
+        study_session = get_user_study_session(
+            session, submission.study_session_id, user
+        )
+        if study_session is not None:
+            record_learning_event(
+                session,
+                study_session=study_session,
+                user=user,
+                event_type="solution_revealed",
+                assignment_id=assignment.id,
+                assignment_version=submission.assignment_version,
+                event_data={"submission_id": submission.id},
             )
         return {
             "assignment_id": assignment.id,
@@ -960,9 +1272,21 @@ def create_app(
                 raise HTTPException(409, "Email address already exists.")
             user.email = email
         if "participant_code" in body.model_fields_set:
-            user.participant_code = (
-                (body.participant_code or "").strip() or None
+            participant_code = normalize_participant_code(body.participant_code)
+            duplicate_participant = (
+                session.scalar(
+                    select(User).where(
+                        User.role == "student",
+                        User.participant_code == participant_code,
+                        User.id != user.id,
+                    )
+                )
+                if participant_code
+                else None
             )
+            if duplicate_participant is not None:
+                raise HTTPException(409, "Participant code already exists.")
+            user.participant_code = participant_code
         if body.active is not None:
             user.is_active = body.active
         session.commit()

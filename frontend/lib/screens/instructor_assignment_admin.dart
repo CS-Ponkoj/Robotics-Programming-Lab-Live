@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/screens/student_accounts_page.dart';
+import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
 
@@ -66,6 +67,17 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
         title: const Text('Instructor assignment studio'),
         actions: [
           IconButton(
+            tooltip: 'Research study dashboard',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const InstructorResearchDashboard(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.insights_rounded),
+          ),
+          IconButton(
             tooltip: 'Manage student accounts',
             onPressed: () {
               Navigator.of(context).push(
@@ -105,16 +117,34 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: FilledButton.tonalIcon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const StudentAccountsPage(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.manage_accounts_outlined),
-                    label: const Text('Manage student accounts'),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const StudentAccountsPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.manage_accounts_outlined),
+                        label: const Text('Manage student accounts'),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const InstructorResearchDashboard(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.insights_rounded),
+                        label: const Text('View research dashboard'),
+                      ),
+                    ],
                   ),
                 ),
                 if (_error != null) ...[

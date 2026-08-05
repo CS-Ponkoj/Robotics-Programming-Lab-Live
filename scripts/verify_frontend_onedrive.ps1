@@ -26,9 +26,13 @@ foreach ($file in @(".metadata", "analysis_options.yaml", "pubspec.lock", "pubsp
 Push-Location $target
 try {
     flutter pub get
+    if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed." }
     flutter analyze
+    if ($LASTEXITCODE -ne 0) { throw "flutter analyze failed." }
     flutter test
+    if ($LASTEXITCODE -ne 0) { throw "flutter test failed." }
     flutter build web --release --dart-define="API_BASE_URL=$ApiBaseUrl"
+    if ($LASTEXITCODE -ne 0) { throw "flutter build web failed." }
 } finally {
     Pop-Location
 }

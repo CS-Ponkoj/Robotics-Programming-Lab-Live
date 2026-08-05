@@ -5,6 +5,7 @@ import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/auth_api.dart';
+import 'package:iuse_demo/services/research_api.dart';
 
 const _requestTimeout = Duration(seconds: 15);
 const _executionTimeout = Duration(seconds: 90);
@@ -48,6 +49,8 @@ Future<UnittestFeedbackDto> fetchUnittestFeedback(int id, String code,
         body: jsonEncode({
           'code': code,
           'use_ai_tutor': useAiTutor,
+          if (researchTracker.studySessionId != null)
+            'study_session_id': researchTracker.studySessionId,
         }),
       )
       .timeout(_executionTimeout);

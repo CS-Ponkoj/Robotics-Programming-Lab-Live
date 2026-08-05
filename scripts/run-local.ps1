@@ -111,6 +111,17 @@ function Wait-ForEndpoint {
 $token = New-LocalToken
 $processes = @()
 try {
+    $previousDatabaseUrl = [System.Environment]::GetEnvironmentVariable("DATABASE_URL", "Process")
+    [System.Environment]::SetEnvironmentVariable("DATABASE_URL", $DatabaseUrl, "Process")
+    Push-Location $backendRoot
+    try {
+        & $python -m alembic upgrade head
+        if ($LASTEXITCODE -ne 0) { throw "Database migration failed." }
+    } finally {
+        Pop-Location
+        [System.Environment]::SetEnvironmentVariable("DATABASE_URL", $previousDatabaseUrl, "Process")
+    }
+
     $sandbox = Start-ProjectProcess -Name "sandbox" -FilePath $python `
         -ArgumentList @("-m", "uvicorn", "sandbox_service:app", "--host", "127.0.0.1", "--port", "$SandboxPort", "--no-server-header") `
         -WorkingDirectory $backendRoot -Environment @{

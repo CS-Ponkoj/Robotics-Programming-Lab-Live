@@ -5,6 +5,7 @@ import 'package:iuse_demo/models/assignment_progress.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/screens/assignment_workspace.dart';
 import 'package:iuse_demo/screens/instructor_assignment_admin.dart';
+import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
@@ -544,6 +545,15 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
           child: PopupMenuButton<String>(
             tooltip: 'Account menu',
             onSelected: (value) async {
+              if (value == 'study-data' && context.mounted) {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => user.isInstructor
+                        ? const InstructorResearchDashboard()
+                        : const StudentResearchPage(),
+                  ),
+                );
+              }
               if (value == 'logout') {
                 await Future<void>.delayed(Duration.zero);
                 await onLogout();
@@ -558,6 +568,18 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'study-data',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.insights_rounded),
+                  title: Text(
+                    user.isInstructor
+                        ? 'Research dashboard'
+                        : 'My study progress',
+                  ),
+                ),
+              ),
               const PopupMenuItem<String>(
                 value: 'logout',
                 child: ListTile(

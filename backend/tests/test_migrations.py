@@ -16,7 +16,9 @@ EXPECTED_TABLES = {
     "audit_events",
     "auth_sessions",
     "hint_interactions",
+    "learning_events",
     "password_reset_tokens",
+    "study_sessions",
     "submissions",
     "users",
 }
@@ -48,19 +50,34 @@ def test_alembic_creates_a_fresh_schema(tmp_path, monkeypatch):
     engine.dispose()
 
 
-def test_alembic_adopts_an_existing_v3_schema(tmp_path, monkeypatch):
+def test_alembic_upgrades_an_existing_v4_baseline(tmp_path, monkeypatch):
     database_path = tmp_path / "existing.sqlite"
-    engine = build_engine(f"sqlite:///{database_path.as_posix()}")
-    Base.metadata.create_all(engine)
-    engine.dispose()
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    command.upgrade(config, "head")
+    command.downgrade(config, "0001_v4_baseline")
 
-    _upgrade(database_path, monkeypatch)
+    baseline_engine = build_engine(database_url)
+    baseline_tables = set(inspect(baseline_engine).get_table_names())
+    baseline_columns = {
+        column["name"] for column in inspect(baseline_engine).get_columns("submissions")
+    }
+    assert "study_sessions" not in baseline_tables
+    assert "learning_events" not in baseline_tables
+    assert "study_session_id" not in baseline_columns
+    baseline_engine.dispose()
 
-    migrated_engine = build_engine(f"sqlite:///{database_path.as_posix()}")
-    assert EXPECTED_TABLES.issubset(
-        set(inspect(migrated_engine).get_table_names())
-    )
+    command.upgrade(config, "head")
+    migrated_engine = build_engine(database_url)
+    assert EXPECTED_TABLES.issubset(set(inspect(migrated_engine).get_table_names()))
+    migrated_columns = {
+        column["name"] for column in inspect(migrated_engine).get_columns("submissions")
+    }
+    assert {"user_id", "study_session_id"}.issubset(migrated_columns)
     migrated_engine.dispose()
+    get_settings.cache_clear()
 
 
 def test_disposable_database_rollback_and_recovery_rehearsal(tmp_path, monkeypatch):

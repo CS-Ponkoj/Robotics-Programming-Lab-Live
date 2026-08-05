@@ -8,6 +8,7 @@ import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/assignment_api.dart';
+import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:highlight/languages/python.dart';
@@ -49,6 +50,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _controller =
         CodeController(language: python, params: EditorParams(tabSpaces: 4));
     _assignment = fetchAssignment(widget.id);
+    unawaited(_trackAssignmentOpened());
     _feedback = fetchUnittestFeedback(widget.id, "");
     _submissionId = learningProgress.submissionIds[widget.id] ?? '';
     if (solutionRevealedAssignments.contains(widget.id) &&
@@ -57,9 +59,42 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  Future<void> _trackAssignmentOpened() async {
+    try {
+      final assignment = await _assignment;
+      researchTracker.setActiveAssignment(widget.id, assignment.version);
+      await researchTracker.trackEvent(
+        'assignment_opened',
+        assignmentId: widget.id,
+        assignmentVersion: assignment.version,
+        eventData: const {'source': 'assignment_catalog'},
+      );
+    } on Object {
+      // Research capture never changes assignment loading behavior.
+    }
+  }
+
+  Future<void> _trackWorkspaceEvent(
+    String eventType,
+    Map<String, dynamic> eventData,
+  ) async {
+    try {
+      final assignment = await _assignment;
+      await researchTracker.trackEvent(
+        eventType,
+        assignmentId: widget.id,
+        assignmentVersion: assignment.version,
+        eventData: eventData,
+      );
+    } on Object {
+      // Research capture never changes assignment interaction behavior.
+    }
+  }
+
   @override
   void dispose() {
     _draftSaveTimer?.cancel();
+    researchTracker.clearActiveAssignment(widget.id);
     if (!_init) {
       unawaited(learningProgress.saveDraft(widget.id, _code));
     }
@@ -227,6 +262,12 @@ class _MyHomePageState extends State<MyHomePage> {
       onHome: () => Navigator.of(context).popUntil((route) => route.isFirst),
       onFeedbackChanged: (value) {
         setState(() => _enableFeedback = value);
+        unawaited(
+          _trackWorkspaceEvent(
+            'ai_tutor_toggled',
+            {'enabled': value},
+          ),
+        );
       },
     );
 
@@ -277,6 +318,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   selectedIndex: _selectedWorkspaceTab,
                   onDestinationSelected: (index) {
                     setState(() => _selectedWorkspaceTab = index);
+                    unawaited(
+                      _trackWorkspaceEvent(
+                        'workspace_tab_changed',
+                        {'tab_index': index},
+                      ),
+                    );
                   },
                 ),
               Expanded(

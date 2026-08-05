@@ -13,6 +13,7 @@ from auth_service import (
     create_user,
     normalize_email,
     normalize_login_id,
+    normalize_participant_code,
     record_audit,
     revoke_user_sessions,
 )
@@ -170,9 +171,22 @@ def sync_accounts_from_json(session: Session, path: Path) -> dict:
 
             changed = False
             new_email = normalize_email(account.get("email"))
-            participant_code = (
-                str(account.get("participant_code") or "").strip() or None
+            participant_code = normalize_participant_code(
+                str(account.get("participant_code") or "")
             )
+            duplicate_participant = (
+                session.scalar(
+                    select(User).where(
+                        User.role == "student",
+                        User.participant_code == participant_code,
+                        User.id != user.id,
+                    )
+                )
+                if role == "student" and participant_code
+                else None
+            )
+            if duplicate_participant is not None:
+                raise ValueError("participant code already exists")
             if user.role != role:
                 user.role = role
                 changed = True

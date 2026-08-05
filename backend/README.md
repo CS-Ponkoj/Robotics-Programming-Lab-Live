@@ -9,6 +9,8 @@
 - Submission execution can use a restricted local worker or per-run Docker sandbox.
 - Server-side sessions authorize student and instructor roles.
 - Instructor tools manage study accounts without exposing password hashes.
+- Research sessions and learning events use participant codes in dashboards and
+  exports; submitted code and login IDs are excluded from research datasets.
 
 Docker Compose loads secrets and instructor settings from the ignored
 `backend/.env` file and defaults submission execution to the Docker sandbox.
