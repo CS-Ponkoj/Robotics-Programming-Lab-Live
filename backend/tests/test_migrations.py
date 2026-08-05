@@ -61,3 +61,27 @@ def test_alembic_adopts_an_existing_v3_schema(tmp_path, monkeypatch):
         set(inspect(migrated_engine).get_table_names())
     )
     migrated_engine.dispose()
+
+
+def test_disposable_database_rollback_and_recovery_rehearsal(tmp_path, monkeypatch):
+    database_path = tmp_path / "rollback-rehearsal.sqlite"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+
+    command.upgrade(config, "head")
+    upgraded_engine = build_engine(database_url)
+    assert EXPECTED_TABLES.issubset(set(inspect(upgraded_engine).get_table_names()))
+    upgraded_engine.dispose()
+
+    command.downgrade(config, "base")
+    rolled_back_engine = build_engine(database_url)
+    assert set(inspect(rolled_back_engine).get_table_names()) == {"alembic_version"}
+    rolled_back_engine.dispose()
+
+    command.upgrade(config, "head")
+    recovered_engine = build_engine(database_url)
+    assert EXPECTED_TABLES.issubset(set(inspect(recovered_engine).get_table_names()))
+    recovered_engine.dispose()
+    get_settings.cache_clear()

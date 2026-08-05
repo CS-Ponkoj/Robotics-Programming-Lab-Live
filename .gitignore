@@ -80,6 +80,9 @@ __pycache__/
 # Ignore Windows folder settings
 desktop.ini
 
+# Generated local SQA exports (the maintained workbook remains at repository root)
+outputs/
+
 
 
 # You may also ignore generated Flutter plugin files if they are re-generated,

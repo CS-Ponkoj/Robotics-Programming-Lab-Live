@@ -42,6 +42,13 @@ row does nothing, while `"active": false` deactivates an account.
 `temporary_password` values are hashed and removed from the JSON file after a
 successful import.
 
+You can edit `data/study_accounts.json` directly in VS Code or Notepad. Add a
+row to create an account, enter a new `temporary_password` to change its
+password, or set `"active": false` to remove its login access while preserving
+its study records. To rename a login ID safely, add the new ID and deactivate
+the old ID. Do not commit this ignored file because it can briefly contain
+plain-text temporary passwords.
+
 Email/reset features are disabled by default for the v4 professor demo. If they
 are enabled in a later release, configure SMTP settings in `.env` to deliver one-time activation and reset
 links. When SMTP is not configured, development messages stay in the in-memory
