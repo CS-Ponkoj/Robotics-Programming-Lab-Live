@@ -4,7 +4,7 @@
 
 **Branch:** `codex-ros-local-assignment` based on staging `main` at `522dd745`
 
-**Decision:** PASS for staging publication. The local code-only ROS assignment and its real container grader pass. Live deployment remains a separate future step because it requires a hosted ROS worker.
+**Decision:** PASS for staging feature-branch publication; HOLD staging `main` until the rendered-browser visual checklist is completed. The local code-only ROS assignment, real container grader and hands-on API workflow pass. Live deployment remains a separate future step because it requires a hosted ROS worker.
 
 | Area | Result | Evidence |
 |---|---:|---|
@@ -29,17 +29,20 @@
 | Authenticated real ROS API | PASS | Student login to Assignment 5 run returns execution success, score 100 and seven passing evidence rows in 10.68 seconds |
 | Adversarial real ROS matrix | PASS | Wrong velocity, syntax error, runtime crash, unsafe import, infinite loop, excessive output and oversized code all produced the expected bounded result |
 | Container isolation | PASS | Non-root worker, network disabled, read-only root, capability drop, no-new-privileges, resource limits, executable workspace and non-executable `/tmp` |
+| Manual functional QA | PASS | Staging-folder run passed 12 hands-on checks: service health, invalid login, both roles, role isolation, instructor validation, safe project tree, correct score 100 and wrong velocity rejected at score 80 |
 | Rendered browser interaction | BLOCKED | Codex browser control could not start because of a Windows sandbox helper failure; widget behavior remains covered by Flutter tests |
 
 ## Staging decision and live limitation
 
-The feature is ready for the staging Git repository and local classroom evaluation. Recheck the local ROS image at any time with:
+The feature is ready on the staging Git feature branch and for local classroom evaluation. Recheck the local ROS image at any time with:
 
 ```powershell
 .\scripts\check-ros2-local.ps1
 ```
 
 Do not promote Assignment 5 to the current live Render service yet. Render cannot run this local Docker-in-Docker grader design. A separate hosted ROS worker or container-job service must be designed, secured and SQA-tested before live publication.
+
+Before merging staging `main`, open `http://127.0.0.1:8180` and visually confirm: login layout, Assignment 5 file tree, lock icons on six files, editable `controller.py`, correct-result presentation, wrong-result presentation, narrow/mobile layout and keyboard navigation.
 
 ## Repository-answer limitation
 
