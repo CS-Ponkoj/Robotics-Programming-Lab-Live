@@ -3,6 +3,10 @@
 A configurable robotics-education platform with a Flutter student/instructor
 interface and a FastAPI assignment, grading, simulation, and tutoring API.
 
+## Live application
+
+Open the classroom-ready web application: [Robotics Programming Lab](https://robotics-programming-lab.vercel.app/)
+
 ## What is implemented
 
 - Versioned, database-backed assignment definitions
