@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:highlight/languages/python.dart';
 import 'package:iuse_demo/main.dart' as app;
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
@@ -20,6 +22,120 @@ const testAuthenticatedUser = AuthenticatedUser(
 Future<void> testLogout() async {}
 
 void main() {
+  test('assignment DTO parses the ROS project file permissions', () {
+    final assignment = AssignmentDto.fromJson({
+      'id': 5,
+      'stable_id': 'ros2-drive-forward',
+      'version': 1,
+      'title': 'Drive Forward and Stop',
+      'description': 'ROS 2 assignment',
+      'assignment_html': '<p>Instructions</p>',
+      'starter_code': 'pass',
+      'language': 'python-ros2',
+      'project_files': [
+        {
+          'path': 'src/robot_motion/package.xml',
+          'content': '<package/>',
+          'editable': false,
+        },
+        {
+          'path': 'src/robot_motion/robot_motion/controller.py',
+          'content': '',
+          'editable': true,
+        },
+      ],
+      'editable_file_path': 'src/robot_motion/robot_motion/controller.py',
+      'vals': <String, dynamic>{},
+    });
+
+    expect(assignment.projectFiles, hasLength(2));
+    expect(
+      assignment.projectFiles.singleWhere((file) => file.editable).path,
+      endsWith('controller.py'),
+    );
+    expect(assignment.editableFilePath, endsWith('controller.py'));
+  });
+
+  testWidgets('ROS project explorer identifies editable and locked files', (
+    WidgetTester tester,
+  ) async {
+    const files = [
+      AssignmentProjectFile(
+        path: 'src/robot_motion/package.xml',
+        content: '<package/>',
+      ),
+      AssignmentProjectFile(
+        path: 'src/robot_motion/robot_motion/controller.py',
+        editable: true,
+      ),
+    ];
+    AssignmentProjectFile? selected;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: app.AssignmentProjectExplorer(
+            files: files,
+            selectedPath: files.last.path,
+            onFileSelected: (file) => selected = file,
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const Key('assignment-project-file-tree')),
+      findsOneWidget,
+    );
+    expect(find.text('package.xml'), findsOneWidget);
+    expect(find.text('controller.py'), findsOneWidget);
+    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+
+    await tester.tap(find.text('package.xml'));
+    expect(selected?.path, endsWith('package.xml'));
+    expect(selected?.editable, isFalse);
+  });
+
+  testWidgets('locked ROS project file makes the code viewer read only', (
+    WidgetTester tester,
+  ) async {
+    final controller = CodeController(language: python, text: '<package/>');
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: SizedBox(
+            width: 900,
+            height: 600,
+            child: app.AssignmentProjectWorkspace(
+              files: const [
+                AssignmentProjectFile(
+                  path: 'src/robot_motion/package.xml',
+                  content: '<package/>',
+                ),
+              ],
+              selectedPath: 'src/robot_motion/package.xml',
+              selectedFileEditable: false,
+              controller: controller,
+              onFileSelected: (_) {},
+              onChanged: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final codeField = tester.widget<CodeField>(
+      find.byKey(const Key('assignment-code-field')),
+    );
+    expect(codeField.readOnly, isTrue);
+    expect(find.text('Read only'), findsOneWidget);
+  });
+
   test('only the authenticated app URL restores a browser session', () {
     expect(
       isAuthenticatedAppEntry(
@@ -41,15 +157,14 @@ void main() {
     );
   });
 
-  testWidgets('the public root clears a saved session and shows login',
-      (WidgetTester tester) async {
+  testWidgets('the public root clears a saved session and shows login', (
+    WidgetTester tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
       'auth_session_token': 'previous-demo-session',
     });
 
-    await tester.pumpWidget(
-      const app.MyApp(forceFreshLoginOnStart: true),
-    );
+    await tester.pumpWidget(const app.MyApp(forceFreshLoginOnStart: true));
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginPage), findsOneWidget);
@@ -57,16 +172,14 @@ void main() {
     expect(preferences.getString('auth_session_token'), isNull);
   });
 
-  testWidgets('shared app theme defines the visual system',
-      (WidgetTester tester) async {
+  testWidgets('shared app theme defines the visual system', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildAppTheme(),
         home: const Scaffold(
-          body: FilledButton(
-            onPressed: null,
-            child: Text('Themed action'),
-          ),
+          body: FilledButton(onPressed: null, child: Text('Themed action')),
         ),
       ),
     );
@@ -79,120 +192,121 @@ void main() {
     expect(theme.progressIndicatorTheme.linearMinHeight, 8);
   });
 
-  testWidgets('assignment workspace adapts from desktop panels to mobile tabs',
-      (WidgetTester tester) async {
-    Widget workspaceApp(Size size) {
-      return MaterialApp(
-        theme: buildAppTheme(),
-        home: MediaQuery(
-          data: MediaQueryData(size: size),
-          child: const app.MyHomePage(
-            title: 'Assignment 1: Navigation',
-            id: 1,
+  testWidgets(
+    'assignment workspace adapts from desktop panels to mobile tabs',
+    (WidgetTester tester) async {
+      Widget workspaceApp(Size size) {
+        return MaterialApp(
+          theme: buildAppTheme(),
+          home: MediaQuery(
+            data: MediaQueryData(size: size),
+            child: const app.MyHomePage(
+              title: 'Assignment 1: Navigation',
+              id: 1,
+            ),
           ),
-        ),
+        );
+      }
+
+      await tester.pumpWidget(workspaceApp(const Size(1200, 900)));
+
+      expect(
+        find.byKey(const Key('assignment-workspace-navigation')),
+        findsNothing,
       );
-    }
+      expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
+      expect(
+        find.byKey(const Key('assignment-instructions-panel')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+      expect(find.byKey(const Key('workspace-resize-handle')), findsOneWidget);
 
-    await tester.pumpWidget(workspaceApp(const Size(1200, 900)));
+      final initialEditorWidth = tester
+          .getSize(find.byKey(const Key('assignment-editor-panel')))
+          .width;
+      await tester.drag(
+        find.byKey(const Key('workspace-resize-handle')),
+        const Offset(120, 0),
+      );
+      await tester.pump();
+      expect(
+        tester.getSize(find.byKey(const Key('assignment-editor-panel'))).width,
+        greaterThan(initialEditorWidth),
+      );
 
-    expect(
-      find.byKey(const Key('assignment-workspace-navigation')),
-      findsNothing,
-    );
-    expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
-    expect(
-      find.byKey(const Key('assignment-instructions-panel')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
-    expect(
-      find.byKey(const Key('workspace-resize-handle')),
-      findsOneWidget,
-    );
+      await tester.tap(find.byKey(const Key('focus-editor-button')));
+      await tester.pump();
+      expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
+      expect(
+        find.byKey(const Key('assignment-instructions-panel')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
+      expect(find.byTooltip('Restore workspace'), findsOneWidget);
 
-    final initialEditorWidth =
-        tester.getSize(find.byKey(const Key('assignment-editor-panel'))).width;
-    await tester.drag(
-      find.byKey(const Key('workspace-resize-handle')),
-      const Offset(120, 0),
-    );
-    await tester.pump();
-    expect(
-      tester.getSize(find.byKey(const Key('assignment-editor-panel'))).width,
-      greaterThan(initialEditorWidth),
-    );
+      await tester.tap(find.byKey(const Key('focus-editor-button')));
+      await tester.pump();
+      expect(
+        find.byKey(const Key('assignment-instructions-panel')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('focus-editor-button')));
-    await tester.pump();
-    expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
-    expect(
-      find.byKey(const Key('assignment-instructions-panel')),
-      findsNothing,
-    );
-    expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
-    expect(find.byTooltip('Restore workspace'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pump();
+      expect(
+        find.byKey(const Key('assignment-instructions-panel')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('assignment-editor-panel')), findsNothing);
+      expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('focus-editor-button')));
-    await tester.pump();
-    expect(
-      find.byKey(const Key('assignment-instructions-panel')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
+      expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-    await tester.pump();
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
-    await tester.pump();
-    expect(
-      find.byKey(const Key('assignment-instructions-panel')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('assignment-editor-panel')), findsNothing);
-    expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
+      await tester.pumpWidget(workspaceApp(const Size(390, 844)));
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pump();
-    expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
-    expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+      expect(
+        find.byKey(const Key('assignment-workspace-navigation')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
+      expect(
+        find.byKey(const Key('assignment-instructions-panel')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
 
-    await tester.pumpWidget(workspaceApp(const Size(390, 844)));
+      await tester.tap(find.text('Instructions'));
+      await tester.pump();
 
-    expect(
-      find.byKey(const Key('assignment-workspace-navigation')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
-    expect(
-      find.byKey(const Key('assignment-instructions-panel')),
-      findsNothing,
-    );
-    expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
+      expect(find.byKey(const Key('assignment-editor-panel')), findsNothing);
+      expect(
+        find.byKey(const Key('assignment-instructions-panel')),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.text('Instructions'));
-    await tester.pump();
+      await tester.tap(find.text('Results'));
+      await tester.pump();
 
-    expect(find.byKey(const Key('assignment-editor-panel')), findsNothing);
-    expect(
-      find.byKey(const Key('assignment-instructions-panel')),
-      findsOneWidget,
-    );
+      expect(
+        find.byKey(const Key('assignment-instructions-panel')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+    },
+  );
 
-    await tester.tap(find.text('Results'));
-    await tester.pump();
-
-    expect(
-      find.byKey(const Key('assignment-instructions-panel')),
-      findsNothing,
-    );
-    expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
-  });
-
-  testWidgets('assignment header preserves back and feedback controls',
-      (WidgetTester tester) async {
+  testWidgets('assignment header preserves back and feedback controls', (
+    WidgetTester tester,
+  ) async {
     var backCount = 0;
     var homeCount = 0;
     var feedbackEnabled = false;
@@ -229,17 +343,15 @@ void main() {
     expect(feedbackEnabled, isTrue);
   });
 
-  testWidgets('control enter runs assignment tests from the keyboard',
-      (WidgetTester tester) async {
+  testWidgets('control enter runs assignment tests from the keyboard', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildAppTheme(),
         home: const MediaQuery(
           data: MediaQueryData(size: Size(1200, 900)),
-          child: app.MyHomePage(
-            title: 'Assignment 1: Navigation',
-            id: 1,
-          ),
+          child: app.MyHomePage(title: 'Assignment 1: Navigation', id: 1),
         ),
       ),
     );
@@ -259,8 +371,9 @@ void main() {
     expect(find.text('Ready when you are'), findsNothing);
   });
 
-  testWidgets('editor toolbar runs tests once and exposes running state',
-      (WidgetTester tester) async {
+  testWidgets('editor toolbar runs tests once and exposes running state', (
+    WidgetTester tester,
+  ) async {
     var runCount = 0;
     final semantics = tester.ensureSemantics();
 
@@ -296,8 +409,9 @@ void main() {
     expect(runCount, 1);
   });
 
-  testWidgets('workspace panel header presents consistent panel identity',
-      (WidgetTester tester) async {
+  testWidgets('workspace panel header presents consistent panel identity', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildAppTheme(),
@@ -313,18 +427,13 @@ void main() {
 
     expect(find.byIcon(Icons.fact_check_rounded), findsOneWidget);
     expect(find.text('Results'), findsOneWidget);
-    expect(
-      find.text('Review test outcomes and feedback'),
-      findsOneWidget,
-    );
-    expect(
-      tester.getSize(find.byType(app.AssignmentPanelHeader)).height,
-      64,
-    );
+    expect(find.text('Review test outcomes and feedback'), findsOneWidget);
+    expect(tester.getSize(find.byType(app.AssignmentPanelHeader)).height, 64);
   });
 
-  testWidgets('assignment instructions organize content without losing it',
-      (WidgetTester tester) async {
+  testWidgets('assignment instructions organize content without losing it', (
+    WidgetTester tester,
+  ) async {
     final semantics = tester.ensureSemantics();
     var solutionRevealed = false;
     const html = '''
@@ -397,9 +506,7 @@ void main() {
     expect(find.text('Reveal worked solution?'), findsOneWidget);
     expect(solutionRevealed, isFalse);
 
-    await tester.tap(
-      find.byKey(const Key('confirm-solution-reveal-button')),
-    );
+    await tester.tap(find.byKey(const Key('confirm-solution-reveal-button')));
     await tester.pumpAndSettle();
 
     expect(solutionRevealed, isTrue);
@@ -411,8 +518,9 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('worked solution stays locked until a test run is completed',
-      (WidgetTester tester) async {
+  testWidgets('worked solution stays locked until a test run is completed', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildAppTheme(),
@@ -455,8 +563,9 @@ void main() {
     expect(assignment.solutionHtml, contains('16.82842712474619 units'));
   });
 
-  testWidgets('landing page header presents the robotics lab identity',
-      (WidgetTester tester) async {
+  testWidgets('landing page header presents the robotics lab identity', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -479,8 +588,9 @@ void main() {
     expect(find.byIcon(Icons.admin_panel_settings_outlined), findsNothing);
   });
 
-  testWidgets('account menu waits for logout without leaving a popup route',
-      (WidgetTester tester) async {
+  testWidgets('account menu waits for logout without leaving a popup route', (
+    WidgetTester tester,
+  ) async {
     var logoutCalls = 0;
     await tester.pumpWidget(
       MaterialApp(
@@ -504,8 +614,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('instructor header exposes role-authorized management',
-      (WidgetTester tester) async {
+  testWidgets('instructor header exposes role-authorized management', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -524,12 +635,11 @@ void main() {
     expect(find.byIcon(Icons.admin_panel_settings_outlined), findsOneWidget);
   });
 
-  testWidgets('login page asks for study credentials',
-      (WidgetTester tester) async {
+  testWidgets('login page asks for study credentials', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: LoginPage(onAuthenticated: (_) {}),
-      ),
+      MaterialApp(home: LoginPage(onAuthenticated: (_) {})),
     );
 
     expect(find.byKey(const Key('login-id-field')), findsOneWidget);
@@ -540,17 +650,16 @@ void main() {
     expect(find.text('Forgot password?'), findsNothing);
   });
 
-  testWidgets('landing page content is centered and width constrained',
-      (WidgetTester tester) async {
+  testWidgets('landing page content is centered and width constrained', (
+    WidgetTester tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(1600, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
-          body: LandingPageContent(
-            child: ColoredBox(color: Colors.white),
-          ),
+          body: LandingPageContent(child: ColoredBox(color: Colors.white)),
         ),
       ),
     );
@@ -561,8 +670,9 @@ void main() {
     expect(tester.getCenter(content).dx, 800);
   });
 
-  testWidgets('landing page frame uses the neutral learning surface',
-      (WidgetTester tester) async {
+  testWidgets('landing page frame uses the neutral learning surface', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: LandingPageFrame(
@@ -579,12 +689,11 @@ void main() {
     expect(scaffold.backgroundColor, landingPageBackgroundColor);
   });
 
-  testWidgets('loading state presents assignment placeholders',
-      (WidgetTester tester) async {
+  testWidgets('loading state presents assignment placeholders', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(body: AssignmentLoadingState()),
-      ),
+      const MaterialApp(home: Scaffold(body: AssignmentLoadingState())),
     );
 
     expect(find.text('Loading assignments…'), findsOneWidget);
@@ -592,16 +701,15 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
-  testWidgets('error state retries assignment loading',
-      (WidgetTester tester) async {
+  testWidgets('error state retries assignment loading', (
+    WidgetTester tester,
+  ) async {
     var retryCount = 0;
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: AssignmentLoadError(
-            onRetry: () => retryCount += 1,
-          ),
+          body: AssignmentLoadError(onRetry: () => retryCount += 1),
         ),
       ),
     );
@@ -611,8 +719,9 @@ void main() {
     expect(retryCount, 1);
   });
 
-  testWidgets('progress summary reflects completed assignments',
-      (WidgetTester tester) async {
+  testWidgets('progress summary reflects completed assignments', (
+    WidgetTester tester,
+  ) async {
     app.learningProgress.latestScores
       ..clear()
       ..addAll({1: 60, 2: 60});
@@ -626,22 +735,22 @@ void main() {
 
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(
-          body: ProgressSummary(totalAssignments: 4),
-        ),
+        home: Scaffold(body: ProgressSummary(totalAssignments: 4)),
       ),
     );
 
     expect(find.text('1 of 4 assignments completed'), findsOneWidget);
     expect(find.text('25%'), findsOneWidget);
 
-    final progress = tester
-        .widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
+    final progress = tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator),
+    );
     expect(progress.value, 0.25);
   });
 
-  testWidgets('assignment collection switches between grid and list layouts',
-      (WidgetTester tester) async {
+  testWidgets('assignment collection switches between grid and list layouts', (
+    WidgetTester tester,
+  ) async {
     const assignments = [
       AssignmentDto(
         id: 1,
@@ -689,8 +798,9 @@ void main() {
     expect(find.byKey(const Key('assignment-list')), findsOneWidget);
   });
 
-  testWidgets('assignment card keeps the existing assignment navigation',
-      (WidgetTester tester) async {
+  testWidgets('assignment card keeps the existing assignment navigation', (
+    WidgetTester tester,
+  ) async {
     const assignment = AssignmentDto(
       id: 1,
       title: 'Assignment 1: Obstacle Avoidance',
@@ -726,8 +836,9 @@ void main() {
     expect(find.byType(app.MyHomePage), findsOneWidget);
   });
 
-  testWidgets('assignment card marks a revealed solution',
-      (WidgetTester tester) async {
+  testWidgets('assignment card marks a revealed solution', (
+    WidgetTester tester,
+  ) async {
     const assignment = AssignmentDto(
       id: 2,
       title: 'Assignment 2: Planning',
@@ -757,8 +868,9 @@ void main() {
     expect(find.text('Solution viewed'), findsOneWidget);
   });
 
-  testWidgets('assignment card distinguishes progress state from score',
-      (WidgetTester tester) async {
+  testWidgets('assignment card distinguishes progress state from score', (
+    WidgetTester tester,
+  ) async {
     const assignment = AssignmentDto(
       id: 3,
       title: 'Assignment 3: Navigation',
@@ -794,8 +906,9 @@ void main() {
     expect(find.text('Last score: 60%'), findsOneWidget);
   });
 
-  testWidgets('feedback uses boolean results for pass and accuracy counts',
-      (WidgetTester tester) async {
+  testWidgets('feedback uses boolean results for pass and accuracy counts', (
+    WidgetTester tester,
+  ) async {
     const feedback = UnittestFeedbackDto(
       id: 2,
       testedVals: ['first', 'second'],
@@ -829,8 +942,9 @@ void main() {
     expect(find.byIcon(Icons.close_rounded), findsNWidgets(2));
   });
 
-  testWidgets('guided feedback presents terminal output and hint separately',
-      (WidgetTester tester) async {
+  testWidgets('guided feedback presents terminal output and hint separately', (
+    WidgetTester tester,
+  ) async {
     const feedback = UnittestFeedbackDto(
       id: 1,
       testedVals: [],
@@ -863,16 +977,15 @@ void main() {
     );
   });
 
-  testWidgets('test run error explains how to recover and retries',
-      (WidgetTester tester) async {
+  testWidgets('test run error explains how to recover and retries', (
+    WidgetTester tester,
+  ) async {
     var retryCount = 0;
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: app.TestRunErrorState(
-            onRetry: () => retryCount += 1,
-          ),
+          body: app.TestRunErrorState(onRetry: () => retryCount += 1),
         ),
       ),
     );
@@ -885,22 +998,24 @@ void main() {
     expect(retryCount, 1);
   });
 
-  testWidgets('secure grader loading state explains free-tier startup delay',
-      (WidgetTester tester) async {
+  testWidgets('secure grader loading state explains free-tier startup delay', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(body: app.SecureGraderLoadingState()),
-      ),
+      const MaterialApp(home: Scaffold(body: app.SecureGraderLoadingState())),
     );
 
     expect(
-        find.byKey(const Key('secure-grader-loading-state')), findsOneWidget);
+      find.byKey(const Key('secure-grader-loading-state')),
+      findsOneWidget,
+    );
     expect(find.text('Starting secure grader…'), findsOneWidget);
     expect(find.textContaining('up to one minute'), findsOneWidget);
   });
 
-  testWidgets('results remain readable and overflow-free on a narrow screen',
-      (WidgetTester tester) async {
+  testWidgets('results remain readable and overflow-free on a narrow screen', (
+    WidgetTester tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(320, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final semantics = tester.ensureSemantics();

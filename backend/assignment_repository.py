@@ -80,6 +80,7 @@ class AssignmentRepository:
             assignment_id = int(source["id"])
             expected_values = source.get("vals", {})
             reference_path = REFERENCE_SOLUTIONS.get(assignment_id)
+            configured_reference_path = source.get("reference_solution_path")
             assignment = Assignment(
                 id=assignment_id,
                 stable_id=source.get(
@@ -132,12 +133,18 @@ class AssignmentRepository:
                 ),
                 asset_manifest=source.get("asset_manifest", []),
                 grader_type=source.get("grader_type", "python_variables"),
-                grader_config={"expected_values": expected_values},
+                grader_config=source.get(
+                    "grader_config", {"expected_values": expected_values}
+                ),
                 solution_html=source.get("solution_html", ""),
                 reference_solution_path=(
-                    str(reference_path.relative_to(BASE_DIR.parent))
-                    if reference_path and reference_path.is_file()
-                    else None
+                    configured_reference_path
+                    if configured_reference_path
+                    else (
+                        str(reference_path.relative_to(BASE_DIR.parent))
+                        if reference_path and reference_path.is_file()
+                        else None
+                    )
                 ),
             )
             current = self.session.get(Assignment, assignment_id)
@@ -236,6 +243,18 @@ class AssignmentRepository:
 
 
 def to_student_assignment(assignment: Assignment) -> AssignmentStudent:
+    project_files = [
+        {
+            "path": str(item.get("path", "")),
+            "content": str(item.get("content", "")),
+            "editable": item.get("editable") is True,
+        }
+        for item in (assignment.asset_manifest or [])
+        if isinstance(item, dict)
+        and item.get("kind") == "project_file"
+        and str(item.get("path", "")).strip()
+    ]
+    editable_paths = [item["path"] for item in project_files if item["editable"]]
     return AssignmentStudent(
         id=assignment.id,
         stable_id=assignment.stable_id,
@@ -249,6 +268,8 @@ def to_student_assignment(assignment: Assignment) -> AssignmentStudent:
         public_tests=assignment.public_tests or [],
         rubric=assignment.rubric or [],
         simulation_config=assignment.simulation_config or {},
+        project_files=project_files,
+        editable_file_path=editable_paths[0] if len(editable_paths) == 1 else None,
         has_solution=bool(assignment.solution_html),
         solution_html="",
         vals={},

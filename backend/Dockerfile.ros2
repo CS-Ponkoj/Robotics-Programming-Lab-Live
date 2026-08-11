@@ -1,0 +1,13 @@
+FROM ros:jazzy-ros-base-noble@sha256:31daab66eef9139933379fb67159449944f4e2dcf2e22c2d12cc715f29873e0f
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-colcon-common-extensions \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 10001 --create-home --shell /usr/sbin/nologin grader
+
+WORKDIR /grader
+COPY ros2_worker.py /grader/ros2_worker.py
+COPY ros2_topic_harness.py /grader/ros2_topic_harness.py
+
+USER 10001:10001
+ENTRYPOINT ["/ros_entrypoint.sh", "python3", "/grader/ros2_worker.py"]

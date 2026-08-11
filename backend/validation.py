@@ -23,11 +23,25 @@ def validate_assignment(
         errors.append("At least one learning objective is required.")
     if not assignment.rubric:
         errors.append("At least one rubric criterion is required.")
-    if assignment.grader_type != "python_variables":
+    if assignment.grader_type == "python_variables":
+        expected = (assignment.grader_config or {}).get("expected_values", {})
+        if not expected:
+            errors.append("Hidden expected values are required for this grader.")
+    elif assignment.grader_type == "ros2_topic":
+        config = assignment.grader_config or {}
+        for name in ("package_name", "executable", "topic", "message_type"):
+            if not str(config.get(name, "")).strip():
+                errors.append(f"ROS 2 grader setting '{name}' is required.")
+        project_files = [
+            item
+            for item in (assignment.asset_manifest or [])
+            if isinstance(item, dict) and item.get("kind") == "project_file"
+        ]
+        editable_files = [item for item in project_files if item.get("editable") is True]
+        if len(editable_files) != 1:
+            errors.append("A ROS 2 assignment must have exactly one editable project file.")
+    else:
         errors.append(f"Unsupported grader type: {assignment.grader_type}.")
-    expected = (assignment.grader_config or {}).get("expected_values", {})
-    if not expected:
-        errors.append("Hidden expected values are required for this grader.")
     if not assignment.reference_solution_path:
         errors.append("A server-side reference solution path is required.")
         return errors

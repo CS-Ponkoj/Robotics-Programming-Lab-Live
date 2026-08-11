@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     sandbox_url: str | None = None
     sandbox_api_token: str | None = None
     sandbox_http_timeout_seconds: float = 75.0
+    ros2_grader_image: str = "robotics-lab-ros2-grader:jazzy-v1"
     object_storage_root: Path = BASE_DIR / "managed_assets"
     max_submission_chars: int = 50_000
     max_request_bytes: int = 100_000

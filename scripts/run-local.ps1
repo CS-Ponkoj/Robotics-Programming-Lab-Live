@@ -175,16 +175,16 @@ try {
     }
     $flutterCommand = (Get-Command flutter).Source
     $frontend = Start-ProjectProcess -Name "frontend" -FilePath $flutterCommand `
-        -ArgumentList @("run", "-d", "chrome", "--web-port", "$FrontendPort", "--dart-define=API_BASE_URL=http://127.0.0.1:$BackendPort") `
+        -ArgumentList @("run", "-d", "web-server", "--web-hostname", "127.0.0.1", "--web-port", "$FrontendPort", "--dart-define=API_BASE_URL=http://127.0.0.1:$BackendPort") `
         -WorkingDirectory $resolvedFrontend
     $processes += [pscustomobject]@{ name = "frontend"; id = $frontend.Id }
-    Wait-ForEndpoint -Name "Frontend" -Url "http://localhost:$FrontendPort" -Attempts 240 -AcceptAnySuccess
+    Wait-ForEndpoint -Name "Frontend" -Url "http://127.0.0.1:$FrontendPort" -Attempts 240 -AcceptAnySuccess
 
     [pscustomobject]@{
         repository = $repositoryRoot
         startedAt = (Get-Date).ToString("o")
         processes = $processes
-        frontendUrl = "http://localhost:$FrontendPort"
+        frontendUrl = "http://127.0.0.1:$FrontendPort"
         backendUrl = "http://127.0.0.1:$BackendPort"
         sandboxUrl = "http://127.0.0.1:$SandboxPort"
         databaseUrl = $DatabaseUrl
@@ -192,7 +192,7 @@ try {
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8
 
     Write-Output "Robotics Programming Lab is starting."
-    Write-Output "Frontend: http://localhost:$FrontendPort"
+    Write-Output "Frontend: http://127.0.0.1:$FrontendPort"
     Write-Output "Backend:  http://127.0.0.1:$BackendPort/health"
     Write-Output "Sandbox:  http://127.0.0.1:$SandboxPort/health"
     Write-Output "AI enabled: $([bool]$EnableAi)"

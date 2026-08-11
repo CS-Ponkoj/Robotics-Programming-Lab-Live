@@ -57,6 +57,13 @@ services:
       dockerfile: Dockerfile.sandbox
     profiles: ["build"]
 
+  ros2-grader-image:
+    image: robotics-lab-ros2-grader:jazzy-v1
+    build:
+      context: backend
+      dockerfile: Dockerfile.ros2
+    profiles: ["build"]
+
 volumes:
   robotics_postgres_data:
   robotics_redis_data:
