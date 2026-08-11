@@ -21,12 +21,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-enum AssignmentWorkspaceFocus {
-  none,
-  editor,
-  instructions,
-  results,
-}
+enum AssignmentWorkspaceFocus { none, editor, instructions, results }
 
 class _MyHomePageState extends State<MyHomePage> {
   late Future<AssignmentDto> _assignment;
@@ -39,6 +34,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _init = true;
   String _submissionId = '';
   String _revealedSolutionHtml = '';
+  String? _selectedProjectFilePath;
+  bool _selectedProjectFileEditable = true;
   int _selectedWorkspaceTab = 0;
   double _editorWidthFraction = 0.5;
   AssignmentWorkspaceFocus _workspaceFocus = AssignmentWorkspaceFocus.none;
@@ -47,8 +44,10 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    _controller =
-        CodeController(language: python, params: EditorParams(tabSpaces: 4));
+    _controller = CodeController(
+      language: python,
+      params: EditorParams(tabSpaces: 4),
+    );
     _assignment = fetchAssignment(widget.id);
     unawaited(_trackAssignmentOpened());
     _feedback = fetchUnittestFeedback(widget.id, "");
@@ -111,6 +110,23 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void _selectProjectFile(AssignmentProjectFile file) {
+    if (_selectedProjectFileEditable) {
+      _saveDraft(_controller.fullText);
+    }
+    setState(() {
+      _selectedProjectFilePath = file.path;
+      _selectedProjectFileEditable = file.editable;
+      _controller.text = file.editable ? _code : file.content;
+    });
+    unawaited(
+      _trackWorkspaceEvent('workspace_file_selected', {
+        'path': file.path,
+        'editable': file.editable,
+      }),
+    );
+  }
+
   void _runTests() {
     setState(() {
       _submitted = true;
@@ -127,9 +143,11 @@ class _MyHomePageState extends State<MyHomePage> {
         final passed = feedback.unittestFeedback
             .asMap()
             .entries
-            .where((entry) =>
-                entry.key < feedback.unittestPassResults.length &&
-                feedback.unittestPassResults[entry.key])
+            .where(
+              (entry) =>
+                  entry.key < feedback.unittestPassResults.length &&
+                  feedback.unittestPassResults[entry.key],
+            )
             .length;
         final total = feedback.unittestPassResults.length;
 
@@ -143,10 +161,7 @@ class _MyHomePageState extends State<MyHomePage> {
           _isRunning = false;
         });
         unawaited(
-          learningProgress.recordSubmission(
-            widget.id,
-            feedback.submissionId,
-          ),
+          learningProgress.recordSubmission(widget.id, feedback.submissionId),
         );
         unawaited(learningProgress.recordAttempt(widget.id, score));
       },
@@ -188,17 +203,18 @@ class _MyHomePageState extends State<MyHomePage> {
       await learningProgress.recordSolutionReveal(widget.id);
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     }
   }
 
   void _toggleWorkspaceFocus(AssignmentWorkspaceFocus target) {
     setState(() {
-      _workspaceFocus =
-          _workspaceFocus == target ? AssignmentWorkspaceFocus.none : target;
+      _workspaceFocus = _workspaceFocus == target
+          ? AssignmentWorkspaceFocus.none
+          : target;
     });
   }
 
@@ -206,8 +222,10 @@ class _MyHomePageState extends State<MyHomePage> {
     final workspaceWidth = MediaQuery.sizeOf(context).width;
     setState(() {
       _editorWidthFraction =
-          (_editorWidthFraction + horizontalDelta / workspaceWidth)
-              .clamp(0.3, 0.7);
+          (_editorWidthFraction + horizontalDelta / workspaceWidth).clamp(
+            0.3,
+            0.7,
+          );
     });
   }
 
@@ -234,15 +252,15 @@ class _MyHomePageState extends State<MyHomePage> {
     final useDesktopLayout = MediaQuery.sizeOf(context).width >= 900;
     final showEditor = useDesktopLayout
         ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
-            _workspaceFocus == AssignmentWorkspaceFocus.editor
+              _workspaceFocus == AssignmentWorkspaceFocus.editor
         : _selectedWorkspaceTab == 0;
     final showInstructions = useDesktopLayout
         ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
-            _workspaceFocus == AssignmentWorkspaceFocus.instructions
+              _workspaceFocus == AssignmentWorkspaceFocus.instructions
         : _selectedWorkspaceTab == 1;
     final showResults = useDesktopLayout
         ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
-            _workspaceFocus == AssignmentWorkspaceFocus.results
+              _workspaceFocus == AssignmentWorkspaceFocus.results
         : _selectedWorkspaceTab == 2;
     final showResizeHandle =
         useDesktopLayout && _workspaceFocus == AssignmentWorkspaceFocus.none;
@@ -262,12 +280,7 @@ class _MyHomePageState extends State<MyHomePage> {
       onHome: () => Navigator.of(context).popUntil((route) => route.isFirst),
       onFeedbackChanged: (value) {
         setState(() => _enableFeedback = value);
-        unawaited(
-          _trackWorkspaceEvent(
-            'ai_tutor_toggled',
-            {'enabled': value},
-          ),
-        );
+        unawaited(_trackWorkspaceEvent('ai_tutor_toggled', {'enabled': value}));
       },
     );
 
@@ -288,9 +301,7 @@ class _MyHomePageState extends State<MyHomePage> {
           },
           const SingleActivator(LogicalKeyboardKey.escape): () {
             if (_workspaceFocus != AssignmentWorkspaceFocus.none) {
-              setState(
-                () => _workspaceFocus = AssignmentWorkspaceFocus.none,
-              );
+              setState(() => _workspaceFocus = AssignmentWorkspaceFocus.none);
             }
           },
           const SingleActivator(LogicalKeyboardKey.digit1, alt: true): () =>
@@ -312,213 +323,250 @@ class _MyHomePageState extends State<MyHomePage> {
         child: FocusTraversalGroup(
           child: Scaffold(
             appBar: appBar,
-            body: Column(children: [
-              if (!useDesktopLayout)
-                AssignmentWorkspaceNavigation(
-                  selectedIndex: _selectedWorkspaceTab,
-                  onDestinationSelected: (index) {
-                    setState(() => _selectedWorkspaceTab = index);
-                    unawaited(
-                      _trackWorkspaceEvent(
-                        'workspace_tab_changed',
-                        {'tab_index': index},
-                      ),
-                    );
-                  },
-                ),
-              Expanded(
-                child: Row(children: [
-                  // ─── Left: code editor ─────────────────────────
-                  if (showEditor)
-                    Expanded(
-                      flex: showResizeHandle
-                          ? (_editorWidthFraction * 1000).round()
-                          : 1,
-                      child: Container(
-                        key: const Key('assignment-editor-panel'),
-                        color: Theme.of(context).colorScheme.secondaryFixedDim,
-                        child: Column(children: [
-                          AssignmentEditorToolbar(
-                            isRunning: _isRunning,
-                            onRun: _runTests,
-                            isFocused: _workspaceFocus ==
-                                AssignmentWorkspaceFocus.editor,
-                            onFocusToggle: useDesktopLayout
-                                ? () => _toggleWorkspaceFocus(
+            body: Column(
+              children: [
+                if (!useDesktopLayout)
+                  AssignmentWorkspaceNavigation(
+                    selectedIndex: _selectedWorkspaceTab,
+                    onDestinationSelected: (index) {
+                      setState(() => _selectedWorkspaceTab = index);
+                      unawaited(
+                        _trackWorkspaceEvent('workspace_tab_changed', {
+                          'tab_index': index,
+                        }),
+                      );
+                    },
+                  ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      // ─── Left: code editor ─────────────────────────
+                      if (showEditor)
+                        Expanded(
+                          flex: showResizeHandle
+                              ? (_editorWidthFraction * 1000).round()
+                              : 1,
+                          child: Container(
+                            key: const Key('assignment-editor-panel'),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.secondaryFixedDim,
+                            child: Column(
+                              children: [
+                                AssignmentEditorToolbar(
+                                  isRunning: _isRunning,
+                                  onRun: _runTests,
+                                  isFocused:
+                                      _workspaceFocus ==
                                       AssignmentWorkspaceFocus.editor,
-                                    )
-                                : null,
-                          ),
-                          Expanded(
-                            child: FutureBuilder<AssignmentDto>(
-                              future: _assignment,
-                              builder: (ctx, snap) {
-                                if (snap.hasData) {
-                                  if (_init) {
-                                    _code = learningProgress
-                                            .codeDrafts[widget.id] ??
-                                        snap.data!.code;
-                                    _controller.text = _code;
-                                    _init = false;
-                                  }
-                                  return Semantics(
-                                    label: 'Python code editor',
-                                    textField: true,
-                                    child: CodeTheme(
-                                      data: CodeThemeData(styles: darculaTheme),
-                                      child: CodeField(
-                                        controller: _controller,
-                                        expands: true,
-                                        minLines: null,
-                                        onChanged: (_) =>
-                                            _saveDraft(_controller.fullText),
-                                      ),
-                                    ),
-                                  );
-                                }
-                                if (snap.hasError) {
-                                  return const Center(child: Text("Error"));
-                                }
-                                return const Center(
-                                    child: CircularProgressIndicator());
-                              },
-                            ),
-                          ),
-                        ]),
-                      ),
-                    ),
-
-                  // ─── Right: scenario + feedback ────────────────
-                  if (showResizeHandle)
-                    WorkspaceResizeHandle(
-                      editorFraction: _editorWidthFraction,
-                      onDragUpdate: _resizeWorkspace,
-                    ),
-                  if (showInstructions || showResults)
-                    Expanded(
-                      flex: showResizeHandle
-                          ? ((1 - _editorWidthFraction) * 1000).round()
-                          : 1,
-                      child: Column(children: [
-                        // scenario half
-                        if (showInstructions)
-                          Expanded(
-                            flex: 1,
-                            child: Column(children: [
-                              AssignmentPanelHeader(
-                                icon: Icons.menu_book_rounded,
-                                title: 'Instructions',
-                                subtitle: 'Review the scenario and task',
-                                isFocused: _workspaceFocus ==
-                                    AssignmentWorkspaceFocus.instructions,
-                                onFocusToggle: useDesktopLayout
-                                    ? () => _toggleWorkspaceFocus(
-                                          AssignmentWorkspaceFocus.instructions,
+                                  onFocusToggle: useDesktopLayout
+                                      ? () => _toggleWorkspaceFocus(
+                                          AssignmentWorkspaceFocus.editor,
                                         )
-                                    : null,
-                              ),
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  key: const Key(
-                                      'assignment-instructions-panel'),
-                                  padding: const EdgeInsets.all(AppSpacing.md),
+                                      : null,
+                                ),
+                                Expanded(
                                   child: FutureBuilder<AssignmentDto>(
                                     future: _assignment,
                                     builder: (ctx, snap) {
                                       if (snap.hasData) {
-                                        return AssignmentInstructions(
-                                          assignmentId: widget.id,
-                                          html: snap.data!.htmlDesc
-                                              .replaceAll(
-                                                "http://localhost:5000",
-                                                apiBaseUrl,
-                                              )
-                                              .replaceAll(
-                                                "http://127.0.0.1:5000",
-                                                apiBaseUrl,
-                                              ),
-                                          solutionHtml:
-                                              _revealedSolutionHtml.isNotEmpty
-                                                  ? _revealedSolutionHtml
-                                                  : snap.data!.solutionHtml,
-                                          hasSolution: snap.data!.hasSolution,
-                                          solutionRevealed:
-                                              solutionRevealedAssignments
-                                                  .contains(
-                                            widget.id,
-                                          ),
-                                          canRevealSolution:
-                                              learningProgress.hasAttempted(
-                                            widget.id,
-                                          ),
-                                          onSolutionRevealed: () =>
-                                              unawaited(_revealSolution()),
+                                        if (_init) {
+                                          _code =
+                                              learningProgress.codeDrafts[widget
+                                                  .id] ??
+                                              snap.data!.code;
+                                          _selectedProjectFilePath =
+                                              snap.data!.editableFilePath;
+                                          _selectedProjectFileEditable = true;
+                                          _controller.text = _code;
+                                          _init = false;
+                                        }
+                                        return AssignmentProjectWorkspace(
+                                          files: snap.data!.projectFiles,
+                                          selectedPath:
+                                              _selectedProjectFilePath,
+                                          selectedFileEditable:
+                                              _selectedProjectFileEditable,
+                                          controller: _controller,
+                                          onFileSelected: _selectProjectFile,
+                                          onChanged: () {
+                                            if (_selectedProjectFileEditable) {
+                                              _saveDraft(_controller.fullText);
+                                            }
+                                          },
                                         );
                                       }
                                       if (snap.hasError) {
-                                        return const Text(
-                                            "Error loading scenario");
+                                        return const Center(
+                                          child: Text("Error"),
+                                        );
                                       }
                                       return const Center(
-                                          child: CircularProgressIndicator());
+                                        child: CircularProgressIndicator(),
+                                      );
                                     },
                                   ),
                                 ),
-                              ),
-                            ]),
+                              ],
+                            ),
                           ),
+                        ),
 
-                        // feedback half
-                        if (showResults)
-                          Expanded(
-                            flex: 1,
-                            child: Column(
-                                key: const Key('assignment-results-panel'),
-                                children: [
-                                  AssignmentPanelHeader(
-                                    icon: Icons.fact_check_rounded,
-                                    title: 'Results',
-                                    subtitle:
-                                        'Review test outcomes and feedback',
-                                    isFocused: _workspaceFocus ==
-                                        AssignmentWorkspaceFocus.results,
-                                    onFocusToggle: useDesktopLayout
-                                        ? () => _toggleWorkspaceFocus(
-                                              AssignmentWorkspaceFocus.results,
-                                            )
-                                        : null,
-                                  ),
-                                  Expanded(
-                                    child: _submitted
-                                        ? FutureBuilder<UnittestFeedbackDto>(
-                                            future: _feedback,
+                      // ─── Right: scenario + feedback ────────────────
+                      if (showResizeHandle)
+                        WorkspaceResizeHandle(
+                          editorFraction: _editorWidthFraction,
+                          onDragUpdate: _resizeWorkspace,
+                        ),
+                      if (showInstructions || showResults)
+                        Expanded(
+                          flex: showResizeHandle
+                              ? ((1 - _editorWidthFraction) * 1000).round()
+                              : 1,
+                          child: Column(
+                            children: [
+                              // scenario half
+                              if (showInstructions)
+                                Expanded(
+                                  flex: 1,
+                                  child: Column(
+                                    children: [
+                                      AssignmentPanelHeader(
+                                        icon: Icons.menu_book_rounded,
+                                        title: 'Instructions',
+                                        subtitle:
+                                            'Review the scenario and task',
+                                        isFocused:
+                                            _workspaceFocus ==
+                                            AssignmentWorkspaceFocus
+                                                .instructions,
+                                        onFocusToggle: useDesktopLayout
+                                            ? () => _toggleWorkspaceFocus(
+                                                AssignmentWorkspaceFocus
+                                                    .instructions,
+                                              )
+                                            : null,
+                                      ),
+                                      Expanded(
+                                        child: SingleChildScrollView(
+                                          key: const Key(
+                                            'assignment-instructions-panel',
+                                          ),
+                                          padding: const EdgeInsets.all(
+                                            AppSpacing.md,
+                                          ),
+                                          child: FutureBuilder<AssignmentDto>(
+                                            future: _assignment,
                                             builder: (ctx, snap) {
-                                              if (snap.connectionState ==
-                                                  ConnectionState.waiting) {
-                                                return const SecureGraderLoadingState();
+                                              if (snap.hasData) {
+                                                return AssignmentInstructions(
+                                                  assignmentId: widget.id,
+                                                  html: snap.data!.htmlDesc
+                                                      .replaceAll(
+                                                        "http://localhost:5000",
+                                                        apiBaseUrl,
+                                                      )
+                                                      .replaceAll(
+                                                        "http://127.0.0.1:5000",
+                                                        apiBaseUrl,
+                                                      ),
+                                                  solutionHtml:
+                                                      _revealedSolutionHtml
+                                                          .isNotEmpty
+                                                      ? _revealedSolutionHtml
+                                                      : snap.data!.solutionHtml,
+                                                  hasSolution:
+                                                      snap.data!.hasSolution,
+                                                  solutionRevealed:
+                                                      solutionRevealedAssignments
+                                                          .contains(widget.id),
+                                                  canRevealSolution:
+                                                      learningProgress
+                                                          .hasAttempted(
+                                                            widget.id,
+                                                          ),
+                                                  onSolutionRevealed: () =>
+                                                      unawaited(
+                                                        _revealSolution(),
+                                                      ),
+                                                );
                                               }
                                               if (snap.hasError) {
-                                                return TestRunErrorState(
-                                                  onRetry: _runTests,
+                                                return const Text(
+                                                  "Error loading scenario",
                                                 );
                                               }
-                                              if (snap.hasData) {
-                                                return Feedback(
-                                                  data: snap.data!,
-                                                );
-                                              }
-                                              return const SizedBox.shrink();
+                                              return const Center(
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              );
                                             },
-                                          )
-                                        : const _EmptyResultsState(),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ]),
+                                ),
+
+                              // feedback half
+                              if (showResults)
+                                Expanded(
+                                  flex: 1,
+                                  child: Column(
+                                    key: const Key('assignment-results-panel'),
+                                    children: [
+                                      AssignmentPanelHeader(
+                                        icon: Icons.fact_check_rounded,
+                                        title: 'Results',
+                                        subtitle:
+                                            'Review test outcomes and feedback',
+                                        isFocused:
+                                            _workspaceFocus ==
+                                            AssignmentWorkspaceFocus.results,
+                                        onFocusToggle: useDesktopLayout
+                                            ? () => _toggleWorkspaceFocus(
+                                                AssignmentWorkspaceFocus
+                                                    .results,
+                                              )
+                                            : null,
+                                      ),
+                                      Expanded(
+                                        child: _submitted
+                                            ? FutureBuilder<
+                                                UnittestFeedbackDto
+                                              >(
+                                                future: _feedback,
+                                                builder: (ctx, snap) {
+                                                  if (snap.connectionState ==
+                                                      ConnectionState.waiting) {
+                                                    return const SecureGraderLoadingState();
+                                                  }
+                                                  if (snap.hasError) {
+                                                    return TestRunErrorState(
+                                                      onRetry: _runTests,
+                                                    );
+                                                  }
+                                                  if (snap.hasData) {
+                                                    return Feedback(
+                                                      data: snap.data!,
+                                                    );
+                                                  }
+                                                  return const SizedBox.shrink();
+                                                },
+                                              )
+                                            : const _EmptyResultsState(),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
-                      ]),
-                    ),
-                ]),
-              ),
-            ]),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -549,8 +597,9 @@ class AssignmentInstructions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sections = AssignmentInstructionSections.fromHtml(html);
-    final displayedSolutionHtml =
-        solutionHtml.isNotEmpty ? solutionHtml : sections.solution;
+    final displayedSolutionHtml = solutionHtml.isNotEmpty
+        ? solutionHtml
+        : sections.solution;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -635,8 +684,9 @@ class AssignmentInstructionSections {
     for (var index = 0; index < matches.length; index++) {
       final match = matches[index];
       final heading = match.group(1)!.toLowerCase();
-      final end =
-          index + 1 < matches.length ? matches[index + 1].start : html.length;
+      final end = index + 1 < matches.length
+          ? matches[index + 1].start
+          : html.length;
       final content = html.substring(match.end, end);
       final destination = switch (heading) {
         'scenario' => 'scenario',
@@ -646,8 +696,9 @@ class AssignmentInstructionSections {
       };
 
       if (buffers[destination]!.isNotEmpty) {
-        buffers[destination]!
-            .write('<p><strong>${match.group(1)}</strong></p>');
+        buffers[destination]!.write(
+          '<p><strong>${match.group(1)}</strong></p>',
+        );
       }
       buffers[destination]!.write(content);
     }
@@ -1079,6 +1130,254 @@ class AssignmentEditorToolbar extends StatelessWidget {
   }
 }
 
+class AssignmentProjectWorkspace extends StatelessWidget {
+  const AssignmentProjectWorkspace({
+    super.key,
+    required this.files,
+    required this.selectedPath,
+    required this.selectedFileEditable,
+    required this.controller,
+    required this.onFileSelected,
+    required this.onChanged,
+  });
+
+  final List<AssignmentProjectFile> files;
+  final String? selectedPath;
+  final bool selectedFileEditable;
+  final CodeController controller;
+  final ValueChanged<AssignmentProjectFile> onFileSelected;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final editor = Column(
+      children: [
+        if (files.isNotEmpty)
+          ProjectFileStatusBar(
+            path: selectedPath ?? files.first.path,
+            editable: selectedFileEditable,
+          ),
+        Expanded(
+          child: Semantics(
+            label: selectedFileEditable
+                ? 'Editable Python code file'
+                : 'Read-only project file',
+            textField: true,
+            readOnly: !selectedFileEditable,
+            child: CodeTheme(
+              data: CodeThemeData(styles: darculaTheme),
+              child: CodeField(
+                key: const Key('assignment-code-field'),
+                controller: controller,
+                expands: true,
+                minLines: null,
+                readOnly: !selectedFileEditable,
+                onChanged: (_) => onChanged(),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+    if (files.isEmpty) {
+      return editor;
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final explorer = AssignmentProjectExplorer(
+          files: files,
+          selectedPath: selectedPath,
+          onFileSelected: onFileSelected,
+        );
+        if (constraints.maxWidth < 620) {
+          return Column(
+            children: [
+              SizedBox(height: 180, child: explorer),
+              Expanded(child: editor),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            SizedBox(width: 250, child: explorer),
+            VerticalDivider(
+              width: 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+            Expanded(child: editor),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class AssignmentProjectExplorer extends StatelessWidget {
+  const AssignmentProjectExplorer({
+    super.key,
+    required this.files,
+    required this.selectedPath,
+    required this.onFileSelected,
+  });
+
+  final List<AssignmentProjectFile> files;
+  final String? selectedPath;
+  final ValueChanged<AssignmentProjectFile> onFileSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ColoredBox(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.account_tree_outlined,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  'PROJECT FILES',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              key: const Key('assignment-project-file-tree'),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              itemCount: files.length,
+              itemBuilder: (context, index) {
+                final file = files[index];
+                final selected = file.path == selectedPath;
+                final segments = file.path.split('/');
+                final name = segments.last;
+                final depth = (segments.length - 1).clamp(0, 4);
+                return Semantics(
+                  label:
+                      '${file.path}, ${file.editable ? 'editable' : 'read only'}',
+                  button: true,
+                  selected: selected,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: depth * 8.0),
+                    child: ListTile(
+                      key: Key('project-file-${file.path}'),
+                      dense: true,
+                      selected: selected,
+                      selectedTileColor: theme.colorScheme.primaryContainer,
+                      leading: Icon(
+                        _fileIcon(name),
+                        size: 18,
+                        color: selected
+                            ? theme.colorScheme.onPrimaryContainer
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                      title: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: selected ? FontWeight.w700 : null,
+                        ),
+                      ),
+                      trailing: Icon(
+                        file.editable
+                            ? Icons.edit_outlined
+                            : Icons.lock_outline,
+                        size: 16,
+                        color: file.editable
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                      onTap: () => onFileSelected(file),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static IconData _fileIcon(String name) {
+    if (name.endsWith('.py')) {
+      return Icons.code_rounded;
+    }
+    if (name.endsWith('.xml')) {
+      return Icons.data_object_rounded;
+    }
+    if (name.endsWith('.cfg')) {
+      return Icons.tune_rounded;
+    }
+    return Icons.insert_drive_file_outlined;
+  }
+}
+
+class ProjectFileStatusBar extends StatelessWidget {
+  const ProjectFileStatusBar({
+    super.key,
+    required this.path,
+    required this.editable,
+  });
+
+  final String path;
+  final bool editable;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const Key('project-file-status-bar'),
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              path,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Icon(editable ? Icons.edit_outlined : Icons.lock_outline, size: 15),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            editable ? 'Editable' : 'Read only',
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class WorkspaceResizeHandle extends StatelessWidget {
   const WorkspaceResizeHandle({
     super.key,
@@ -1254,12 +1553,15 @@ class AssignmentPageHeader extends StatelessWidget
                 value: feedbackEnabled,
                 onChanged: onFeedbackChanged,
                 activeColor: theme.colorScheme.primary,
-                activeTrackColor:
-                    theme.colorScheme.onPrimary.withValues(alpha: 0.9),
-                inactiveThumbColor:
-                    theme.colorScheme.onPrimary.withValues(alpha: 0.7),
-                inactiveTrackColor:
-                    theme.colorScheme.onPrimary.withValues(alpha: 0.2),
+                activeTrackColor: theme.colorScheme.onPrimary.withValues(
+                  alpha: 0.9,
+                ),
+                inactiveThumbColor: theme.colorScheme.onPrimary.withValues(
+                  alpha: 0.7,
+                ),
+                inactiveTrackColor: theme.colorScheme.onPrimary.withValues(
+                  alpha: 0.2,
+                ),
               ),
               const SizedBox(width: AppSpacing.sm),
             ],
@@ -1287,10 +1589,7 @@ class AssignmentWorkspaceNavigation extends StatelessWidget {
       selectedIndex: selectedIndex,
       onDestinationSelected: onDestinationSelected,
       destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.code_rounded),
-          label: 'Code',
-        ),
+        NavigationDestination(icon: Icon(Icons.code_rounded), label: 'Code'),
         NavigationDestination(
           icon: Icon(Icons.menu_book_rounded),
           label: 'Instructions',
@@ -1454,7 +1753,8 @@ class Feedback extends StatelessWidget {
 
     final resultCards = data.unittestFeedback.asMap().entries.map((entry) {
       final feedback = entry.value;
-      final didPass = entry.key < data.unittestPassResults.length &&
+      final didPass =
+          entry.key < data.unittestPassResults.length &&
           data.unittestPassResults[entry.key];
       var first = feedback;
       var highlighted = '';
@@ -1484,11 +1784,7 @@ class Feedback extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ResultSummary(
-            passed: passed,
-            failed: failed,
-            accuracy: accuracy,
-          ),
+          _ResultSummary(passed: passed, failed: failed, accuracy: accuracy),
           const SizedBox(height: AppSpacing.md),
           _TerminalOutput(data: data),
           if (data.hint.isNotEmpty) ...[
@@ -1498,17 +1794,17 @@ class Feedback extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
           Text(
             'Test details',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: AppSpacing.sm),
           if (resultCards.isEmpty)
             Text(
               'No individual test details were returned.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             )
           else
             ...resultCards.expand(
@@ -1541,7 +1837,8 @@ class LegacyFeedback extends StatelessWidget {
 
     final feedbackWidgets = feedbackLines.asMap().entries.map((entry) {
       final e = entry.value;
-      final check = entry.key < data.unittestPassResults.length &&
+      final check =
+          entry.key < data.unittestPassResults.length &&
           data.unittestPassResults[entry.key];
       String first = e, second = "", third = "";
       for (var v in vars) {
@@ -1562,8 +1859,10 @@ class LegacyFeedback extends StatelessWidget {
             padding: const EdgeInsets.all(5.0),
             child: Row(
               children: [
-                Icon(check ? Icons.check : Icons.cancel,
-                    color: check ? Colors.green : Colors.red),
+                Icon(
+                  check ? Icons.check : Icons.cancel,
+                  color: check ? Colors.green : Colors.red,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: RichText(
@@ -1574,9 +1873,9 @@ class LegacyFeedback extends StatelessWidget {
                           text: first,
                           style: TextStyle(
                             fontFamily: "Courier-New",
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onTertiaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onTertiaryContainer,
                           ),
                         ),
                         TextSpan(
@@ -1590,9 +1889,9 @@ class LegacyFeedback extends StatelessWidget {
                           text: third,
                           style: TextStyle(
                             fontFamily: "Courier-New",
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onTertiaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onTertiaryContainer,
                           ),
                         ),
                       ],
@@ -1618,13 +1917,17 @@ class LegacyFeedback extends StatelessWidget {
               children: [
                 Icon(Icons.check_circle, color: Colors.green),
                 const SizedBox(width: 4),
-                Text("Passed: $passed",
-                    style: const TextStyle(color: Colors.green)),
+                Text(
+                  "Passed: $passed",
+                  style: const TextStyle(color: Colors.green),
+                ),
                 const SizedBox(width: 16),
                 Icon(Icons.cancel, color: Colors.red),
                 const SizedBox(width: 4),
-                Text("Failed: $failed",
-                    style: const TextStyle(color: Colors.red)),
+                Text(
+                  "Failed: $failed",
+                  style: const TextStyle(color: Colors.red),
+                ),
               ],
             ),
           ),
@@ -1632,107 +1935,135 @@ class LegacyFeedback extends StatelessWidget {
           // accuracy bar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                "🎯 Accuracy: ${accuracy.toStringAsFixed(1)}%",
-                style: const TextStyle(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "🎯 Accuracy: ${accuracy.toStringAsFixed(1)}%",
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blueGrey),
-              ),
-              const SizedBox(height: 8),
-              TweenAnimationBuilder<double>(
-                duration: const Duration(seconds: 1),
-                curve: Curves.easeOut,
-                tween: Tween(begin: 0.0, end: accuracy / 100),
-                builder: (context, value, _) => LinearProgressIndicator(
-                  value: value,
-                  minHeight: 8,
-                  color: Colors.green,
-                  backgroundColor: Colors.green.withValues(alpha: 0.3),
+                    color: Colors.blueGrey,
+                  ),
                 ),
-              ),
-            ]),
+                const SizedBox(height: 8),
+                TweenAnimationBuilder<double>(
+                  duration: const Duration(seconds: 1),
+                  curve: Curves.easeOut,
+                  tween: Tween(begin: 0.0, end: accuracy / 100),
+                  builder: (context, value, _) => LinearProgressIndicator(
+                    value: value,
+                    minHeight: 8,
+                    color: Colors.green,
+                    backgroundColor: Colors.green.withValues(alpha: 0.3),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
 
           // terminal output / error
           data.execSuccess
-              ? Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      "Terminal Output:",
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyLarge!
-                          .copyWith(fontFamily: "roboto-mono"),
+              ? Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        "Terminal Output:",
+                        style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          fontFamily: "roboto-mono",
+                        ),
+                      ),
                     ),
-                  ),
-                  Card(
-                    color: const Color.fromARGB(100, 43, 74, 93),
-                    child: Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Text("> ${data.codeOutput}",
+                    Card(
+                      color: const Color.fromARGB(100, 43, 74, 93),
+                      child: Padding(
+                        padding: const EdgeInsets.all(15),
+                        child: Text(
+                          "> ${data.codeOutput}",
                           style: const TextStyle(
-                              fontFamily: "Courier-New", fontSize: 12)),
+                            fontFamily: "Courier-New",
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                     ),
-                  )
-                ])
-              : Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text("There was an error running the code:"),
-                  ),
-                  Card(
-                    color: Theme.of(context).colorScheme.secondary,
-                    child: Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Text("> ${data.codeExecResult}",
+                  ],
+                )
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text("There was an error running the code:"),
+                    ),
+                    Card(
+                      color: Theme.of(context).colorScheme.secondary,
+                      child: Padding(
+                        padding: const EdgeInsets.all(15),
+                        child: Text(
+                          "> ${data.codeExecResult}",
                           style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSecondary,
-                              fontFamily: "Courier-New",
-                              fontSize: 12)),
+                            color: Theme.of(context).colorScheme.onSecondary,
+                            fontFamily: "Courier-New",
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                     ),
-                  )
-                ]),
+                  ],
+                ),
 
           if (data.hint.isNotEmpty) ...[
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Card(
-                  color: Colors.amber.shade100,
-                  child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(children: [
-                        const Icon(Icons.lightbulb,
-                            color: Colors.amber, size: 24),
-                        const SizedBox(width: 8),
-                        Expanded(
-                            child: Text("AI Hint: ${data.hint}",
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87))),
-                      ]))),
+                color: Colors.amber.shade100,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.lightbulb,
+                        color: Colors.amber,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "AI Hint: ${data.hint}",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
 
           const SizedBox(height: 8),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text("Unittest Feedback",
-                style: TextStyle(
-                    fontFamily: "roboto-mono",
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold)),
+            child: Text(
+              "Unittest Feedback",
+              style: TextStyle(
+                fontFamily: "roboto-mono",
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           Card(
             color: Theme.of(context).colorScheme.secondary,
             child: Padding(
-                padding: const EdgeInsets.all(15),
-                child: Column(children: feedbackWidgets)),
+              padding: const EdgeInsets.all(15),
+              child: Column(children: feedbackWidgets),
+            ),
           ),
         ],
       ),
@@ -1807,8 +2138,9 @@ class _ResultSummary extends StatelessWidget {
             LinearProgressIndicator(
               value: accuracy / 100,
               color: statusColor,
-              backgroundColor:
-                  theme.colorScheme.surface.withValues(alpha: 0.72),
+              backgroundColor: theme.colorScheme.surface.withValues(
+                alpha: 0.72,
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
             Wrap(
@@ -1869,9 +2201,9 @@ class _ResultCount extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -1949,10 +2281,7 @@ class _TerminalOutput extends StatelessWidget {
 }
 
 class _HintCallout extends StatelessWidget {
-  const _HintCallout({
-    required this.hint,
-    required this.source,
-  });
+  const _HintCallout({required this.hint, required this.source});
 
   final String hint;
   final String source;
@@ -1972,10 +2301,7 @@ class _HintCallout extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.lightbulb_outline_rounded,
-            color: Colors.amber.shade900,
-          ),
+          Icon(Icons.lightbulb_outline_rounded, color: Colors.amber.shade900),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
@@ -1985,8 +2311,8 @@ class _HintCallout extends StatelessWidget {
                   source == 'openai'
                       ? 'OpenAI tutor hint'
                       : source == 'fallback'
-                          ? 'Built-in tutor hint'
-                          : 'Guided hint',
+                      ? 'Built-in tutor hint'
+                      : 'Guided hint',
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: Colors.brown.shade900,
                     fontWeight: FontWeight.w800,

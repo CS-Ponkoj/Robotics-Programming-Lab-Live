@@ -39,7 +39,7 @@ from auth_service import (
 from config import Settings, get_settings
 from database import Base, build_engine
 from email_service import EmailService
-from graders import PythonVariableGrader
+from graders import PythonVariableGrader, Ros2TopicGrader
 from models import (
     Assignment,
     HintInteraction,
@@ -58,6 +58,7 @@ from research_service import (
     xlsx_bytes,
 )
 from sandbox import build_sandbox
+from ros2_executor import DockerRos2Executor
 from schemas import (
     AdminAssignmentPayload,
     AdminPasswordReset,
@@ -98,6 +99,7 @@ STATIC_DIR = BASE_DIR / "static"
 def create_app(
     settings: Settings | None = None,
     database_url: str | None = None,
+    ros2_executor_factory=None,
 ) -> FastAPI:
     configured = settings or get_settings()
     configured.validate_runtime()
@@ -143,6 +145,12 @@ def create_app(
     application.state.rate_limit_lock = threading.Lock()
     application.state.execution_slots = threading.BoundedSemaphore(
         configured.max_concurrent_executions
+    )
+    application.state.ros2_executor_factory = ros2_executor_factory or (
+        lambda timeout: DockerRos2Executor(
+            image=configured.ros2_grader_image,
+            timeout_seconds=timeout,
+        )
     )
     application.add_middleware(
         CORSMiddleware,
@@ -334,14 +342,18 @@ def create_app(
         return assignment
 
     def grader_for(assignment: Assignment, request: Request):
-        if assignment.grader_type != "python_variables":
-            raise HTTPException(422, f"Unsupported grader: {assignment.grader_type}.")
         settings_value = request.app.state.settings
         timeout = float(
             (assignment.execution_settings or {}).get(
                 "timeout_seconds", settings_value.execution_timeout_seconds
             )
         )
+        if assignment.grader_type == "ros2_topic":
+            return Ros2TopicGrader(
+                request.app.state.ros2_executor_factory(timeout)
+            )
+        if assignment.grader_type != "python_variables":
+            raise HTTPException(422, f"Unsupported grader: {assignment.grader_type}.")
         sandbox = build_sandbox(
             settings_value.sandbox_backend,
             settings_value.sandbox_image,

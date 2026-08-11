@@ -4,6 +4,12 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+class AssignmentProjectFile(BaseModel):
+    path: str
+    content: str = ""
+    editable: bool = False
+
+
 class AssignmentStudent(BaseModel):
     id: int
     stable_id: str
@@ -17,6 +23,8 @@ class AssignmentStudent(BaseModel):
     public_tests: list[dict[str, Any]] = Field(default_factory=list)
     rubric: list[dict[str, Any]] = Field(default_factory=list)
     simulation_config: dict[str, Any] = Field(default_factory=dict)
+    project_files: list[AssignmentProjectFile] = Field(default_factory=list)
+    editable_file_path: str | None = None
     has_solution: bool = False
     solution_html: str = ""
     vals: dict[str, Any] = Field(default_factory=dict)
@@ -197,6 +205,7 @@ class LearningEventRequest(BaseModel):
         "assignment_opened",
         "ai_tutor_toggled",
         "workspace_tab_changed",
+        "workspace_file_selected",
     ]
     assignment_id: int | None = Field(default=None, ge=1)
     assignment_version: int | None = Field(default=None, ge=1)

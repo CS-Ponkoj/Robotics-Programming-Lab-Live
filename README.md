@@ -122,6 +122,36 @@ short-lived container with no network, capped memory/CPU, and a process limit.
 For zero-Docker local development, run `backend/run.py` directly; it uses the
 restricted subprocess fallback from `backend/.env`.
 
+### Local ROS 2 assignment
+
+Assignment 5 adds a ROS 2 Jazzy code-only exercise. Students can inspect the
+package tree but can edit only
+`src/robot_motion/robot_motion/controller.py`. Its grader builds the package,
+starts the node, and observes `geometry_msgs/Twist` messages on `/cmd_vel`; it
+does not launch a simulator.
+
+Docker Desktop with Linux containers must be installed and running. Build the
+versioned grader image once, and rebuild it after changing either ROS worker:
+
+```powershell
+docker compose --profile build build ros2-grader-image
+docker image inspect robotics-lab-ros2-grader:jazzy-v1
+```
+
+Then use the normal local command:
+
+```powershell
+.\scripts\run-local.ps1
+```
+
+Assignments 1 through 4 still run when Docker is unavailable, but Assignment 5
+will return an actionable Docker Desktop error instead of waiting indefinitely.
+The maintained controller answer for instructor checks is
+`manual_sqa_answers/assignment_5_ros2_drive_forward/controller.py`. It is not
+returned by the student API or bundled into Flutter. Because it is committed as
+requested, anyone who can read this Git repository can read the answer; do not
+give students repository access if it must remain private.
+
 The live classroom deployment uses a second Render Docker web service defined
 in `render.yaml`. The main API sends only student code, requested result names,
 and an execution timeout to that service. The sandbox has no database or OpenAI

@@ -1,0 +1,87 @@
+from graders.base import GradeResult
+from models import Assignment
+from ros2_executor import Ros2Executor
+from schemas import TestEvidence
+
+
+class Ros2TopicGrader:
+    def __init__(self, executor: Ros2Executor):
+        self.executor = executor
+
+    def run(self, assignment: Assignment, code: str) -> GradeResult:
+        return self._evaluate(assignment, code)
+
+    def grade(self, assignment: Assignment, code: str) -> GradeResult:
+        return self._evaluate(assignment, code)
+
+    def _evaluate(self, assignment: Assignment, code: str) -> GradeResult:
+        project_files = [
+            item
+            for item in (assignment.asset_manifest or [])
+            if isinstance(item, dict) and item.get("kind") == "project_file"
+        ]
+        result = self.executor.execute(
+            code,
+            project_files,
+            assignment.grader_config or {},
+        )
+        evidence = self._evidence(assignment, result)
+        weights = (assignment.grader_config or {}).get("test_weights", {})
+        total_weight = sum(float(weights.get(item.test_id, 1)) for item in evidence)
+        passed_weight = sum(
+            float(weights.get(item.test_id, 1)) for item in evidence if item.passed
+        )
+        score = round((passed_weight / total_weight) * 100) if total_weight else 0
+        execution_succeeded = result.get("success") is True
+        return GradeResult(
+            execution_succeeded=execution_succeeded,
+            passed=execution_succeeded and bool(evidence) and all(
+                item.passed for item in evidence
+            ),
+            score=score,
+            code_output=result.get("output", ""),
+            execution_error="" if execution_succeeded else result.get("error", ""),
+            tested_names=[item.test_id for item in evidence],
+            evidence=evidence,
+        )
+
+    @staticmethod
+    def _evidence(assignment: Assignment, result: dict) -> list[TestEvidence]:
+        configured = {
+            str(item.get("id")): str(item.get("label", item.get("id", "Test")))
+            for item in (assignment.public_tests or [])
+            if isinstance(item, dict) and item.get("id")
+        }
+        returned = {
+            str(item.get("id")): item
+            for item in result.get("tests", [])
+            if isinstance(item, dict) and item.get("id") in configured
+        }
+        evidence = []
+        for test_id, label in configured.items():
+            item = returned.get(test_id, {})
+            evidence.append(
+                TestEvidence(
+                    test_id=test_id,
+                    label=label,
+                    passed=item.get("passed") is True,
+                    message=str(
+                        item.get(
+                            "message",
+                            "The grader could not confirm this requirement.",
+                        )
+                    ),
+                    visibility="public",
+                )
+            )
+        if evidence:
+            return evidence
+        return [
+            TestEvidence(
+                test_id="ros2-execution",
+                label="ROS 2 execution",
+                passed=False,
+                message=result.get("error", "The ROS 2 grader could not run."),
+                visibility="public",
+            )
+        ]

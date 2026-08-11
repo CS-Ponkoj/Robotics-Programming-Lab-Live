@@ -274,8 +274,8 @@ def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
     response = client.get("/assignments")
     assert response.status_code == 200
     assignments = response.json()["assignments"]
-    assert [assignment["id"] for assignment in assignments] == [1, 2, 3, 4]
-    assert [assignment["version"] for assignment in assignments] == [3, 2, 3, 2]
+    assert [assignment["id"] for assignment in assignments] == [1, 2, 3, 4, 5]
+    assert [assignment["version"] for assignment in assignments] == [3, 2, 3, 2, 1]
     assert all(assignment["stable_id"] for assignment in assignments)
     assert all(assignment["solution_html"] == "" for assignment in assignments)
     assert all(assignment["vals"] == {} for assignment in assignments)
@@ -286,7 +286,7 @@ def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
     )
 
 
-@pytest.mark.parametrize("assignment_id", [1, 2, 3, 4])
+@pytest.mark.parametrize("assignment_id", [1, 2, 3, 4, 5])
 def test_gets_each_assignment_without_hidden_grader_data(client, assignment_id):
     response = client.get(f"/assignments/{assignment_id}")
     assert response.status_code == 200
@@ -296,6 +296,20 @@ def test_gets_each_assignment_without_hidden_grader_data(client, assignment_id):
     assert assignment["rubric"]
     assert "grader_config" not in assignment
     assert "common_misconceptions" not in assignment
+
+
+def test_ros_assignment_exposes_one_editable_file_without_private_grader_data(client):
+    response = client.get("/assignments/5")
+
+    assert response.status_code == 200
+    assignment = response.json()
+    assert assignment["stable_id"] == "ros2-drive-forward"
+    assert assignment["language"] == "python-ros2"
+    assert assignment["editable_file_path"].endswith("controller.py")
+    assert sum(item["editable"] for item in assignment["project_files"]) == 1
+    assert any(item["path"].endswith("package.xml") for item in assignment["project_files"])
+    assert "grader_config" not in assignment
+    assert "reference_solution_path" not in assignment
 
 
 def test_serves_assignment_image(client):

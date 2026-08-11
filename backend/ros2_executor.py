@@ -1,0 +1,137 @@
+from __future__ import annotations
+
+import json
+import os
+import secrets
+import subprocess
+from typing import Protocol
+
+
+class Ros2Executor(Protocol):
+    def execute(
+        self,
+        code: str,
+        project_files: list[dict],
+        config: dict,
+    ) -> dict:
+        ...
+
+
+class DockerRos2Executor:
+    """Run one ROS 2 submission in a short-lived, networkless container."""
+
+    def __init__(self, image: str, timeout_seconds: float = 20.0):
+        self.image = image
+        self.timeout_seconds = timeout_seconds
+
+    def execute(
+        self,
+        code: str,
+        project_files: list[dict],
+        config: dict,
+    ) -> dict:
+        request_data = json.dumps(
+            {
+                "code": code,
+                "project_files": project_files,
+                "config": _safe_config(config),
+            }
+        )
+        domain_id = str(secrets.randbelow(200) + 1)
+        command = [
+            "docker",
+            "run",
+            "--rm",
+            "-i",
+            "--network",
+            "none",
+            "--read-only",
+            "--tmpfs",
+            "/workspace:rw,nosuid,nodev,size=256m,uid=10001,gid=10001",
+            "--tmpfs",
+            "/tmp:rw,nosuid,nodev,size=64m,uid=10001,gid=10001",
+            "--memory",
+            "768m",
+            "--cpus",
+            "1",
+            "--pids-limit",
+            "128",
+            "--cap-drop",
+            "ALL",
+            "--security-opt",
+            "no-new-privileges",
+            "--env",
+            "ROS_LOCALHOST_ONLY=1",
+            "--env",
+            f"ROS_DOMAIN_ID={domain_id}",
+            "--env",
+            "HOME=/tmp",
+            self.image,
+        ]
+        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        try:
+            completed = subprocess.run(
+                command,
+                input=request_data,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_seconds + 5,
+                check=False,
+                creationflags=creation_flags,
+            )
+        except FileNotFoundError:
+            return _executor_error(
+                "The local ROS 2 grader is unavailable. Install and start Docker Desktop."
+            )
+        except subprocess.TimeoutExpired:
+            return _executor_error(
+                f"The ROS 2 test exceeded {self.timeout_seconds:g} seconds and was stopped."
+            )
+        if completed.returncode != 0:
+            return _executor_error(
+                completed.stderr.strip()[-2000:]
+                or "The ROS 2 grader container failed."
+            )
+        try:
+            result = json.loads(completed.stdout)
+        except json.JSONDecodeError:
+            return _executor_error("The ROS 2 grader returned an invalid response.")
+        if not _valid_result(result):
+            return _executor_error("The ROS 2 grader returned an invalid response.")
+        return result
+
+
+def _safe_config(config: dict) -> dict:
+    allowed = {
+        "package_name",
+        "executable",
+        "topic",
+        "message_type",
+        "expected_linear_x",
+        "linear_tolerance",
+        "angular_tolerance",
+        "move_seconds",
+        "stop_tolerance_seconds",
+        "minimum_publish_rate_hz",
+        "test_weights",
+    }
+    return {key: value for key, value in config.items() if key in allowed}
+
+
+def _valid_result(result: object) -> bool:
+    return (
+        isinstance(result, dict)
+        and isinstance(result.get("success"), bool)
+        and isinstance(result.get("error"), str)
+        and isinstance(result.get("output"), str)
+        and isinstance(result.get("tests"), list)
+    )
+
+
+def _executor_error(message: str) -> dict:
+    return {
+        "success": False,
+        "error": message,
+        "output": "",
+        "tests": [],
+    }
