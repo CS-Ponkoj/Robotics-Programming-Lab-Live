@@ -56,6 +56,7 @@ functionality and must never depend on OpenAI.
 
 | Repository or environment | Role | Policy |
 |---|---|---|
+| `C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging` | Canonical Windows staging checkout | Run ordinary local development, local execution, SQA, and staging Git work from this folder. It must track `CS-Ponkoj/Robotics-Programming-Lab-Staging`; do not treat temporary worktrees or `IUSE_Project-2026` as the canonical staging checkout. |
 | `CS-Ponkoj/Robotics-Programming-Lab-Staging` | Development, local execution, SQA, and release candidates | Make changes on focused branches and merge into staging `main` only after verification. |
 | `CS-Ponkoj/Robotics-Programming-Lab` | Live Vercel and Render deployment | Production `main` receives only an approved, tested staging commit. Do not patch production directly. |
 | Local SQLite | Fast developer feedback | May be used for ordinary local work; it is ignored and disposable. |
@@ -69,6 +70,14 @@ be identical for the tested staging release and production release.
 The production repository `main` branch is the live branch watched by Vercel and
 Render. Publication, production promotion, tags, releases, and destructive
 operations require explicit project-owner approval.
+
+Before every repository action, verify the checkout with
+`git rev-parse --show-toplevel`, the current branch, `git remote -v`, and
+`git status --short`. The canonical local staging checkout and staging Git
+repository must resolve to the intended matching commit before handoff. Preserve
+unrelated local work with a named, recoverable stash when a clean synchronized
+checkout is required. Never fetch, merge, push, or deploy the `production`
+remote unless the project owner explicitly authorizes a live promotion.
 
 ## Architecture map
 
@@ -120,6 +129,10 @@ Use an incremental, evidence-driven workflow:
 8. Run the complete release gate when behavior, dependencies, data, deployment,
    authentication, grading, or shared UI changes.
 9. Record evidence and remaining limitations honestly.
+10. At the beginning and end of each task, check whether durable repository
+    facts or engineering rules have changed enough to require an `AGENTS.md`
+    update. Update it in the same verified staging workflow when needed; do not
+    create documentation churn for ordinary implementation details.
 
 Do not claim a feature works because it compiles. Verify observable behavior at
 the appropriate API, test, browser, database, or deployed-service boundary.
@@ -437,6 +450,12 @@ not patch production in place.
 Update documentation whenever a change affects setup, architecture,
 configuration, API behavior, assignment authoring, research data, security,
 deployment, or recovery.
+
+Treat `AGENTS.md` maintenance as a required handoff check. Update it when the
+canonical checkout, repository roles, branch policy, supported commands,
+architecture, security boundary, verification gate, or release process changes.
+When none of those durable facts changed, record that no `AGENTS.md` update was
+needed rather than editing the file unnecessarily.
 
 SQA evidence must state:
 
