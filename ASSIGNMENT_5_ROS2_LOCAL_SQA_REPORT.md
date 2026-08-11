@@ -4,9 +4,9 @@
 
 **Environment:** `C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging`
 
-**Branch and tested commit:** staging `main` at `3ab909b7b6b7ecd6977e14ccb1e98f878fe76e17`
+**Branch and tested commit:** staging `main` at `d4ef4934eb12bf5d36392a79f14e47058f71464f` (application source unchanged from the previously tested ROS implementation)
 
-**Decision:** PASS for the local staging implementation, automated release gate, authenticated functional QA and staging-Git synchronization. Rendered browser inspection is still BLOCKED by the Codex Windows browser-control sandbox and must be completed by a human before production promotion. Live was not touched and remains a separate future step because it requires a hosted ROS worker.
+**Decision:** PASS for the local staging implementation, automated release gate, authenticated functional QA, rendered browser QA and staging-Git synchronization. The former Codex browser-control blocker was resolved with the documented Windows `unelevated` sandbox fallback. Live was not touched and remains a separate future step because it requires a hosted ROS worker.
 
 | Area | Result | Evidence |
 |---|---:|---|
@@ -34,8 +34,8 @@
 | Manual functional QA | PASS | Exact staging-folder run passed health, invalid login, both roles, role isolation, instructor validation, seven-file safe project tree with one editable file, correct score 100 with seven evidence rows in 9.03 seconds, and wrong velocity rejected at score 80 in 8.98 seconds |
 | Student solution boundary | PASS | The compatibility `solution_html` field is empty (length 0); no grader configuration, reference-solution path or private project file is returned |
 | AI default | PASS | Managed local state records `aiEnabled: false` |
-| Local/staging Git consistency | PASS | Local staging `main` and `origin/main` both resolve to `3ab909b7`; pre-existing local lockfile and generated import report remain excluded from this release |
-| Rendered browser interaction | BLOCKED | Browser control failed before connecting with `windows sandbox failed: helper_unknown_error: setup refresh had errors`; UI behavior remains covered by 39 Flutter tests but is not represented as manually passed |
+| Local/staging Git consistency | PASS | Local staging `main` and `origin/main` resolved to `d4ef4934` before this report-only update; unrelated local artifacts remain excluded from the release commit |
+| Rendered browser interaction | PASS | Codex connected to the local app after switching to the documented Windows `unelevated` sandbox fallback. Verified login, five assignment cards, Assignment 5 file locks, editable `controller.py`, AI off by default, starter score 29%, maintained solution score 100% with seven passing tests, mobile-width results and `Ctrl+Enter` execution. |
 
 ## Staging decision and live limitation
 
@@ -47,7 +47,7 @@ The feature is synchronized to staging Git `main` and is ready for local classro
 
 Do not promote Assignment 5 to the current live Render service yet. Render cannot run this local Docker-in-Docker grader design. A separate hosted ROS worker or container-job service must be designed, secured and SQA-tested before live publication.
 
-Before production promotion, open `http://127.0.0.1:8180` and visually confirm: login layout, Assignment 5 file tree, lock icons on six files, editable `controller.py`, correct-result presentation, wrong-result presentation, narrow/mobile layout and keyboard navigation.
+The local rendered checklist was completed at `http://127.0.0.1:8180` on 2026-08-11. Repeat the same browser checklist against the deployed release candidate before any future production promotion.
 
 ## Repository-answer limitation
 
