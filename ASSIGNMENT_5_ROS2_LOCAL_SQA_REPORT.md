@@ -4,7 +4,7 @@
 
 **Branch:** `codex-ros-local-assignment` based on staging `main` at `522dd745`
 
-**Decision:** PARTIAL - code and local platform checks pass; real ROS container execution is blocked until Docker Desktop is explicitly installed.
+**Decision:** PASS for staging publication. The local code-only ROS assignment and its real container grader pass. Live deployment remains a separate future step because it requires a hosted ROS worker.
 
 | Area | Result | Evidence |
 |---|---:|---|
@@ -13,7 +13,7 @@
 | Student workspace data | PASS | Seven project files returned; exactly one editable `controller.py` |
 | Private data boundary | PASS | Student API omits `grader_config` and `reference_solution_path` |
 | Maintained answer | PASS | `manual_sqa_answers/assignment_5_ros2_drive_forward/controller.py` is tracked for instructor checks |
-| Grader unit and API tests | PASS | Correct, partial, unsafe-import, missing-Docker and injected-API paths pass |
+| Grader unit and API tests | PASS | Correct, partial, syntax-error, unsafe-import, isolation-policy, missing-Docker and injected-API paths pass |
 | Full backend regression | PASS | 100 tests passed in a clean declared-dependency environment |
 | Python dependency integrity | PASS | `pip check` reports no broken requirements |
 | Python compilation | PASS | Backend `compileall` succeeds |
@@ -23,21 +23,23 @@
 | Local launcher | PASS | Corrected to use web-server mode and an IPv4 health probe |
 | Local service health | PASS | Frontend 200; backend and dedicated Python sandbox report `ok` |
 | Authenticated Assignment 5 API | PASS | Demo student loads Assignment 5 and its safe project-file payload |
-| Missing runtime behavior | PASS | Run returns the Docker Desktop recovery message in about 0.04 seconds; no indefinite spinner |
-| Real ROS 2 Jazzy image build | BLOCKED | Docker Desktop is not installed on this computer |
-| Correct answer in real ROS runtime | BLOCKED | Requires the versioned ROS 2 Docker image |
-| Incorrect/runtime behavior in real ROS runtime | BLOCKED | Requires the versioned ROS 2 Docker image |
+| Docker readiness | PASS | Docker Desktop 4.86.0; Linux engine 29.7.2; project readiness script locates PATH or standard Windows installation |
+| Real ROS 2 Jazzy image build | PASS | Pinned official Jazzy base built as `robotics-lab-ros2-grader:jazzy-v1` |
+| Correct answer in real ROS runtime | PASS | Seven of seven tests pass; approximately 58 messages at 10 Hz |
+| Authenticated real ROS API | PASS | Student login to Assignment 5 run returns execution success, score 100 and seven passing evidence rows in 10.68 seconds |
+| Adversarial real ROS matrix | PASS | Wrong velocity, syntax error, runtime crash, unsafe import, infinite loop, excessive output and oversized code all produced the expected bounded result |
+| Container isolation | PASS | Non-root worker, network disabled, read-only root, capability drop, no-new-privileges, resource limits, executable workspace and non-executable `/tmp` |
 | Rendered browser interaction | BLOCKED | Codex browser control could not start because of a Windows sandbox helper failure; widget behavior remains covered by Flutter tests |
 
-## Required completion gate
+## Staging decision and live limitation
 
-After explicitly approving and installing Docker Desktop, start its Linux engine and run:
+The feature is ready for the staging Git repository and local classroom evaluation. Recheck the local ROS image at any time with:
 
 ```powershell
-.\scripts\check-ros2-local.ps1 -Build
+.\scripts\check-ros2-local.ps1
 ```
 
-Then run the maintained correct controller plus incorrect and unsafe submissions through Assignment 5. Do not publish this feature to live until those real-container checks pass.
+Do not promote Assignment 5 to the current live Render service yet. Render cannot run this local Docker-in-Docker grader design. A separate hosted ROS worker or container-job service must be designed, secured and SQA-tested before live publication.
 
 ## Repository-answer limitation
 

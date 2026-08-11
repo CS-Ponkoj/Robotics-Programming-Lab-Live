@@ -137,13 +137,14 @@ def evaluate(request: dict) -> dict:
     except json.JSONDecodeError:
         return failure("The ROS 2 runtime test returned an invalid response.")
     runtime_tests = runtime.get("tests", []) if isinstance(runtime, dict) else []
+    runtime_error = str(runtime.get("runtime_error", ""))
     tests = [
         test_result("package-build", True, "The ROS 2 package built successfully."),
         *runtime_tests,
     ]
     return {
-        "success": True,
-        "error": "",
+        "success": not bool(runtime_error),
+        "error": runtime_error,
         "output": runtime.get("output", ""),
         "tests": tests,
     }

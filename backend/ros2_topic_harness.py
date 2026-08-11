@@ -49,8 +49,9 @@ def main() -> None:
     monitor.create_subscription(Twist, topic, receive, 10)
     student = subprocess.Popen(
         ["ros2", "run", package, executable],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
         start_new_session=True,
     )
     started_at = time.monotonic()
@@ -69,6 +70,7 @@ def main() -> None:
                 os.killpg(student.pid, signal.SIGKILL)
         monitor.destroy_node()
         rclpy.shutdown()
+    student_stdout, student_stderr = student.communicate(timeout=1)
 
     duration = messages[-1][0] - messages[0][0] if len(messages) > 1 else 0.0
     publish_rate = (len(messages) - 1) / duration if duration > 0 else 0.0
@@ -87,6 +89,14 @@ def main() -> None:
     )
     held_stop = stop_ok and sum(item[0] >= first_stop for item in stopped) >= 3 and not any(
         item[0] > first_stop + 0.1 and abs(item[1]) > 0.001 for item in messages
+    )
+    runtime_error = (
+        ""
+        if alive_at_end
+        else (
+            student_stderr.strip()[-1000:]
+            or "The robot_controller node exited unexpectedly."
+        )
     )
 
     tests = [
@@ -124,8 +134,26 @@ def main() -> None:
     print(
         json.dumps(
             {
-                "error": "" if all(item["passed"] for item in tests) else "One or more ROS behavior requirements need attention.",
-                "output": f"Observed {len(messages)} Twist messages at approximately {publish_rate:.1f} Hz.",
+                "error": runtime_error
+                or (
+                    ""
+                    if all(item["passed"] for item in tests)
+                    else "One or more ROS behavior requirements need attention."
+                ),
+                "runtime_error": runtime_error,
+                "output": (
+                    f"Observed {len(messages)} Twist messages at approximately {publish_rate:.1f} Hz."
+                    + (
+                        f"\nNode stderr: {student_stderr.strip()[-1000:]}"
+                        if runtime_error
+                        else ""
+                    )
+                    + (
+                        f"\nNode stdout: {student_stdout.strip()[-1000:]}"
+                        if student_stdout.strip()
+                        else ""
+                    )
+                ),
                 "tests": tests,
             }
         )

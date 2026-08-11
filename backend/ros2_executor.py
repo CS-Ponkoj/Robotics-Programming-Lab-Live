@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import shutil
 import subprocess
 from typing import Protocol
 
@@ -37,9 +38,20 @@ class DockerRos2Executor:
                 "config": _safe_config(config),
             }
         )
+        docker_executable = shutil.which("docker")
+        if docker_executable is None and os.name == "nt":
+            installed = (
+                r"C:\Program Files\Docker\Docker\resources\bin\docker.exe"
+            )
+            if os.path.isfile(installed):
+                docker_executable = installed
+        if docker_executable is None:
+            return _executor_error(
+                "The local ROS 2 grader is unavailable. Install and start Docker Desktop."
+            )
         domain_id = str(secrets.randbelow(200) + 1)
         command = [
-            "docker",
+            docker_executable,
             "run",
             "--rm",
             "-i",
@@ -47,9 +59,9 @@ class DockerRos2Executor:
             "none",
             "--read-only",
             "--tmpfs",
-            "/workspace:rw,nosuid,nodev,size=256m,uid=10001,gid=10001",
+            "/workspace:rw,nosuid,nodev,exec,size=256m,uid=10001,gid=10001",
             "--tmpfs",
-            "/tmp:rw,nosuid,nodev,size=64m,uid=10001,gid=10001",
+            "/tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001",
             "--memory",
             "768m",
             "--cpus",

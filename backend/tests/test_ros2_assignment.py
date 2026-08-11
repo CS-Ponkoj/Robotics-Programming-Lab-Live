@@ -147,6 +147,19 @@ def test_docker_executor_isolated_flags_and_config_allowlist(monkeypatch):
     command = captured['command']
     assert result['success'] is True
     assert command[command.index('--network') + 1] == 'none'
+    tmpfs_values = [
+        command[index + 1]
+        for index, value in enumerate(command)
+        if value == '--tmpfs'
+    ]
+    assert any(
+        value.startswith('/workspace:') and 'exec' in value
+        for value in tmpfs_values
+    )
+    assert any(
+        value.startswith('/tmp:') and 'noexec' in value
+        for value in tmpfs_values
+    )
     assert '--read-only' in command
     assert '--memory' in command
     assert '--cpus' in command
