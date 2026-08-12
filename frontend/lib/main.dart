@@ -58,7 +58,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _restoreSession() async {
     final user = await AuthApi.restore();
-    if (user != null && !user.isInstructor) {
+    if (user != null && !user.isInstructor && !user.isDemo) {
       unawaited(researchTracker.startSafely());
     }
     if (mounted) {
@@ -70,8 +70,14 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _logout() async {
-    await researchTracker.stop();
+    final wasDemo = _user?.isDemo ?? false;
+    if (!wasDemo) {
+      await researchTracker.stop();
+    }
     await AuthApi.logout();
+    if (wasDemo) {
+      await learningProgress.load();
+    }
     if (mounted) {
       markLoggedOutBrowserEntry();
       setState(() => _user = null);
@@ -80,7 +86,9 @@ class _MyAppState extends State<MyApp> {
 
   void _onAuthenticated(AuthenticatedUser user) {
     markAuthenticatedBrowserEntry();
-    if (!user.isInstructor) {
+    if (user.isDemo) {
+      learningProgress.startEphemeralSession();
+    } else if (!user.isInstructor) {
       unawaited(researchTracker.startSafely());
     }
     setState(() => _user = user);

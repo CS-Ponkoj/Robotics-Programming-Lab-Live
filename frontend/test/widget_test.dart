@@ -535,9 +535,44 @@ void main() {
     expect(find.byKey(const Key('login-id-field')), findsOneWidget);
     expect(find.byKey(const Key('login-password-field')), findsOneWidget);
     expect(find.byKey(const Key('login-submit-button')), findsOneWidget);
+    expect(find.byKey(const Key('student-demo-button')), findsOneWidget);
+    expect(find.text('Try the student demo'), findsOneWidget);
+    expect(
+      find.textContaining('resets when you refresh'),
+      findsOneWidget,
+    );
     expect(find.textContaining('student / student'), findsNothing);
     expect(find.textContaining('instructor / instructor'), findsNothing);
     expect(find.text('Forgot password?'), findsNothing);
+  });
+
+  testWidgets('demo header is labeled temporary and hides saved study data',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          appBar: LandingPageHeader(
+            user: AuthenticatedUser(
+              id: 'demo-student-id',
+              loginId: 'student',
+              role: 'student',
+              isDemo: true,
+            ),
+            onLogout: testLogout,
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.text('Demo mode: all work resets when you refresh'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byTooltip('Account menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Demo student (temporary)'), findsOneWidget);
+    expect(find.text('My study progress'), findsNothing);
+    expect(find.text('Sign out'), findsOneWidget);
   });
 
   testWidgets('landing page content is centered and width constrained',

@@ -63,6 +63,25 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _startDemo() async {
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final session = await AuthApi.demoLogin();
+      widget.onAuthenticated(session.user);
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _error = _displayError(error));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _working = false);
+      }
+    }
+  }
+
   Future<void> _resetPassword() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -335,6 +354,36 @@ class _LoginPageState extends State<LoginPage> {
                                   : 'Sign in',
                         ),
                       ),
+                      if (!resetMode) ...[
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                'or',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        OutlinedButton.icon(
+                          key: const Key('student-demo-button'),
+                          onPressed: _working ? null : _startDemo,
+                          icon: const Icon(Icons.science_outlined),
+                          label: const Text('Try the student demo'),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Use every student learning tool without an account. '
+                          'Demo work is temporary and resets when you refresh.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                       if (_working) ...[
                         const SizedBox(height: 10),
                         const Text(

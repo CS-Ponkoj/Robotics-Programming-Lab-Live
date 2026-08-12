@@ -99,8 +99,22 @@ def test_attempt_and_instructor_edit_survive_application_restart(tmp_path):
     with TestClient(
         create_app(settings=first_settings, database_url=database_url)
     ) as first_client:
-        student = _login(first_client, "student", "student")
         instructor = _login(first_client, "instructor", "instructor")
+        student_password = "Classroom-Student-4827"
+        created = first_client.post(
+            "/admin/students",
+            headers=_bearer(instructor["token"]),
+            json={
+                "login_id": "classroom-persistent-student",
+                "temporary_password": student_password,
+            },
+        )
+        assert created.status_code == 201
+        student = _login(
+            first_client,
+            "classroom-persistent-student",
+            student_password,
+        )
 
         submission_response = first_client.post(
             "/assignments/2/submit",
@@ -141,7 +155,7 @@ def test_attempt_and_instructor_edit_survive_application_restart(tmp_path):
             database_assignment = session.get(Assignment, 2)
 
             assert persisted_submission is not None
-            assert persisted_submission.student_id == "student"
+            assert persisted_submission.student_id == "classroom-persistent-student"
             assert persisted_submission.assignment_version == original_version
             assert database_assignment is not None
             assert database_assignment.description == marker

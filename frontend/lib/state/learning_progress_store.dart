@@ -23,6 +23,11 @@ class LearningProgressStore {
 
   bool get isLoaded => _storage != null;
 
+  void startEphemeralSession() {
+    _storage = InMemoryProgressStorage();
+    _clearState();
+  }
+
   bool hasAttempted(int assignmentId) => (attemptCounts[assignmentId] ?? 0) > 0;
 
   AssignmentProgressState assignmentState(
@@ -41,28 +46,28 @@ class LearningProgressStore {
     _storage = storage ?? createProgressStorage();
     await _storage!.initialize();
 
-    latestScores
-      ..clear()
-      ..addAll(_decodeIntMap(_getStringSafely(_latestScoresKey)));
-    bestScores
-      ..clear()
-      ..addAll(_decodeIntMap(_getStringSafely(_bestScoresKey)));
-    codeDrafts
-      ..clear()
-      ..addAll(_decodeStringMap(_getStringSafely(_draftsKey)));
-    attemptCounts
-      ..clear()
-      ..addAll(_decodeIntMap(_getStringSafely(_attemptCountsKey)));
-    revealedSolutions
-      ..clear()
-      ..addAll(
-        _decodeIntList(_getStringSafely(_revealedSolutionsKey))
-            .map(int.tryParse)
-            .whereType<int>(),
-      );
-    submissionIds
-      ..clear()
-      ..addAll(_decodeStringMap(_getStringSafely(_submissionIdsKey)));
+    _clearState();
+    latestScores.addAll(_decodeIntMap(_getStringSafely(_latestScoresKey)));
+    bestScores.addAll(_decodeIntMap(_getStringSafely(_bestScoresKey)));
+    codeDrafts.addAll(_decodeStringMap(_getStringSafely(_draftsKey)));
+    attemptCounts.addAll(_decodeIntMap(_getStringSafely(_attemptCountsKey)));
+    revealedSolutions.addAll(
+      _decodeIntList(_getStringSafely(_revealedSolutionsKey))
+          .map(int.tryParse)
+          .whereType<int>(),
+    );
+    submissionIds.addAll(
+      _decodeStringMap(_getStringSafely(_submissionIdsKey)),
+    );
+  }
+
+  void _clearState() {
+    latestScores.clear();
+    bestScores.clear();
+    codeDrafts.clear();
+    attemptCounts.clear();
+    revealedSolutions.clear();
+    submissionIds.clear();
   }
 
   Future<void> saveDraft(int assignmentId, String code) async {
