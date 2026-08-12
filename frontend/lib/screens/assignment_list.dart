@@ -515,7 +515,9 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Practice autonomous navigation through hands-on coding challenges',
+                  user.isDemo
+                      ? 'Demo mode: all work resets when you refresh'
+                      : 'Practice autonomous navigation through hands-on coding challenges',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(
@@ -563,23 +565,26 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
               PopupMenuItem<String>(
                 enabled: false,
                 child: Text(
-                  '${user.loginId} (${user.role})',
+                  user.isDemo
+                      ? 'Demo student (temporary)'
+                      : '${user.loginId} (${user.role})',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
               const PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'study-data',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.insights_rounded),
-                  title: Text(
-                    user.isInstructor
-                        ? 'Research dashboard'
-                        : 'My study progress',
+              if (!user.isDemo)
+                PopupMenuItem<String>(
+                  value: 'study-data',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.insights_rounded),
+                    title: Text(
+                      user.isInstructor
+                          ? 'Research dashboard'
+                          : 'My study progress',
+                    ),
                   ),
                 ),
-              ),
               const PopupMenuItem<String>(
                 value: 'logout',
                 child: ListTile(

@@ -44,6 +44,12 @@ functionality and must never depend on OpenAI.
 - Keep AI available but disabled by default unless a study configuration
   explicitly enables it.
 - Do not display demo credentials on the login page.
+- Public student-demo access must use a server-issued ephemeral session. Demo
+  authentication, code attempts, hints, solution unlocks, drafts, and progress
+  must remain memory-only; a browser refresh must return to login and reset the
+  demo. Demo activity must not create auth-session, submission, hint, audit, or
+  research rows. Keep demo authorization student-only and isolate every demo
+  browser session from every other session.
 - Derive student identity from the authenticated server session. Never trust a
   client-supplied student ID for ownership or authorization.
 - Keep student and instructor capabilities separated and tested.
@@ -63,9 +69,14 @@ functionality and must never depend on OpenAI.
 | Staging PostgreSQL | Production-parity SQA | Must be separate from production and contain no live research records. |
 | Production Neon PostgreSQL | Live mutable data | Schema changes require Alembic migrations and recovery planning. |
 
-Promote releases by Git commit SHA, never by copying files between repositories.
-The source tree, tests, assignment content, migrations, and deployment files must
-be identical for the tested staging release and production release.
+Promote production-ready changes by reviewed Git commits, never by copying files
+between repositories. Staging may contain unreleased features such as ROS
+Assignment 5 while production intentionally remains on Assignments 1-4. While
+that difference exists, do not merge staging wholesale into production. Apply
+only the reviewed common change to a production branch, verify the production
+assignment inventory contains exactly 1-4 and no ROS artifacts, then run the
+same complete gate on both resulting commits. Promote ROS only after its hosted
+sandbox architecture and release are explicitly approved.
 
 The production repository `main` branch is the live branch watched by Vercel and
 Render. Publication, production promotion, tags, releases, and destructive

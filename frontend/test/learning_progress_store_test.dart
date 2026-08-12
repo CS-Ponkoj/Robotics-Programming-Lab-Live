@@ -38,6 +38,30 @@ void main() {
     expect(store.bestScores[1], 100);
   });
 
+  test('demo progress is memory-only and leaves saved student data unchanged',
+      () async {
+    final persistentStorage = InMemoryProgressStorage();
+    final store = LearningProgressStore();
+    await store.load(storage: persistentStorage);
+    await store.saveDraft(1, 'saved student draft');
+    await store.recordAttempt(1, 80);
+
+    store.startEphemeralSession();
+    expect(store.codeDrafts, isEmpty);
+    expect(store.attemptCounts, isEmpty);
+
+    await store.saveDraft(2, 'temporary demo draft');
+    await store.recordAttempt(2, 100);
+    expect(store.codeDrafts[2], 'temporary demo draft');
+
+    final restored = LearningProgressStore();
+    await restored.load(storage: persistentStorage);
+    expect(restored.codeDrafts[1], 'saved student draft');
+    expect(restored.latestScores[1], 80);
+    expect(restored.codeDrafts, isNot(contains(2)));
+    expect(restored.latestScores, isNot(contains(2)));
+  });
+
   test('an invalidated solution reveal is removed from persistence', () async {
     final storage = InMemoryProgressStorage();
     final store = LearningProgressStore();

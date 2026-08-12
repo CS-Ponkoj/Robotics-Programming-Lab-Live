@@ -42,17 +42,44 @@ class AuthApi {
       throw Exception(errorMessage(response));
     }
 
+    final session = _sessionFrom(response);
+    await _activate(session, persist: !session.user.isDemo);
+    return session;
+  }
+
+  static Future<AuthSession> demoLogin() async {
+    final response = await http
+        .post(Uri.parse('$apiBaseUrl/auth/demo'))
+        .timeout(_authTimeout);
+    if (response.statusCode != 200) {
+      throw Exception(errorMessage(response));
+    }
+    final session = _sessionFrom(response);
+    await _activate(session, persist: false);
+    return session;
+  }
+
+  static AuthSession _sessionFrom(http.Response response) {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final session = AuthSession(
+    return AuthSession(
       token: data['token'] as String,
       user: AuthenticatedUser.fromJson(
         Map<String, dynamic>.from(data['user'] as Map),
       ),
     );
+  }
+
+  static Future<void> _activate(
+    AuthSession session, {
+    required bool persist,
+  }) async {
     _token = session.token;
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_tokenStorageKey, session.token);
-    return session;
+    if (persist) {
+      await preferences.setString(_tokenStorageKey, session.token);
+    } else {
+      await preferences.remove(_tokenStorageKey);
+    }
   }
 
   static Future<AuthenticatedUser?> restore() async {
@@ -71,9 +98,14 @@ class AuthApi {
           )
           .timeout(_authTimeout);
       if (response.statusCode == 200) {
-        return AuthenticatedUser.fromJson(
+        final user = AuthenticatedUser.fromJson(
           Map<String, dynamic>.from(jsonDecode(response.body) as Map),
         );
+        if (user.isDemo) {
+          await clearLocalSession();
+          return null;
+        }
+        return user;
       }
     } on Object {
       // A stale or unreachable session is cleared so the user can sign in.

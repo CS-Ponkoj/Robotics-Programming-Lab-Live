@@ -115,9 +115,10 @@ def authenticate_user(session: Session, login_id: str, password: str) -> User | 
         return None
     if not verify_password(password, user.password_hash):
         return None
-    user.last_login_at = utc_now()
-    session.commit()
-    session.refresh(user)
+    if not user.is_demo:
+        user.last_login_at = utc_now()
+        session.commit()
+        session.refresh(user)
     return user
 
 

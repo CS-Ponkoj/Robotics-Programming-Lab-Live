@@ -38,6 +38,18 @@ def bearer(token):
     return {"Authorization": f"Bearer {token}"}
 
 
+def create_regular_student(client, login_id):
+    password = "Study-Password-4827"
+    instructor = login(client, "instructor", "instructor")
+    response = client.post(
+        "/admin/students",
+        headers=bearer(instructor["token"]),
+        json={"login_id": login_id, "temporary_password": password},
+    )
+    assert response.status_code == 201
+    return login(client, login_id, password)
+
+
 def test_default_demo_accounts_login_restore_and_logout(auth_client):
     student = login(auth_client, "student", "student")
     instructor = login(auth_client, "instructor", "instructor")
@@ -297,7 +309,7 @@ def test_configured_smtp_sends_real_test_message(tmp_path, monkeypatch):
 
 
 def test_authenticated_submission_uses_logged_in_student_id(auth_client):
-    student = login(auth_client, "student", "student")
+    student = create_regular_student(auth_client, "submission-owner")
     response = auth_client.post(
         "/assignments/2/run",
         headers=bearer(student["token"]),
@@ -310,7 +322,7 @@ def test_authenticated_submission_uses_logged_in_student_id(auth_client):
                 Submission.id == response.json()["submission_id"]
             )
         )
-        assert submission.student_id == "student"
+        assert submission.student_id == "submission-owner"
 
 
 def test_student_password_is_hashed_and_never_stored_as_plain_text(auth_client):
@@ -387,7 +399,7 @@ def test_students_cannot_access_each_others_submission_feedback_or_solution(
 def test_assignment_attempt_and_instructor_action_are_persisted_for_audit(
     auth_client,
 ):
-    student = login(auth_client, "student", "student")
+    student = create_regular_student(auth_client, "audit-attempt-student")
     instructor = login(auth_client, "instructor", "instructor")
     submission_response = auth_client.post(
         "/assignments/2/submit",
@@ -413,7 +425,7 @@ def test_assignment_attempt_and_instructor_action_are_persisted_for_audit(
         audit_event = session.scalar(
             select(AuditEvent).where(AuditEvent.action == "student.created")
         )
-        assert submission.student_id == "student"
+        assert submission.student_id == "audit-attempt-student"
         assert submission.assignment_version == 2
         assert submission.evidence["tests"]
         assert audit_event.actor_user_id == instructor["user"]["id"]

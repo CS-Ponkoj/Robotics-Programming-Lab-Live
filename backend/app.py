@@ -1,10 +1,12 @@
 import logging
 import os
+import secrets
 import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -27,6 +29,7 @@ from auth_service import (
     create_session,
     create_user,
     generate_temporary_password,
+    hash_token,
     normalize_email,
     normalize_login_id,
     normalize_participant_code,
@@ -141,6 +144,9 @@ def create_app(
     application.state.SessionLocal = local_session
     application.state.email_outbox = []
     application.state.login_failures = {}
+    application.state.demo_sessions = {}
+    application.state.demo_submissions = {}
+    application.state.demo_session_lock = threading.Lock()
     application.state.rate_limits = {}
     application.state.rate_limit_lock = threading.Lock()
     application.state.execution_slots = threading.BoundedSemaphore(
@@ -211,11 +217,89 @@ def create_app(
             return None
         return token.strip()
 
+    def demo_session_record(request: Request, token: str | None = None):
+        raw_token = token or bearer_token(request)
+        if not raw_token:
+            return None
+        token_hash = hash_token(raw_token)
+        now = utc_now()
+        with request.app.state.demo_session_lock:
+            expired = [
+                key
+                for key, value in request.app.state.demo_sessions.items()
+                if value["expires_at"] <= now
+            ]
+            for key in expired:
+                request.app.state.demo_sessions.pop(key, None)
+                stale_submissions = [
+                    submission_id
+                    for submission_id, entry in request.app.state.demo_submissions.items()
+                    if entry["token_hash"] == key
+                ]
+                for submission_id in stale_submissions:
+                    request.app.state.demo_submissions.pop(submission_id, None)
+            record = request.app.state.demo_sessions.get(token_hash)
+        if record is None:
+            return None
+        return token_hash, record
+
+    def demo_user_for_token(
+        request: Request,
+        session: Session,
+        token: str | None,
+    ) -> User | None:
+        record = demo_session_record(request, token)
+        if record is None:
+            return None
+        user = session.get(User, record[1]["user_id"])
+        if user is None or not user.is_active or not user.is_demo:
+            return None
+        return user
+
+    def is_ephemeral_demo(request: Request, user: User) -> bool:
+        record = demo_session_record(request)
+        return bool(
+            user.is_demo
+            and record is not None
+            and record[1]["user_id"] == user.id
+        )
+
+    def create_demo_session(request: Request, user: User):
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hash_token(raw_token)
+        expires_at = utc_now() + timedelta(
+            hours=max(1, request.app.state.settings.auth_session_hours)
+        )
+        with request.app.state.demo_session_lock:
+            request.app.state.demo_sessions[token_hash] = {
+                "user_id": user.id,
+                "expires_at": expires_at,
+            }
+        return raw_token, expires_at
+
+    def revoke_demo_session(request: Request, token: str | None) -> bool:
+        if not token:
+            return False
+        token_hash = hash_token(token)
+        with request.app.state.demo_session_lock:
+            removed = request.app.state.demo_sessions.pop(token_hash, None)
+            submission_ids = [
+                submission_id
+                for submission_id, entry in request.app.state.demo_submissions.items()
+                if entry["token_hash"] == token_hash
+            ]
+            for submission_id in submission_ids:
+                request.app.state.demo_submissions.pop(submission_id, None)
+        return removed is not None
+
     def current_user(
         request: Request,
         session: Session = Depends(session_dependency),
     ) -> User:
-        user = user_for_session_token(session, bearer_token(request))
+        token = bearer_token(request)
+        user = demo_user_for_token(request, session, token)
+        if user is None:
+            user = user_for_session_token(session, token)
         if user is None:
             raise HTTPException(401, "Authentication required.")
         return user
@@ -238,7 +322,9 @@ def create_app(
             return
         # Authenticated quotas follow the account. Client-controlled forwarding
         # headers must not allow a student to bypass the execution limit.
-        key = f"{bucket}:{user.id}"
+        demo_record = demo_session_record(request)
+        identity = demo_record[0] if demo_record is not None else user.id
+        key = f"{bucket}:{identity}"
         now = time.monotonic()
         cutoff = now - 60.0
         with request.app.state.rate_limit_lock:
@@ -279,7 +365,10 @@ def create_app(
         token = request.app.state.settings.admin_api_token
         if token and x_admin_token == token:
             return None
-        user = user_for_session_token(session, bearer_token(request))
+        bearer = bearer_token(request)
+        user = demo_user_for_token(request, session, bearer)
+        if user is None:
+            user = user_for_session_token(session, bearer)
         if user is not None:
             if user.role == "instructor":
                 return user
@@ -373,6 +462,7 @@ def create_app(
             raise HTTPException(413, "Submitted code is too large.")
 
     def store_submission(
+        request: Request,
         session: Session,
         assignment: Assignment,
         body: SubmissionRequest,
@@ -391,6 +481,7 @@ def create_app(
             "tests": [item.model_dump() for item in result.evidence],
         }
         submission = Submission(
+            id=str(uuid4()),
             assignment_id=assignment.id,
             assignment_version=assignment.version,
             student_id=user.login_id,
@@ -403,18 +494,66 @@ def create_app(
             score=result.score,
             evidence=evidence,
         )
+        if is_ephemeral_demo(request, user):
+            token_record = demo_session_record(request)
+            if token_record is None:
+                raise HTTPException(401, "Demo session has expired.")
+            with request.app.state.demo_session_lock:
+                request.app.state.demo_submissions[submission.id] = {
+                    "token_hash": token_record[0],
+                    "submission": submission,
+                }
+            return submission
         session.add(submission)
         session.commit()
         session.refresh(submission)
         return submission
 
     def study_session_for_submission(
-        session: Session, body: SubmissionRequest, user: User
+        request: Request,
+        session: Session,
+        body: SubmissionRequest,
+        user: User,
     ) -> StudySession | None:
+        if is_ephemeral_demo(request, user):
+            return None
         value = get_user_study_session(session, body.study_session_id, user)
         if body.study_session_id and value is None:
             raise HTTPException(404, "Study session not found.")
         return value
+
+    def submission_for_request(
+        request: Request,
+        session: Session,
+        user: User,
+        submission_id: str,
+        assignment_id: int,
+        assignment_version: int | None = None,
+    ) -> Submission | None:
+        if is_ephemeral_demo(request, user):
+            token_record = demo_session_record(request)
+            if token_record is None:
+                return None
+            with request.app.state.demo_session_lock:
+                entry = request.app.state.demo_submissions.get(submission_id)
+            if entry is None or entry["token_hash"] != token_record[0]:
+                return None
+            submission = entry["submission"]
+            if submission.assignment_id != assignment_id:
+                return None
+            if (
+                assignment_version is not None
+                and submission.assignment_version != assignment_version
+            ):
+                return None
+            return submission
+        conditions = [
+            Submission.id == submission_id,
+            Submission.assignment_id == assignment_id,
+        ]
+        if assignment_version is not None:
+            conditions.append(Submission.assignment_version == assignment_version)
+        return session.scalar(select(Submission).where(*conditions))
 
     def record_submission_event(
         session: Session,
@@ -516,6 +655,13 @@ def create_app(
             request.app.state.login_failures[login_id] = recent_failures
             raise HTTPException(401, "Invalid login ID or password.")
         request.app.state.login_failures.pop(login_id, None)
+        if user.is_demo and user.role == "student":
+            raw_token, expires_at = create_demo_session(request, user)
+            return {
+                "token": raw_token,
+                "expires_at": expires_at,
+                "user": user_payload(user),
+            }
         raw_token, auth_session = create_session(
             session,
             user,
@@ -534,6 +680,31 @@ def create_app(
             "user": user_payload(user),
         }
 
+    @application.post("/auth/demo", response_model=LoginResponse)
+    def demo_login(
+        request: Request,
+        session: Session = Depends(session_dependency),
+    ):
+        if not request.app.state.settings.enable_demo_accounts:
+            raise HTTPException(404, "Demo access is not available.")
+        user = session.scalar(
+            select(User)
+            .where(
+                User.role == "student",
+                User.is_demo.is_(True),
+                User.is_active.is_(True),
+            )
+            .order_by(User.login_id)
+        )
+        if user is None:
+            raise HTTPException(503, "Demo student account is unavailable.")
+        raw_token, expires_at = create_demo_session(request, user)
+        return {
+            "token": raw_token,
+            "expires_at": expires_at,
+            "user": user_payload(user),
+        }
+
     @application.get("/auth/me", response_model=AuthenticatedUser)
     def auth_me(user: User = Depends(current_user)):
         return user_payload(user)
@@ -544,7 +715,10 @@ def create_app(
         session: Session = Depends(session_dependency),
         user: User = Depends(current_user),
     ):
-        revoke_session_token(session, bearer_token(request))
+        token = bearer_token(request)
+        if revoke_demo_session(request, token):
+            return {"logged_out": True}
+        revoke_session_token(session, token)
         record_audit(
             session,
             action="auth.logout",
@@ -557,9 +731,12 @@ def create_app(
     @application.post("/auth/change-password")
     def auth_change_password(
         body: ChangePasswordRequest,
+        request: Request,
         session: Session = Depends(session_dependency),
         user: User = Depends(current_user),
     ):
+        if is_ephemeral_demo(request, user):
+            raise HTTPException(403, "Demo accounts cannot change passwords.")
         if not verify_password(body.current_password, user.password_hash):
             raise HTTPException(400, "Current password is incorrect.")
         change_password(session, user, body.new_password)
@@ -637,11 +814,17 @@ def create_app(
     )
     def start_study_session(
         body: StudySessionStartRequest,
+        request: Request,
         session: Session = Depends(session_dependency),
         user: User = Depends(current_user),
     ):
         if user.role != "student":
             raise HTTPException(403, "Student access required.")
+        if is_ephemeral_demo(request, user):
+            raise HTTPException(
+                409,
+                "Demo progress is kept only in this browser session.",
+            )
         client_session_id = body.client_session_id.strip()
         existing = session.scalar(
             select(StudySession).where(
@@ -864,13 +1047,14 @@ def create_app(
         )
         require_code(body, request)
         assignment = get_assignment_or_404(session, assignment_id)
-        study_session = study_session_for_submission(session, body, user)
+        study_session = study_session_for_submission(request, session, body, user)
         grader = grader_for(assignment, request)
         result = execute_with_capacity(
             request,
             lambda: grader.run(assignment, body.code),
         )
         submission = store_submission(
+            request,
             session,
             assignment,
             body,
@@ -911,13 +1095,14 @@ def create_app(
             )
         require_code(body, request)
         assignment = get_assignment_or_404(session, assignment_id)
-        study_session = study_session_for_submission(session, body, user)
+        study_session = study_session_for_submission(request, session, body, user)
         grader = grader_for(assignment, request)
         result = execute_with_capacity(
             request,
             lambda: grader.grade(assignment, body.code),
         )
         submission = store_submission(
+            request,
             session,
             assignment,
             body,
@@ -931,14 +1116,15 @@ def create_app(
             tutor_feedback = TutorService(request.app.state.settings).feedback(
                 assignment, submission, hint_level=1
             )
-            session.add(
-                HintInteraction(
-                    submission_id=submission.id,
-                    hint_level=1,
-                    feedback=tutor_feedback.model_dump(),
+            if not is_ephemeral_demo(request, user):
+                session.add(
+                    HintInteraction(
+                        submission_id=submission.id,
+                        hint_level=1,
+                        feedback=tutor_feedback.model_dump(),
+                    )
                 )
-            )
-            session.commit()
+                session.commit()
         record_submission_event(
             session,
             study_session=study_session,
@@ -984,11 +1170,12 @@ def create_app(
             requests_per_minute=request.app.state.settings.tutor_requests_per_minute,
         )
         assignment = get_assignment_or_404(session, assignment_id)
-        submission = session.scalar(
-            select(Submission).where(
-                Submission.id == body.submission_id,
-                Submission.assignment_id == assignment_id,
-            )
+        submission = submission_for_request(
+            request,
+            session,
+            user,
+            body.submission_id,
+            assignment_id,
         )
         if submission is None:
             raise HTTPException(404, "Submission not found.")
@@ -997,14 +1184,15 @@ def create_app(
         feedback = TutorService(request.app.state.settings).feedback(
             assignment, submission, hint_level=body.hint_level
         )
-        session.add(
-            HintInteraction(
-                submission_id=submission.id,
-                hint_level=body.hint_level,
-                feedback=feedback.model_dump(),
+        if not is_ephemeral_demo(request, user):
+            session.add(
+                HintInteraction(
+                    submission_id=submission.id,
+                    hint_level=body.hint_level,
+                    feedback=feedback.model_dump(),
+                )
             )
-        )
-        session.commit()
+            session.commit()
         study_session = get_user_study_session(
             session, submission.study_session_id, user
         )
@@ -1028,16 +1216,18 @@ def create_app(
     def reveal_solution(
         assignment_id: int,
         body: SolutionRequest,
+        request: Request,
         session: Session = Depends(session_dependency),
         user: User = Depends(current_user),
     ):
         assignment = get_assignment_or_404(session, assignment_id)
-        submission = session.scalar(
-            select(Submission).where(
-                Submission.id == body.submission_id,
-                Submission.assignment_id == assignment_id,
-                Submission.assignment_version == assignment.version,
-            )
+        submission = submission_for_request(
+            request,
+            session,
+            user,
+            body.submission_id,
+            assignment_id,
+            assignment.version,
         )
         if submission is None:
             raise HTTPException(

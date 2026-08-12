@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -7,10 +9,29 @@ from config import Settings
 
 @pytest.fixture()
 def research_client(tmp_path):
+    account_file = tmp_path / "study_accounts.json"
+    account_file.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "accounts": [
+                    {
+                        "login_id": "research-student",
+                        "temporary_password": "Research-Student-4827",
+                        "role": "student",
+                        "participant_code": "RESEARCH-001",
+                        "active": True,
+                        "demo": False,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     settings = Settings(
         database_url="sqlite://",
         openai_api_key=None,
-        study_accounts_file=tmp_path / "study_accounts.json",
+        study_accounts_file=account_file,
     )
     with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
         yield client
@@ -37,7 +58,9 @@ def _start(client, login, client_id="browser-session-0001"):
 
 
 def test_study_session_lifecycle_heartbeat_events_and_isolation(research_client):
-    student = _login(research_client, "student", "student")
+    student = _login(
+        research_client, "research-student", "Research-Student-4827"
+    )
     instructor = _login(research_client, "instructor", "instructor")
 
     started = _start(research_client, student)
@@ -99,7 +122,9 @@ def test_study_session_lifecycle_heartbeat_events_and_isolation(research_client)
 
 
 def test_submission_hint_solution_and_ai_status_are_recorded(research_client):
-    student = _login(research_client, "student", "student")
+    student = _login(
+        research_client, "research-student", "Research-Student-4827"
+    )
     study_session = _start(research_client, student, "browser-session-0002").json()
     assignment = research_client.get(
         "/assignments/1", headers=_bearer(student)
@@ -222,7 +247,9 @@ def test_instructor_dashboard_and_exports_use_participant_codes(research_client)
 
 
 def test_learning_event_validation_limits_untrusted_data(research_client):
-    student = _login(research_client, "student", "student")
+    student = _login(
+        research_client, "research-student", "Research-Student-4827"
+    )
     session_id = _start(
         research_client, student, "browser-session-validation"
     ).json()["id"]
