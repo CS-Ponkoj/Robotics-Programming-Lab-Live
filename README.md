@@ -213,3 +213,15 @@ flutter build web --dart-define=API_BASE_URL=http://127.0.0.1:5000
 
 Native Android builds additionally require Android Studio and the Android SDK.
 Windows desktop builds require the Visual Studio C++ desktop workload.
+
+## Author
+
+**Ponkoj Shill**  
+AI/ML researcher and Ph.D. candidate in Computer Science
+
+- [GitHub](https://github.com/CS-Ponkoj)
+- [Portfolio](https://ponkoj.com)
+
+## License
+
+No license file is currently included. Please contact the author before reusing the repository beyond review, education, or fair-use evaluation.
