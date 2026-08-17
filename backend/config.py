@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     object_storage_root: Path = BASE_DIR / "managed_assets"
     max_submission_chars: int = 50_000
     max_request_bytes: int = 100_000
-    execution_timeout_seconds: float = 5.0
+    execution_timeout_seconds: float = 10.0
     max_concurrent_executions: int = 2
     execution_requests_per_minute: int = 30
     tutor_requests_per_minute: int = 10

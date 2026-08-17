@@ -60,6 +60,8 @@ services:
           envVarKey: SANDBOX_API_TOKEN
       - key: SANDBOX_HTTP_TIMEOUT_SECONDS
         value: "75"
+      - key: EXECUTION_TIMEOUT_SECONDS
+        value: "10"
       - key: EXECUTION_REQUESTS_PER_MINUTE
         value: "30"
       - key: TUTOR_REQUESTS_PER_MINUTE
