@@ -4,12 +4,15 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Protocol
 
 import httpx
 
 
 WORKER_PATH = Path(__file__).with_name("submission_worker.py")
+REMOTE_RETRY_DELAYS_SECONDS = (2.0, 4.0, 8.0, 12.0, 16.0, 20.0)
+REMOTE_RETRYABLE_STATUS_CODES = {429, 502, 503, 504}
 
 
 class Sandbox(Protocol):
@@ -158,6 +161,7 @@ class RemoteSandbox:
         api_token: str,
         timeout_seconds: float = 5.0,
         http_timeout_seconds: float = 75.0,
+        retry_delays_seconds: tuple[float, ...] | None = None,
     ):
         normalized_url = url.strip().rstrip("/")
         if normalized_url and "://" not in normalized_url:
@@ -170,34 +174,83 @@ class RemoteSandbox:
             http_timeout_seconds,
             timeout_seconds + 2,
         )
+        self.retry_delays_seconds = (
+            REMOTE_RETRY_DELAYS_SECONDS
+            if retry_delays_seconds is None
+            else retry_delays_seconds
+        )
 
     def execute(self, code: str, result_names: list[str]) -> dict:
-        try:
-            response = httpx.post(
-                f"{self.url}/execute",
-                headers={"Authorization": f"Bearer {self.api_token}"},
-                json={
-                    "code": code,
-                    "result_names": result_names,
-                    "timeout_seconds": self.timeout_seconds,
-                },
-                timeout=self.http_timeout_seconds,
-            )
-        except (httpx.TimeoutException, httpx.NetworkError):
-            return _sandbox_error(
-                "The secure grader is temporarily unavailable. Please try again."
-            )
-        if response.status_code != 200:
-            return _sandbox_error(
-                "The secure grader rejected the execution request. Please try again."
-            )
-        try:
-            result = response.json()
-        except (json.JSONDecodeError, ValueError):
-            return _sandbox_error("The secure grader returned an invalid response.")
-        if not _valid_result(result):
-            return _sandbox_error("The secure grader returned an invalid response.")
-        return result
+        request_data = {
+            "code": code,
+            "result_names": result_names,
+            "timeout_seconds": self.timeout_seconds,
+        }
+        attempts = len(self.retry_delays_seconds) + 1
+        deadline = time.monotonic() + self.http_timeout_seconds
+        for attempt in range(attempts):
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                break
+            try:
+                response = httpx.post(
+                    f"{self.url}/execute",
+                    headers={"Authorization": f"Bearer {self.api_token}"},
+                    json=request_data,
+                    timeout=max(0.1, remaining_seconds),
+                )
+            except (httpx.TimeoutException, httpx.NetworkError):
+                return _sandbox_error(
+                    "The secure grader is temporarily unavailable. Please try again."
+                )
+
+            if response.status_code in {401, 403}:
+                return _sandbox_error(
+                    "The secure grader is not configured correctly. "
+                    "Please contact the instructor."
+                )
+            if response.status_code != 200:
+                if response.status_code in REMOTE_RETRYABLE_STATUS_CODES:
+                    if self._wait_before_retry(attempt, deadline):
+                        continue
+                    return _sandbox_error(
+                        "The secure grader is starting or temporarily busy. "
+                        "Please wait a moment and try again."
+                    )
+                return _sandbox_error(
+                    "The secure grader could not accept the execution request. "
+                    "Please try again."
+                )
+
+            try:
+                result = response.json()
+            except (json.JSONDecodeError, ValueError):
+                if self._wait_before_retry(attempt, deadline):
+                    continue
+                return _sandbox_error(
+                    "The secure grader returned an invalid response."
+                )
+            if not _valid_result(result):
+                if self._wait_before_retry(attempt, deadline):
+                    continue
+                return _sandbox_error(
+                    "The secure grader returned an invalid response."
+                )
+            return result
+
+        return _sandbox_error(
+            "The secure grader is temporarily unavailable. Please try again."
+        )
+
+    def _wait_before_retry(self, attempt: int, deadline: float) -> bool:
+        if attempt >= len(self.retry_delays_seconds):
+            return False
+        delay = self.retry_delays_seconds[attempt]
+        minimum_next_request_seconds = self.timeout_seconds + 2
+        if time.monotonic() + delay + minimum_next_request_seconds > deadline:
+            return False
+        time.sleep(delay)
+        return True
 
 
 def _valid_result(result: object) -> bool:

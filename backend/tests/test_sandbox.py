@@ -1,4 +1,5 @@
 import httpx
+import pytest
 import subprocess
 
 from sandbox import RemoteSandbox, SubprocessSandbox, build_sandbox
@@ -70,6 +71,8 @@ def test_remote_sandbox_sends_only_execution_data_and_auth_token(monkeypatch):
     ).execute("answer = 42", ["answer"])
 
     assert result["success"] is True
+    request_timeout = captured.pop("timeout")
+    assert request_timeout == pytest.approx(20, abs=0.1)
     assert captured == {
         "url": "http://sandbox.internal:10000/execute",
         "headers": {"Authorization": "Bearer test-sandbox-token"},
@@ -78,7 +81,6 @@ def test_remote_sandbox_sends_only_execution_data_and_auth_token(monkeypatch):
             "result_names": ["answer"],
             "timeout_seconds": 4,
         },
-        "timeout": 20,
     }
 
 
@@ -127,6 +129,89 @@ def test_remote_sandbox_returns_safe_error_without_leaking_provider_details(
     assert "secret-token" not in result["error"]
 
 
+def test_remote_sandbox_retries_temporary_rejection_then_succeeds(monkeypatch):
+    responses = iter(
+        [
+            type("Response", (), {"status_code": 503})(),
+            type(
+                "Response",
+                (),
+                {
+                    "status_code": 200,
+                    "json": staticmethod(
+                        lambda: {
+                            "success": True,
+                            "error": "",
+                            "output": "",
+                            "values": {"answer": 42},
+                        }
+                    ),
+                },
+            )(),
+        ]
+    )
+    calls = []
+
+    def fake_post(*_args, **_kwargs):
+        calls.append(True)
+        return next(responses)
+
+    monkeypatch.setattr("sandbox.httpx.post", fake_post)
+    result = RemoteSandbox(
+        "https://sandbox.example.test",
+        "secret-token",
+        retry_delays_seconds=(0,),
+    ).execute("answer = 42", ["answer"])
+
+    assert result["success"] is True
+    assert result["values"] == {"answer": 42}
+    assert len(calls) == 2
+
+
+def test_remote_sandbox_does_not_retry_authentication_failure(monkeypatch):
+    calls = []
+
+    class Response:
+        status_code = 401
+
+    def fake_post(*_args, **_kwargs):
+        calls.append(True)
+        return Response()
+
+    monkeypatch.setattr("sandbox.httpx.post", fake_post)
+    result = RemoteSandbox(
+        "https://sandbox.example.test",
+        "secret-token",
+        retry_delays_seconds=(0, 0),
+    ).execute("answer = 42", ["answer"])
+
+    assert result["success"] is False
+    assert "not configured correctly" in result["error"]
+    assert len(calls) == 1
+
+
+def test_remote_sandbox_reports_persistent_temporary_failure(monkeypatch):
+    calls = []
+
+    class Response:
+        status_code = 503
+
+    def fake_post(*_args, **_kwargs):
+        calls.append(True)
+        return Response()
+
+    monkeypatch.setattr("sandbox.httpx.post", fake_post)
+    result = RemoteSandbox(
+        "https://sandbox.example.test",
+        "secret-token",
+        retry_delays_seconds=(0, 0),
+    ).execute("answer = 42", ["answer"])
+
+    assert result["success"] is False
+    assert "starting or temporarily busy" in result["error"]
+    assert len(calls) == 3
+
+
 def test_remote_sandbox_rejects_malformed_success_response(monkeypatch):
     class Response:
         status_code = 200
@@ -139,6 +224,7 @@ def test_remote_sandbox_rejects_malformed_success_response(monkeypatch):
     result = RemoteSandbox(
         "https://sandbox.example.test",
         "secret-token",
+        retry_delays_seconds=(),
     ).execute("answer = 42", ["answer"])
 
     assert result["success"] is False
