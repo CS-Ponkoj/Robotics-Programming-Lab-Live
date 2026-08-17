@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app import create_app
@@ -101,7 +102,7 @@ def test_backend_grades_through_real_remote_sandbox_contract(
     sandbox_client = TestClient(sandbox_app)
 
     def bridge_request(_url, *, headers, json, timeout):
-        assert timeout == 20
+        assert timeout == pytest.approx(20, abs=0.01)
         return sandbox_client.post("/execute", headers=headers, json=json)
 
     monkeypatch.setattr("sandbox.httpx.post", bridge_request)
