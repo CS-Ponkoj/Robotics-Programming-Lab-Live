@@ -60,37 +60,42 @@ Set-Location ..
 
 ### Run
 
-Recommended one-command local staging run:
+Run the complete local staging stack from the repository root:
 
 ```powershell
-.\scripts\run-local.ps1
+Set-Location "C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging"
+.\scripts\stop-local.ps1
+.\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
 ```
 
-This starts the dedicated sandbox, backend, and Flutter web application while
-keeping AI off by default. Stop them with:
+This starts the dedicated sandbox, FastAPI backend, and Flutter web application
+while keeping AI off by default. It runs Flutter from a generated copy under
+`LocalAppData`, preventing OneDrive from locking Flutter build files. Keep the
+PowerShell window open and use the frontend URL printed by the script (with the
+ports above, `http://127.0.0.1:8180/app`).
+
+The launcher defaults to frontend port `8080`, backend port `5000`, and sandbox
+port `5001` when the port parameters are omitted. Stop only the processes
+managed by the launcher with:
 
 ```powershell
 .\scripts\stop-local.ps1
 ```
 
-The manual commands below remain available for troubleshooting.
-
-Backend terminal:
+To troubleshoot the explicit-port example, check each managed service:
 
 ```powershell
-Set-Location .\backend
-..\venv\Scripts\python.exe run.py
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8180/app
+Invoke-RestMethod http://127.0.0.1:5100/health
+Invoke-RestMethod http://127.0.0.1:5101/health
 ```
 
-Flutter terminal:
+Do not use the retired `backend/run.py` command, and do not run `flutter run`
+directly inside the OneDrive checkout. Those older commands omit the dedicated
+sandbox and can trigger OneDrive build-directory locks.
 
-```powershell
-Set-Location .\frontend
-flutter run -d chrome --dart-define=API_BASE_URL=http://127.0.0.1:5000
-```
-
-The backend seeds the four existing assignments and two prototype accounts into
-the database on first start:
+The backend seeds the configured assignments (including staging-only Assignment
+5) and two prototype accounts into the database on first start:
 
 ```text
 Student:    student / student
@@ -119,8 +124,10 @@ docker compose up --build postgres redis backend
 
 Compose defaults to `SANDBOX_BACKEND=docker`, executing every submission in a
 short-lived container with no network, capped memory/CPU, and a process limit.
-For zero-Docker local development, run `backend/run.py` directly; it uses the
-restricted subprocess fallback from `backend/.env`.
+For ordinary zero-Docker development of Assignments 1 through 4, use
+`scripts/run-local.ps1`; it launches the dedicated local sandbox service with
+the restricted subprocess executor. Assignment 5 still requires Docker Desktop
+and its ROS 2 grader image.
 
 ### Local ROS 2 assignment
 
@@ -230,16 +237,16 @@ values, and official solutions are never included in the model input.
 
 ## Verification
 
-```powershell
-Set-Location .\backend
-..\venv\Scripts\python.exe -m pytest -q
-..\venv\Scripts\python.exe -m pip check
+Run the complete OneDrive-safe verification gate from the repository root:
 
-Set-Location ..\frontend
-flutter analyze
-flutter test
-flutter build web --dart-define=API_BASE_URL=http://127.0.0.1:5000
+```powershell
+Set-Location "C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging"
+.\scripts\verify-local.ps1 -ApiBaseUrl http://127.0.0.1:5100
 ```
+
+This runs backend tests, dependency and compilation checks, Flutter analysis and
+tests, a release web build from a safe `LocalAppData` copy, Git whitespace
+validation, and managed-service health checks when the local stack is running.
 
 Native Android builds additionally require Android Studio and the Android SDK.
 Windows desktop builds require the Visual Studio C++ desktop workload.
