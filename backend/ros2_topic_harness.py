@@ -28,25 +28,37 @@ def main() -> None:
     angular_tolerance = float(config.get("angular_tolerance", 0.01))
     move_seconds = float(config.get("move_seconds", 5.0))
     stop_tolerance = float(config.get("stop_tolerance_seconds", 0.5))
+    startup_grace = float(config.get("startup_grace_seconds", 2.0))
     minimum_rate = float(config.get("minimum_publish_rate_hz", 5.0))
-    observation_seconds = move_seconds + stop_tolerance + 0.8
+    observation_seconds = move_seconds + startup_grace + stop_tolerance + 0.8
 
     messages: list[tuple[float, float, float]] = []
-    first_message_at: float | None = None
+    student_started_at: float | None = None
 
     rclpy.init(args=None)
     monitor = Node(f"grader_cmd_vel_monitor_{os.getpid()}")
 
     def receive(message: Twist) -> None:
-        nonlocal first_message_at
         now = time.monotonic()
-        if first_message_at is None:
-            first_message_at = now
+        if student_started_at is None:
+            return
         messages.append(
-            (now - first_message_at, float(message.linear.x), float(message.angular.z))
+            (
+                now - student_started_at,
+                float(message.linear.x),
+                float(message.angular.z),
+            )
         )
 
     monitor.create_subscription(Twist, topic, receive, 10)
+    # Give the monitoring participant time to advertise its subscription before
+    # the student's five-second timer starts. This reduces DDS discovery loss on
+    # cold or resource-constrained runners.
+    monitor_ready_at = time.monotonic() + 0.5
+    while time.monotonic() < monitor_ready_at:
+        rclpy.spin_once(monitor, timeout_sec=0.05)
+
+    student_started_at = time.monotonic()
     student = subprocess.Popen(
         ["ros2", "run", package, executable],
         stdout=subprocess.PIPE,
@@ -85,7 +97,9 @@ def main() -> None:
         abs(item[2]) <= angular_tolerance for item in messages
     )
     stop_ok = first_stop is not None and (
-        move_seconds - stop_tolerance <= first_stop <= move_seconds + stop_tolerance
+        move_seconds - stop_tolerance
+        <= first_stop
+        <= move_seconds + startup_grace + stop_tolerance
     )
     held_stop = stop_ok and sum(item[0] >= first_stop for item in stopped) >= 3 and not any(
         item[0] > first_stop + 0.1 and abs(item[1]) > 0.001 for item in messages

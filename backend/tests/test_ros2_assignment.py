@@ -185,6 +185,19 @@ def test_obstacle_harness_waits_for_ros_discovery_before_scoring():
     assert readiness < clear_phase
 
 
+def test_drive_forward_harness_uses_process_relative_timing_with_startup_grace():
+    source = (Path(__file__).parents[1] / "ros2_topic_harness.py").read_text(
+        encoding="utf-8"
+    )
+
+    process_clock = source.index("student_started_at = time.monotonic()")
+    student_launch = source.index("student = subprocess.Popen(")
+    assert "startup_grace_seconds" in source
+    assert "now - student_started_at" in source
+    assert "monitor_ready_at = time.monotonic() + 0.5" in source
+    assert process_clock < student_launch
+
+
 def test_docker_executor_returns_actionable_error_when_docker_is_missing(monkeypatch):
     def missing(*_args, **_kwargs):
         raise FileNotFoundError

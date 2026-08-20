@@ -4,7 +4,7 @@ Last updated: 2026-08-20
 
 Scope: credential-free student demo access with memory-only state
 
-Branch under test: `codex-assignment-6-ros2-obstacle-stop`
+Branch under test: `assignment-6-ros2-obstacle-stop`
 
 ## Acceptance result
 
@@ -28,7 +28,7 @@ credentials.
 |---|---|---|---|---|
 | DEMO-001 | Public demo entry | A visitor can start without credentials | Rendered login shows **Try the student demo** and no credential values | PASS |
 | DEMO-002 | Student capability parity | Demo can list, open, edit, run, submit, request hints, and unlock solutions | API workflow and rendered Assignment 2 run completed normally | PASS |
-| DEMO-003 | Assignment inventory | Staging retains Assignments 1–5, including ROS Assignment 5 | Rendered catalog and backend inventory matched | PASS |
+| DEMO-003 | Assignment inventory | Staging retains Assignments 1–6, including ROS Assignments 5 and 6 | Rendered catalog and backend inventory matched | PASS |
 | DEMO-004 | Authentication persistence | No demo token is stored in browser preferences | Flutter policy test passed; restore rejects legacy demo tokens | PASS |
 | DEMO-005 | Learning-progress persistence | Demo drafts, scores, attempts, submission IDs, and solution state stay in memory | Flutter store test proved saved student data is unchanged and demo data disappears on reload | PASS |
 | DEMO-006 | Server persistence | Demo creates no auth-session, submission, hint, research-session, or audit rows | Focused API test compared all five database table counts before and after a run/hint/solution workflow | PASS |
@@ -37,7 +37,7 @@ credentials.
 | DEMO-009 | Logout | Logout revokes the in-memory token and session data | Logout returned 200; subsequent `/auth/me` returned 401 | PASS |
 | DEMO-010 | Research integrity | Demo activity is excluded from permanent study capture | Demo research-session creation returned 409; frontend does not start the tracker | PASS |
 | DEMO-011 | AI default | AI is available but off by default | Rendered assignment toolbar showed the AI toggle off | PASS |
-| DEMO-012 | Backend regression | Existing backend behavior remains green | 114 backend tests passed | PASS |
+| DEMO-012 | Backend regression | Existing backend behavior remains green | 115 backend tests passed | PASS |
 | DEMO-013 | Frontend regression | Analyzer, all Flutter tests, and release web build pass | Zero analyzer findings, 43 Flutter tests passed, release build succeeded | PASS |
 | DEMO-014 | Dependency integrity | Installed backend dependencies are consistent | `pip check` reported no broken requirements | PASS |
 | DEMO-015 | Password student classification | Logging in with the default student ID and password creates a persistent student session, not a demo | Local API login and `/auth/me` both returned `is_demo=false`; an auth-session row was created | PASS |

@@ -30,8 +30,8 @@ hosted ROS worker and its deployment SQA are explicitly approved.
 | Excessive output | PASS | Execution remained bounded and behavior tests failed without exposing unbounded output |
 | Oversized submission | PASS | Assignment 6 API returns HTTP 413 before execution |
 | Container isolation | PASS | Reuses the networkless, read-only, non-root Docker executor with CPU, memory, PID, capability, and privilege limits |
-| Focused backend tests | PASS | 12 ROS-specific tests passed, including the ROS-discovery readiness regression |
-| Full backend regression | PASS | 114 tests passed |
+| Focused backend tests | PASS | 13 ROS-specific tests passed, including both ROS-discovery timing regressions |
+| Full backend regression | PASS | 115 tests passed |
 | Python integrity | PASS | `pip check` and backend `compileall` passed |
 | Flutter analysis | PASS | No issues found |
 | Flutter regression | PASS | 43 tests passed, including complete project-file content replacement and persistent-student analytics access |
@@ -41,7 +41,7 @@ hosted ROS worker and its deployment SQA are explicitly approved.
 | Instructor publish validation | PASS | Authenticated `/admin/assignments/6/validate` returned `valid=true` with no errors after running the maintained answer |
 | Desktop browser | PASS | Card 06, instructions, seven-file tree, read-only files, editable controller, and AI-off state rendered correctly |
 | Mobile browser | PASS | Assignment workspace rendered at 390 x 844 without browser errors |
-| CI protection | PASS | The fixed harness waits for ROS discovery and one end-to-end response before scoring; the rebuilt image plus four additional consecutive runs passed Assignment 5 at 7/7 and Assignment 6 at 9/9 |
+| CI protection | PASS | Assignment 6 waits for end-to-end ROS discovery before scoring. Assignment 5 warms the monitor before launch and measures stop timing from process start with bounded startup allowance. Three consecutive rebuilt-image runs passed Assignment 5 at 7/7 and Assignment 6 at 9/9. |
 | Master Excel SQA checklist | BLOCKED | The required bundled spreadsheet dependency loader was unavailable in this session; the existing workbook was not modified with an unsupported library |
 
 ## Remaining production limitations
@@ -74,5 +74,13 @@ publisher/subscriber discovery. The node became available after the clear-path
 phase, so the otherwise correct maintained answer had no settled clear-phase
 sample. The harness now waits for the `/scan` subscriber, `/cmd_vel` publisher,
 and one end-to-end scan response, then clears readiness traffic before beginning
-the scored phases. Five consecutive rebuilt-image runs produced identical PASS
-results for both maintained ROS assignments.
+the scored phases.
+
+The first staging-main run then exposed a separate Assignment 5 clock defect.
+That harness measured five seconds from the first message received, but a cold
+runner can discover the publisher after the student's timer has already begun.
+A correct solution therefore appeared to stop too early. The harness now warms
+the monitoring participant before launch, timestamps commands from student
+process start, and permits only a bounded two-second ROS startup allowance.
+Three consecutive rebuilt-image runs produced identical PASS results for both
+maintained ROS assignments.
