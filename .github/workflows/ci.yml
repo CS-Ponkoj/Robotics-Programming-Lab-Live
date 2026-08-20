@@ -79,6 +79,15 @@ jobs:
             http://127.0.0.1:18081/execute)"
           test "$status" = "401"
 
+  ros2-grader-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build pinned ROS 2 grader image
+        run: docker build -f backend/Dockerfile.ros2 -t robotics-lab-ros2-grader:jazzy-v1 backend
+      - name: Verify maintained ROS 2 assignment answers
+        run: python backend/verify_ros2_assignments.py
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

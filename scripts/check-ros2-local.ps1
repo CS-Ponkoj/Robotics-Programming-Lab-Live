@@ -37,3 +37,17 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Output ('ROS 2 local grader is ready: ' + $image)
+
+$python = Join-Path $repositoryRoot 'venv\Scripts\python.exe'
+if (-not (Test-Path -LiteralPath $python)) {
+    $pythonCommand = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $pythonCommand) {
+        throw 'Python is required to verify the maintained ROS 2 answers.'
+    }
+    $python = $pythonCommand.Source
+}
+
+& $python (Join-Path $repositoryRoot 'backend\verify_ros2_assignments.py')
+if ($LASTEXITCODE -ne 0) {
+    throw 'One or more maintained ROS 2 answers failed the real Docker grader.'
+}

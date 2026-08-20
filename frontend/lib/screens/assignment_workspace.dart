@@ -23,6 +23,15 @@ class MyHomePage extends StatefulWidget {
 
 enum AssignmentWorkspaceFocus { none, editor, instructions, results }
 
+void setAssignmentEditorContent(
+  CodeController controller,
+  String content,
+) {
+  // CodeController keeps a separate full-code model; assigning inherited
+  // TextEditingController.text can leave that model on the previous file.
+  controller.fullText = content;
+}
+
 class _MyHomePageState extends State<MyHomePage> {
   late Future<AssignmentDto> _assignment;
   late Future<UnittestFeedbackDto> _feedback;
@@ -117,7 +126,10 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _selectedProjectFilePath = file.path;
       _selectedProjectFileEditable = file.editable;
-      _controller.text = file.editable ? _code : file.content;
+      setAssignmentEditorContent(
+        _controller,
+        file.editable ? _code : file.content,
+      );
     });
     unawaited(
       _trackWorkspaceEvent('workspace_file_selected', {
@@ -378,7 +390,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                           _selectedProjectFilePath =
                                               snap.data!.editableFilePath;
                                           _selectedProjectFileEditable = true;
-                                          _controller.text = _code;
+                                          setAssignmentEditorContent(
+                                            _controller,
+                                            _code,
+                                          );
                                           _init = false;
                                         }
                                         return AssignmentProjectWorkspace(

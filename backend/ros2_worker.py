@@ -13,7 +13,13 @@ import sys
 WORKSPACE = Path("/workspace")
 MAX_PROJECT_FILES = 30
 MAX_FILE_CHARS = 100_000
-ALLOWED_IMPORT_ROOTS = frozenset({"rclpy", "geometry_msgs"})
+ALLOWED_IMPORT_ROOTS = frozenset(
+    {"geometry_msgs", "math", "rclpy", "sensor_msgs"}
+)
+ROS2_HARNESSES = {
+    "drive_forward": "/grader/ros2_topic_harness.py",
+    "obstacle_stop": "/grader/ros2_obstacle_harness.py",
+}
 
 
 def validate_controller(code: str) -> None:
@@ -74,6 +80,14 @@ def run_command(command: list[str], timeout: float) -> subprocess.CompletedProce
     )
 
 
+def select_harness(config: dict) -> str:
+    harness_name = str(config.get("harness", "drive_forward"))
+    try:
+        return ROS2_HARNESSES[harness_name]
+    except KeyError as error:
+        raise ValueError(f"Unsupported ROS 2 harness: {harness_name}") from error
+
+
 def evaluate(request: dict) -> dict:
     try:
         prepare_workspace(request)
@@ -108,11 +122,16 @@ def evaluate(request: dict) -> dict:
             ],
         }
 
-    config_json = json.dumps(request.get("config", {}))
+    config = request.get("config", {})
+    try:
+        harness_path = select_harness(config)
+    except ValueError as error:
+        return failure(str(error))
+    config_json = json.dumps(config)
     shell_command = (
         "source /opt/ros/jazzy/setup.bash && "
         "source /workspace/install/setup.bash && "
-        "python3 /grader/ros2_topic_harness.py"
+        f"python3 {harness_path}"
     )
     environment = os.environ.copy()
     environment["ROS_GRADER_CONFIG"] = config_json

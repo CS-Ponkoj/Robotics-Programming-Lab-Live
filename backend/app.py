@@ -252,17 +252,13 @@ def create_app(
         if record is None:
             return None
         user = session.get(User, record[1]["user_id"])
-        if user is None or not user.is_active or not user.is_demo:
+        if user is None or not user.is_active or user.role != "student":
             return None
         return user
 
     def is_ephemeral_demo(request: Request, user: User) -> bool:
         record = demo_session_record(request)
-        return bool(
-            user.is_demo
-            and record is not None
-            and record[1]["user_id"] == user.id
-        )
+        return bool(record is not None and record[1]["user_id"] == user.id)
 
     def create_demo_session(request: Request, user: User):
         raw_token = secrets.token_urlsafe(32)
@@ -377,14 +373,14 @@ def create_app(
             raise HTTPException(401, "Invalid instructor token.")
         raise HTTPException(401, "Instructor authentication required.")
 
-    def user_payload(user: User) -> dict:
+    def user_payload(user: User, *, is_demo: bool | None = None) -> dict:
         return AuthenticatedUser(
             id=user.id,
             login_id=user.login_id,
             role=user.role,
             email=user.email,
             participant_code=user.participant_code,
-            is_demo=user.is_demo,
+            is_demo=user.is_demo if is_demo is None else is_demo,
             must_change_password=user.must_change_password,
         ).model_dump()
 
@@ -655,13 +651,6 @@ def create_app(
             request.app.state.login_failures[login_id] = recent_failures
             raise HTTPException(401, "Invalid login ID or password.")
         request.app.state.login_failures.pop(login_id, None)
-        if user.is_demo and user.role == "student":
-            raw_token, expires_at = create_demo_session(request, user)
-            return {
-                "token": raw_token,
-                "expires_at": expires_at,
-                "user": user_payload(user),
-            }
         raw_token, auth_session = create_session(
             session,
             user,
@@ -677,7 +666,7 @@ def create_app(
         return {
             "token": raw_token,
             "expires_at": auth_session.expires_at,
-            "user": user_payload(user),
+            "user": user_payload(user, is_demo=False),
         }
 
     @application.post("/auth/demo", response_model=LoginResponse)
@@ -690,11 +679,10 @@ def create_app(
         user = session.scalar(
             select(User)
             .where(
+                User.login_id == "student",
                 User.role == "student",
-                User.is_demo.is_(True),
                 User.is_active.is_(True),
             )
-            .order_by(User.login_id)
         )
         if user is None:
             raise HTTPException(503, "Demo student account is unavailable.")
@@ -702,12 +690,12 @@ def create_app(
         return {
             "token": raw_token,
             "expires_at": expires_at,
-            "user": user_payload(user),
+            "user": user_payload(user, is_demo=True),
         }
 
     @application.get("/auth/me", response_model=AuthenticatedUser)
-    def auth_me(user: User = Depends(current_user)):
-        return user_payload(user)
+    def auth_me(request: Request, user: User = Depends(current_user)):
+        return user_payload(user, is_demo=is_ephemeral_demo(request, user))
 
     @application.post("/auth/logout")
     def logout(
@@ -928,11 +916,17 @@ def create_app(
 
     @application.get("/research/me")
     def my_research_data(
+        request: Request,
         session: Session = Depends(session_dependency),
         user: User = Depends(current_user),
     ):
         if user.role != "student":
             raise HTTPException(403, "Student access required.")
+        if is_ephemeral_demo(request, user):
+            raise HTTPException(
+                409,
+                "Demo progress is temporary and has no saved research data.",
+            )
         return student_research_payload(session, user)
 
     @application.get("/admin/research/summary")

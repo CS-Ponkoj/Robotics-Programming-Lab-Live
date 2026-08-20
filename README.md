@@ -94,8 +94,9 @@ Do not use the retired `backend/run.py` command, and do not run `flutter run`
 directly inside the OneDrive checkout. Those older commands omit the dedicated
 sandbox and can trigger OneDrive build-directory locks.
 
-The backend seeds the configured assignments (including staging-only Assignment
-5) and two prototype accounts into the database on first start:
+The backend seeds the configured assignments (including staging-only ROS
+Assignments 5 and 6) and two prototype accounts into the database on first
+start:
 
 ```text
 Student:    student / student
@@ -126,16 +127,22 @@ Compose defaults to `SANDBOX_BACKEND=docker`, executing every submission in a
 short-lived container with no network, capped memory/CPU, and a process limit.
 For ordinary zero-Docker development of Assignments 1 through 4, use
 `scripts/run-local.ps1`; it launches the dedicated local sandbox service with
-the restricted subprocess executor. Assignment 5 still requires Docker Desktop
-and its ROS 2 grader image.
+the restricted subprocess executor. Assignments 5 and 6 require Docker Desktop
+and the ROS 2 grader image.
 
-### Local ROS 2 assignment
+### Local ROS 2 assignments
 
-Assignment 5 adds a ROS 2 Jazzy code-only exercise. Students can inspect the
-package tree but can edit only
-`src/robot_motion/robot_motion/controller.py`. Its grader builds the package,
-starts the node, and observes `geometry_msgs/Twist` messages on `/cmd_vel`; it
-does not launch a simulator.
+The staging catalog contains two ROS 2 Jazzy code-only exercises:
+
+- Assignment 5 publishes timed `geometry_msgs/Twist` movement and stop commands
+  on `/cmd_vel`.
+- Assignment 6 subscribes to synthetic `sensor_msgs/LaserScan` messages on
+  `/scan`, stops for a nearby obstacle or invalid scan, and resumes when the
+  path clears.
+
+Students can inspect each package tree but can edit only that package's
+`controller.py`. The grader builds the package and checks observable topic
+behavior without launching a simulator.
 
 Docker Desktop with Linux containers must be installed and running. Build the
 versioned grader image once, and rebuild it after changing either ROS worker:
@@ -151,13 +158,15 @@ Then use the normal local command:
 .\scripts\run-local.ps1
 ```
 
-Assignments 1 through 4 still run when Docker is unavailable, but Assignment 5
-will return an actionable Docker Desktop error instead of waiting indefinitely.
-The maintained controller answer for instructor checks is
-`manual_sqa_answers/assignment_5_ros2_drive_forward/controller.py`. It is not
-returned by the student API or bundled into Flutter. Because it is committed as
-requested, anyone who can read this Git repository can read the answer; do not
-give students repository access if it must remain private.
+Assignments 1 through 4 still run when Docker is unavailable, but Assignments 5
+and 6 return an actionable Docker Desktop error instead of waiting
+indefinitely. Run `scripts/check-ros2-local.ps1` to verify the image and both
+maintained answers. The controller answers are stored at
+`manual_sqa_answers/assignment_5_ros2_drive_forward/controller.py` and
+`manual_sqa_answers/assignment_6_ros2_obstacle_stop/controller.py`. They are not
+returned by the student API or bundled into Flutter. Because they are committed
+as requested, anyone who can read this Git repository can read the answers; do
+not give students repository access if they must remain private.
 
 The live classroom deployment uses a second Render Docker web service defined
 in `render.yaml`. The main API sends only student code, requested result names,

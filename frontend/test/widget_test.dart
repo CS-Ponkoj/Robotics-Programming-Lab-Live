@@ -136,6 +136,20 @@ void main() {
     expect(find.text('Read only'), findsOneWidget);
   });
 
+  test('switching project files replaces the complete code model', () {
+    final controller =
+        CodeController(language: python, text: 'controller code');
+    addTearDown(controller.dispose);
+
+    app.setAssignmentEditorContent(controller, '<package/>');
+    expect(controller.fullText, '<package/>');
+    expect(controller.text, '<package/>');
+
+    app.setAssignmentEditorContent(controller, 'editable controller');
+    expect(controller.fullText, 'editable controller');
+    expect(controller.text, 'editable controller');
+  });
+
   test('only the authenticated app URL restores a browser session', () {
     expect(
       isAuthenticatedAppEntry(
@@ -612,6 +626,27 @@ void main() {
 
     expect(logoutCalls, 1);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('persistent student header exposes saved study progress', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          appBar: LandingPageHeader(
+            user: testAuthenticatedUser,
+            onLogout: testLogout,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.textContaining('Demo mode:'), findsNothing);
+    await tester.tap(find.byTooltip('Account menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('student (student)'), findsOneWidget);
+    expect(find.text('My study progress'), findsOneWidget);
   });
 
   testWidgets('instructor header exposes role-authorized management', (

@@ -62,6 +62,13 @@ def test_demo_session_supports_student_workflow_without_database_writes(
     assert payload["user"]["is_demo"] is True
     headers = bearer(payload["token"])
 
+    restored = demo_client.get("/auth/me", headers=headers)
+    assert restored.status_code == 200
+    assert restored.json()["is_demo"] is True
+    research = demo_client.get("/research/me", headers=headers)
+    assert research.status_code == 409
+    assert "no saved research data" in research.json()["error"]
+
     assignments = demo_client.get("/assignments", headers=headers)
     assert assignments.status_code == 200
 
@@ -127,7 +134,7 @@ def test_demo_sessions_are_isolated_and_logout_revokes_memory_token(demo_client)
     assert demo_client.get("/auth/me", headers=first_headers).status_code == 401
 
 
-def test_demo_credentials_also_create_an_ephemeral_student_session(demo_client):
+def test_student_credentials_create_a_persistent_student_session(demo_client):
     before = persistent_counts(demo_client)
     with demo_client.app.state.SessionLocal() as session:
         last_login_before = session.scalar(
@@ -138,13 +145,30 @@ def test_demo_credentials_also_create_an_ephemeral_student_session(demo_client):
         json={"login_id": "student", "password": "student"},
     )
     assert login.status_code == 200
-    assert login.json()["user"]["is_demo"] is True
-    assert persistent_counts(demo_client) == before
+    payload = login.json()
+    assert payload["user"]["is_demo"] is False
+    headers = bearer(payload["token"])
+
+    restored = demo_client.get("/auth/me", headers=headers)
+    assert restored.status_code == 200
+    assert restored.json()["is_demo"] is False
+    tracked = demo_client.post(
+        "/research/sessions",
+        headers=headers,
+        json={"client_session_id": "persistent-student-session"},
+    )
+    assert tracked.status_code == 201
+    assert demo_client.get("/research/me", headers=headers).status_code == 200
+
+    after = persistent_counts(demo_client)
+    assert after["auth_sessions"] == before["auth_sessions"] + 1
+    assert after["study_sessions"] == before["study_sessions"] + 1
     with demo_client.app.state.SessionLocal() as session:
         last_login_after = session.scalar(
             select(User.last_login_at).where(User.login_id == "student")
         )
-    assert last_login_after == last_login_before
+    assert last_login_after is not None
+    assert last_login_after != last_login_before
 
 
 def test_demo_endpoint_is_hidden_when_demo_accounts_are_disabled(tmp_path):

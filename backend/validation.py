@@ -32,6 +32,9 @@ def validate_assignment(
         for name in ("package_name", "executable", "topic", "message_type"):
             if not str(config.get(name, "")).strip():
                 errors.append(f"ROS 2 grader setting '{name}' is required.")
+        harness = str(config.get("harness", "drive_forward"))
+        if harness not in {"drive_forward", "obstacle_stop"}:
+            errors.append(f"Unsupported ROS 2 harness: {harness}.")
         project_files = [
             item
             for item in (assignment.asset_manifest or [])

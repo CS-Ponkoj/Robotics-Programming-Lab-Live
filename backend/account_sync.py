@@ -20,7 +20,7 @@ from auth_service import (
 from models import User
 
 
-DEMO_ACCOUNT_ROLES = (
+DEFAULT_ACCOUNT_ROLES = (
     {"login_id": "instructor", "role": "instructor"},
     {"login_id": "student", "role": "student"},
 )
@@ -39,7 +39,7 @@ def seed_demo_accounts(
         "student": student_password,
         "instructor": instructor_password,
     }
-    for account in DEMO_ACCOUNT_ROLES:
+    for account in DEFAULT_ACCOUNT_ROLES:
         existing = session.scalar(
             select(User).where(User.login_id == account["login_id"])
         )
@@ -50,7 +50,7 @@ def seed_demo_accounts(
                 password=passwords[account["role"]],
                 role=account["role"],
                 participant_code="DEMO" if account["role"] == "student" else None,
-                is_demo=True,
+                is_demo=False,
             )
             record_audit(
                 session,
@@ -59,6 +59,20 @@ def seed_demo_accounts(
                 resource_id=user.id,
                 actor_user_id=None,
                 details={"login_id": user.login_id, "role": user.role},
+            )
+        elif existing.is_demo:
+            # Demo behavior belongs to the server-issued /auth/demo session,
+            # not to accounts authenticated with a login ID and password.
+            # Correct databases created by older releases during startup.
+            existing.is_demo = False
+            session.commit()
+            record_audit(
+                session,
+                action="account.default_demo_flag_removed",
+                resource_type="user",
+                resource_id=existing.id,
+                actor_user_id=None,
+                details={"login_id": existing.login_id, "role": existing.role},
             )
 
 

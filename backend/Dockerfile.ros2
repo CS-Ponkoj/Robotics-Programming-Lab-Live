@@ -8,6 +8,7 @@ RUN apt-get update \
 WORKDIR /grader
 COPY ros2_worker.py /grader/ros2_worker.py
 COPY ros2_topic_harness.py /grader/ros2_topic_harness.py
+COPY ros2_obstacle_harness.py /grader/ros2_obstacle_harness.py
 
 USER 10001:10001
 ENTRYPOINT ["/ros_entrypoint.sh", "python3", "/grader/ros2_worker.py"]

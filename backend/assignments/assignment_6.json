@@ -1,0 +1,93 @@
+{
+  "id": 6,
+  "stable_id": "ros2-obstacle-stop",
+  "version": 1,
+  "title": "Assignment 6: Stop for an Obstacle with ROS 2",
+  "description": "Use LaserScan sensor data to move through a clear path, stop for a nearby obstacle, and resume safely.",
+  "assignment_html": "<p><strong>Scenario</strong></p><p>You are programming a mobile robot that receives laser-range readings on <code>/scan</code> and velocity commands on <code>/cmd_vel</code>.</p><p><strong>Your task</strong></p><ol><li>Subscribe to <code>sensor_msgs/LaserScan</code> messages on <code>/scan</code>.</li><li>Create a <code>Twist</code> publisher on <code>/cmd_vel</code>.</li><li>Drive straight at <code>0.20 m/s</code> when the nearest valid scan distance is greater than <code>0.75 m</code>.</li><li>Publish zero velocity when an obstacle is at or within <code>0.75 m</code>, or when the scan contains no valid positive distance.</li><li>Resume forward motion when the path becomes clear again.</li></ol><p><strong>What to edit</strong></p><p>Read every file in the project tree, but edit only <code>reactive_navigation/controller.py</code> and complete the TODO sections.</p><p><strong>Run Tests</strong></p><p>The grader builds the ROS package, publishes synthetic <code>LaserScan</code> messages, and observes the resulting <code>Twist</code> commands. Simulation is not used in this assignment.</p>",
+  "starter_code": "import math\n\nimport rclpy\nfrom geometry_msgs.msg import Twist\nfrom rclpy.node import Node\nfrom sensor_msgs.msg import LaserScan\n\n\nclass ObstacleStopController(Node):\n\n    def __init__(self):\n        super().__init__('obstacle_stop_controller')\n\n        # TODO 1: Create a Twist publisher on /cmd_vel with queue depth 10.\n        self.velocity_publisher = None\n\n        # TODO 2: Subscribe to LaserScan messages on /scan.\n        self.scan_subscription = None\n\n        self.forward_speed = 0.20\n        self.stop_distance = 0.75\n\n    def handle_scan(self, scan):\n        # TODO 3: Keep only finite, positive range readings.\n        valid_ranges = []\n\n        # A scan with no valid distance must cause a safe stop.\n        nearest_obstacle = min(valid_ranges) if valid_ranges else 0.0\n\n        command = Twist()\n        # TODO 4: Move forward only when the nearest obstacle is farther\n        # than stop_distance. Otherwise publish zero linear velocity.\n        pass\n\n        command.angular.z = 0.0\n\n        # TODO 5: Publish the velocity command.\n        pass\n\n\ndef main(args=None):\n    rclpy.init(args=args)\n    controller = ObstacleStopController()\n    try:\n        rclpy.spin(controller)\n    except KeyboardInterrupt:\n        pass\n    finally:\n        controller.destroy_node()\n        rclpy.shutdown()\n\n\nif __name__ == '__main__':\n    main()\n",
+  "language": "python-ros2",
+  "status": "published",
+  "learning_objectives": [
+    "Create ROS 2 publishers and subscribers with rclpy.",
+    "Interpret sensor_msgs/LaserScan range data safely.",
+    "Convert sensor evidence into geometry_msgs/Twist commands.",
+    "Implement a fail-safe stop and resume behavior without a simulator."
+  ],
+  "execution_settings": {
+    "runtime": "ros2-jazzy-python",
+    "timeout_seconds": 20,
+    "editable_file": "src/reactive_navigation/reactive_navigation/controller.py",
+    "network_enabled": false,
+    "simulation_enabled": false
+  },
+  "public_tests": [
+    {"id": "package-build", "label": "ROS 2 package builds successfully"},
+    {"id": "node-start", "label": "obstacle_stop_controller starts without crashing"},
+    {"id": "scan-response", "label": "Responds to LaserScan messages on /scan"},
+    {"id": "cmd-vel-topic", "label": "Publishes Twist messages on /cmd_vel"},
+    {"id": "clear-path-forward", "label": "Moves forward near 0.20 m/s when the path is clear"},
+    {"id": "obstacle-stop", "label": "Stops when an obstacle is within 0.75 m"},
+    {"id": "invalid-scan-stop", "label": "Stops safely when the scan has no valid distance"},
+    {"id": "straight-motion", "label": "Keeps angular velocity at zero"},
+    {"id": "resume-motion", "label": "Resumes forward motion after the obstacle clears"}
+  ],
+  "rubric": [
+    {"criterion": "Package execution", "description": "The package builds and the node starts.", "weight": 15},
+    {"criterion": "ROS interfaces", "description": "Subscribes to /scan and publishes Twist messages on /cmd_vel.", "weight": 20},
+    {"criterion": "Clear-path motion", "description": "Moves straight at the required forward speed when the path is clear.", "weight": 20},
+    {"criterion": "Obstacle safety", "description": "Stops for near obstacles and invalid scans.", "weight": 30},
+    {"criterion": "Recovery", "description": "Resumes motion when valid clear-path readings return.", "weight": 10},
+    {"criterion": "Code readability", "description": "Uses clear and maintainable callback logic.", "weight": 5}
+  ],
+  "common_misconceptions": [
+    {"tag": "missing-scan-subscription", "description": "The node publishes velocity but never subscribes to LaserScan data."},
+    {"tag": "wrong-threshold-direction", "description": "The comparison moves when an obstacle is near and stops when the path is clear."},
+    {"tag": "invalid-range-handling", "description": "NaN, infinity, zero, or negative readings are treated as valid obstacle distances."},
+    {"tag": "no-resume", "description": "The controller stops correctly but never resumes after the path clears."}
+  ],
+  "tutoring_rules": {
+    "max_hint_level": 4,
+    "start_with_question": true,
+    "never_reveal_hidden_tests": true,
+    "ai_enabled_by_default": false
+  },
+  "simulation_config": {"enabled": false, "provider": null, "scenario": null},
+  "asset_manifest": [
+    {"kind": "project_file", "path": "src/reactive_navigation/package.xml", "editable": false, "content": "<?xml version='1.0'?>\n<package format='3'>\n  <name>reactive_navigation</name>\n  <version>0.0.1</version>\n  <description>Reactive obstacle-stop ROS 2 learning package</description>\n  <maintainer email='instructor@example.invalid'>Robotics Programming Lab</maintainer>\n  <license>Apache-2.0</license>\n  <exec_depend>rclpy</exec_depend>\n  <exec_depend>geometry_msgs</exec_depend>\n  <exec_depend>sensor_msgs</exec_depend>\n  <test_depend>ament_pytest</test_depend>\n  <export><build_type>ament_python</build_type></export>\n</package>\n"},
+    {"kind": "project_file", "path": "src/reactive_navigation/setup.py", "editable": false, "content": "from setuptools import find_packages, setup\n\npackage_name = 'reactive_navigation'\n\nsetup(\n    name=package_name,\n    version='0.0.1',\n    packages=find_packages(exclude=['test']),\n    data_files=[\n        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),\n        ('share/' + package_name, ['package.xml']),\n        ('share/' + package_name + '/launch', ['launch/controller.launch.py']),\n    ],\n    install_requires=['setuptools'],\n    zip_safe=True,\n    maintainer='Robotics Programming Lab',\n    maintainer_email='instructor@example.invalid',\n    description='Reactive obstacle-stop ROS 2 learning package',\n    license='Apache-2.0',\n    entry_points={'console_scripts': ['controller = reactive_navigation.controller:main']},\n)\n"},
+    {"kind": "project_file", "path": "src/reactive_navigation/setup.cfg", "editable": false, "content": "[develop]\nscript_dir=$base/lib/reactive_navigation\n[install]\ninstall_scripts=$base/lib/reactive_navigation\n"},
+    {"kind": "project_file", "path": "src/reactive_navigation/resource/reactive_navigation", "editable": false, "content": ""},
+    {"kind": "project_file", "path": "src/reactive_navigation/reactive_navigation/__init__.py", "editable": false, "content": ""},
+    {"kind": "project_file", "path": "src/reactive_navigation/reactive_navigation/controller.py", "editable": true, "content": ""},
+    {"kind": "project_file", "path": "src/reactive_navigation/launch/controller.launch.py", "editable": false, "content": "from launch import LaunchDescription\nfrom launch_ros.actions import Node\n\n\ndef generate_launch_description():\n    return LaunchDescription([\n        Node(\n            package='reactive_navigation',\n            executable='controller',\n            name='obstacle_stop_controller',\n            output='screen',\n        )\n    ])\n"}
+  ],
+  "grader_type": "ros2_topic",
+  "grader_config": {
+    "harness": "obstacle_stop",
+    "package_name": "reactive_navigation",
+    "executable": "controller",
+    "topic": "/cmd_vel",
+    "message_type": "geometry_msgs/msg/Twist",
+    "scan_topic": "/scan",
+    "scan_message_type": "sensor_msgs/msg/LaserScan",
+    "expected_linear_x": 0.20,
+    "linear_tolerance": 0.02,
+    "angular_tolerance": 0.01,
+    "stop_distance": 0.75,
+    "minimum_publish_rate_hz": 3.0,
+    "test_weights": {
+      "package-build": 10,
+      "node-start": 5,
+      "scan-response": 10,
+      "cmd-vel-topic": 10,
+      "clear-path-forward": 15,
+      "obstacle-stop": 20,
+      "invalid-scan-stop": 15,
+      "straight-motion": 5,
+      "resume-motion": 10
+    }
+  },
+  "solution_html": "<p><strong>Approach</strong></p><ol><li>Create the <code>/scan</code> subscription and <code>/cmd_vel</code> publisher.</li><li>Filter the scan to finite, positive ranges and find the nearest valid distance.</li><li>Publish <code>linear.x = 0.20</code> only when that distance is greater than <code>0.75 m</code>.</li><li>Publish zero velocity for a nearby obstacle or invalid scan, and reevaluate every new scan so motion resumes when safe.</li></ol>",
+  "reference_solution_path": "manual_sqa_answers/assignment_6_ros2_obstacle_stop/controller.py"
+}

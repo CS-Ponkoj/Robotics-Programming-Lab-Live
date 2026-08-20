@@ -26,7 +26,7 @@ def test_newer_seed_versions_upgrade_existing_local_assignments():
         AssignmentRepository(session).sync_seed_assignments()
 
         assignments = AssignmentRepository(session).list_all()
-        assert [item.version for item in assignments] == [3, 2, 3, 2, 1]
+        assert [item.version for item in assignments] == [3, 2, 3, 2, 1, 1]
         for assignment in assignments:
             compile(
                 assignment.starter_code,

@@ -1,10 +1,10 @@
 # Manual assignment answers
 
 These Python files are instructor/SQA reference answers for manually testing
-Assignments 1 through 5. Assignment 5 keeps its controller answer inside the
-`assignment_5_ros2_drive_forward` folder. These files are not served by the
-application and do not
-contain hidden grading tests.
+Assignments 1 through 6. The ROS 2 controller answers are stored in the
+`assignment_5_ros2_drive_forward` and `assignment_6_ros2_obstacle_stop`
+folders. These files are not served by the application and do not contain
+hidden grading tests.
 
 To test an answer locally:
 

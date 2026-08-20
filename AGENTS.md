@@ -71,7 +71,7 @@ functionality and must never depend on OpenAI.
 
 Promote production-ready changes by reviewed Git commits, never by copying files
 between repositories. Staging may contain unreleased features such as ROS
-Assignment 5 while production intentionally remains on Assignments 1-4. While
+Assignments 5 and 6 while production intentionally remains on Assignments 1-4. While
 that difference exists, do not merge staging wholesale into production. Apply
 only the reviewed common change to a production branch, verify the production
 assignment inventory contains exactly 1-4 and no ROS artifacts, then run the
@@ -108,6 +108,7 @@ backend/                          FastAPI application
   graders/                        Modular AssignmentGrader implementations
   sandbox.py                      Sandbox client and execution policies
   sandbox_service.py              Dedicated execution service
+  ros2_worker.py / ros2_*_harness.py  Isolated ROS package build and behavior checks
   tutor.py / hinter.py            Deterministic and optional AI tutoring
   research_service.py             Study sessions, events, summaries, and exports
   migrations/                     Alembic production schema history

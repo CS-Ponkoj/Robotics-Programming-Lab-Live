@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from account_sync import seed_demo_accounts
 from app import create_app
 from config import Settings
 from models import AuditEvent, Submission, User
@@ -50,13 +51,14 @@ def create_regular_student(client, login_id):
     return login(client, login_id, password)
 
 
-def test_default_demo_accounts_login_restore_and_logout(auth_client):
+def test_default_accounts_login_restore_and_logout(auth_client):
     student = login(auth_client, "student", "student")
     instructor = login(auth_client, "instructor", "instructor")
 
     assert student["user"]["role"] == "student"
-    assert student["user"]["is_demo"] is True
+    assert student["user"]["is_demo"] is False
     assert instructor["user"]["role"] == "instructor"
+    assert instructor["user"]["is_demo"] is False
 
     restored = auth_client.get("/auth/me", headers=bearer(student["token"]))
     assert restored.status_code == 200
@@ -69,6 +71,31 @@ def test_default_demo_accounts_login_restore_and_logout(auth_client):
     assert auth_client.get(
         "/auth/me", headers=bearer(student["token"])
     ).status_code == 401
+
+
+def test_startup_removes_legacy_demo_flag_from_password_accounts(auth_client):
+    with auth_client.app.state.SessionLocal() as session:
+        accounts = session.scalars(
+            select(User).where(User.login_id.in_(("student", "instructor")))
+        ).all()
+        for account in accounts:
+            account.is_demo = True
+        session.commit()
+
+        seed_demo_accounts(
+            session,
+            True,
+            student_password="student",
+            instructor_password="instructor",
+        )
+
+        corrected = {
+            account.login_id: account.is_demo
+            for account in session.scalars(
+                select(User).where(User.login_id.in_(("student", "instructor")))
+            ).all()
+        }
+    assert corrected == {"instructor": False, "student": False}
 
 
 def test_login_rejects_invalid_credentials_and_throttles(auth_client):

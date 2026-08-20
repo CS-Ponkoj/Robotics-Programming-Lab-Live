@@ -115,13 +115,17 @@ class DockerRos2Executor:
 
 def _safe_config(config: dict) -> dict:
     allowed = {
+        "harness",
         "package_name",
         "executable",
         "topic",
         "message_type",
+        "scan_topic",
+        "scan_message_type",
         "expected_linear_x",
         "linear_tolerance",
         "angular_tolerance",
+        "stop_distance",
         "move_seconds",
         "stop_tolerance_seconds",
         "minimum_publish_rate_hz",
