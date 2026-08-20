@@ -172,6 +172,19 @@ def test_ros2_worker_selects_only_known_behavior_harnesses():
         select_harness({"harness": "student-selected-path"})
 
 
+def test_obstacle_harness_waits_for_ros_discovery_before_scoring():
+    source = (Path(__file__).parents[1] / "ros2_obstacle_harness.py").read_text(
+        encoding="utf-8"
+    )
+
+    readiness = source.index("controller_ready = wait_for_controller()")
+    clear_phase = source.index('run_phase("clear"')
+    assert "scan_publisher.get_subscription_count() > 0" in source
+    assert "monitor.count_publishers(command_topic) > 0" in source
+    assert "messages.clear()" in source
+    assert readiness < clear_phase
+
+
 def test_docker_executor_returns_actionable_error_when_docker_is_missing(monkeypatch):
     def missing(*_args, **_kwargs):
         raise FileNotFoundError

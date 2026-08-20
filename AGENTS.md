@@ -418,6 +418,8 @@ Flutter `build`, `.local-run`, local databases, caches, and generated logs.
 
 - Inspect branch, remotes, status, and diff before modifying or publishing.
 - Start work from current staging `main` on a focused feature branch.
+- Never use the word `codex` (in any capitalization) in a Git branch name or
+  commit message. Use a short project- or feature-based name instead.
 - Keep commits focused and use clear imperative commit messages.
 - Do not mix formatting, dependency upgrades, feature work, and unrelated fixes
   in one commit.

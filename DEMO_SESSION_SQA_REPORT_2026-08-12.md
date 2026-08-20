@@ -37,7 +37,7 @@ credentials.
 | DEMO-009 | Logout | Logout revokes the in-memory token and session data | Logout returned 200; subsequent `/auth/me` returned 401 | PASS |
 | DEMO-010 | Research integrity | Demo activity is excluded from permanent study capture | Demo research-session creation returned 409; frontend does not start the tracker | PASS |
 | DEMO-011 | AI default | AI is available but off by default | Rendered assignment toolbar showed the AI toggle off | PASS |
-| DEMO-012 | Backend regression | Existing backend behavior remains green | 113 backend tests passed | PASS |
+| DEMO-012 | Backend regression | Existing backend behavior remains green | 114 backend tests passed | PASS |
 | DEMO-013 | Frontend regression | Analyzer, all Flutter tests, and release web build pass | Zero analyzer findings, 43 Flutter tests passed, release build succeeded | PASS |
 | DEMO-014 | Dependency integrity | Installed backend dependencies are consistent | `pip check` reported no broken requirements | PASS |
 | DEMO-015 | Password student classification | Logging in with the default student ID and password creates a persistent student session, not a demo | Local API login and `/auth/me` both returned `is_demo=false`; an auth-session row was created | PASS |

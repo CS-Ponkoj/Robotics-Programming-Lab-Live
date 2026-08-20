@@ -70,6 +70,29 @@ def main() -> None:
         scan.ranges = ranges
         return scan
 
+    def wait_for_controller(timeout: float = 5.0) -> bool:
+        """Wait for ROS discovery and one end-to-end scan response."""
+        nonlocal current_phase, phase_started_at
+        current_phase = "readiness"
+        phase_started_at = time.monotonic()
+        deadline = phase_started_at + timeout
+        next_publish = phase_started_at
+        while time.monotonic() < deadline:
+            if student.poll() is not None:
+                return False
+            now = time.monotonic()
+            if now >= next_publish:
+                scan_publisher.publish(scan_message([2.0] * 9))
+                next_publish = now + 0.08
+            rclpy.spin_once(monitor, timeout_sec=0.03)
+            if (
+                scan_publisher.get_subscription_count() > 0
+                and monitor.count_publishers(command_topic) > 0
+                and messages
+            ):
+                return True
+        return False
+
     def run_phase(name: str, ranges: list[float], duration: float) -> None:
         nonlocal current_phase, phase_started_at
         current_phase = name
@@ -84,8 +107,11 @@ def main() -> None:
             if student.poll() is not None:
                 break
 
+    controller_ready = False
     try:
-        run_phase("warmup", [2.0] * 9, 1.2)
+        controller_ready = wait_for_controller()
+        # Readiness traffic must never count as scored student evidence.
+        messages.clear()
         run_phase("clear", [2.0] * 9, 1.2)
         run_phase("obstacle", [2.0, 1.5, 0.4, 1.5, 2.0], 1.2)
         run_phase("invalid", [math.inf, math.nan, 0.0, -1.0], 1.2)
@@ -130,6 +156,7 @@ def main() -> None:
         abs(item[3]) <= angular_tolerance for item in settled
     )
     resume_ok = forward_ok("resume")
+    node_started = controller_ready and (alive_at_end or bool(messages))
     runtime_error = (
         ""
         if alive_at_end
@@ -142,10 +169,10 @@ def main() -> None:
     tests = [
         result(
             "node-start",
-            alive_at_end or bool(messages),
+            node_started,
             "The obstacle_stop_controller node started."
-            if alive_at_end or messages
-            else "The node exited before it could be tested.",
+            if node_started
+            else "The node did not become ready before the test phases began.",
         ),
         result(
             "scan-response",
