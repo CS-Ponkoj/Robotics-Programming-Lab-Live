@@ -2,6 +2,7 @@
   "id": 6,
   "stable_id": "ros2-obstacle-stop",
   "version": 1,
+  "data_schema_version": 1,
   "title": "Assignment 6: Stop for an Obstacle with ROS 2",
   "description": "Use LaserScan sensor data to move through a clear path, stop for a nearby obstacle, and resume safely.",
   "assignment_html": "<p><strong>Scenario</strong></p><p>You are programming a mobile robot that receives laser-range readings on <code>/scan</code> and velocity commands on <code>/cmd_vel</code>.</p><p><strong>Your task</strong></p><ol><li>Subscribe to <code>sensor_msgs/LaserScan</code> messages on <code>/scan</code>.</li><li>Create a <code>Twist</code> publisher on <code>/cmd_vel</code>.</li><li>Drive straight at <code>0.20 m/s</code> when the nearest valid scan distance is greater than <code>0.75 m</code>.</li><li>Publish zero velocity when an obstacle is at or within <code>0.75 m</code>, or when the scan contains no valid positive distance.</li><li>Resume forward motion when the path becomes clear again.</li></ol><p><strong>What to edit</strong></p><p>Read every file in the project tree, but edit only <code>reactive_navigation/controller.py</code> and complete the TODO sections.</p><p><strong>Run Tests</strong></p><p>The grader builds the ROS package, publishes synthetic <code>LaserScan</code> messages, and observes the resulting <code>Twist</code> commands. Simulation is not used in this assignment.</p>",

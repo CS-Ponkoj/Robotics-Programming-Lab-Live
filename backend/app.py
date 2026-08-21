@@ -40,6 +40,7 @@ from auth_service import (
     verify_password,
 )
 from config import Settings, get_settings
+from data_contracts import normalize_event_data
 from database import Base, build_engine
 from email_service import EmailService
 from graders import PythonVariableGrader, Ros2TopicGrader
@@ -130,7 +131,7 @@ def create_app(
 
     application = FastAPI(
         title="Robotics Programming Lab API",
-        version="4.1.0",
+        version="5.0.0",
         lifespan=lifespan,
         docs_url=None if configured.environment.lower() == "production" else "/docs",
         redoc_url=None if configured.environment.lower() == "production" else "/redoc",
@@ -201,9 +202,17 @@ def create_app(
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(_request: Request, error: RequestValidationError):
+        safe_details = [
+            {
+                "type": item.get("type", "validation_error"),
+                "location": [str(part) for part in item.get("loc", ())],
+                "message": item.get("msg", "Invalid value."),
+            }
+            for item in error.errors()
+        ]
         return JSONResponse(
             status_code=400,
-            content={"error": "Invalid request.", "details": error.errors()},
+            content={"error": "Invalid request.", "details": safe_details},
         )
 
     def session_dependency(request: Request):
@@ -468,7 +477,9 @@ def create_app(
         study_session: StudySession | None,
     ) -> Submission:
         evidence = {
+            "data_schema_version": assignment.data_schema_version,
             "execution_succeeded": result.execution_succeeded,
+            "execution_status": result.execution_status.value,
             "passed": result.passed,
             "score": result.score,
             "execution_error": result.execution_error,
@@ -480,12 +491,14 @@ def create_app(
             id=str(uuid4()),
             assignment_id=assignment.id,
             assignment_version=assignment.version,
+            data_schema_version=assignment.data_schema_version,
             student_id=user.login_id,
             user_id=user.id,
             study_session_id=study_session.id if study_session else None,
             mode=mode,
             code=body.code,
             execution_succeeded=result.execution_succeeded,
+            execution_status=result.execution_status.value,
             passed=result.passed,
             score=result.score,
             evidence=evidence,
@@ -574,6 +587,7 @@ def create_app(
             event_data={
                 "submission_id": submission.id,
                 "execution_succeeded": submission.execution_succeeded,
+                "execution_status": submission.execution_status,
                 "passed": submission.passed,
                 "score": submission.score,
                 "ai_tutor_requested": ai_tutor_requested,
@@ -600,6 +614,7 @@ def create_app(
             code_exec_result=evidence.get("execution_error", ""),
             code_output=evidence.get("code_output", ""),
             ex_success=submission.execution_succeeded,
+            execution_status=submission.execution_status,
             score=submission.score,
             hint=tutor_feedback.hint if tutor_feedback else "",
             evidence=tests,
@@ -617,7 +632,7 @@ def create_app(
             raise HTTPException(503, "Database unavailable.") from error
         response = {
             "status": "ok",
-            "api_version": "4.1.0",
+            "api_version": "5.0.0",
         }
         if configured.environment.lower() == "production":
             response["release"] = os.getenv("RENDER_GIT_COMMIT", "unknown")[:12]
@@ -879,6 +894,10 @@ def create_app(
             raise HTTPException(409, "Study session has ended.")
         if len(json.dumps(body.event_data)) > 4_000:
             raise HTTPException(413, "Learning event data is too large.")
+        try:
+            event_data = normalize_event_data(body.event_type.value, body.event_data)
+        except ValueError as error:
+            raise HTTPException(400, "Learning event data is invalid.") from error
         if body.assignment_id is not None:
             assignment = get_assignment_or_404(session, body.assignment_id)
             if body.assignment_version not in {None, assignment.version}:
@@ -890,7 +909,7 @@ def create_app(
             event_type=body.event_type,
             assignment_id=body.assignment_id,
             assignment_version=body.assignment_version,
-            event_data=body.event_data,
+            event_data=event_data,
             client_occurred_at=body.client_occurred_at,
         )
         return {"event_id": event.id, "recorded": True}

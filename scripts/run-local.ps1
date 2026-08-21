@@ -68,6 +68,11 @@ function Start-ProjectProcess {
     try {
         $stdout = Join-Path $logRoot "$Name.stdout.log"
         $stderr = Join-Path $logRoot "$Name.stderr.log"
+        foreach ($logFile in @($stdout, $stderr)) {
+            if (Test-Path -LiteralPath $logFile) {
+                Remove-Item -LiteralPath $logFile -Force
+            }
+        }
         return Start-Process -FilePath $FilePath -ArgumentList $ArgumentList `
             -WorkingDirectory $WorkingDirectory -WindowStyle Hidden -PassThru `
             -RedirectStandardOutput $stdout -RedirectStandardError $stderr
@@ -106,6 +111,27 @@ function Wait-ForEndpoint {
         }
     }
     throw "$Name did not become healthy at $Url. Review .local-run\logs."
+}
+
+function Wait-ForLogMessage {
+    param(
+        [string]$Name,
+        [string]$Path,
+        [string]$Text,
+        [int]$ProcessId,
+        [int]$Attempts = 240
+    )
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        if (Test-Path -LiteralPath $Path) {
+            $content = Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue
+            if ($content -and $content.Contains($Text)) { return }
+        }
+        if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {
+            throw "$Name exited before it became ready. Review .local-run\logs."
+        }
+        Start-Sleep -Milliseconds 500
+    }
+    throw "$Name did not become ready. Review .local-run\logs."
 }
 
 $token = New-LocalToken
@@ -178,7 +204,15 @@ try {
         -ArgumentList @("run", "-d", "web-server", "--web-hostname", "127.0.0.1", "--web-port", "$FrontendPort", "--dart-define=API_BASE_URL=http://127.0.0.1:$BackendPort") `
         -WorkingDirectory $resolvedFrontend
     $processes += [pscustomobject]@{ name = "frontend"; id = $frontend.Id }
-    Wait-ForEndpoint -Name "Frontend" -Url "http://127.0.0.1:$FrontendPort" -Attempts 240 -AcceptAnySuccess
+    Wait-ForLogMessage -Name "Frontend compiler" `
+        -Path (Join-Path $logRoot "frontend.stdout.log") `
+        -Text "is being served at http://127.0.0.1:$FrontendPort" `
+        -ProcessId $frontend.Id
+    Wait-ForEndpoint -Name "Frontend shell" -Url "http://127.0.0.1:$FrontendPort" -Attempts 240 -AcceptAnySuccess
+    # Flutter's web server can return index.html before the generated Dart
+    # entrypoint is available. Wait for that module so the first browser load
+    # cannot race the compiler and render a blank page.
+    Wait-ForEndpoint -Name "Frontend entrypoint" -Url "http://127.0.0.1:$FrontendPort/web_entrypoint.dart" -Attempts 240 -AcceptAnySuccess
 
     [pscustomobject]@{
         repository = $repositoryRoot
@@ -191,7 +225,7 @@ try {
         aiEnabled = [bool]$EnableAi
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8
 
-    Write-Output "Robotics Programming Lab is starting."
+    Write-Output "Robotics Programming Lab is ready."
     Write-Output "Frontend: http://127.0.0.1:$FrontendPort"
     Write-Output "Backend:  http://127.0.0.1:$BackendPort/health"
     Write-Output "Sandbox:  http://127.0.0.1:$SandboxPort/health"

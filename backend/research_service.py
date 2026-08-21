@@ -7,15 +7,16 @@ from typing import Any, Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from data_contracts import (
+    AUTOMATIC_LEARNING_EVENT_TYPES,
+    CURRENT_DATA_SCHEMA_VERSION,
+    LearningEventType,
+    normalize_event_data,
+)
 from models import LearningEvent, StudySession, Submission, User, utc_now
 
 
-AUTOMATIC_EVENT_TYPES = {
-    "assignment_run",
-    "assignment_submitted",
-    "hint_requested",
-    "solution_revealed",
-}
+AUTOMATIC_EVENT_TYPES = AUTOMATIC_LEARNING_EVENT_TYPES
 
 
 def participant_label(user: User) -> str:
@@ -49,13 +50,22 @@ def record_learning_event(
     client_occurred_at: datetime | None = None,
     commit: bool = True,
 ) -> LearningEvent:
+    normalized_event_type = LearningEventType(str(event_type)).value
+    if (assignment_id is None) != (assignment_version is None):
+        raise ValueError(
+            "assignment_id and assignment_version must be provided together"
+        )
+    normalized_event_data = normalize_event_data(
+        normalized_event_type, event_data or {}
+    )
     event = LearningEvent(
         study_session_id=study_session.id,
         user_id=user.id,
         assignment_id=assignment_id,
         assignment_version=assignment_version,
-        event_type=event_type,
-        event_data=event_data or {},
+        event_type=normalized_event_type,
+        event_data=normalized_event_data,
+        data_schema_version=CURRENT_DATA_SCHEMA_VERSION,
         client_occurred_at=client_occurred_at,
     )
     session.add(event)
@@ -148,6 +158,8 @@ def build_research_dataset(session: Session) -> dict[str, list[dict[str, Any]]]:
             "study_session_id": submission.study_session_id or "",
             "assignment_id": submission.assignment_id,
             "assignment_version": submission.assignment_version,
+            "data_schema_version": submission.data_schema_version,
+            "execution_status": submission.execution_status,
             "mode": submission.mode,
             "execution_succeeded": submission.execution_succeeded,
             "passed": submission.passed,

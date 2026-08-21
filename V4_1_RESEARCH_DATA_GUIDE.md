@@ -41,6 +41,12 @@ grading but is excluded from research dashboards and exports.
 - Export: student summary CSV, assignment attempts CSV, learning events CSV,
   or a three-sheet Excel workbook
 
+For local file locations, table definitions, standard execution statuses, and
+event payload rules, see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). The local
+SQLite database is the ignored `backend/robotics_lab_staging.db` file and can be
+opened read-only with a trusted VS Code SQLite viewer. Assignment source data is
+human-readable in `backend/assignments/assignment_*.json`.
+
 ## Privacy and data quality
 
 - Research screens and exports use unique participant codes, not login IDs.

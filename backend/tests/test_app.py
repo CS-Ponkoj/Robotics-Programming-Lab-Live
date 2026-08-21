@@ -73,7 +73,7 @@ def test_health_reports_fastapi_platform(client):
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "api_version": "4.1.0",
+        "api_version": "5.0.0",
         "database": "sqlite",
         "sandbox": "subprocess",
     }
@@ -358,6 +358,7 @@ def test_correct_submission_passes_and_records_assignment_version(client):
     assert response.status_code == 200
     assert body["pass"] is True
     assert body["ex_success"] is True
+    assert body["execution_status"] == "completed"
     assert body["assignment_version"] == 2
     assert body["submission_id"]
     assert body["unittest_pass_results"] == [True, True, True, True]

@@ -162,6 +162,17 @@ def test_submission_hint_solution_and_ai_status_are_recorded(research_client):
     assert mine["summary"]["solutions_revealed"] == 1
     assert all("code" not in attempt for attempt in mine["attempts"])
     assert all("code" not in event["event_data"] for event in mine["events"])
+    assert mine["attempts"][0]["data_schema_version"] == 1
+    assert mine["attempts"][0]["execution_status"] in {
+        "completed",
+        "syntax_error",
+        "runtime_error",
+        "timeout",
+        "rejected",
+        "grader_unavailable",
+        "internal_error",
+        "execution_error",
+    }
 
     invalid_session = research_client.post(
         "/assignments/1/submit",
@@ -269,6 +280,25 @@ def test_learning_event_validation_limits_untrusted_data(research_client):
         },
     )
     assert oversized.status_code == 413
+    mismatched_assignment_version = research_client.post(
+        f"/research/sessions/{session_id}/events",
+        headers=_bearer(student),
+        json={
+            "event_type": "assignment_opened",
+            "assignment_id": 1,
+            "event_data": {"source": "assignment_catalog"},
+        },
+    )
+    assert mismatched_assignment_version.status_code == 400
+    invalid_shape = research_client.post(
+        f"/research/sessions/{session_id}/events",
+        headers=_bearer(student),
+        json={
+            "event_type": "ai_tutor_toggled",
+            "event_data": {"enabled": False, "unexpected": "not stored"},
+        },
+    )
+    assert invalid_shape.status_code == 400
     too_much_time = research_client.post(
         f"/research/sessions/{session_id}/heartbeat",
         headers=_bearer(student),

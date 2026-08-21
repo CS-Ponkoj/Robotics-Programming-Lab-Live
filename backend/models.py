@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
@@ -22,10 +23,20 @@ def utc_now() -> datetime:
 
 class Assignment(Base):
     __tablename__ = "assignments"
+    __table_args__ = (
+        CheckConstraint("version >= 1", name="ck_assignments_version_positive"),
+        CheckConstraint(
+            "data_schema_version >= 1",
+            name="ck_assignments_data_schema_version_positive",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     stable_id: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
+    data_schema_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1"
+    )
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str] = mapped_column(Text, default="")
     assignment_html: Mapped[str] = mapped_column(Text, default="")
@@ -60,12 +71,36 @@ class Assignment(Base):
 
 class Submission(Base):
     __tablename__ = "submissions"
+    __table_args__ = (
+        CheckConstraint(
+            "assignment_version >= 1",
+            name="ck_submissions_assignment_version_positive",
+        ),
+        CheckConstraint(
+            "data_schema_version >= 1",
+            name="ck_submissions_data_schema_version_positive",
+        ),
+        CheckConstraint(
+            "mode IN ('run', 'submit')",
+            name="ck_submissions_mode_known",
+        ),
+        CheckConstraint(
+            "execution_status IN ("
+            "'completed', 'syntax_error', 'runtime_error', 'timeout', "
+            "'rejected', 'grader_unavailable', 'internal_error', 'execution_error'"
+            ")",
+            name="ck_submissions_execution_status_known",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid4())
     )
     assignment_id: Mapped[int] = mapped_column(ForeignKey("assignments.id"), index=True)
     assignment_version: Mapped[int] = mapped_column(Integer)
+    data_schema_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1"
+    )
     student_id: Mapped[str] = mapped_column(String(120), default="anonymous", index=True)
     user_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id"), nullable=True, index=True
@@ -76,6 +111,9 @@ class Submission(Base):
     mode: Mapped[str] = mapped_column(String(20), default="submit")
     code: Mapped[str] = mapped_column(Text)
     execution_succeeded: Mapped[bool] = mapped_column(Boolean, default=False)
+    execution_status: Mapped[str] = mapped_column(
+        String(40), default="execution_error", server_default="execution_error"
+    )
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
     score: Mapped[int] = mapped_column(Integer, default=0)
     evidence: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -89,6 +127,16 @@ class Submission(Base):
 
 class HintInteraction(Base):
     __tablename__ = "hint_interactions"
+    __table_args__ = (
+        CheckConstraint(
+            "data_schema_version >= 1",
+            name="ck_hint_interactions_data_schema_version_positive",
+        ),
+        CheckConstraint(
+            "hint_level >= 1",
+            name="ck_hint_interactions_hint_level_positive",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid4())
@@ -97,6 +145,9 @@ class HintInteraction(Base):
         ForeignKey("submissions.id"), index=True
     )
     hint_level: Mapped[int] = mapped_column(Integer)
+    data_schema_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1"
+    )
     feedback: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
@@ -186,6 +237,17 @@ class StudySession(Base):
 
 class LearningEvent(Base):
     __tablename__ = "learning_events"
+    __table_args__ = (
+        CheckConstraint(
+            "data_schema_version >= 1",
+            name="ck_learning_events_data_schema_version_positive",
+        ),
+        CheckConstraint(
+            "(assignment_id IS NULL AND assignment_version IS NULL) OR "
+            "(assignment_id IS NOT NULL AND assignment_version >= 1)",
+            name="ck_learning_events_assignment_version_pair",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid4())
@@ -198,6 +260,9 @@ class LearningEvent(Base):
         ForeignKey("assignments.id"), nullable=True, index=True
     )
     assignment_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    data_schema_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1"
+    )
     event_type: Mapped[str] = mapped_column(String(80), index=True)
     event_data: Mapped[dict] = mapped_column(JSON, default=dict)
     client_occurred_at: Mapped[datetime | None] = mapped_column(

@@ -102,6 +102,7 @@ frontend/                         Flutter student and instructor application
 backend/                          FastAPI application
   app.py                          HTTP routes and application composition
   models.py                       SQLAlchemy persistence models
+  data_contracts.py               Versioned assignment, grading, and event schemas
   schemas.py                      Pydantic API schemas
   auth_service.py                 Authentication and password/session behavior
   assignment_repository.py       Assignment loading and persistence
@@ -279,6 +280,9 @@ sufficient when an automated test can reasonably protect the behavior.
 - Destructive migrations require an explicit backup, rollback plan, owner
   approval, and restoration rehearsal.
 - Store UTC timestamps and assignment versions with attempts and events.
+- Version JSON-bearing assignment, submission, hint, and learning-event records
+  with `data_schema_version`; update `DATA_DICTIONARY.md` whenever a stored
+  contract or allowlisted status/event value changes.
 - Avoid N+1 queries and unbounded result sets; paginate growing collections.
 
 ## Authentication and authorization rules

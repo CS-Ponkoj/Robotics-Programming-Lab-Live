@@ -1,6 +1,7 @@
 {
     "id": 2,
     "version": 2,
+    "data_schema_version": 1,
     "title": "Assignment 2: Obstacle Avoidance: Bug Algorithm Scenario 2",
     "description": "Another assignment for you to program a robot to avoid an obstacle in the way, while also modeling the Bug2 Algorithm",
     "starter_code": "import math\n\n# Define the points as (x, y) tuples.\nstart_point = (0, 0)\ngoal_point = (10, 0)\nobstacle_A = (4, -1)\nobstacle_B = (6, -1)\nobstacle_C = (6, 1)\nobstacle_D = (4, 1)\n\n# TODO: Replace each placeholder with the required calculation.\n# Straight-line distance from the start to the obstacle.\ndistance_to_obstacle = 0.0\n\n# Right-turn boundary route A -> D -> C -> B.\nperimeter_of_obstacle = 0.0\n\n# Straight-line distance from the obstacle to the goal.\ndistance_from_obstacle_to_goal = 0.0\n\n# Total path length.\ntotal_path_length = 0.0\n\nprint(total_path_length)\n",

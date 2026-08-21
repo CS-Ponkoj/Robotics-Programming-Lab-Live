@@ -1,7 +1,14 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from data_contracts import (
+    CURRENT_DATA_SCHEMA_VERSION,
+    ClientLearningEventType,
+    ExecutionStatus,
+    normalize_assignment_structured_data,
+)
 
 
 class AssignmentProjectFile(BaseModel):
@@ -14,6 +21,7 @@ class AssignmentStudent(BaseModel):
     id: int
     stable_id: str
     version: int
+    data_schema_version: Literal[CURRENT_DATA_SCHEMA_VERSION]
     title: str
     description: str
     assignment_html: str
@@ -71,6 +79,7 @@ class SubmissionResponse(BaseModel):
     code_exec_result: str
     code_output: str
     ex_success: bool
+    execution_status: ExecutionStatus
     score: int
     hint: str = ""
     evidence: list[TestEvidence] = Field(default_factory=list)
@@ -90,6 +99,9 @@ class AdminAssignmentPayload(BaseModel):
     id: int | None = None
     stable_id: str
     version: int = Field(default=1, ge=1)
+    data_schema_version: Literal[CURRENT_DATA_SCHEMA_VERSION] = (
+        CURRENT_DATA_SCHEMA_VERSION
+    )
     title: str
     description: str = ""
     assignment_html: str = ""
@@ -108,6 +120,23 @@ class AdminAssignmentPayload(BaseModel):
     grader_config: dict[str, Any] = Field(default_factory=dict)
     solution_html: str = ""
     reference_solution_path: str | None = None
+
+    @model_validator(mode="after")
+    def validate_structured_assignment_fields(self):
+        normalized = normalize_assignment_structured_data(self.model_dump())
+        for field_name in (
+            "learning_objectives",
+            "execution_settings",
+            "public_tests",
+            "rubric",
+            "misconceptions",
+            "tutoring_rules",
+            "simulation_config",
+            "asset_manifest",
+            "grader_config",
+        ):
+            setattr(self, field_name, normalized[field_name])
+        return self
 
 
 class LoginRequest(BaseModel):
@@ -199,15 +228,26 @@ class StudyHeartbeatRequest(BaseModel):
     assignment_id: int | None = Field(default=None, ge=1)
     assignment_version: int | None = Field(default=None, ge=1)
 
+    @model_validator(mode="after")
+    def require_assignment_version_pair(self):
+        if (self.assignment_id is None) != (self.assignment_version is None):
+            raise ValueError(
+                "assignment_id and assignment_version must be provided together"
+            )
+        return self
+
 
 class LearningEventRequest(BaseModel):
-    event_type: Literal[
-        "assignment_opened",
-        "ai_tutor_toggled",
-        "workspace_tab_changed",
-        "workspace_file_selected",
-    ]
+    event_type: ClientLearningEventType
     assignment_id: int | None = Field(default=None, ge=1)
     assignment_version: int | None = Field(default=None, ge=1)
     event_data: dict[str, Any] = Field(default_factory=dict)
     client_occurred_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_event_contract(self):
+        if (self.assignment_id is None) != (self.assignment_version is None):
+            raise ValueError(
+                "assignment_id and assignment_version must be provided together"
+            )
+        return self

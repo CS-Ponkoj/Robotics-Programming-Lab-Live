@@ -100,10 +100,7 @@ class DockerRos2Executor:
                 f"The ROS 2 test exceeded {self.timeout_seconds:g} seconds and was stopped."
             )
         if completed.returncode != 0:
-            return _executor_error(
-                completed.stderr.strip()[-2000:]
-                or "The ROS 2 grader container failed."
-            )
+            return _executor_error(_container_failure_message(completed.stderr))
         try:
             result = json.loads(completed.stdout)
         except json.JSONDecodeError:
@@ -142,6 +139,23 @@ def _valid_result(result: object) -> bool:
         and isinstance(result.get("output"), str)
         and isinstance(result.get("tests"), list)
     )
+
+
+def _container_failure_message(stderr: str) -> str:
+    message = stderr.strip()
+    lowered = message.lower()
+    daemon_unavailable_markers = (
+        "failed to connect to the docker api",
+        "cannot connect to the docker daemon",
+        "dockerdesktoplinuxengine",
+        "is the docker daemon running",
+    )
+    if any(marker in lowered for marker in daemon_unavailable_markers):
+        return (
+            "The local ROS 2 grader cannot reach Docker Desktop. Start Docker "
+            "Desktop with Linux containers, wait until it is ready, and run the tests again."
+        )
+    return message[-2000:] or "The ROS 2 grader container failed."
 
 
 def _executor_error(message: str) -> dict:

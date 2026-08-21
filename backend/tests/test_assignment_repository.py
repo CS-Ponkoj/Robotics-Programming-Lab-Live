@@ -28,6 +28,10 @@ def test_newer_seed_versions_upgrade_existing_local_assignments():
         assignments = AssignmentRepository(session).list_all()
         assert [item.version for item in assignments] == [3, 2, 3, 2, 1, 1]
         for assignment in assignments:
+            assert assignment.data_schema_version == 1
+            assert assignment.execution_settings["runtime"]
+            assert assignment.public_tests
+            assert assignment.tutoring_rules["ai_enabled_by_default"] is False
             compile(
                 assignment.starter_code,
                 f"assignment-{assignment.id}-starter.py",

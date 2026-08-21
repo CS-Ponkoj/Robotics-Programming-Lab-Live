@@ -4,6 +4,10 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from data_contracts import (
+    CURRENT_DATA_SCHEMA_VERSION,
+    normalize_assignment_structured_data,
+)
 from models import Assignment
 from schemas import AdminAssignmentPayload, AssignmentStudent
 
@@ -66,6 +70,50 @@ def _default_misconceptions(expected_values: dict) -> list[dict]:
     ]
 
 
+def _structured_source_values(source: dict, expected_values: dict) -> dict:
+    return normalize_assignment_structured_data(
+        {
+            "learning_objectives": source.get(
+                "learning_objectives", _default_objectives(source["title"])
+            ),
+            "execution_settings": source.get(
+                "execution_settings",
+                {
+                    "runtime": "python3.11",
+                    "timeout_seconds": 5,
+                    "allowed_imports": ["math", "numpy", "scipy"],
+                },
+            ),
+            "public_tests": source.get(
+                "public_tests",
+                [{"id": "syntax", "label": "Program executes without an error"}],
+            ),
+            "rubric": source.get("rubric", _default_rubric(expected_values)),
+            "misconceptions": source.get(
+                "common_misconceptions",
+                _default_misconceptions(expected_values),
+            ),
+            "tutoring_rules": source.get(
+                "tutoring_rules",
+                {
+                    "max_hint_level": 4,
+                    "start_with_question": True,
+                    "never_reveal_solution": True,
+                    "tone": "encouraging and concise",
+                },
+            ),
+            "simulation_config": source.get(
+                "simulation_config",
+                {"enabled": False, "provider": None, "scenario": None},
+            ),
+            "asset_manifest": source.get("asset_manifest", []),
+            "grader_config": source.get(
+                "grader_config", {"expected_values": expected_values}
+            ),
+        }
+    )
+
+
 class AssignmentRepository:
     def __init__(self, session: Session):
         self.session = session
@@ -79,6 +127,7 @@ class AssignmentRepository:
             source = json.loads(path.read_text(encoding="utf-8"))
             assignment_id = int(source["id"])
             expected_values = source.get("vals", {})
+            structured = _structured_source_values(source, expected_values)
             reference_path = REFERENCE_SOLUTIONS.get(assignment_id)
             configured_reference_path = source.get("reference_solution_path")
             assignment = Assignment(
@@ -87,55 +136,25 @@ class AssignmentRepository:
                     "stable_id", f"robotics-assignment-{assignment_id}"
                 ),
                 version=int(source.get("version", 1)),
+                data_schema_version=int(
+                    source.get("data_schema_version", CURRENT_DATA_SCHEMA_VERSION)
+                ),
                 title=source["title"],
                 description=source.get("description", ""),
                 assignment_html=source.get("assignment_html", ""),
                 starter_code=source.get("starter_code", ""),
                 language=source.get("language", "python"),
                 status=source.get("status", "published"),
-                learning_objectives=source.get(
-                    "learning_objectives", _default_objectives(source["title"])
-                ),
-                execution_settings=source.get(
-                    "execution_settings",
-                    {
-                        "runtime": "python3.11",
-                        "timeout_seconds": 5,
-                        "allowed_imports": ["math", "numpy", "scipy"],
-                    },
-                ),
-                public_tests=source.get(
-                    "public_tests",
-                    [
-                        {
-                            "id": "syntax",
-                            "label": "Program executes without an error",
-                        }
-                    ],
-                ),
-                rubric=source.get("rubric", _default_rubric(expected_values)),
-                misconceptions=source.get(
-                    "common_misconceptions",
-                    _default_misconceptions(expected_values),
-                ),
-                tutoring_rules=source.get(
-                    "tutoring_rules",
-                    {
-                        "max_hint_level": 4,
-                        "start_with_question": True,
-                        "never_reveal_solution": True,
-                        "tone": "encouraging and concise",
-                    },
-                ),
-                simulation_config=source.get(
-                    "simulation_config",
-                    {"enabled": False, "provider": None, "scenario": None},
-                ),
-                asset_manifest=source.get("asset_manifest", []),
+                learning_objectives=structured["learning_objectives"],
+                execution_settings=structured["execution_settings"],
+                public_tests=structured["public_tests"],
+                rubric=structured["rubric"],
+                misconceptions=structured["misconceptions"],
+                tutoring_rules=structured["tutoring_rules"],
+                simulation_config=structured["simulation_config"],
+                asset_manifest=structured["asset_manifest"],
                 grader_type=source.get("grader_type", "python_variables"),
-                grader_config=source.get(
-                    "grader_config", {"expected_values": expected_values}
-                ),
+                grader_config=structured["grader_config"],
                 solution_html=source.get("solution_html", ""),
                 reference_solution_path=(
                     configured_reference_path
@@ -156,6 +175,7 @@ class AssignmentRepository:
             for field in (
                 "stable_id",
                 "version",
+                "data_schema_version",
                 "title",
                 "description",
                 "assignment_html",
@@ -259,6 +279,7 @@ def to_student_assignment(assignment: Assignment) -> AssignmentStudent:
         id=assignment.id,
         stable_id=assignment.stable_id,
         version=assignment.version,
+        data_schema_version=assignment.data_schema_version,
         title=assignment.title,
         description=assignment.description,
         assignment_html=assignment.assignment_html,

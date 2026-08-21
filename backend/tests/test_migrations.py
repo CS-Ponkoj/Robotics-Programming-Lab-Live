@@ -47,6 +47,15 @@ def test_alembic_creates_a_fresh_schema(tmp_path, monkeypatch):
     assert EXPECTED_TABLES.issubset(set(inspect(engine).get_table_names()))
     with Session(engine) as session:
         assert session.scalar(select(models.Assignment).limit(1)) is None
+    assert "data_schema_version" in {
+        column["name"] for column in inspect(engine).get_columns("assignments")
+    }
+    assert {"data_schema_version", "execution_status"}.issubset(
+        {
+            column["name"]
+            for column in inspect(engine).get_columns("submissions")
+        }
+    )
     engine.dispose()
 
 

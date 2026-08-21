@@ -209,6 +209,26 @@ def test_docker_executor_returns_actionable_error_when_docker_is_missing(monkeyp
     assert "Docker Desktop" in result["error"]
 
 
+def test_docker_executor_hides_daemon_pipe_details_when_desktop_is_stopped(monkeypatch):
+    def unavailable(*_args, **_kwargs):
+        return SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr=(
+                "failed to connect to the docker API at "
+                "npipe:////./pipe/dockerDesktopLinuxEngine"
+            ),
+        )
+
+    monkeypatch.setattr("ros2_executor.subprocess.run", unavailable)
+    result = DockerRos2Executor("grader:test").execute("pass", [], {})
+
+    assert result["success"] is False
+    assert result["tests"] == []
+    assert "Start Docker Desktop" in result["error"]
+    assert "npipe" not in result["error"]
+
+
 def test_ros2_controller_validation_rejects_syntax_errors():
     with pytest.raises(SyntaxError):
         validate_controller('if True print(1)')

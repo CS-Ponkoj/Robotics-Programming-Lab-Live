@@ -1,6 +1,7 @@
 {
   "id": 1,
   "version": 3,
+  "data_schema_version": 1,
   "title": "Assignment 1: Obstacle Avoidance: Bug Algorithm Scenario 1",
   "description": "an assignment where you solve for the distance a robot travels using the bug algorithm",
   "assignment_html": "<p><strong>Scenario<\/strong><\/p><p>A small cleaning robot starts at position (2, 1) on a 10x10 grid. Its goal is the charging station at (8, 9). A rectangular obstacle extends from (4, 3) to (7, 6), and the robot first reaches the obstacle at (4, 3).<\/p><p><img src=\"http://localhost:5000/images/1\" height=\"234\" width=\"664\"><\/p><p><strong>Question<\/strong><\/p><p>Using the simplified Bug 2 path shown, calculate the robot's total travel distance when it follows the obstacle boundary clockwise and leaves the obstacle at (4, 6).<\/p><p><strong>Hints<\/strong><\/p><ul><li>Use Euclidean distance from the start to the hit point.<\/li><li>The clockwise boundary route covers three sides of the rectangular obstacle.<\/li><li>Use Euclidean distance again from the leave point to the goal.<\/li><li>Add the three path components to obtain the total distance.<\/li><\/ul>",

@@ -111,6 +111,10 @@ The v4 deployment and local-parity instructions are in
 [`V4_LIVE_DEPLOYMENT.md`](V4_LIVE_DEPLOYMENT.md).
 The V4.1 research dataset and dashboard are documented in
 [`V4_1_RESEARCH_DATA_GUIDE.md`](V4_1_RESEARCH_DATA_GUIDE.md).
+The versioned field definitions, standard status/event values, and local
+database viewing instructions are in [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md).
+The complete local release evidence is in
+[`V5_STAGING_SQA_REPORT.md`](V5_STAGING_SQA_REPORT.md).
 
 ## PostgreSQL, Redis, and Docker
 

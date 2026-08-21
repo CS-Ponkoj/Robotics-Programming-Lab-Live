@@ -2,6 +2,7 @@
   "id": 5,
   "stable_id": "ros2-drive-forward",
   "version": 1,
+  "data_schema_version": 1,
   "title": "Assignment 5: Drive Forward and Stop with ROS 2",
   "description": "Create a ROS 2 velocity publisher that moves a robot forward and then stops safely.",
   "assignment_html": "<p><strong>Scenario</strong></p><p>You are programming a mobile robot in ROS 2. The robot receives movement commands from the <code>/cmd_vel</code> topic.</p><p><strong>Your task</strong></p><ol><li>Create a <code>Twist</code> publisher on <code>/cmd_vel</code>.</li><li>Move forward at <code>0.20 m/s</code> without rotating.</li><li>Stop after approximately five seconds.</li><li>Continue publishing a zero-velocity command after stopping.</li></ol><p><strong>What to edit</strong></p><p>Read every file in the project tree, but edit only <code>robot_motion/controller.py</code> and complete the four TODO sections.</p><p><strong>Run Tests</strong></p><p>The grader builds the ROS package, starts your node, monitors <code>/cmd_vel</code>, and checks its observable behavior. Simulation is not used in this assignment.</p>",
