@@ -117,15 +117,18 @@ backend/                          FastAPI application
   tests/                          Backend regression and security tests
 
 manual_sqa_answers/               Instructor-only manual verification answers
+docs/                             Architecture, deployment, research, and SQA records
 scripts/                          Local run, verification, and release automation
 .github/workflows/ci.yml          Continuous-integration release gates
 render.yaml                       API and sandbox hosting configuration
 vercel.json                       Flutter web deployment configuration
 ```
 
-Read `README.md`, `STAGING_AND_RELEASE_WORKFLOW.md`,
-`V4_1_RESEARCH_DATA_GUIDE.md`, and the current SQA report before making a broad
-architectural, research-data, or release change.
+Read `README.md`, `docs/README.md`,
+`docs/deployment/STAGING_AND_RELEASE_WORKFLOW.md`,
+`docs/research/V4_1_RESEARCH_DATA_GUIDE.md`, and the current report under
+`docs/sqa/` before making a broad architectural, research-data, or release
+change.
 
 ## Working method
 
@@ -281,8 +284,8 @@ sufficient when an automated test can reasonably protect the behavior.
   approval, and restoration rehearsal.
 - Store UTC timestamps and assignment versions with attempts and events.
 - Version JSON-bearing assignment, submission, hint, and learning-event records
-  with `data_schema_version`; update `DATA_DICTIONARY.md` whenever a stored
-  contract or allowlisted status/event value changes.
+  with `data_schema_version`; update `docs/research/DATA_DICTIONARY.md` whenever
+  a stored contract or allowlisted status/event value changes.
 - Avoid N+1 queries and unbounded result sets; paginate growing collections.
 
 ## Authentication and authorization rules
@@ -439,7 +442,7 @@ Flutter `build`, `.local-run`, local databases, caches, and generated logs.
 
 ## Release and rollback rules
 
-Follow `STAGING_AND_RELEASE_WORKFLOW.md` and the guarded scripts.
+Follow `docs/deployment/STAGING_AND_RELEASE_WORKFLOW.md` and the guarded scripts.
 
 Before promotion:
 
@@ -474,6 +477,10 @@ canonical checkout, repository roles, branch policy, supported commands,
 architecture, security boundary, verification gate, or release process changes.
 When none of those durable facts changed, record that no `AGENTS.md` update was
 needed rather than editing the file unnecessarily.
+
+Keep long-form documentation under `docs/` according to `docs/README.md`.
+Reserve the repository root for essential entry-point/governance documents and
+runtime configuration files.
 
 SQA evidence must state:
 

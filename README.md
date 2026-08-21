@@ -35,6 +35,7 @@ Open the classroom-ready web application: [Robotics Programming Lab](https://rob
 - `frontend/`: Flutter web/mobile student and instructor interface
 - `course_materials/`: controlled reference solutions and course source files
 - `manual_sqa_answers/`: instructor-only answer files for manual grader checks
+- `docs/`: architecture, deployment, research-data, and SQA documentation
 - `docker-compose.yml`: PostgreSQL, Redis, FastAPI, and persistent storage
 
 ## Local development
@@ -46,7 +47,7 @@ easy to run without Docker. Production and team environments should set
 The project now uses a two-repository release workflow. All changes and SQA are
 performed in `Robotics-Programming-Lab-Staging`; the live
 `Robotics-Programming-Lab` repository receives only the exact approved commit.
-See [`STAGING_AND_RELEASE_WORKFLOW.md`](STAGING_AND_RELEASE_WORKFLOW.md).
+See the [staging and release workflow](docs/deployment/STAGING_AND_RELEASE_WORKFLOW.md).
 
 ### Install
 
@@ -107,14 +108,11 @@ The login page does not display these credentials. Override both passwords with
 server-side environment variables before sharing a live URL beyond the approved
 professor demo.
 
-The v4 deployment and local-parity instructions are in
-[`V4_LIVE_DEPLOYMENT.md`](V4_LIVE_DEPLOYMENT.md).
-The V4.1 research dataset and dashboard are documented in
-[`V4_1_RESEARCH_DATA_GUIDE.md`](V4_1_RESEARCH_DATA_GUIDE.md).
-The versioned field definitions, standard status/event values, and local
-database viewing instructions are in [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md).
-The complete local release evidence is in
-[`V5_STAGING_SQA_REPORT.md`](V5_STAGING_SQA_REPORT.md).
+The complete documentation map is in [`docs/README.md`](docs/README.md).
+Important entry points include the [V4 deployment guide](docs/deployment/V4_LIVE_DEPLOYMENT.md),
+the [V4.1 research data guide](docs/research/V4_1_RESEARCH_DATA_GUIDE.md),
+the [data dictionary](docs/research/DATA_DICTIONARY.md), and the
+[V5 staging SQA report](docs/sqa/V5_STAGING_SQA_REPORT.md).
 
 ## PostgreSQL, Redis, and Docker
 

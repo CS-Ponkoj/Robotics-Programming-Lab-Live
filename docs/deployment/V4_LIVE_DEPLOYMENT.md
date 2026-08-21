@@ -29,7 +29,7 @@ The local default remains SQLite. Do not set `ENVIRONMENT=production` locally.
 
 ## Live backend and secure grader on Render
 
-Sync the root [`render.yaml`](render.yaml). It defines two services:
+Sync the root [`render.yaml`](../../render.yaml). It defines two services:
 
 1. `robotics-programming-lab-sandbox`, a Docker service that contains no
    database or OpenAI credentials.
@@ -60,7 +60,7 @@ remote-sandbox configuration.
 ## Live frontend on Vercel
 
 Import the GitHub repository and leave the root directory at the repository
-root. The root [`vercel.json`](vercel.json) runs the pinned Flutter build and
+root. The root [`vercel.json`](../../vercel.json) runs the pinned Flutter build and
 serves `frontend/build/web`.
 
 Add one Vercel environment variable before deploying:

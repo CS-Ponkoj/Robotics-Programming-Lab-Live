@@ -7,7 +7,7 @@ team communication, delivery priorities, and release quality. It should be
 updated whenever the platform scope, technology, assignment model, or release
 criteria changes.
 
-The companion workbook, `Robotics_Programming_Lab_Master_SQA_Checklist.xlsx`,
+The companion [master SQA workbook](../sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
 is the execution checklist for verifying every release.
 
 ## Product vision
