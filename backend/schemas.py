@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from data_contracts import (
     CURRENT_DATA_SCHEMA_VERSION,
@@ -60,12 +60,28 @@ class TestEvidence(BaseModel):
 class TutorFeedback(BaseModel):
     diagnosis: str = ""
     misconception: str = ""
+    answer: str = ""
+    debugging_steps: list[str] = Field(default_factory=list)
     hint_level: int = 1
     guiding_question: str = ""
     hint: str = ""
     next_action: str = ""
     solution_revealed: bool = False
     source: Literal["openai", "fallback"] = "fallback"
+
+
+class TutorGeneratedContent(BaseModel):
+    """Strict provider output contract before it reaches the student UI."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    diagnosis: str = Field(min_length=1, max_length=500)
+    misconception: str = Field(max_length=300)
+    answer: str = Field(max_length=700)
+    debugging_steps: list[str] = Field(min_length=1, max_length=3)
+    guiding_question: str = Field(min_length=1, max_length=400)
+    hint: str = Field(min_length=1, max_length=400)
+    next_action: str = Field(min_length=1, max_length=300)
 
 
 class SubmissionResponse(BaseModel):
@@ -89,6 +105,20 @@ class SubmissionResponse(BaseModel):
 class HintRequest(BaseModel):
     submission_id: str
     hint_level: int = Field(default=1, ge=1, le=4)
+
+
+class TutorQuestionRequest(BaseModel):
+    submission_id: str = Field(min_length=1, max_length=36)
+    question: str = Field(min_length=3, max_length=500)
+    hint_level: int = Field(default=1, ge=1, le=4)
+
+    @field_validator("question")
+    @classmethod
+    def normalize_question(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 3:
+            raise ValueError("Question must contain at least 3 visible characters.")
+        return normalized
 
 
 class SolutionRequest(BaseModel):

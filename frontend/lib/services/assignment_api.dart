@@ -101,3 +101,30 @@ Future<Map<String, dynamic>> fetchProgressiveHint(
   }
   throw Exception('Could not load the next hint.');
 }
+
+Future<Map<String, dynamic>> askTutorQuestion(
+  int assignmentId,
+  String submissionId,
+  String question,
+  int hintLevel,
+) async {
+  final response = await http
+      .post(
+        Uri.parse('$apiBaseUrl/assignments/$assignmentId/tutor'),
+        headers: AuthApi.authorizedHeaders(json: true),
+        body: jsonEncode({
+          'submission_id': submissionId,
+          'question': question,
+          'hint_level': hintLevel,
+        }),
+      )
+      .timeout(_requestTimeout);
+  if (response.statusCode == 200) {
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+  if (response.statusCode == 429) {
+    throw Exception(
+        'Tutor request limit reached. Wait a moment and try again.');
+  }
+  throw Exception('The tutor could not answer this question.');
+}

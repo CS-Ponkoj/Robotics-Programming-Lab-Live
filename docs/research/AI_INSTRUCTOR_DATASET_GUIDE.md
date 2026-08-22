@@ -3,8 +3,10 @@
 ## Purpose
 
 This initial dataset records examples of student mistakes and the kind of
-feedback an instructor expects from a future AI tutor. It is an offline
-evaluation resource. The current application and AI tutor do not read it.
+feedback an instructor expects from the AI tutor. It remains an offline
+evaluation resource: the student-facing runtime does not load it. The automated
+AI safety evaluation harness reads all cases to verify the same strict schema,
+privacy boundary, and solution-protection policy used by the runtime tutor.
 
 The dataset helps answer a simple question later: **does the AI respond like a
 safe, useful tutor for mistakes that an instructor has already reviewed?**
@@ -28,8 +30,9 @@ assignment_5.json
 assignment_6.json
 ```
 
-The format and validation code are in `backend/instructor_dataset.py`. Automated
-checks are in `backend/tests/test_instructor_dataset.py`.
+The format and validation code are in `backend/instructor_dataset.py`. Dataset
+validation is in `backend/tests/test_instructor_dataset.py`; the Phase 1 tutor
+evaluation harness is in `backend/tests/test_tutor_evaluations.py`.
 
 ## What one case means
 
@@ -91,12 +94,19 @@ The validator checks schema correctness, assignment IDs and versions, unique
 case IDs, hint order, configured misconception coverage, and the absence of
 protected fields. An approved case without a named reviewer is rejected.
 
-## How this will be used later
+## How this is used now and later
 
-After instructor review, a separate evaluation runner can give each case to the
-AI tutor and compare its response with `expected_feedback` and `hint_ladder`.
-The test-case grader remains the authority for code correctness. The AI remains
-a feedback tutor, not a grader.
+Phase 1 now runs every case through the tutor's controlled request/response
+pipeline using deterministic test responses. This proves assignment coverage,
+strict response validation, privacy filtering, and solution-leakage rejection
+without spending API credit. It does not prove the educational quality of a
+real model response.
+
+After instructor review and when API credit is available, an explicit provider
+evaluation can give each approved case to the configured model and compare its
+response with `expected_feedback` and `hint_ladder`. The test-case grader
+remains the authority for code correctness. The AI remains a feedback tutor,
+not a grader.
 
 Runtime integration must be a separate, reviewed stage. It must preserve AI-off
 behavior, record the model and prompt version, handle provider failure, and pass

@@ -135,7 +135,18 @@ def build_research_dataset(session: Session) -> dict[str, list[dict[str, Any]]]:
                 "average_score": round(sum(scores) / len(scores), 1) if scores else 0,
                 "best_score": max(scores, default=0),
                 "hints_requested": sum(
-                    item.event_type == "hint_requested" for item in user_events
+                    item.event_type == "hint_requested"
+                    and item.event_data.get(
+                        "interaction_type", "progressive_hint"
+                    )
+                    == "progressive_hint"
+                    for item in user_events
+                ),
+                "tutor_questions_asked": sum(
+                    item.event_type == "hint_requested"
+                    and item.event_data.get("interaction_type")
+                    == "student_question"
+                    for item in user_events
                 ),
                 "solutions_revealed": sum(
                     item.event_type == "solution_revealed" for item in user_events
@@ -214,6 +225,7 @@ def student_research_payload(session: Session, user: User) -> dict[str, Any]:
             "average_score": 0,
             "best_score": 0,
             "hints_requested": 0,
+            "tutor_questions_asked": 0,
             "solutions_revealed": 0,
             "ai_tutor_uses": 0,
             "last_activity_at": None,

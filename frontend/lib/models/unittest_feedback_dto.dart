@@ -12,6 +12,7 @@ class UnittestFeedbackDto {
   final bool execSuccess;
   final String hint;
   final String tutorSource;
+  final Map<String, dynamic> tutorFeedback;
 
   const UnittestFeedbackDto(
       {required this.id,
@@ -26,7 +27,8 @@ class UnittestFeedbackDto {
       required this.codeOutput,
       required this.execSuccess,
       required this.hint,
-      this.tutorSource = ''});
+      this.tutorSource = '',
+      this.tutorFeedback = const {}});
 
   factory UnittestFeedbackDto.fromJson(Map<String, dynamic> json) {
     return switch (json) {
@@ -61,6 +63,9 @@ class UnittestFeedbackDto {
           tutorSource: json['tutor_feedback'] is Map
               ? ((json['tutor_feedback'] as Map)['source']?.toString() ?? '')
               : '',
+          tutorFeedback: json['tutor_feedback'] is Map
+              ? Map<String, dynamic>.from(json['tutor_feedback'] as Map)
+              : const {},
         ),
       _ => throw const FormatException('Failed to load assignment.'),
     };

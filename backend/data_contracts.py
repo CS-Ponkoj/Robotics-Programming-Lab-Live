@@ -219,6 +219,22 @@ class HintRequestedEventData(ContractModel):
     submission_id: str = Field(min_length=1, max_length=36)
     hint_level: int = Field(ge=1, le=10)
     source: str = Field(min_length=1, max_length=80)
+    interaction_type: str = Field(
+        default="progressive_hint",
+        pattern="^(progressive_hint|student_question)$",
+    )
+    question_length: int | None = Field(default=None, ge=3, le=500)
+
+    @model_validator(mode="after")
+    def validate_question_metadata(self):
+        if self.interaction_type == "student_question":
+            if self.question_length is None:
+                raise ValueError("question_length is required for student questions")
+        elif self.question_length is not None:
+            raise ValueError(
+                "question_length is only valid for student-question interactions"
+            )
+        return self
 
 
 class SolutionRevealedEventData(ContractModel):

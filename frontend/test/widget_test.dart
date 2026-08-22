@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
@@ -22,6 +24,34 @@ const testAuthenticatedUser = AuthenticatedUser(
 Future<void> testLogout() async {}
 
 void main() {
+  test('feedback DTO preserves structured tutor guidance', () {
+    final feedback = UnittestFeedbackDto.fromJson({
+      'id': 1,
+      'submission_id': 'submission-1',
+      'assignment_version': 1,
+      'tested_vals': <dynamic>[],
+      'pass': false,
+      'ex_success': true,
+      'unittest_results': <dynamic>[],
+      'unittest_pass_results': <dynamic>[],
+      'code_exec_result': '',
+      'code_output': '',
+      'hint': 'Trace the first calculation.',
+      'tutor_feedback': {
+        'source': 'openai',
+        'diagnosis': 'The first calculation is incomplete.',
+        'debugging_steps': ['Trace both inputs.'],
+      },
+    });
+
+    expect(feedback.tutorSource, 'openai');
+    expect(
+      feedback.tutorFeedback['diagnosis'],
+      'The first calculation is incomplete.',
+    );
+    expect(feedback.tutorFeedback['debugging_steps'], ['Trace both inputs.']);
+  });
+
   test('assignment DTO parses the ROS project file permissions', () {
     final assignment = AssignmentDto.fromJson({
       'id': 5,
@@ -1045,6 +1075,238 @@ void main() {
     );
   });
 
+  testWidgets('AI tutor accepts a question and presents structured guidance', (
+    WidgetTester tester,
+  ) async {
+    const feedback = UnittestFeedbackDto(
+      id: 1,
+      submissionId: 'submission-1',
+      testedVals: ['distance_to_hit'],
+      pass: false,
+      unittestFeedback: ['The value of distance_to_hit needs attention'],
+      unittestPassResults: [false],
+      codeExecResult: '',
+      codeOutput: '',
+      execSuccess: true,
+      hint: 'Trace the first distance calculation.',
+      tutorSource: 'openai',
+      tutorFeedback: {
+        'source': 'openai',
+        'diagnosis': 'The first distance calculation is incorrect.',
+        'answer': '',
+        'debugging_steps': ['Inspect both coordinate differences.'],
+        'guiding_question': 'Which coordinates define the first segment?',
+        'next_action': 'Trace the distance helper inputs.',
+      },
+    );
+    var capturedQuestion = '';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: app.Feedback(
+            data: feedback,
+            aiTutorEnabled: true,
+            tutorQuestionRequester:
+                (assignmentId, submissionId, question, hintLevel) async {
+              capturedQuestion = question;
+              return {
+                'source': 'openai',
+                'answer': 'A diagonal depends on both coordinate changes.',
+                'diagnosis': 'Only one coordinate is currently used.',
+                'debugging_steps': ['Compare both coordinate differences.'],
+                'guiding_question': 'Which two differences define the segment?',
+                'next_action': 'Trace the distance helper inputs.',
+              };
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
+    expect(
+      find.textContaining('The first distance calculation is incorrect.'),
+      findsOneWidget,
+    );
+
+    final field = find.byKey(const Key('tutor-question-field'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, 'Why does the diagonal calculation fail?');
+    final button = find.byKey(const Key('ask-tutor-button'));
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+
+    expect(capturedQuestion, 'Why does the diagonal calculation fail?');
+    expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
+    expect(find.text('OpenAI tutor response'), findsOneWidget);
+    expect(
+      find.text('A diagonal depends on both coordinate changes.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('1. Compare both'), findsOneWidget);
+  });
+
+  testWidgets('returned tutor feedback keeps the question form available', (
+    WidgetTester tester,
+  ) async {
+    const feedback = UnittestFeedbackDto(
+      id: 1,
+      submissionId: 'submission-with-tutor-feedback',
+      testedVals: [],
+      pass: false,
+      unittestFeedback: [],
+      unittestPassResults: [],
+      codeExecResult: '',
+      codeOutput: '',
+      execSuccess: true,
+      hint: 'Trace the failing calculation.',
+      tutorSource: 'fallback',
+      tutorFeedback: {
+        'source': 'fallback',
+        'diagnosis': 'One calculation needs attention.',
+        'answer': '',
+        'debugging_steps': ['Inspect its inputs.'],
+        'guiding_question': 'Which value can you verify?',
+        'next_action': 'Compare one intermediate value.',
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: app.Feedback(
+            data: feedback,
+            tutorQuestionRequester:
+                (assignmentId, submissionId, question, hintLevel) async => {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('tutor-question-field')), findsOneWidget);
+    expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
+  });
+
+  testWidgets('tutor question failure keeps input and allows retry', (
+    WidgetTester tester,
+  ) async {
+    const feedback = UnittestFeedbackDto(
+      id: 2,
+      submissionId: 'submission-2',
+      testedVals: [],
+      pass: true,
+      unittestFeedback: [],
+      unittestPassResults: [],
+      codeExecResult: '',
+      codeOutput: '',
+      execSuccess: true,
+      hint: '',
+    );
+    var calls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: app.Feedback(
+            data: feedback,
+            aiTutorEnabled: true,
+            tutorQuestionRequester:
+                (assignmentId, submissionId, question, hintLevel) async {
+              calls += 1;
+              if (calls == 1) {
+                throw Exception('simulated provider failure');
+              }
+              return {
+                'source': 'fallback',
+                'answer': 'Use the latest visible test evidence.',
+                'diagnosis': 'Review the first unexpected value.',
+                'debugging_steps': ['Inspect one intermediate value.'],
+                'guiding_question': 'What value can you verify by hand?',
+                'next_action': 'Run one focused check.',
+              };
+            },
+          ),
+        ),
+      ),
+    );
+
+    final field = find.byKey(const Key('tutor-question-field'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, 'Can you explain this result?');
+    final button = find.byKey(const Key('ask-tutor-button'));
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('tutor-question-error')), findsOneWidget);
+    expect(find.text('Can you explain this result?'), findsOneWidget);
+
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(calls, 2);
+    expect(find.text('Built-in tutor response'), findsOneWidget);
+    expect(find.byKey(const Key('tutor-question-error')), findsNothing);
+  });
+
+  testWidgets('tutor prevents duplicate requests while an answer is loading', (
+    WidgetTester tester,
+  ) async {
+    const feedback = UnittestFeedbackDto(
+      id: 3,
+      submissionId: 'submission-3',
+      testedVals: [],
+      pass: false,
+      unittestFeedback: [],
+      unittestPassResults: [],
+      codeExecResult: '',
+      codeOutput: '',
+      execSuccess: true,
+      hint: '',
+    );
+    final pending = Completer<Map<String, dynamic>>();
+    var calls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: app.Feedback(
+            data: feedback,
+            aiTutorEnabled: true,
+            tutorQuestionRequester:
+                (assignmentId, submissionId, question, hintLevel) {
+              calls += 1;
+              return pending.future;
+            },
+          ),
+        ),
+      ),
+    );
+    final field = find.byKey(const Key('tutor-question-field'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, 'Where should I debug first?');
+    final button = find.byKey(const Key('ask-tutor-button'));
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pump();
+    await tester.tap(button);
+    expect(calls, 1);
+    expect(find.text('Asking tutor…'), findsOneWidget);
+
+    pending.complete({
+      'source': 'openai',
+      'answer': 'Start with the first failing calculation.',
+      'diagnosis': 'The first value is inconsistent.',
+      'debugging_steps': ['Trace its inputs.'],
+      'guiding_question': 'What result do you calculate by hand?',
+      'next_action': 'Compare one value.',
+    });
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
+    expect(find.text('Ask tutor'), findsOneWidget);
+  });
+
   testWidgets('test run error explains how to recover and retries', (
     WidgetTester tester,
   ) async {
@@ -1090,6 +1352,7 @@ void main() {
 
     const feedback = UnittestFeedbackDto(
       id: 3,
+      submissionId: 'narrow-submission',
       testedVals: ['optimal_sector_angle'],
       pass: false,
       unittestFeedback: [
@@ -1100,11 +1363,30 @@ void main() {
       codeOutput: 'Calculated sector: 82 degrees',
       execSuccess: true,
       hint: 'Compare nearby sectors before selecting the final heading.',
+      tutorSource: 'openai',
+      tutorFeedback: {
+        'source': 'openai',
+        'answer': '',
+        'diagnosis': 'The chosen sector is not the nearest safe sector.',
+        'debugging_steps': [
+          'List the safe candidates.',
+          'Compare each candidate with the goal direction.',
+        ],
+        'guiding_question': 'Which safe sector is nearest the goal?',
+        'next_action': 'Trace the selection step.',
+      },
     );
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(body: app.Feedback(data: feedback)),
+      MaterialApp(
+        home: Scaffold(
+          body: app.Feedback(
+            data: feedback,
+            aiTutorEnabled: true,
+            tutorQuestionRequester:
+                (assignmentId, submissionId, question, hintLevel) async => {},
+          ),
+        ),
       ),
     );
 
@@ -1118,6 +1400,8 @@ void main() {
       find.bySemanticsLabel(RegExp('Test needs attention')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('tutor-question-field')), findsOneWidget);
+    expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
     semantics.dispose();
   });
 }

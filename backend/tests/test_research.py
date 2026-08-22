@@ -2,9 +2,11 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app import create_app
 from config import Settings
+from models import HintInteraction
 
 
 @pytest.fixture()
@@ -147,6 +149,17 @@ def test_submission_hint_solution_and_ai_status_are_recorded(research_client):
         json={"submission_id": submission_id, "hint_level": 2},
     )
     assert hint.status_code == 200
+    question_text = "Why does the first calculation fail?"
+    question = research_client.post(
+        "/assignments/1/tutor",
+        headers=_bearer(student),
+        json={
+            "submission_id": submission_id,
+            "question": question_text,
+            "hint_level": 1,
+        },
+    )
+    assert question.status_code == 200
     solution = research_client.post(
         "/assignments/1/solution",
         headers=_bearer(student),
@@ -156,12 +169,32 @@ def test_submission_hint_solution_and_ai_status_are_recorded(research_client):
 
     mine = research_client.get("/research/me", headers=_bearer(student)).json()
     types = [event["event_type"] for event in mine["events"]]
-    assert types == ["assignment_submitted", "hint_requested", "solution_revealed"]
+    assert types == [
+        "assignment_submitted",
+        "hint_requested",
+        "hint_requested",
+        "solution_revealed",
+    ]
     assert mine["summary"]["attempts"] == 1
     assert mine["summary"]["hints_requested"] == 1
+    assert mine["summary"]["tutor_questions_asked"] == 1
     assert mine["summary"]["solutions_revealed"] == 1
     assert all("code" not in attempt for attempt in mine["attempts"])
     assert all("code" not in event["event_data"] for event in mine["events"])
+    assert all(
+        question_text not in json.dumps(event["event_data"])
+        for event in mine["events"]
+    )
+    question_event = mine["events"][2]
+    assert question_event["event_data"]["interaction_type"] == "student_question"
+    assert question_event["event_data"]["question_length"] == len(question_text)
+    with research_client.app.state.SessionLocal() as session:
+        interactions = session.scalars(select(HintInteraction)).all()
+        assert len(interactions) == 2
+        assert all(
+            question_text not in json.dumps(item.feedback)
+            for item in interactions
+        )
     assert mine["attempts"][0]["data_schema_version"] == 1
     assert mine["attempts"][0]["execution_status"] in {
         "completed",

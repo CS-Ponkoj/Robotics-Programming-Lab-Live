@@ -224,9 +224,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _toggleWorkspaceFocus(AssignmentWorkspaceFocus target) {
     setState(() {
-      _workspaceFocus = _workspaceFocus == target
-          ? AssignmentWorkspaceFocus.none
-          : target;
+      _workspaceFocus =
+          _workspaceFocus == target ? AssignmentWorkspaceFocus.none : target;
     });
   }
 
@@ -235,9 +234,9 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _editorWidthFraction =
           (_editorWidthFraction + horizontalDelta / workspaceWidth).clamp(
-            0.3,
-            0.7,
-          );
+        0.3,
+        0.7,
+      );
     });
   }
 
@@ -264,15 +263,15 @@ class _MyHomePageState extends State<MyHomePage> {
     final useDesktopLayout = MediaQuery.sizeOf(context).width >= 900;
     final showEditor = useDesktopLayout
         ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
-              _workspaceFocus == AssignmentWorkspaceFocus.editor
+            _workspaceFocus == AssignmentWorkspaceFocus.editor
         : _selectedWorkspaceTab == 0;
     final showInstructions = useDesktopLayout
         ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
-              _workspaceFocus == AssignmentWorkspaceFocus.instructions
+            _workspaceFocus == AssignmentWorkspaceFocus.instructions
         : _selectedWorkspaceTab == 1;
     final showResults = useDesktopLayout
         ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
-              _workspaceFocus == AssignmentWorkspaceFocus.results
+            _workspaceFocus == AssignmentWorkspaceFocus.results
         : _selectedWorkspaceTab == 2;
     final showResizeHandle =
         useDesktopLayout && _workspaceFocus == AssignmentWorkspaceFocus.none;
@@ -368,13 +367,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                 AssignmentEditorToolbar(
                                   isRunning: _isRunning,
                                   onRun: _runTests,
-                                  isFocused:
-                                      _workspaceFocus ==
+                                  isFocused: _workspaceFocus ==
                                       AssignmentWorkspaceFocus.editor,
                                   onFocusToggle: useDesktopLayout
                                       ? () => _toggleWorkspaceFocus(
-                                          AssignmentWorkspaceFocus.editor,
-                                        )
+                                            AssignmentWorkspaceFocus.editor,
+                                          )
                                       : null,
                                 ),
                                 Expanded(
@@ -383,9 +381,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder: (ctx, snap) {
                                       if (snap.hasData) {
                                         if (_init) {
-                                          _code =
-                                              learningProgress.codeDrafts[widget
-                                                  .id] ??
+                                          _code = learningProgress
+                                                  .codeDrafts[widget.id] ??
                                               snap.data!.code;
                                           _selectedProjectFilePath =
                                               snap.data!.editableFilePath;
@@ -451,15 +448,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                         title: 'Instructions',
                                         subtitle:
                                             'Review the scenario and task',
-                                        isFocused:
-                                            _workspaceFocus ==
+                                        isFocused: _workspaceFocus ==
                                             AssignmentWorkspaceFocus
                                                 .instructions,
                                         onFocusToggle: useDesktopLayout
                                             ? () => _toggleWorkspaceFocus(
-                                                AssignmentWorkspaceFocus
-                                                    .instructions,
-                                              )
+                                                  AssignmentWorkspaceFocus
+                                                      .instructions,
+                                                )
                                             : null,
                                       ),
                                       Expanded(
@@ -487,9 +483,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                                       ),
                                                   solutionHtml:
                                                       _revealedSolutionHtml
-                                                          .isNotEmpty
-                                                      ? _revealedSolutionHtml
-                                                      : snap.data!.solutionHtml,
+                                                              .isNotEmpty
+                                                          ? _revealedSolutionHtml
+                                                          : snap.data!
+                                                              .solutionHtml,
                                                   hasSolution:
                                                       snap.data!.hasSolution,
                                                   solutionRevealed:
@@ -498,12 +495,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                                   canRevealSolution:
                                                       learningProgress
                                                           .hasAttempted(
-                                                            widget.id,
-                                                          ),
+                                                    widget.id,
+                                                  ),
                                                   onSolutionRevealed: () =>
                                                       unawaited(
-                                                        _revealSolution(),
-                                                      ),
+                                                    _revealSolution(),
+                                                  ),
                                                 );
                                               }
                                               if (snap.hasError) {
@@ -535,21 +532,19 @@ class _MyHomePageState extends State<MyHomePage> {
                                         title: 'Results',
                                         subtitle:
                                             'Review test outcomes and feedback',
-                                        isFocused:
-                                            _workspaceFocus ==
+                                        isFocused: _workspaceFocus ==
                                             AssignmentWorkspaceFocus.results,
                                         onFocusToggle: useDesktopLayout
                                             ? () => _toggleWorkspaceFocus(
-                                                AssignmentWorkspaceFocus
-                                                    .results,
-                                              )
+                                                  AssignmentWorkspaceFocus
+                                                      .results,
+                                                )
                                             : null,
                                       ),
                                       Expanded(
                                         child: _submitted
                                             ? FutureBuilder<
-                                                UnittestFeedbackDto
-                                              >(
+                                                UnittestFeedbackDto>(
                                                 future: _feedback,
                                                 builder: (ctx, snap) {
                                                   if (snap.connectionState ==
@@ -564,9 +559,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                                   if (snap.hasData) {
                                                     return Feedback(
                                                       data: snap.data!,
+                                                      aiTutorEnabled:
+                                                          _enableFeedback,
                                                     );
                                                   }
-                                                  return const SizedBox.shrink();
+                                                  return const SizedBox
+                                                      .shrink();
                                                 },
                                               )
                                             : const _EmptyResultsState(),
@@ -612,9 +610,8 @@ class AssignmentInstructions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sections = AssignmentInstructionSections.fromHtml(html);
-    final displayedSolutionHtml = solutionHtml.isNotEmpty
-        ? solutionHtml
-        : sections.solution;
+    final displayedSolutionHtml =
+        solutionHtml.isNotEmpty ? solutionHtml : sections.solution;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -699,9 +696,8 @@ class AssignmentInstructionSections {
     for (var index = 0; index < matches.length; index++) {
       final match = matches[index];
       final heading = match.group(1)!.toLowerCase();
-      final end = index + 1 < matches.length
-          ? matches[index + 1].start
-          : html.length;
+      final end =
+          index + 1 < matches.length ? matches[index + 1].start : html.length;
       final content = html.substring(match.end, end);
       final destination = switch (heading) {
         'scenario' => 'scenario',
@@ -1753,10 +1749,24 @@ class SecureGraderLoadingState extends StatelessWidget {
   }
 }
 
+typedef TutorQuestionRequester = Future<Map<String, dynamic>> Function(
+  int assignmentId,
+  String submissionId,
+  String question,
+  int hintLevel,
+);
+
 class Feedback extends StatelessWidget {
-  const Feedback({super.key, required this.data});
+  const Feedback({
+    super.key,
+    required this.data,
+    this.aiTutorEnabled = false,
+    this.tutorQuestionRequester,
+  });
 
   final UnittestFeedbackDto data;
+  final bool aiTutorEnabled;
+  final TutorQuestionRequester? tutorQuestionRequester;
 
   @override
   Widget build(BuildContext context) {
@@ -1765,11 +1775,11 @@ class Feedback extends StatelessWidget {
     final total = passed + failed;
     final accuracy = total > 0 ? (passed / total) * 100 : 0.0;
     final vars = data.testedVals.map((value) => value.toString()).toList();
+    final tutorAvailable = aiTutorEnabled || data.tutorFeedback.isNotEmpty;
 
     final resultCards = data.unittestFeedback.asMap().entries.map((entry) {
       final feedback = entry.value;
-      final didPass =
-          entry.key < data.unittestPassResults.length &&
+      final didPass = entry.key < data.unittestPassResults.length &&
           data.unittestPassResults[entry.key];
       var first = feedback;
       var highlighted = '';
@@ -1802,9 +1812,14 @@ class Feedback extends StatelessWidget {
           _ResultSummary(passed: passed, failed: failed, accuracy: accuracy),
           const SizedBox(height: AppSpacing.md),
           _TerminalOutput(data: data),
-          if (data.hint.isNotEmpty) ...[
+          if (data.hint.isNotEmpty ||
+              (tutorAvailable && data.submissionId.isNotEmpty)) ...[
             const SizedBox(height: AppSpacing.md),
-            _TutorHintPanel(data: data),
+            _TutorHintPanel(
+              data: data,
+              allowQuestions: tutorAvailable,
+              questionRequester: tutorQuestionRequester ?? askTutorQuestion,
+            ),
           ],
           const SizedBox(height: AppSpacing.lg),
           Text(
@@ -1818,8 +1833,8 @@ class Feedback extends StatelessWidget {
             Text(
               'No individual test details were returned.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             )
           else
             ...resultCards.expand(
@@ -1852,8 +1867,7 @@ class LegacyFeedback extends StatelessWidget {
 
     final feedbackWidgets = feedbackLines.asMap().entries.map((entry) {
       final e = entry.value;
-      final check =
-          entry.key < data.unittestPassResults.length &&
+      final check = entry.key < data.unittestPassResults.length &&
           data.unittestPassResults[entry.key];
       String first = e, second = "", third = "";
       for (var v in vars) {
@@ -1987,8 +2001,8 @@ class LegacyFeedback extends StatelessWidget {
                       child: Text(
                         "Terminal Output:",
                         style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          fontFamily: "roboto-mono",
-                        ),
+                              fontFamily: "roboto-mono",
+                            ),
                       ),
                     ),
                     Card(
@@ -2216,9 +2230,9 @@ class _ResultCount extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
         ],
       ),
@@ -2326,8 +2340,8 @@ class _HintCallout extends StatelessWidget {
                   source == 'openai'
                       ? 'OpenAI tutor hint'
                       : source == 'fallback'
-                      ? 'Built-in tutor hint'
-                      : 'Guided hint',
+                          ? 'Built-in tutor hint'
+                          : 'Guided hint',
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: Colors.brown.shade900,
                     fontWeight: FontWeight.w800,
@@ -2350,20 +2364,31 @@ class _HintCallout extends StatelessWidget {
 }
 
 class _TutorHintPanel extends StatefulWidget {
-  const _TutorHintPanel({required this.data});
+  const _TutorHintPanel({
+    required this.data,
+    required this.allowQuestions,
+    required this.questionRequester,
+  });
 
   final UnittestFeedbackDto data;
+  final bool allowQuestions;
+  final TutorQuestionRequester questionRequester;
 
   @override
   State<_TutorHintPanel> createState() => _TutorHintPanelState();
 }
 
 class _TutorHintPanelState extends State<_TutorHintPanel> {
+  final TextEditingController _questionController = TextEditingController();
+  final FocusNode _questionFocus = FocusNode();
   late String _hint;
   late String _source;
   int _hintLevel = 1;
   bool _loading = false;
+  bool _asking = false;
+  Map<String, dynamic>? _answer;
   String? _error;
+  String? _questionError;
 
   @override
   void initState() {
@@ -2379,12 +2404,66 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
     }
   }
 
+  @override
+  void dispose() {
+    _questionController.dispose();
+    _questionFocus.dispose();
+    super.dispose();
+  }
+
   void _reset() {
     _hint = widget.data.hint;
     _source = widget.data.tutorSource;
     _hintLevel = 1;
     _loading = false;
+    _asking = false;
+    _answer = widget.data.tutorFeedback.isEmpty
+        ? null
+        : Map<String, dynamic>.from(widget.data.tutorFeedback);
     _error = null;
+    _questionError = null;
+    _questionController.clear();
+  }
+
+  Future<void> _askQuestion() async {
+    if (_asking || widget.data.submissionId.isEmpty) {
+      return;
+    }
+    final question = _questionController.text.trim();
+    if (question.length < 3) {
+      setState(() {
+        _questionError = 'Enter a question with at least 3 characters.';
+      });
+      _questionFocus.requestFocus();
+      return;
+    }
+    setState(() {
+      _asking = true;
+      _questionError = null;
+    });
+    try {
+      final response = await widget.questionRequester(
+        widget.data.id,
+        widget.data.submissionId,
+        question,
+        _hintLevel,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _answer = response;
+        _asking = false;
+      });
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _asking = false;
+          _questionError =
+              'The tutor is temporarily unavailable. Your question was kept; try again.';
+        });
+      }
+    }
   }
 
   Future<void> _requestNextHint() async {
@@ -2427,35 +2506,39 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _HintCallout(hint: _hint, source: _source),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            Text(
-              'Hint level $_hintLevel of 4',
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-            FilledButton.tonalIcon(
-              key: const Key('next-hint-button'),
-              onPressed: _loading || _hintLevel >= 4 ? null : _requestNextHint,
-              icon: _loading
-                  ? const SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.arrow_forward_rounded, size: 18),
-              label: Text(
-                _hintLevel >= 4
-                    ? 'Maximum guidance reached'
-                    : 'Get another hint',
+        if (_hint.isNotEmpty) ...[
+          _HintCallout(hint: _hint, source: _source),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        if (_hint.isNotEmpty)
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              Text(
+                'Hint level $_hintLevel of 4',
+                style: Theme.of(context).textTheme.labelMedium,
               ),
-            ),
-          ],
-        ),
+              FilledButton.tonalIcon(
+                key: const Key('next-hint-button'),
+                onPressed:
+                    _loading || _hintLevel >= 4 ? null : _requestNextHint,
+                icon: _loading
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.arrow_forward_rounded, size: 18),
+                label: Text(
+                  _hintLevel >= 4
+                      ? 'Maximum guidance reached'
+                      : 'Get another hint',
+                ),
+              ),
+            ],
+          ),
         if (_error != null) ...[
           const SizedBox(height: AppSpacing.xs),
           Text(
@@ -2463,7 +2546,146 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ],
+        if (widget.allowQuestions) ...[
+          if (_hint.isNotEmpty) const SizedBox(height: AppSpacing.md),
+          Text(
+            'Ask the tutor',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Ask about your latest attempt. The tutor explains and guides, but does not provide completed code.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            key: const Key('tutor-question-field'),
+            controller: _questionController,
+            focusNode: _questionFocus,
+            enabled: !_asking,
+            minLines: 1,
+            maxLines: 3,
+            maxLength: 500,
+            textInputAction: TextInputAction.newline,
+            onChanged: (_) {
+              if (_questionError != null) {
+                setState(() => _questionError = null);
+              }
+            },
+            decoration: const InputDecoration(
+              labelText: 'Your question',
+              hintText: 'For example: Why is my first calculation failing?',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              key: const Key('ask-tutor-button'),
+              onPressed: _asking ? null : _askQuestion,
+              icon: _asking
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.question_answer_outlined, size: 18),
+              label: Text(_asking ? 'Asking tutor…' : 'Ask tutor'),
+            ),
+          ),
+          if (_questionError != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _questionError!,
+                key: const Key('tutor-question-error'),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ),
+          ],
+          if (_answer != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            _TutorAnswerCard(data: _answer!),
+          ],
+        ],
       ],
+    );
+  }
+}
+
+class _TutorAnswerCard extends StatelessWidget {
+  const _TutorAnswerCard({required this.data});
+
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = data['source']?.toString() ?? 'fallback';
+    final answer = data['answer']?.toString() ?? '';
+    final diagnosis = data['diagnosis']?.toString() ?? '';
+    final guidingQuestion = data['guiding_question']?.toString() ?? '';
+    final nextAction = data['next_action']?.toString() ?? '';
+    final debuggingSteps =
+        (data['debugging_steps'] as List<dynamic>? ?? const [])
+            .map((item) => item.toString())
+            .where((item) => item.isNotEmpty)
+            .toList();
+
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: source == 'openai'
+          ? 'OpenAI tutor response'
+          : 'Built-in tutor response',
+      child: Card(
+        key: const Key('tutor-answer-card'),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                source == 'openai'
+                    ? 'OpenAI tutor response'
+                    : 'Built-in tutor response',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              if (answer.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(answer),
+              ],
+              if (diagnosis.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text('What to inspect: $diagnosis'),
+              ],
+              if (debuggingSteps.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Debugging steps',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                ...debuggingSteps.asMap().entries.map(
+                      (entry) => Text('${entry.key + 1}. ${entry.value}'),
+                    ),
+              ],
+              if (guidingQuestion.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text('Think about: $guidingQuestion'),
+              ],
+              if (nextAction.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text('Next action: $nextAction'),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

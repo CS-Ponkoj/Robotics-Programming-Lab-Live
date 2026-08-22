@@ -163,6 +163,13 @@ def test_assignment_routes_require_authentication(client):
                 json={"submission_id": "missing", "hint_level": 1},
             ),
             client.post(
+                "/assignments/2/tutor",
+                json={
+                    "submission_id": "missing",
+                    "question": "Why is this failing?",
+                },
+            ),
+            client.post(
                 "/assignments/2/solution",
                 json={"submission_id": "missing"},
             ),
@@ -419,6 +426,90 @@ def test_progressive_hint_cannot_use_a_submission_from_another_assignment(client
         json={"submission_id": submission["submission_id"], "hint_level": 2},
     )
     assert response.status_code == 404
+
+
+def test_student_can_ask_tutor_about_owned_submission(client):
+    submission = client.post(
+        "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
+    ).json()
+
+    response = client.post(
+        "/assignments/2/tutor",
+        json={
+            "submission_id": submission["submission_id"],
+            "question": "  Why does the path total still fail?  ",
+            "hint_level": 1,
+        },
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["source"] == "fallback"
+    assert body["answer"]
+    assert body["debugging_steps"]
+    assert body["solution_revealed"] is False
+
+
+@pytest.mark.parametrize("question", ["   ", "x" * 501])
+def test_tutor_question_rejects_invalid_text(client, question):
+    submission = client.post(
+        "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
+    ).json()
+    response = client.post(
+        "/assignments/2/tutor",
+        json={
+            "submission_id": submission["submission_id"],
+            "question": question,
+        },
+    )
+    assert response.status_code == 400
+
+
+def test_tutor_question_cannot_use_submission_from_another_assignment(client):
+    submission = client.post(
+        "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
+    ).json()
+    response = client.post(
+        "/assignments/1/tutor",
+        json={
+            "submission_id": submission["submission_id"],
+            "question": "Why is this failing?",
+        },
+    )
+    assert response.status_code == 404
+
+
+def test_tutor_question_rate_limit_returns_retry_guidance(tmp_path):
+    settings = Settings(
+        database_url="sqlite://",
+        openai_api_key=None,
+        study_accounts_file=tmp_path / "study_accounts.json",
+        tutor_requests_per_minute=1,
+    )
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as value:
+        login = value.post(
+            "/auth/login", json={"login_id": "student", "password": "student"}
+        ).json()
+        headers = {"Authorization": f"Bearer {login['token']}"}
+        submission = value.post(
+            "/assignments/2/submit",
+            headers=headers,
+            json={"code": INCORRECT_ASSIGNMENT_2},
+        ).json()
+        payload = {
+            "submission_id": submission["submission_id"],
+            "question": "Why is the path total failing?",
+        }
+        first = value.post(
+            "/assignments/2/tutor", headers=headers, json=payload
+        )
+        blocked = value.post(
+            "/assignments/2/tutor", headers=headers, json=payload
+        )
+
+    assert first.status_code == 200
+    assert blocked.status_code == 429
+    assert blocked.headers["Retry-After"]
 
 
 def test_ai_tutoring_is_opt_in_for_fast_default_grading(client):

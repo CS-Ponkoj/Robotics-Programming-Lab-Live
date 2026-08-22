@@ -87,6 +87,7 @@ from schemas import (
     StudySessionStartRequest,
     SubmissionRequest,
     SubmissionResponse,
+    TutorQuestionRequest,
 )
 from tutor import TutorService
 from validation import validate_assignment
@@ -1221,6 +1222,70 @@ def create_app(
                     "submission_id": submission.id,
                     "hint_level": body.hint_level,
                     "source": feedback.source,
+                },
+            )
+        return feedback
+
+    @application.post("/assignments/{assignment_id}/tutor")
+    def ask_tutor(
+        assignment_id: int,
+        body: TutorQuestionRequest,
+        request: Request,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="tutor",
+            requests_per_minute=request.app.state.settings.tutor_requests_per_minute,
+        )
+        assignment = get_assignment_or_404(session, assignment_id)
+        submission = submission_for_request(
+            request,
+            session,
+            user,
+            body.submission_id,
+            assignment_id,
+        )
+        if submission is None or submission.student_id != user.login_id:
+            raise HTTPException(404, "Submission not found.")
+
+        feedback = TutorService(request.app.state.settings).feedback(
+            assignment,
+            submission,
+            hint_level=body.hint_level,
+            student_question=body.question,
+        )
+        if not is_ephemeral_demo(request, user):
+            stored_feedback = feedback.model_dump()
+            stored_feedback["interaction_type"] = "student_question"
+            session.add(
+                HintInteraction(
+                    submission_id=submission.id,
+                    hint_level=body.hint_level,
+                    feedback=stored_feedback,
+                )
+            )
+            session.commit()
+
+        study_session = get_user_study_session(
+            session, submission.study_session_id, user
+        )
+        if study_session is not None:
+            record_learning_event(
+                session,
+                study_session=study_session,
+                user=user,
+                event_type="hint_requested",
+                assignment_id=assignment.id,
+                assignment_version=submission.assignment_version,
+                event_data={
+                    "submission_id": submission.id,
+                    "hint_level": body.hint_level,
+                    "source": feedback.source,
+                    "interaction_type": "student_question",
+                    "question_length": len(body.question),
                 },
             )
         return feedback

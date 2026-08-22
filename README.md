@@ -14,7 +14,8 @@ Open the classroom-ready web application: [Robotics Programming Lab](https://rob
 - Generic student endpoints for run, submit, hints, and protected solutions
 - Modular `AssignmentGrader` implementations
 - Server-only hidden grader configuration and reference solutions
-- Progressive deterministic tutoring with an optional OpenAI enhancement
+- Progressive deterministic tutoring, student questions, and an optional
+  OpenAI enhancement that never changes the test-based grade
 - Assignment-specific objectives, rubrics, misconceptions, tutor policies, and
   simulation configuration
 - Instructor assignment studio with validation-before-publish
@@ -243,8 +244,22 @@ record includes its version.
 
 Without an API key, the tutor produces deterministic progressive hints from
 sanitized grader evidence. With `OPENAI_API_KEY` in an ignored backend environment
-file, the same tutor boundary can enhance that feedback. Hidden tests, expected
-values, and official solutions are never included in the model input.
+file, students can opt in to an enhanced feedback response and ask questions
+about their latest attempt. The test-case grader remains the only grading
+authority. The tutor explains the first problem, recommends small debugging
+steps, asks a guiding question, and avoids completed code.
+
+The model receives only the student's current code, optional current question,
+assignment learning context, and student-visible grader evidence. Hidden test
+implementations, protected expected values, grader configuration, credentials,
+and official solutions are never included. Model output must match a strict
+structured schema and pass a solution-leakage policy check; otherwise the
+platform returns a safe built-in response. OpenAI response storage is disabled.
+
+AI tutoring is disabled by default in the interface. Start the local stack with
+`\.\scripts\run-local.ps1 -EnableAi` to make the opt-in switch available. If the
+key is missing, invalid, rate-limited, or out of credit, grading still completes
+and the built-in tutor remains available.
 
 ## Verification
 

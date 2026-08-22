@@ -136,10 +136,18 @@ Each event type has a small approved metadata shape. Extra fields are rejected,
 which prevents passwords, source code, or arbitrary browser data from being
 stored accidentally.
 
+For `hint_requested`, `interaction_type` distinguishes a progressive hint from
+a `student_question`. Question events store only the question length, hint
+level, and tutor source. The student's question text is not written to the
+learning-event record.
+
 ### `hint_interactions`
 
-Connects a structured tutor response and hint level to one submission. Demo
-sessions do not create persistent hint rows.
+Connects a structured tutor response and hint level to one submission. The
+response may contain a diagnosis, short answer, debugging steps, guiding
+question, next action, source, and solution-protection flag. For student
+questions, the stored response also records `interaction_type` but does not
+store the raw question. Demo sessions do not create persistent hint rows.
 
 ## Assignment JSON fields
 

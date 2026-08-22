@@ -412,6 +412,22 @@ def test_students_cannot_access_each_others_submission_feedback_or_solution(
         headers=other_headers,
         json={"submission_id": submission["submission_id"], "hint_level": 1},
     )
+    owner_question = auth_client.post(
+        "/assignments/2/tutor",
+        headers=owner_headers,
+        json={
+            "submission_id": submission["submission_id"],
+            "question": "Why is the total failing?",
+        },
+    )
+    other_question = auth_client.post(
+        "/assignments/2/tutor",
+        headers=other_headers,
+        json={
+            "submission_id": submission["submission_id"],
+            "question": "Show me this student's feedback.",
+        },
+    )
     other_solution = auth_client.post(
         "/assignments/2/solution",
         headers=other_headers,
@@ -419,7 +435,9 @@ def test_students_cannot_access_each_others_submission_feedback_or_solution(
     )
 
     assert owner_hint.status_code == 200
+    assert owner_question.status_code == 200
     assert other_hint.status_code == 404
+    assert other_question.status_code == 404
     assert other_solution.status_code == 403
 
 

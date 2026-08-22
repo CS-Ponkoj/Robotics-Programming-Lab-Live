@@ -244,8 +244,8 @@ The subprocess executor remains development-only.
 
 ## AI tutoring plan
 
-AI work is intentionally deferred until the generic assignment and evidence
-model is stable.
+Phase 1 is implemented behind an opt-in switch. Deterministic grading remains
+the authority and the built-in tutor remains the required fallback.
 
 ### Non-AI baseline
 
@@ -259,21 +259,34 @@ The platform must always provide:
 - predictable latency;
 - no dependency on API quota.
 
-### Future AI enhancement
+### Phase 1 AI feedback tutor
 
-When resumed, the AI tutor should:
+The current tutor:
 
 1. Receive only student code, published instructions, learning objectives,
    tutoring policy, misconceptions, and sanitized visible evidence.
 2. Never receive hidden tests, expected values, grader configuration, or the
    official solution.
-3. Provide diagnosis, guiding question, hint, and next action without writing a
-   replacement solution.
-4. Adapt support to hint level, prior attempts, and demonstrated mastery.
+3. Provides a diagnosis, short answer, debugging steps, guiding question, hint,
+   and next action without writing a replacement solution.
+4. Accepts a student's question about their latest owned submission and adapts
+   support to the selected hint level.
 5. Clearly label whether feedback came from OpenAI or the built-in tutor.
-6. Enforce timeouts, cost limits, rate limits, logging, and fallback behavior.
-7. Store prompt-policy version and model metadata with feedback for evaluation.
-8. Support instructor review and quality evaluation before broad release.
+6. Enforce timeouts, token limits, rate limits, logging, and fallback behavior.
+7. Require strict structured output, disable OpenAI response storage, and reject
+   suspicious output before display.
+8. Record privacy-safe interaction metadata without storing raw questions in
+   general learning events.
+
+### Later AI phases
+
+- Compare current and prior attempts to explain meaningful code changes.
+- Add prompt-policy/model version metadata for controlled research analysis.
+- Run approved instructor evaluation cases against the real provider and score
+  pedagogical quality before classroom rollout.
+- Add instructor review, quality flags, and aggregate tutor-effectiveness
+  reporting.
+- Adapt support to demonstrated mastery without changing deterministic grades.
 
 ## Simulation plan
 
