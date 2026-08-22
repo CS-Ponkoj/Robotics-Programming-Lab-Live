@@ -1,29 +1,27 @@
 import math
 
-def calculate_distance(x1, y1, x2, y2):
-  return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-# Initial conditions
-start_x = 2
-start_y = 1
-goal_x = 8
-goal_y = 9
-obstacle_x1 = 4 
-obstacle_y1 = 3
-obstacle_x2 = 7
-obstacle_y2 = 6
+start_point = (2.0, 1.0)
+goal_point = (8.0, 9.0)
+hit_point = (4.0, 11.0 / 3.0)
+top_left = (4.0, 6.0)
+leave_point = (23.0 / 4.0, 6.0)
 
-# Distance to hit point
-distance_to_hit = 
 
-# Distance along obstacle boundary (clockwise)
-distance_along_obstacle = 
+def calculate_distance(point_1, point_2):
+    return math.hypot(point_2[0] - point_1[0], point_2[1] - point_1[1])
 
-# Distance from leave point to goal (Bug 2)
-distance_leave_to_goal =
 
-# Total distance
-total_distance =
+# TODO: Distance from the start to the m-line hit point.
+distance_to_hit = 0.0
 
-# print Total travel distance
-print("Total travel distance:", total_distance) 
+# TODO: Clockwise boundary distance H -> T -> L.
+distance_along_obstacle = 0.0
+
+# TODO: Distance from the m-line leave point to the goal.
+distance_leave_to_goal = 0.0
+
+# TODO: Add the three traveled components exactly once.
+total_distance = 0.0
+
+print("Total travel distance:", total_distance)

@@ -87,9 +87,9 @@ if __name__ == "__main__":
     #     exec(code)
 
     tester = MathQuestionTestCase({
-        "distance_to_hit": 2.8284271247461903,
-        "distance_along_obstacle": 9.0,
-        "total_distance": 16
+        "distance_to_hit": 10.0 / 3.0,
+        "distance_along_obstacle": 49.0 / 12.0,
+        "total_distance": 67.0 / 6.0
     })
 
     print(tester.test_vals())

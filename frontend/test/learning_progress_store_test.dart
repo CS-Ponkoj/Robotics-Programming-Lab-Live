@@ -9,7 +9,7 @@ void main() {
     final firstStore = LearningProgressStore();
     await firstStore.load(storage: storage);
 
-    await firstStore.saveDraft(2, 'total_path_length = 14');
+    await firstStore.saveDraft(2, 'total_path_length = 12');
     await firstStore.recordAttempt(2, 50);
     await firstStore.recordAttempt(2, 100);
     await firstStore.recordSubmission(2, 'submission-abc');
@@ -18,7 +18,7 @@ void main() {
     final reloadedStore = LearningProgressStore();
     await reloadedStore.load(storage: storage);
 
-    expect(reloadedStore.codeDrafts[2], 'total_path_length = 14');
+    expect(reloadedStore.codeDrafts[2], 'total_path_length = 12');
     expect(reloadedStore.latestScores[2], 100);
     expect(reloadedStore.bestScores[2], 100);
     expect(reloadedStore.attemptCounts[2], 2);

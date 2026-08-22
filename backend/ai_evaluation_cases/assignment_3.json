@@ -2,7 +2,7 @@
   "dataset_schema_version": 1,
   "assignment_id": 3,
   "assignment_stable_id": "robotics-assignment-3",
-  "assignment_version": 3,
+  "assignment_version": 4,
   "authored_by_role": "instructor",
   "review_status": "draft",
   "policy": {"never_reveal_official_solution": true, "never_reveal_hidden_tests": true, "runtime_use_enabled": false},
@@ -31,23 +31,23 @@
     },
     {
       "case_id": "a3-times-ignore-wait",
-      "title": "Compares travel time without elevator wait time",
+      "title": "Omits destination-floor travel from both totals",
       "case_type": "conceptual_error",
       "review_status": "draft",
-      "student_code": "time_to_E_m = path_to_E_m / walking_speed\ntime_to_E_s = path_to_E_s / walking_speed",
+      "student_code": "total_time_via_E_m = path_to_E_m / robot_speed + main_elevator_wait + floors_to_travel * main_seconds_per_floor\ntotal_time_via_E_s = path_to_E_s / robot_speed + service_elevator_wait + floors_to_travel * service_seconds_per_floor",
       "expected_execution_status": "completed",
-      "misconception_tags": ["incorrect-time-to-E-m", "incorrect-time-to-E-s"],
+      "misconception_tags": ["incorrect-path-from-E-m-to-goal", "incorrect-path-from-E-s-to-goal", "incorrect-total-time-via-E-m", "incorrect-total-time-via-E-s"],
       "expected_feedback": {
-        "diagnosis": "The computed times include walking only and omit other time components described in the scenario.",
-        "debugging_steps": ["List all time components for each option.", "Keep units consistent.", "Add waiting and elevator travel to walking time where required."],
-        "socratic_question": "Besides walking, what other delays occur before reaching the destination floor?",
+        "diagnosis": "The totals stop when each elevator reaches floor 10 and omit the remaining horizontal route from the elevator shaft to the goal.",
+        "debugging_steps": ["List every segment from S to G for each option.", "Identify the floor-10 path after the elevator ride.", "Convert that path to time and add it to the matching total."],
+        "socratic_question": "Where is the robot immediately after the elevator ride, and is that coordinate already G?",
         "must_mention": ["all time components", "consistent units"],
         "must_avoid": ["official numeric answer", "complete solution code"]
       },
       "hint_ladder": [
-        {"level": 1, "hint": "The scenario describes more than walking time."},
-        {"level": 2, "hint": "Create a checklist of wait, ride, and walking components for each elevator."},
-        {"level": 3, "hint": "Add the applicable components separately for the main and service options."}
+        {"level": 1, "hint": "Trace the route beyond the elevator exit on floor 10."},
+        {"level": 2, "hint": "Each elevator shaft has its own remaining distance to G."},
+        {"level": 3, "hint": "Add path_from_E_m_to_goal or path_from_E_s_to_goal to its matching time expression."}
       ],
       "instructor_notes": "Draft time-model misconception; instructor review is required."
     },

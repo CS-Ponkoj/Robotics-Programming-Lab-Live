@@ -82,6 +82,8 @@ desktop.ini
 
 # Generated local SQA exports (the maintained workbook remains at repository root)
 outputs/
+/output/
+/tmp/
 
 
 

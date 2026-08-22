@@ -128,13 +128,13 @@ def test_backend_grades_through_real_remote_sandbox_contract(
             json={
                 "code": (
                     "distance_to_obstacle = 4\n"
-                    "perimeter_of_obstacle = 6\n"
+                    "distance_along_obstacle = 4\n"
                     "distance_from_obstacle_to_goal = 4\n"
-                    "total_path_length = 14\n"
+                    "total_path_length = 12\n"
                 )
             },
         )
 
     assert response.status_code == 200
     assert response.json()["pass"] is True
-    assert response.json()["assignment_version"] == 2
+    assert response.json()["assignment_version"] == 3

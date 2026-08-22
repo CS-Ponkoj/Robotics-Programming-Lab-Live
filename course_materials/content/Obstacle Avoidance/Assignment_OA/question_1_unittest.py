@@ -1,54 +1,34 @@
-#!/bin/bash python3
 import unittest
-import os
 
-#needs to be in the same directory as the question file - working on a solution
-from question_1_solution import *
+from question_1 import *
 
 
+class Assignment3TestCase(unittest.TestCase):
 
-class OAUnitTest(unittest.TestCase):
-        
-    def test_path_to_E_m(self):
-        self.assertEqual(path_to_E_m, 
-                         14.385164807134505, 
-                         "The path to main elevator is incorrect")
-    
-    def test_path_to_E_s(self):
-        self.assertEqual(path_to_E_s, 
-                         10.04987562112089, 
-                         "The path to service elevator is incorrect")
-    
-    def test_straight_line_distance_with_barrier(self):
-        self.assertEqual(straight_line_distance_with_barrier(S, 
-                                                             E_m, 
-                                                             barrier_start, 
-                                                             barrier_end, 
-                                                             safety_margin), 
-                         14.385164807134505, 
-                         "The straight line distance with barrier function is incorrect")
-    
-    def test_time_to_E_m(self):
-        self.assertEqual(time_to_E_m, 
-                         119.3851648071345, 
-                         "The time to main elevator is incorrect")
-    
-    def test_time_to_E_s(self):
-        self.assertEqual(time_to_E_s, 
-                         120.04987562112089, 
-                         "The time to service elevator is incorrect")
-        
+    def test_path_to_main_elevator(self):
+        self.assertAlmostEqual(path_to_E_m, 5.130648586880582)
+
+    def test_path_to_service_elevator(self):
+        self.assertAlmostEqual(path_to_E_s, 13.191468274710683)
+
+    def test_main_elevator_to_goal(self):
+        self.assertAlmostEqual(path_from_E_m_to_goal, 29.154759474226502)
+
+    def test_service_elevator_to_goal(self):
+        self.assertAlmostEqual(path_from_E_s_to_goal, 24.20743687382041)
+
+    def test_total_time_via_main(self):
+        self.assertAlmostEqual(total_time_via_E_m, 139.2854080611071)
+
+    def test_total_time_via_service(self):
+        self.assertAlmostEqual(total_time_via_E_s, 147.3989051485311)
+
     def test_best_option(self):
-        self.assertEqual(best_option, 
-                         "Main Elevator", 
-                         "The best path option is incorrect, check your calculations")
-        
-    def test_best_time(self):
-        self.assertEqual(best_time, 119.3851648071345, "The best time is incorrect")
+        self.assertEqual(best_option, "Main Elevator")
 
-if __name__ == '__main__':
-    # with file("math_question_1_solution.py", 'r') as file:
-    #     code = file.read()
-    #     exec(code)
-    
+    def test_best_time(self):
+        self.assertAlmostEqual(best_time, 139.2854080611071)
+
+
+if __name__ == "__main__":
     unittest.main()

@@ -152,6 +152,22 @@ Use an incremental, evidence-driven workflow:
     update. Update it in the same verified staging workflow when needed; do not
     create documentation churn for ordinary implementation details.
 
+The current development priority is the complete local staging application.
+Build and verify changes in the canonical staging checkout first. Do not expand
+the scope to production hosting, the public/live repository, Android packaging,
+or mobile-store release work unless the project owner explicitly starts that
+phase. A local feature is not ready merely because its happy path works: make
+one focused change, run its closest acceptance check, correct any failure, and
+only then begin the next change. After all focused checks pass, run the complete
+local release gate and perform the applicable student, instructor, browser,
+sandbox, and assignment-answer checks.
+
+Keep implementation and supporting evidence synchronized. When code,
+assignment content, dependencies, commands, schemas, or behavior changes,
+update the relevant README, long-form documentation, automated tests, SQA
+Markdown report, and master SQA workbook in the same verified change. Prefer a
+small accurate documentation update over leaving a known-stale checklist.
+
 Do not claim a feature works because it compiles. Verify observable behavior at
 the appropriate API, test, browser, database, or deployed-service boundary.
 

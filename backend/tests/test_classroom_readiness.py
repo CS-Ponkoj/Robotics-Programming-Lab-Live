@@ -58,6 +58,89 @@ def test_classroom_official_solution_passes(assignment_id, tmp_path):
     assert all(response.json()["unittest_pass_results"])
 
 
+def test_assignment_4_exposes_the_complete_deterministic_lidar_model(tmp_path):
+    settings = _settings("sqlite://", tmp_path / "assignment-4-accounts.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        response = client.get(
+            "/assignments/4", headers=_bearer(student["token"])
+        )
+
+    assert response.status_code == 200
+    assignment = response.json()
+    instructions = assignment["assignment_html"]
+    assert "10 + 2 * np.sin(np.radians(angle))" in instructions
+    assert "3 through 357" in instructions
+    assert "80 through 100" in instructions
+    assert "np.sin(np.radians(angle))" in assignment["starter_code"]
+
+
+def test_assignment_2_uses_explicit_hit_and_leave_geometry(tmp_path):
+    settings = _settings("sqlite://", tmp_path / "assignment-2-accounts.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        headers = _bearer(student["token"])
+        assignment = client.get("/assignments/2", headers=headers).json()
+        old_three_edge_model = client.post(
+            "/assignments/2/submit",
+            headers=headers,
+            json={
+                "code": (
+                    "distance_to_obstacle = 4\n"
+                    "distance_along_obstacle = 6\n"
+                    "distance_from_obstacle_to_goal = 4\n"
+                    "total_path_length = 14\n"
+                )
+            },
+        )
+
+    instructions = assignment["assignment_html"]
+    assert "H(4,0)" in instructions
+    assert "L(6,0)" in instructions
+    assert "H -&gt; A -&gt; B -&gt; L" in instructions
+    assert "Do not use the full rectangle perimeter" in instructions
+    assert old_three_edge_model.status_code == 200
+    assert old_three_edge_model.json()["pass"] is False
+
+
+def test_assignment_3_includes_the_complete_floor_to_floor_route(tmp_path):
+    settings = _settings("sqlite://", tmp_path / "assignment-3-accounts.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        response = client.get(
+            "/assignments/3", headers=_bearer(student["token"])
+        )
+
+    assert response.status_code == 200
+    assignment = response.json()
+    instructions = assignment["assignment_html"]
+    assert "S -&gt; M1 -&gt; M2 -&gt; E_m" in instructions
+    assert "After exiting on floor 10" in instructions
+    assert "path_from_E_m_to_goal" in assignment["starter_code"]
+    assert "path_from_E_s_to_goal" in assignment["starter_code"]
+    assert "total_time_via_E_m" in assignment["starter_code"]
+    assert "total_time_via_E_s" in assignment["starter_code"]
+
+
+def test_assignment_1_uses_valid_bug2_m_line_intersections(tmp_path):
+    settings = _settings("sqlite://", tmp_path / "assignment-1-accounts.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        response = client.get(
+            "/assignments/1", headers=_bearer(student["token"])
+        )
+
+    assert response.status_code == 200
+    assignment = response.json()
+    instructions = assignment["assignment_html"]
+    assert "Bug2 <em>m-line</em>" in instructions
+    assert "H(4, 11/3)" in instructions
+    assert "L(23/4, 6)" in instructions
+    assert "H and L both lie on the m-line" in instructions
+    assert "hit_point = (4.0, 11.0 / 3.0)" in assignment["starter_code"]
+    assert "leave_point = (23.0 / 4.0, 6.0)" in assignment["starter_code"]
+
+
 @pytest.mark.parametrize(
     ("label", "code", "expected_error"),
     [

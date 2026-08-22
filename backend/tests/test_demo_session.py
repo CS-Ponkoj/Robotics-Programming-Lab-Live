@@ -16,9 +16,9 @@ from models import (
 
 CORRECT_ASSIGNMENT_2 = """
 distance_to_obstacle = 4
-perimeter_of_obstacle = 6
+distance_along_obstacle = 4
 distance_from_obstacle_to_goal = 4
-total_path_length = 14
+total_path_length = 12
 """
 
 

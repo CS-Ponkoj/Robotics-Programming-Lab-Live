@@ -2,7 +2,7 @@
   "dataset_schema_version": 1,
   "assignment_id": 1,
   "assignment_stable_id": "robotics-assignment-1",
-  "assignment_version": 3,
+  "assignment_version": 4,
   "authored_by_role": "instructor",
   "review_status": "draft",
   "policy": {
@@ -16,7 +16,7 @@
       "title": "Uses Manhattan distance for the first segment",
       "case_type": "conceptual_error",
       "review_status": "draft",
-      "student_code": "distance_to_hit = abs(obstacle_x1 - start_x) + abs(obstacle_y1 - start_y)",
+      "student_code": "distance_to_hit = abs(hit_point[0] - start_point[0]) + abs(hit_point[1] - start_point[1])",
       "expected_execution_status": "completed",
       "misconception_tags": ["incorrect-distance-to-hit"],
       "expected_feedback": {
@@ -35,23 +35,23 @@
     },
     {
       "case_id": "a1-incomplete-boundary-path",
-      "title": "Counts too few obstacle sides and starts the final segment at the wrong point",
+      "title": "Omits part of the clockwise boundary route and leaves from the corner",
       "case_type": "conceptual_error",
       "review_status": "draft",
-      "student_code": "distance_along_obstacle = (obstacle_x2 - obstacle_x1) + (obstacle_y2 - obstacle_y1)\ndistance_leave_to_goal = calculate_distance(obstacle_x2, obstacle_y2, goal_x, goal_y)",
+      "student_code": "distance_along_obstacle = calculate_distance(hit_point, top_left)\ndistance_leave_to_goal = calculate_distance(top_left, goal_point)",
       "expected_execution_status": "completed",
       "misconception_tags": ["incorrect-distance-along-obstacle", "incorrect-distance-leave-to-goal"],
       "expected_feedback": {
-        "diagnosis": "The boundary route does not match the three-side clockwise path, and the final segment begins from a different point than the stated leave point.",
-        "debugging_steps": ["Trace the clockwise boundary one side at a time.", "List every visited corner before calculating lengths.", "Use the stated leave point as the start of the final segment."],
-        "socratic_question": "Which three boundary edges are traversed before the robot leaves the obstacle?",
-        "must_mention": ["three boundary sides", "stated leave point"],
+        "diagnosis": "The code stops boundary following at the top-left corner, but the stated Bug2 route continues along the top edge to the m-line leave point.",
+        "debugging_steps": ["Trace H to T to L in order.", "Measure both boundary segments.", "Start the final segment at L rather than T."],
+        "socratic_question": "After reaching the top-left corner, where does the route next meet the m-line?",
+        "must_mention": ["both boundary segments", "m-line leave point"],
         "must_avoid": ["official numeric answer", "complete solution code"]
       },
       "hint_ladder": [
-        {"level": 1, "hint": "Trace the orange route rather than using only the rectangle dimensions."},
-        {"level": 2, "hint": "Count the boundary edges and verify the coordinates where the robot leaves."},
-        {"level": 3, "hint": "Calculate each traveled edge separately, then start the goal-distance calculation at the declared leave point."}
+        {"level": 1, "hint": "Trace the named H -> T -> L route in order."},
+        {"level": 2, "hint": "The top-left corner is a turn, not the leave point."},
+        {"level": 3, "hint": "Add H-to-T and T-to-L, then calculate the goal segment from L."}
       ],
       "instructor_notes": "Draft combined misconception case; instructor should confirm wording against the current diagram."
     },

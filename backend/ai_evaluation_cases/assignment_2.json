@@ -2,52 +2,52 @@
   "dataset_schema_version": 1,
   "assignment_id": 2,
   "assignment_stable_id": "robotics-assignment-2",
-  "assignment_version": 2,
+  "assignment_version": 3,
   "authored_by_role": "instructor",
   "review_status": "draft",
   "policy": {"never_reveal_official_solution": true, "never_reveal_hidden_tests": true, "runtime_use_enabled": false},
   "cases": [
     {
       "case_id": "a2-obstacle-distance-axis-only",
-      "title": "Calculates the approach distance using one axis",
+      "title": "Uses the obstacle corner instead of the hit point",
       "case_type": "conceptual_error",
       "review_status": "draft",
-      "student_code": "distance_to_obstacle = abs(obstacle_x1 - start_x)",
+      "student_code": "distance_to_obstacle = calculate_distance(start_point, obstacle_A)",
       "expected_execution_status": "completed",
       "misconception_tags": ["incorrect-distance-to-obstacle"],
       "expected_feedback": {
-        "diagnosis": "The approach segment changes in both coordinates, but the calculation considers only one axis.",
-        "debugging_steps": ["Compare both endpoint coordinates.", "Identify whether the route is diagonal.", "Use the provided distance helper for a straight segment."],
-        "socratic_question": "Do both x and y change between the start and the obstacle point?",
-        "must_mention": ["both coordinates"],
+        "diagnosis": "The approach ends at the specified hit point on the obstacle edge, but the calculation uses a rectangle corner instead.",
+        "debugging_steps": ["Identify the named hit point in the route.", "Compare that point with obstacle_A.", "Use the distance helper with the actual segment endpoints."],
+        "socratic_question": "Which point does the route identify as the robot's first contact with the obstacle?",
+        "must_mention": ["hit point"],
         "must_avoid": ["official numeric answer", "complete solution code"]
       },
       "hint_ladder": [
-        {"level": 1, "hint": "Inspect how both coordinates change."},
-        {"level": 2, "hint": "One-axis subtraction cannot measure a diagonal."},
-        {"level": 3, "hint": "Call the supplied distance function with the two segment endpoints."}
+        {"level": 1, "hint": "Find the route's explicitly named first-contact point."},
+        {"level": 2, "hint": "The hit point lies on an edge and is not the lower-left corner."},
+        {"level": 3, "hint": "Measure from start_point to hit_point."}
       ],
       "instructor_notes": "Draft geometry misconception; instructor review is required."
     },
     {
       "case_id": "a2-perimeter-and-goal-route",
-      "title": "Uses half a perimeter and the wrong goal-segment origin",
+      "title": "Uses the full rectangle instead of the traveled boundary route",
       "case_type": "conceptual_error",
       "review_status": "draft",
-      "student_code": "perimeter_of_obstacle = width + height\ndistance_from_obstacle_to_goal = calculate_distance(obstacle_x1, obstacle_y1, goal_x, goal_y)",
+      "student_code": "distance_along_obstacle = 2 * (width + height)\ndistance_from_obstacle_to_goal = calculate_distance(obstacle_B, goal_point)",
       "expected_execution_status": "completed",
-      "misconception_tags": ["incorrect-perimeter-of-obstacle", "incorrect-distance-from-obstacle-to-goal"],
+      "misconception_tags": ["incorrect-distance-along-obstacle", "incorrect-distance-from-obstacle-to-goal"],
       "expected_feedback": {
-        "diagnosis": "The perimeter formula counts only one width and height, and the final path begins from the entry point instead of the specified departure point.",
-        "debugging_steps": ["Write the four sides of a rectangle explicitly.", "Confirm the point where boundary following ends.", "Calculate the final segment from that point."],
-        "socratic_question": "How many widths and heights make a complete rectangle boundary?",
-        "must_mention": ["complete perimeter", "departure point"],
+        "diagnosis": "The code measures the full rectangle perimeter, but the specified route travels only from H through A and B to L. The final segment must also begin at L.",
+        "debugging_steps": ["List the exact route points in order.", "Measure only the three boundary segments actually traveled.", "Start the final segment at the named leave point."],
+        "socratic_question": "Which rectangle edges and partial edges does H -> A -> B -> L actually traverse?",
+        "must_mention": ["traveled boundary route", "leave point"],
         "must_avoid": ["official numeric answer", "complete solution code"]
       },
       "hint_ladder": [
-        {"level": 1, "hint": "Sketch the rectangle and label all four sides."},
-        {"level": 2, "hint": "Check whether each dimension occurs once or twice in a perimeter."},
-        {"level": 3, "hint": "After the boundary route, use its ending coordinate as the next segment's starting coordinate."}
+        {"level": 1, "hint": "Trace only the named H -> A -> B -> L route."},
+        {"level": 2, "hint": "The robot does not travel the upper or side edges outside that route."},
+        {"level": 3, "hint": "Add H-to-A, A-to-B, and B-to-L, then continue from L."}
       ],
       "instructor_notes": "Draft combined boundary misconception; instructor review is required."
     },
@@ -56,7 +56,7 @@
       "title": "Total path double-counts the obstacle approach",
       "case_type": "conceptual_error",
       "review_status": "draft",
-      "student_code": "total_path_length = distance_to_obstacle + perimeter_of_obstacle + distance_from_obstacle_to_goal + distance_to_obstacle",
+      "student_code": "total_path_length = distance_to_obstacle + distance_along_obstacle + distance_from_obstacle_to_goal + distance_to_obstacle",
       "expected_execution_status": "completed",
       "misconception_tags": ["incorrect-total-path-length"],
       "expected_feedback": {

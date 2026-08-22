@@ -113,7 +113,7 @@ The complete documentation map is in [`docs/README.md`](docs/README.md).
 Important entry points include the [V4 deployment guide](docs/deployment/V4_LIVE_DEPLOYMENT.md),
 the [V4.1 research data guide](docs/research/V4_1_RESEARCH_DATA_GUIDE.md),
 the [data dictionary](docs/research/DATA_DICTIONARY.md), and the
-[V5 staging SQA report](docs/sqa/V5_STAGING_SQA_REPORT.md).
+[assignment content local SQA report](docs/sqa/ASSIGNMENT_CONTENT_LOCAL_SQA_REPORT_2026-08-21.md).
 
 ## PostgreSQL, Redis, and Docker
 
@@ -257,7 +257,7 @@ structured schema and pass a solution-leakage policy check; otherwise the
 platform returns a safe built-in response. OpenAI response storage is disabled.
 
 AI tutoring is disabled by default in the interface. Start the local stack with
-`\.\scripts\run-local.ps1 -EnableAi` to make the opt-in switch available. If the
+`.\scripts\run-local.ps1 -EnableAi` to make the opt-in switch available. If the
 key is missing, invalid, rate-limited, or out of credit, grading still completes
 and the built-in tutor remains available.
 

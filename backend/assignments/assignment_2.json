@@ -1,11 +1,59 @@
 {
-    "id": 2,
-    "version": 2,
-    "data_schema_version": 1,
-    "title": "Assignment 2: Obstacle Avoidance: Bug Algorithm Scenario 2",
-    "description": "Another assignment for you to program a robot to avoid an obstacle in the way, while also modeling the Bug2 Algorithm",
-    "starter_code": "import math\n\n# Define the points as (x, y) tuples.\nstart_point = (0, 0)\ngoal_point = (10, 0)\nobstacle_A = (4, -1)\nobstacle_B = (6, -1)\nobstacle_C = (6, 1)\nobstacle_D = (4, 1)\n\n# TODO: Replace each placeholder with the required calculation.\n# Straight-line distance from the start to the obstacle.\ndistance_to_obstacle = 0.0\n\n# Right-turn boundary route A -> D -> C -> B.\nperimeter_of_obstacle = 0.0\n\n# Straight-line distance from the obstacle to the goal.\ndistance_from_obstacle_to_goal = 0.0\n\n# Total path length.\ntotal_path_length = 0.0\n\nprint(total_path_length)\n",
-    "assignment_html": "<p><strong style=\"background-color: transparent; color: rgb(0, 0, 0);\">Math Question: Calculating the Path Length using the Bug Algorithm<\/strong><\/p><p><br><\/p><p><span style=\"background-color: transparent; color: rgb(0, 0, 0);\">Suppose a mobile robot uses the Bug2 obstacle avoidance algorithm to navigate in a 2D environment. The robot starts at the origin point O(0,0) and needs to reach a goal point G(10,0). However, there is a rectangular obstacle in the robot's environment with vertices at A(4,\u22121), B(6,\u22121), C(6,1), and D(4,1).<\/span><\/p><p><br><\/p><p><span style=\"background-color: transparent; color: rgb(0, 0, 0);\">When the robot encounters this obstacle, it follows the edge of the obstacle until it can resume its path to the goal. Assume the robot always turns right when it encounters the obstacle and follows the Bug2 algorithm perfectly.<\/span><\/p><p><br><\/p><p><strong style=\"background-color: transparent; color: rgb(0, 0, 0);\">Question:<\/strong><\/p><p><span style=\"background-color: transparent; color: rgb(0, 0, 0);\">Calculate the total path length that the robot will travel to reach the goal, including the detour around the obstacle. Provide your answer in the form of an expression that includes the perimeter of the obstacle that the robot follows and the straight-line paths before and after the detour.<\/span><\/p><p><br><\/p><p><strong style=\"background-color: transparent; color: rgb(0, 0, 0);\">Hints:<\/strong><\/p><ul><li><span style=\"background-color: transparent; color: rgb(0, 0, 0);\">Calculate the straight-line distance the robot travels before encountering the obstacle.<\/span><\/li><li><span style=\"background-color: transparent; color: rgb(0, 0, 0);\">Add the distance the robot travels around the obstacle (consider the robot will follow a right turn when encountering the edges of the obstacle).<\/span><\/li><li><span style=\"background-color: transparent; color: rgb(0, 0, 0);\">Calculate the straight-line distance from the point where the robot leaves the obstacle to the goal.<\/span><\/li><li><span style=\"background-color: transparent; color: rgb(0, 0, 0);\">Sum these distances to get the total path length.<\/span><\/li><\/ul><p><br><\/p><p><strong style=\"background-color: transparent; color: rgb(0, 0, 0);\">Assumptions:<\/strong><\/p><ul><li><span style=\"background-color: transparent; color: rgb(0, 0, 0);\">The robot can detect the obstacle as soon as it is in line with it.<\/span><\/li><li><span style=\"background-color: transparent; color: rgb(0, 0, 0);\">The robot can travel in straight lines and can turn with perfect right angles.<\/span><\/li><\/ul><p><br><\/p>",
-    "solution_html": "<p><strong>1. Reach the obstacle</strong></p><p>The assignment's simplified path model uses <strong>4 units</strong> from O(0,0) to point A.</p><p><strong>2. Follow the obstacle boundary</strong></p><p>The right-turn route A to D to C to B covers three edges of 2 units each, for <strong>6 units</strong>.</p><p><strong>3. Continue to the goal</strong></p><p>The model uses <strong>4 units</strong> from the obstacle to G(10,0).</p><p><strong>Total path</strong>: 4 + 6 + 4 = <strong>14 units</strong>.</p>",
-    "vals": {"distance_to_obstacle":4, "perimeter_of_obstacle":6, "distance_from_obstacle_to_goal":4, "total_path_length":14}
+  "id": 2,
+  "version": 3,
+  "data_schema_version": 1,
+  "title": "Assignment 2: Obstacle Avoidance: Bug Algorithm Scenario 2",
+  "description": "Calculate a geometrically consistent Bug2 detour around a rectangular obstacle.",
+  "starter_code": "import math\n\n# Define the route points as (x, y) tuples.\nstart_point = (0, 0)\ngoal_point = (10, 0)\nhit_point = (4, 0)\nleave_point = (6, 0)\nobstacle_A = (4, -1)\nobstacle_B = (6, -1)\nobstacle_C = (6, 1)\nobstacle_D = (4, 1)\n\ndef calculate_distance(point_1, point_2):\n    return math.hypot(point_2[0] - point_1[0], point_2[1] - point_1[1])\n\n# TODO: Straight-line distance from the start to the hit point.\ndistance_to_obstacle = 0.0\n\n# TODO: Right-turn boundary route hit_point -> A -> B -> leave_point.\ndistance_along_obstacle = 0.0\n\n# TODO: Straight-line distance from the leave point to the goal.\ndistance_from_obstacle_to_goal = 0.0\n\n# TODO: Add the three traveled components exactly once.\ntotal_path_length = 0.0\n\nprint(total_path_length)\n",
+  "assignment_html": "<p><strong>Scenario</strong></p><p>A robot travels east along the Bug2 m-line from <code>O(0,0)</code> toward <code>G(10,0)</code>. A rectangle blocks the m-line, with corners <code>A(4,-1)</code>, <code>B(6,-1)</code>, <code>C(6,1)</code>, and <code>D(4,1)</code>.</p><p><strong>Specified Bug2 route</strong></p><p>The robot reaches the obstacle at hit point <code>H(4,0)</code>. A right turn from its eastward heading sends it toward the lower boundary. It follows <code>H -&gt; A -&gt; B -&gt; L</code>, where the leave point is <code>L(6,0)</code>. Point L is back on the m-line and is closer to the goal than H, so the robot leaves the boundary and continues straight to G.</p><p><strong>Your task</strong></p><ol><li>Calculate <code>distance_to_obstacle</code> from O to H.</li><li>Calculate <code>distance_along_obstacle</code> as the sum of H-to-A, A-to-B, and B-to-L. Do not use the full rectangle perimeter.</li><li>Calculate <code>distance_from_obstacle_to_goal</code> from L to G.</li><li>Set <code>total_path_length</code> to the sum of those three traveled components.</li></ol><p>Use Euclidean distance for each segment. The robot turns at exact points and its size and turning radius are ignored.</p>",
+  "stable_id": "robotics-assignment-2",
+  "language": "python",
+  "status": "published",
+  "learning_objectives": [
+    "Locate Bug2 hit and leave points where a rectangular obstacle intersects the m-line.",
+    "Translate a specified right-turn boundary route into Euclidean line segments.",
+    "Distinguish the traveled boundary distance from the full obstacle perimeter.",
+    "Compose a complete path length without omitting or double-counting segments."
+  ],
+  "execution_settings": {
+    "runtime": "python3.11",
+    "timeout_seconds": 5,
+    "allowed_imports": ["math"],
+    "network_enabled": false,
+    "simulation_enabled": false
+  },
+  "public_tests": [
+    {"id": "public-execution", "label": "Program executes without an error"}
+  ],
+  "rubric": [
+    {"criterion": "Approach to H", "description": "Calculate the distance from O to the actual obstacle hit point.", "weight": 25},
+    {"criterion": "Right-turn detour", "description": "Add only the H-to-A, A-to-B, and B-to-L boundary segments.", "weight": 25},
+    {"criterion": "Departure from L", "description": "Calculate the straight distance from the leave point to G.", "weight": 25},
+    {"criterion": "Total path", "description": "Add the three traveled components exactly once.", "weight": 25}
+  ],
+  "common_misconceptions": [
+    {"tag": "incorrect-distance-to-obstacle", "description": "Uses a rectangle corner instead of the specified hit point H."},
+    {"tag": "incorrect-distance-along-obstacle", "description": "Uses the full perimeter or a different boundary direction instead of H-to-A-to-B-to-L."},
+    {"tag": "incorrect-distance-from-obstacle-to-goal", "description": "Starts the final segment at a corner instead of leave point L."},
+    {"tag": "incorrect-total-path-length", "description": "Omits or double-counts a traveled route component."}
+  ],
+  "tutoring_rules": {
+    "max_hint_level": 4,
+    "start_with_question": true,
+    "never_reveal_solution": true,
+    "never_reveal_hidden_tests": true,
+    "ai_enabled_by_default": false,
+    "tone": "Socratic, encouraging, and precise about route endpoints"
+  },
+  "simulation_config": {"enabled": false, "provider": null, "scenario": null},
+  "asset_manifest": [],
+  "grader_type": "python_variables",
+  "reference_solution_path": "course_materials/content/Obstacle Avoidance/Assignment_Bug_Algorithm/Scenario_2/Programing_Question_1_solution.py",
+  "solution_html": "<p><strong>1. Approach</strong></p><p>The m-line distance from O(0,0) to H(4,0) is <strong>4 units</strong>.</p><p><strong>2. Boundary detour</strong></p><p>The route H to A to B to L has lengths 1, 2, and 1, totaling <strong>4 units</strong>.</p><p><strong>3. Continue to the goal</strong></p><p>The m-line distance from L(6,0) to G(10,0) is <strong>4 units</strong>.</p><p><strong>Total path</strong>: 4 + 4 + 4 = <strong>12 units</strong>.</p>",
+  "vals": {
+    "distance_to_obstacle": 4,
+    "distance_along_obstacle": 4,
+    "distance_from_obstacle_to_goal": 4,
+    "total_path_length": 12
+  }
 }

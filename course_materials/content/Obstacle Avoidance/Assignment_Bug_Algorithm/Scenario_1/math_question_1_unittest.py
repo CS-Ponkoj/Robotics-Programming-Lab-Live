@@ -1,32 +1,22 @@
-#!/bin/bash python3
 import unittest
-import os
+
 from math_question_1_solution import *
 
 
-#feedback on direction
-#need to be able to show the correct value - guidance.
-
 class MathQuestion1TestCase(unittest.TestCase):
-    
-    def testDistanceToHit(self):
-        self.assertEqual(distance_to_hit, 2.8284271247461903, "Distance to hit the first point is incorrect")
-        
-    def testDistanceAlongObstacle(self):
-        self.assertEqual(distance_along_obstacle, 9.0, "Distance along the obstacle boundary is incorrect")
-    
-    def testDistanceLeaveToGoal(self):
-        self.assertEqual(distance_leave_to_goal, 5.0, "Distance from leave point to goal is incorrect")
-    
-    def testTotalDistance(self):
-        self.assertEqual(total_distance, 16.82842712474619, "The total distance you calculated is incorrect")
-    
-    
-        
 
-if __name__ == '__main__':
-    # with file("math_question_1_solution.py", 'r') as file:
-    #     code = file.read()
-    #     exec(code)
-    
+    def test_distance_to_hit(self):
+        self.assertAlmostEqual(distance_to_hit, 10.0 / 3.0)
+
+    def test_distance_along_obstacle(self):
+        self.assertAlmostEqual(distance_along_obstacle, 49.0 / 12.0)
+
+    def test_distance_leave_to_goal(self):
+        self.assertAlmostEqual(distance_leave_to_goal, 15.0 / 4.0)
+
+    def test_total_distance(self):
+        self.assertAlmostEqual(total_distance, 67.0 / 6.0)
+
+
+if __name__ == "__main__":
     unittest.main()

@@ -23,6 +23,7 @@ and verification records.
 ## SQA evidence
 
 - [Master SQA checklist](sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
+- [Assignment content local SQA report](sqa/ASSIGNMENT_CONTENT_LOCAL_SQA_REPORT_2026-08-21.md)
 - [AI Tutor Phase 1 staging SQA report](sqa/AI_TUTOR_PHASE1_SQA_REPORT_2026-08-21.md)
 - [V5 staging SQA report](sqa/V5_STAGING_SQA_REPORT.md)
 - [Stage 1 data-standardization SQA report](sqa/DATA_STANDARDIZATION_STAGE1_SQA_REPORT.md)

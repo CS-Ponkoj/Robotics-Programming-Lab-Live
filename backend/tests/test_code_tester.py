@@ -6,10 +6,10 @@ def test_allows_assignment_math_import():
         1,
         """
 import math
-distance_to_hit = math.sqrt(8)
-distance_along_obstacle = 9.0
-distance_leave_to_goal = 5.0
-total_distance = math.sqrt(8) + 14
+distance_to_hit = 10.0 / 3.0
+distance_along_obstacle = 49.0 / 12.0
+distance_leave_to_goal = 15.0 / 4.0
+total_distance = 67.0 / 6.0
 """,
         {},
     )
@@ -26,9 +26,9 @@ def test_rejects_import_outside_assignment_allowlist():
         """
 import os
 distance_to_obstacle = 4
-perimeter_of_obstacle = 6
+distance_along_obstacle = 4
 distance_from_obstacle_to_goal = 4
-total_path_length = 14
+total_path_length = 12
 """,
         {},
     )
@@ -56,9 +56,9 @@ def test_caps_submission_output():
         """
 print("x" * 30000)
 distance_to_obstacle = 4
-perimeter_of_obstacle = 6
+distance_along_obstacle = 4
 distance_from_obstacle_to_goal = 4
-total_path_length = 14
+total_path_length = 12
 """,
         {},
     )

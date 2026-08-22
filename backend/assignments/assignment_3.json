@@ -1,11 +1,71 @@
 {
-    "id": 3,
-    "version": 3,
-    "data_schema_version": 1,
-    "title": "Assignment 3: Autonomous Robot Navigation in a Dynamic Office Environment",
-    "description": "A more complex obstacle avoidance assignment",
-    "assignment_html": "<p><strong>Autonomous Robot Navigation in a Dynamic Office Environment<\/strong><\/p><p><strong>Scenario:<\/strong><\/p><p>An autonomous delivery robot equipped with SLAM technology navigates a recently renovated multi-story office building. Starting from position <em>S<\/em>(5,5) on the 5th floor, the robot's task is to deliver documents to a goal location <em>G<\/em>(25,30) on the 10th floor. The building features two elevators: a main elevator <em>Em<\/em>\u200B at (10,5) and a service elevator <em>Es<\/em>\u200B at (6,15), with different speeds and wait times due to their usage patterns.<\/p><p>During its delivery task, the robot encounters an unexpected obstacle: a temporary construction barrier that extends linearly from (8,5) to (8,10). Moreover, as the robot approaches the elevators, it detects a movable obstacle blocking its most direct path.<\/p><p><strong>Given Data:<\/strong><\/p><ul><li><strong>Main Elevator (<em>Em<\/em>\u200B) Speed<\/strong>: 1 floor\/15 seconds, <strong>Wait Time<\/strong>: 30 seconds (crowding)<\/li><li><strong>Service Elevator (<em>Es<\/em>\u200B) Speed<\/strong>: 1 floor\/20 seconds, <strong>Wait Time<\/strong>: 10 seconds<\/li><li><strong>Robot Speed<\/strong>: 1 meter\/second<\/li><li><strong>Obstacle Detection Range<\/strong>: 2 meters<\/li><li><strong>Safety Margin<\/strong>: 0.5 meters from obstacles<\/li><\/ul><p><strong>Task:<\/strong><\/p><p>Calculate the optimal path for the robot to reach goal <em>G<\/em> from its starting position <em>S<\/em>, considering the elevators' locations, speeds, wait times, and the obstacles encountered. The robot must update its route dynamically upon detecting the temporary barrier and the movable obstacle.<\/p><p><strong>Questions:<\/strong><\/p><ol><li><strong>Path to Elevators<\/strong>: Calculate the shortest path lengths from <em>S<\/em> to both <em>Em<\/em>\u200B and <em>Es<\/em>\u200B, taking into account the temporary construction barrier. Consider the robot's ability to detect obstacles and the required safety margin.<\/li><li><strong>Elevator Choice and Total Time to Goal<\/strong>: Based on the calculated paths and elevator characteristics, decide which elevator (<em>Em<\/em>\u200B or <em>Es<\/em>\u200B) the robot should use. Compute the total time to reach the goal <em>G<\/em> on the 10th floor using the chosen elevator, including navigation and elevator wait and travel times.<\/li><li><strong>Dynamic Obstacle Detour<\/strong>: If the robot detects a movable obstacle 2 meters ahead on its path to the chosen elevator, requiring a 1-meter detour radius, recalculate the adjusted path length to the elevator. How does this affect the robot's total time to the goal?<\/li><li><strong>Comprehensive Solution<\/strong>: Integrate the calculations to provide a complete solution that includes the path planning to the elevator, the selection of the elevator based on time efficiency, and adjustments for dynamic obstacles, ensuring the safety margin is maintained.<\/li><\/ol><p><br><\/p>",
-    "starter_code": "import math\nfrom scipy.spatial import distance\n\n# Constants\nrobot_speed = 1\nsafety_margin = 0.5\nobstacle_detection_range = 2\ndetour_radius = 1.0\nmain_elevator_wait = 30\nservice_elevator_wait = 10\nmain_elevator_speed = 1 / 15\nservice_elevator_speed = 1 / 20\nfloors_to_travel = 10 - 5\n\n# Points in meters on the 5th-floor plan\nS = (5, 5)\nG = (25, 30)\nE_m = (10, 5)\nE_s = (6, 15)\nbarrier_start = (8, 5)\nbarrier_end = (8, 10)\nmovable_obstacle = (6, 6)\n\ndef straight_line_distance_with_barrier(start, end, barrier_start, barrier_end, safety_margin):\n    \"\"\"Return a barrier-aware path length.\n\n    TODO: Replace the placeholder with the direct or detour calculation.\n    \"\"\"\n    return 0.0\n\n# TODO: Calculate both barrier-aware paths.\npath_to_E_m = 0.0\npath_to_E_s = 0.0\n\n# TODO: Add a half-circle detour when the obstacle is within detection range.\nif distance.euclidean(S, movable_obstacle) <= obstacle_detection_range:\n    detour_length = 0.0\n    path_to_E_m += 0.0\n    path_to_E_s += 0.0\n\n# TODO: Include navigation, wait, and elevator travel time.\ntime_to_E_m = 0.0\ntime_to_E_s = 0.0\n\n# TODO: Choose the elevator with the lower complete travel time.\nbest_option = \"\"\nbest_time = 0.0\n\nprint(path_to_E_m, path_to_E_s, time_to_E_m, time_to_E_s, best_option, best_time)",
-    "solution_html": "<p><strong>1. Compare barrier-aware paths</strong></p><ul><li>Main elevator base path: approximately <strong>14.385 m</strong>.</li><li>Service elevator base path: approximately <strong>10.050 m</strong>.</li></ul><p><strong>2. Include the detected movable obstacle</strong></p><p>The obstacle at (6, 6) is within the 2-meter detection range. A half-circle detour with a 1-meter radius adds <strong>pi meters</strong> to each route.</p><ul><li>Adjusted main-elevator path: approximately <strong>17.527 m</strong>.</li><li>Adjusted service-elevator path: approximately <strong>13.191 m</strong>.</li></ul><p><strong>3. Include wait and elevator travel time</strong></p><ul><li>Main elevator total: approximately <strong>122.527 seconds</strong>.</li><li>Service elevator total: approximately <strong>123.191 seconds</strong>.</li></ul><p>The <strong>Main Elevator</strong> remains the optimal choice.</p>",
-    "vals": {"path_to_E_m": 17.526757460724298, "path_to_E_s":13.191468274710683, "time_to_E_m":122.5267574607243, "time_to_E_s":123.19146827471069, "best_option":"Main Elevator", "best_time":122.5267574607243}
+  "id": 3,
+  "version": 4,
+  "data_schema_version": 1,
+  "title": "Assignment 3: Autonomous Robot Navigation in a Dynamic Office Environment",
+  "description": "Compare two complete multi-floor routes using explicit obstacle detours, elevator delays, and destination-floor travel.",
+  "assignment_html": "<p><strong>Scenario</strong></p><p>A delivery robot starts at <code>S(5,5)</code> on floor 5 and must reach <code>G(25,30)</code> on floor 10. The main elevator shaft is at <code>E_m(10,5)</code> and the service elevator shaft is at <code>E_s(6,15)</code> on both floors. The robot moves horizontally at 1 meter per second.</p><p><strong>Floor 5 routes</strong></p><ul><li>A vertical construction barrier blocks the direct main-elevator route. The required 0.5-meter-clearance detour is explicitly represented by waypoints <code>M1(7.5,4.5)</code> and <code>M2(8.5,4.5)</code>. Calculate the main entry path along <code>S -&gt; M1 -&gt; M2 -&gt; E_m</code>.</li><li>The service-elevator base path is the straight segment from S to E_s. A movable obstacle lies on that route, so add a half-circle detour of radius 1 meter: <code>pi * radius</code>.</li></ul><p><strong>Elevator and floor 10 routes</strong></p><ul><li>Main elevator: 30-second wait and 15 seconds per floor.</li><li>Service elevator: 10-second wait and 20 seconds per floor.</li><li>Both elevators travel 5 floors.</li><li>After exiting on floor 10, calculate a straight path from that elevator's shaft coordinate to G.</li></ul><p><strong>Your task</strong></p><ol><li>Calculate <code>path_to_E_m</code> and <code>path_to_E_s</code> on floor 5.</li><li>Calculate <code>path_from_E_m_to_goal</code> and <code>path_from_E_s_to_goal</code> on floor 10.</li><li>Calculate <code>total_time_via_E_m</code> and <code>total_time_via_E_s</code>. Each total must include floor-5 travel, elevator wait, elevator ride, and floor-10 travel.</li><li>Set <code>best_option</code> to <code>Main Elevator</code> or <code>Service Elevator</code> and set <code>best_time</code> to the corresponding smaller total.</li></ol><p>Use Euclidean distance for straight segments. Do not add any obstacle behavior beyond the two specified detours.</p>",
+  "starter_code": "import math\n\nrobot_speed = 1.0\nservice_detour_radius = 1.0\nmain_elevator_wait = 30.0\nservice_elevator_wait = 10.0\nmain_seconds_per_floor = 15.0\nservice_seconds_per_floor = 20.0\nfloors_to_travel = 5\n\nS = (5.0, 5.0)\nG = (25.0, 30.0)\nE_m = (10.0, 5.0)\nE_s = (6.0, 15.0)\nM1 = (7.5, 4.5)\nM2 = (8.5, 4.5)\n\ndef calculate_distance(point_1, point_2):\n    return math.hypot(point_2[0] - point_1[0], point_2[1] - point_1[1])\n\ndef route_length(points):\n    return sum(\n        calculate_distance(points[index], points[index + 1])\n        for index in range(len(points) - 1)\n    )\n\n# TODO: Floor-5 routes to each elevator.\npath_to_E_m = 0.0\npath_to_E_s = 0.0\n\n# TODO: Floor-10 routes from each elevator to the goal.\npath_from_E_m_to_goal = 0.0\npath_from_E_s_to_goal = 0.0\n\n# TODO: Complete time through each elevator.\ntotal_time_via_E_m = 0.0\ntotal_time_via_E_s = 0.0\n\n# TODO: Choose the smaller complete time and matching label.\nbest_option = \"\"\nbest_time = 0.0\n\nprint(\n    path_to_E_m,\n    path_to_E_s,\n    path_from_E_m_to_goal,\n    path_from_E_s_to_goal,\n    total_time_via_E_m,\n    total_time_via_E_s,\n    best_option,\n    best_time,\n)\n",
+  "stable_id": "robotics-assignment-3",
+  "language": "python",
+  "status": "published",
+  "learning_objectives": [
+    "Calculate piecewise Euclidean routes through specified waypoints.",
+    "Model a stated half-circle obstacle detour without inventing additional geometry.",
+    "Combine horizontal travel, elevator wait, elevator ride, and destination-floor travel into a complete time.",
+    "Compare two route alternatives using the same complete cost model."
+  ],
+  "execution_settings": {
+    "runtime": "python3.11",
+    "timeout_seconds": 5,
+    "allowed_imports": ["math"],
+    "network_enabled": false,
+    "simulation_enabled": false
+  },
+  "public_tests": [
+    {"id": "public-execution", "label": "Program executes without an error"}
+  ],
+  "rubric": [
+    {"criterion": "Main entry route", "description": "Calculate the complete waypoint route from S to the main elevator.", "weight": 12.5},
+    {"criterion": "Service entry route", "description": "Add the specified half-circle detour to the straight service-elevator route.", "weight": 12.5},
+    {"criterion": "Main destination route", "description": "Calculate the floor-10 route from the main elevator to G.", "weight": 12.5},
+    {"criterion": "Service destination route", "description": "Calculate the floor-10 route from the service elevator to G.", "weight": 12.5},
+    {"criterion": "Main total time", "description": "Include every travel, wait, and ride component for the main elevator.", "weight": 12.5},
+    {"criterion": "Service total time", "description": "Include every travel, wait, and ride component for the service elevator.", "weight": 12.5},
+    {"criterion": "Best route label", "description": "Select the label associated with the smaller complete time.", "weight": 12.5},
+    {"criterion": "Best route time", "description": "Store the smaller complete time consistently with the selected label.", "weight": 12.5}
+  ],
+  "common_misconceptions": [
+    {"tag": "incorrect-path-to-E-m", "description": "Uses the blocked straight route or omits one of the required main-elevator waypoints."},
+    {"tag": "incorrect-path-to-E-s", "description": "Omits the specified half-circle detour or treats its radius as a diameter."},
+    {"tag": "incorrect-path-from-E-m-to-goal", "description": "Stops at the main elevator instead of adding the floor-10 route to G."},
+    {"tag": "incorrect-path-from-E-s-to-goal", "description": "Stops at the service elevator instead of adding the floor-10 route to G."},
+    {"tag": "incorrect-total-time-via-E-m", "description": "Omits a main-route travel, wait, ride, or destination component."},
+    {"tag": "incorrect-total-time-via-E-s", "description": "Omits a service-route travel, wait, ride, or destination component."},
+    {"tag": "incorrect-best-option", "description": "Compares incomplete totals or chooses a label that does not match the smaller total."},
+    {"tag": "incorrect-best-time", "description": "Stores a partial or larger time instead of the selected route's complete time."}
+  ],
+  "tutoring_rules": {
+    "max_hint_level": 4,
+    "start_with_question": true,
+    "never_reveal_solution": true,
+    "never_reveal_hidden_tests": true,
+    "ai_enabled_by_default": false,
+    "tone": "Socratic, encouraging, and precise about complete route accounting"
+  },
+  "simulation_config": {"enabled": false, "provider": null, "scenario": null},
+  "asset_manifest": [],
+  "grader_type": "python_variables",
+  "reference_solution_path": "course_materials/content/Obstacle Avoidance/Assignment_OA/question_1_solution.py",
+  "solution_html": "<p><strong>Floor 5</strong></p><p>The main route follows S to M1 to M2 to E_m. The service route is its straight distance plus the stated half-circle detour.</p><p><strong>Floor 10</strong></p><p>For each option, include the straight distance from that elevator shaft to G.</p><p><strong>Complete time</strong></p><p>Add floor-5 walking time, elevator wait, five-floor ride time, and floor-10 walking time. The resulting totals are approximately <strong>139.285 seconds</strong> through the main elevator and <strong>147.399 seconds</strong> through the service elevator, so the <strong>Main Elevator</strong> is the faster complete route.</p>",
+  "vals": {
+    "path_to_E_m": 5.130648586880582,
+    "path_to_E_s": 13.191468274710683,
+    "path_from_E_m_to_goal": 29.154759474226502,
+    "path_from_E_s_to_goal": 24.20743687382041,
+    "total_time_via_E_m": 139.2854080611071,
+    "total_time_via_E_s": 147.3989051485311,
+    "best_option": "Main Elevator",
+    "best_time": 139.2854080611071
+  }
 }
