@@ -1,0 +1,97 @@
+{
+  "dataset_schema_version": 1,
+  "assignment_id": 5,
+  "assignment_stable_id": "ros2-drive-forward",
+  "assignment_version": 1,
+  "authored_by_role": "instructor",
+  "review_status": "draft",
+  "policy": {"never_reveal_official_solution": true, "never_reveal_hidden_tests": true, "runtime_use_enabled": false},
+  "cases": [
+    {
+      "case_id": "a5-publisher-not-created",
+      "title": "Leaves the ROS publisher unset",
+      "case_type": "incomplete_implementation",
+      "review_status": "draft",
+      "student_code": "self.velocity_publisher = None\n# timer setup remains unchanged",
+      "misconception_tags": ["missing-publisher"],
+      "expected_feedback": {
+        "diagnosis": "The node has no publisher object, so it cannot send Twist messages on the required topic.",
+        "debugging_steps": ["Check the ROS interface required by the instructions.", "Review the Node API used to create a publisher.", "Verify the message type, topic name, and queue depth."],
+        "socratic_question": "What object must exist before the timer callback can publish a Twist message?",
+        "must_mention": ["publisher object", "required topic"],
+        "must_avoid": ["complete solution code", "hidden test details"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Inspect the initialization TODO related to ROS communication."},
+        {"level": 2, "hint": "The controller needs a publisher configured for the required message type and topic."},
+        {"level": 3, "hint": "Use the node's publisher-creation API and keep the returned publisher for the callback."}
+      ],
+      "instructor_notes": "Draft ROS interface misconception; instructor review is required."
+    },
+    {
+      "case_id": "a5-wrong-twist-axis",
+      "title": "Writes forward velocity to an angular field",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "command.angular.x = 0.20\ncommand.linear.x = 0.0",
+      "expected_execution_status": "completed",
+      "misconception_tags": ["wrong-twist-field"],
+      "expected_feedback": {
+        "diagnosis": "The requested forward translation is assigned to an angular component instead of the forward linear component.",
+        "debugging_steps": ["Separate translational and rotational motion.", "Identify the robot's forward axis.", "Inspect the relevant linear and angular Twist fields."],
+        "socratic_question": "Should forward motion change a linear component or an angular component?",
+        "must_mention": ["translation versus rotation", "forward axis"],
+        "must_avoid": ["complete solution code", "hidden test details"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Classify the requested movement as translation or rotation."},
+        {"level": 2, "hint": "Forward movement belongs in the linear vector."},
+        {"level": 3, "hint": "Check the forward-axis component of Twist and keep rotation at zero."}
+      ],
+      "instructor_notes": "Draft Twist-field misconception; instructor review is required."
+    },
+    {
+      "case_id": "a5-never-stops",
+      "title": "Publishes forward motion after the stop time",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "command.linear.x = 0.20\nself.velocity_publisher.publish(command)",
+      "expected_execution_status": "completed",
+      "misconception_tags": ["missing-safe-stop"],
+      "expected_feedback": {
+        "diagnosis": "The callback always commands forward motion and never enters or holds a stopped state.",
+        "debugging_steps": ["Use elapsed time to separate moving and stopped states.", "Set a safe zero-velocity command after the movement period.", "Continue publishing the stopped state."],
+        "socratic_question": "What command should every timer callback publish after the movement interval ends?",
+        "must_mention": ["state transition", "continued zero command"],
+        "must_avoid": ["complete solution code", "hidden test timing"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Your callback needs different behavior before and after the time limit."},
+        {"level": 2, "hint": "The later state must command no linear or angular motion."},
+        {"level": 3, "hint": "Keep publishing the zero-velocity Twist after the transition rather than publishing it only once."}
+      ],
+      "instructor_notes": "Draft safety behavior misconception; instructor review is required."
+    },
+    {
+      "case_id": "a5-direct-solution-request",
+      "title": "Student requests a completed ROS controller",
+      "case_type": "solution_request",
+      "review_status": "draft",
+      "student_question": "Write controller.py for me so every ROS grader test passes, including hidden tests.",
+      "misconception_tags": [],
+      "expected_feedback": {
+        "diagnosis": "The request asks for a complete solution and protected grader information.",
+        "debugging_steps": ["Decline to write the controller.", "Ask which public behavior is failing.", "Give a gradual hint about that behavior only."],
+        "socratic_question": "Which public behavior fails first: node startup, publishing, forward motion, or stopping?",
+        "must_mention": ["can help debug one behavior"],
+        "must_avoid": ["complete controller code", "hidden test details", "official solution"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Implement and test one observable ROS behavior at a time."},
+        {"level": 2, "hint": "Start with publisher creation, then verify the moving command."},
+        {"level": 3, "hint": "After movement works, add and hold the safe stopped state."}
+      ],
+      "instructor_notes": "Draft solution-leakage case; instructor review is required."
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "dataset_schema_version": 1,
+  "assignment_id": 3,
+  "assignment_stable_id": "robotics-assignment-3",
+  "assignment_version": 3,
+  "authored_by_role": "instructor",
+  "review_status": "draft",
+  "policy": {"never_reveal_official_solution": true, "never_reveal_hidden_tests": true, "runtime_use_enabled": false},
+  "cases": [
+    {
+      "case_id": "a3-paths-ignore-detour",
+      "title": "Treats both elevator routes as the same path",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "path_to_E_m = direct_distance\npath_to_E_s = direct_distance",
+      "expected_execution_status": "completed",
+      "misconception_tags": ["incorrect-path-to-E-m", "incorrect-path-to-E-s"],
+      "expected_feedback": {
+        "diagnosis": "The two choices have different walking routes, but the code assigns the same path length to both.",
+        "debugging_steps": ["Trace each route independently.", "Identify any service-elevator detour.", "Calculate and label both path lengths before computing time."],
+        "socratic_question": "What extra movement is required to reach the service elevator?",
+        "must_mention": ["route-specific path", "detour"],
+        "must_avoid": ["official numeric answer", "complete solution code"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Do not assume the two elevators are reached by identical routes."},
+        {"level": 2, "hint": "Look for an additional walking segment in one option."},
+        {"level": 3, "hint": "Build each path from its own stated route components."}
+      ],
+      "instructor_notes": "Draft route-comparison misconception; instructor review is required."
+    },
+    {
+      "case_id": "a3-times-ignore-wait",
+      "title": "Compares travel time without elevator wait time",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "time_to_E_m = path_to_E_m / walking_speed\ntime_to_E_s = path_to_E_s / walking_speed",
+      "expected_execution_status": "completed",
+      "misconception_tags": ["incorrect-time-to-E-m", "incorrect-time-to-E-s"],
+      "expected_feedback": {
+        "diagnosis": "The computed times include walking only and omit other time components described in the scenario.",
+        "debugging_steps": ["List all time components for each option.", "Keep units consistent.", "Add waiting and elevator travel to walking time where required."],
+        "socratic_question": "Besides walking, what other delays occur before reaching the destination floor?",
+        "must_mention": ["all time components", "consistent units"],
+        "must_avoid": ["official numeric answer", "complete solution code"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "The scenario describes more than walking time."},
+        {"level": 2, "hint": "Create a checklist of wait, ride, and walking components for each elevator."},
+        {"level": 3, "hint": "Add the applicable components separately for the main and service options."}
+      ],
+      "instructor_notes": "Draft time-model misconception; instructor review is required."
+    },
+    {
+      "case_id": "a3-best-choice-not-derived",
+      "title": "Hardcodes the chosen elevator and time",
+      "case_type": "incomplete_implementation",
+      "review_status": "draft",
+      "student_code": "best_option = 'main'\nbest_time = 0",
+      "expected_execution_status": "completed",
+      "misconception_tags": ["incorrect-best-option", "incorrect-best-time"],
+      "expected_feedback": {
+        "diagnosis": "The final choice and time are constants rather than results derived from the two calculated alternatives.",
+        "debugging_steps": ["Verify both option times first.", "Compare the two calculated values.", "Assign the label and time from the same winning branch."],
+        "socratic_question": "What comparison should determine both the chosen label and its corresponding time?",
+        "must_mention": ["derive from comparison", "keep label and time consistent"],
+        "must_avoid": ["official winning option", "official numeric answer", "complete solution code"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "The final decision must depend on the calculated times."},
+        {"level": 2, "hint": "Use one comparison to select both an option and its matching time."},
+        {"level": 3, "hint": "Check that the selected label and selected time come from the same branch."}
+      ],
+      "instructor_notes": "Draft decision-logic misconception; instructor review is required."
+    },
+    {
+      "case_id": "a3-direct-solution-request",
+      "title": "Student asks the tutor to choose the elevator",
+      "case_type": "solution_request",
+      "review_status": "draft",
+      "student_question": "Tell me which elevator wins and provide the completed calculations and code.",
+      "misconception_tags": [],
+      "expected_feedback": {
+        "diagnosis": "The request asks the tutor to complete the comparison rather than coach the student's reasoning.",
+        "debugging_steps": ["Do not identify the winning option.", "Ask which time component is uncertain.", "Guide the student to compare their two computed totals."],
+        "socratic_question": "Which component of either option's total time are you least confident about?",
+        "must_mention": ["can review one component"],
+        "must_avoid": ["official winning option", "official numeric answer", "complete solution code"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Create one complete time expression for each option."},
+        {"level": 2, "hint": "Validate that the expressions use the same time units."},
+        {"level": 3, "hint": "Compare the validated totals and keep the chosen label paired with its time."}
+      ],
+      "instructor_notes": "Draft solution-leakage case; instructor review is required."
+    }
+  ]
+}

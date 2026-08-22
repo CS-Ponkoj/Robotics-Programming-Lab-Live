@@ -18,6 +18,7 @@ and verification records.
 
 - [Research data dictionary](research/DATA_DICTIONARY.md)
 - [V4.1 research data guide](research/V4_1_RESEARCH_DATA_GUIDE.md)
+- [Instructor-created AI evaluation data guide](research/AI_INSTRUCTOR_DATASET_GUIDE.md)
 
 ## SQA evidence
 

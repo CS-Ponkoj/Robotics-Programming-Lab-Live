@@ -112,6 +112,8 @@ backend/                          FastAPI application
   ros2_worker.py / ros2_*_harness.py  Isolated ROS package build and behavior checks
   tutor.py / hinter.py            Deterministic and optional AI tutoring
   research_service.py             Study sessions, events, summaries, and exports
+  instructor_dataset.py           Offline instructor AI-evaluation contract and validator
+  ai_evaluation_cases/            Server-only, instructor-reviewed tutor evaluation cases
   migrations/                     Alembic production schema history
   assignments/                    Controlled assignment configuration
   tests/                          Backend regression and security tests
@@ -255,6 +257,11 @@ sufficient when an automated test can reasonably protect the behavior.
 - Keep routes thin. Put reusable domain behavior in services, repositories,
   graders, or dedicated modules.
 - Use Pydantic schemas at HTTP boundaries and SQLAlchemy models for persistence.
+- Keep instructor-authored AI evaluation cases server-only and offline until a
+  separately reviewed runtime stage is approved. Draft cases are not research
+  ground truth. Approval requires a named instructor reviewer, and evaluation
+  files must never contain official solutions, hidden tests, grader
+  configuration, or answer keys.
 - Validate request size, types, identifiers, and state transitions server-side.
 - Use explicit authorization checks on every student, instructor, research, and
   administrative endpoint.

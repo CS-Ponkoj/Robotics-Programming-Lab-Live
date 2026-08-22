@@ -1,0 +1,97 @@
+{
+  "dataset_schema_version": 1,
+  "assignment_id": 6,
+  "assignment_stable_id": "ros2-obstacle-stop",
+  "assignment_version": 1,
+  "authored_by_role": "instructor",
+  "review_status": "draft",
+  "policy": {"never_reveal_official_solution": true, "never_reveal_hidden_tests": true, "runtime_use_enabled": false},
+  "cases": [
+    {
+      "case_id": "a6-no-scan-subscription",
+      "title": "Does not subscribe to laser scans",
+      "case_type": "incomplete_implementation",
+      "review_status": "draft",
+      "student_code": "self.scan_subscription = None",
+      "misconception_tags": ["missing-scan-subscription"],
+      "expected_feedback": {
+        "diagnosis": "Without a LaserScan subscription, the controller cannot observe obstacle-distance updates.",
+        "debugging_steps": ["Identify the required sensor topic and message type.", "Create a subscription during node initialization.", "Connect it to the callback that updates motion decisions."],
+        "socratic_question": "What ROS input must trigger the controller's obstacle decision?",
+        "must_mention": ["LaserScan subscription", "sensor callback"],
+        "must_avoid": ["complete solution code", "hidden test details"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "The controller needs live range data before it can react."},
+        {"level": 2, "hint": "That data arrives through a ROS subscription."},
+        {"level": 3, "hint": "Create the required LaserScan subscription and route messages to the scan callback."}
+      ],
+      "instructor_notes": "Draft ROS sensor-interface misconception; instructor review is required."
+    },
+    {
+      "case_id": "a6-threshold-comparison-reversed",
+      "title": "Stops when the path is clear and moves near obstacles",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "if nearest_range > stop_distance:\n    command.linear.x = 0.0\nelse:\n    command.linear.x = forward_speed",
+      "expected_execution_status": "completed",
+      "misconception_tags": ["wrong-threshold-direction"],
+      "expected_feedback": {
+        "diagnosis": "The threshold comparison reverses the intended safety behavior.",
+        "debugging_steps": ["State the condition that means an obstacle is too close.", "Map that condition to the stopped command.", "Map the safe condition to forward movement."],
+        "socratic_question": "Should the robot stop when the nearest valid range is above or below the safety distance?",
+        "must_mention": ["safety condition", "comparison direction"],
+        "must_avoid": ["complete solution code", "hidden threshold"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Translate 'too close' into a numeric comparison."},
+        {"level": 2, "hint": "Smaller valid ranges represent nearer obstacles."},
+        {"level": 3, "hint": "Associate the below-threshold condition with the zero-velocity command."}
+      ],
+      "instructor_notes": "Draft threshold-logic misconception; instructor review is required."
+    },
+    {
+      "case_id": "a6-invalid-ranges-and-no-resume",
+      "title": "Uses invalid ranges and latches the stop forever",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "nearest_range = min(msg.ranges)\nif nearest_range < stop_distance:\n    self.stopped = True\nif self.stopped:\n    command.linear.x = 0.0",
+      "expected_execution_status": "completed",
+      "misconception_tags": ["invalid-range-handling", "no-resume"],
+      "expected_feedback": {
+        "diagnosis": "The minimum may be an invalid sensor value, and the latched flag prevents motion from resuming when the path becomes clear.",
+        "debugging_steps": ["Filter readings using the message's valid range limits and finite-value checks.", "Recompute the safety state for every scan.", "Verify both stop and resume transitions."],
+        "socratic_question": "What should happen on a later scan when all valid readings indicate a clear path?",
+        "must_mention": ["valid range filtering", "re-evaluate each scan", "resume"],
+        "must_avoid": ["complete solution code", "hidden test inputs"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Not every numeric entry in a LaserScan is a usable obstacle distance."},
+        {"level": 2, "hint": "Filter invalid readings, then derive the current state from the current scan."},
+        {"level": 3, "hint": "Avoid a one-way stop latch; allow a later clear scan to restore forward motion."}
+      ],
+      "instructor_notes": "Draft combined sensor-validity and state-transition case; instructor review is required."
+    },
+    {
+      "case_id": "a6-direct-solution-request",
+      "title": "Student requests the complete obstacle controller",
+      "case_type": "solution_request",
+      "review_status": "draft",
+      "student_question": "Give me the finished ROS 2 obstacle-stop controller and reveal the grader scan values.",
+      "misconception_tags": [],
+      "expected_feedback": {
+        "diagnosis": "The request seeks a complete solution and protected grader inputs.",
+        "debugging_steps": ["Decline both disclosures.", "Ask which public behavior is failing.", "Provide a conceptual sensor or state-transition hint."],
+        "socratic_question": "Is your current difficulty receiving scans, deciding when to stop, or resuming after the path clears?",
+        "must_mention": ["can help debug one behavior"],
+        "must_avoid": ["complete controller code", "grader scan values", "hidden test details"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Treat sensing, decision logic, and command publishing as separate steps."},
+        {"level": 2, "hint": "Validate scan inputs before comparing them with the safety threshold."},
+        {"level": 3, "hint": "Recalculate the motion command on every scan so both stopping and resuming are possible."}
+      ],
+      "instructor_notes": "Draft solution-leakage case; instructor review is required."
+    }
+  ]
+}
