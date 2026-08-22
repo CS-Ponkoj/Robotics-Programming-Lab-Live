@@ -30,6 +30,80 @@ Open the classroom-ready web application: [Robotics Programming Lab](https://rob
 - Privacy-safe study sessions, active-time capture, learning events, participant
   analytics, and authenticated CSV/Excel research exports
 
+## Technology stack
+
+| Layer | Technology | Responsibility |
+| --- | --- | --- |
+| Student and instructor interface | Flutter application written in Dart (project version 5.0.0) | Responsive assignment catalog, code workspace, results, tutoring, account administration, and research dashboards |
+| API and application services | Python 3.11, FastAPI, Uvicorn, and Pydantic | Authentication, assignment lifecycle, submissions, grading orchestration, tutoring, administration, and research APIs |
+| Data access and migrations | SQLAlchemy and Alembic | Versioned persistence models and repeatable database schema changes |
+| Database | SQLite locally; PostgreSQL for hosted environments | Users, sessions, assignments, versions, submissions, feedback, study activity, and audit records |
+| Python grading | Modular graders and a dedicated sandbox service | Executes restricted student Python with import, time, output, and request-size controls |
+| ROS 2 grading | ROS 2 Jazzy Docker grader | Builds and checks observable topic behavior for the code-only ROS assignments |
+| AI tutoring | Deterministic tutor plus optional OpenAI Responses API | Explains student-visible evidence and gives progressive help without changing test-based grades |
+| Jobs and managed assets | Inline jobs locally; optional Redis/RQ; controlled backend storage | Supports current synchronous work and a path to longer grading, simulation, and asset jobs |
+| Local infrastructure | PowerShell launchers and Docker Compose | Runs the frontend, API, sandbox, PostgreSQL, Redis, and grader images |
+| Hosted web infrastructure | Vercel frontend; Render API and sandbox | Serves the Flutter web build and isolated backend services when a release is promoted |
+| Quality assurance | Pytest, Flutter analyzer/tests, release web build, Docker grader checks, and SQA records | Verifies backend, UI, grading, safety, and release behavior |
+
+## Application black-box architecture
+
+From a user's perspective, the platform is one learning system. Students and
+instructors use different authorized capabilities, while all grading,
+protected assignment data, tutoring, and persistence remain behind the system
+boundary.
+
+```mermaid
+flowchart LR
+    Student[Student] -->|Login, code, submissions, and questions| System[Robotics Programming Lab]
+    Instructor[Instructor] -->|Assignments, accounts, and review requests| System
+    System -->|Instructions, scores, evidence, hints, and progress| StudentResult[Student learning experience]
+    System -->|Published content, participant records, and exports| InstructorResult[Instructor study management]
+```
+
+The student submits code and receives structured test evidence. The instructor
+manages assignments and study accounts and reviews privacy-safe learning data.
+Hidden tests, grader settings, credentials, and reference solutions are not
+part of the student-facing boundary.
+
+## Technical architecture
+
+```mermaid
+flowchart TB
+    Browser[Web browser] -->|Flutter web UI and HTTPS JSON| API[FastAPI application]
+
+    subgraph Backend[Application services]
+        API --> Auth[Authentication and role authorization]
+        API --> AssignmentEngine[Versioned assignment engine]
+        API --> Graders[Modular grader layer]
+        API --> TutorService[Built-in and optional AI tutor]
+        API --> ResearchService[Study tracking and exports]
+        API --> AdminService[Instructor administration]
+    end
+
+    Auth --> Database[(SQLite local / PostgreSQL hosted)]
+    AssignmentEngine --> Database
+    ResearchService --> Database
+    AdminService --> Database
+    AssignmentEngine --> Assets[Controlled backend asset storage]
+
+    Graders --> PythonSandbox[Dedicated Python sandbox service]
+    PythonSandbox --> PythonWorker[Restricted short-lived Python worker]
+    Graders --> ROSGrader[ROS 2 Jazzy Docker grader]
+
+    TutorService --> Fallback[Deterministic progressive feedback]
+    TutorService -. opt-in, sanitized context .-> OpenAI[OpenAI Responses API]
+
+    API -. optional longer jobs .-> Queue[Redis and RQ]
+```
+
+The Flutter client contains presentation and local interaction state, but it
+does not grade submissions or hold protected answers. FastAPI is the trusted
+orchestration boundary. It authorizes requests, loads the exact assignment
+version, delegates code to an isolated grader, stores structured evidence, and
+then provides built-in or optional AI-enhanced tutoring. The deterministic
+grader remains the only scoring authority.
+
 ## Repository layout
 
 - `backend/`: FastAPI application, database models, graders, tutor, sandbox, and tests

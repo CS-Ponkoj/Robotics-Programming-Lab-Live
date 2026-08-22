@@ -134,6 +134,18 @@ change.
 
 ## Working method
 
+Engineering principles:
+
+- Prefer clean, correct, maintainable code over fast implementation.
+- Use the simplest design that satisfies current requirements and known future
+  plans; do not add abstractions, dependencies, or services without a clear
+  need.
+- Explain technical decisions, failures, and limitations in simple language.
+- Proactively check related edge cases, regressions, security risks, and stale
+  supporting documentation while keeping the change focused.
+- Preserve existing functionality and unrelated user work unless the owner
+  explicitly authorizes a broader change.
+
 Use an incremental, evidence-driven workflow:
 
 1. Inspect the current behavior, relevant tests, working tree, branch, and
