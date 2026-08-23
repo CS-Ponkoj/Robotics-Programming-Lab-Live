@@ -17,9 +17,12 @@ and secrets remain external environment values.
 Install once:
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
+.\scripts\setup-local.ps1
 ```
+
+Python 3.14 is required. The OneDrive checkout uses the single ignored
+`venv/`. On a newly synced Windows computer, run
+`.\scripts\setup-local.ps1 -Repair` once before testing.
 
 Run the complete application:
 

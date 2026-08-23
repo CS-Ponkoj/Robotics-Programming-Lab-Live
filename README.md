@@ -1,164 +1,224 @@
 # Robotics Programming Lab
 
-A configurable robotics-education platform with a Flutter student/instructor
-interface and a FastAPI assignment, grading, simulation, and tutoring API.
+A local-first robotics education platform. Students complete Python and ROS 2
+assignments in Flutter, FastAPI runs the assignment workflow, and test cases
+remain the only grading authority. AI tutoring is optional and off by default.
 
-## Live application
+This is the **staging repository**. Development and SQA happen here before an
+approved release is promoted to the separate live repository.
 
-Open the classroom-ready web application: [Robotics Programming Lab](https://robotics-programming-lab.vercel.app/)
+## Run it on this computer
+
+Open PowerShell in the repository root. The path may differ between computers;
+you do not need to type a fixed username or OneDrive path.
+
+First setup on this computer:
+
+```powershell
+.\scripts\setup-local.ps1
+```
+
+Start the application:
+
+```powershell
+.\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
+```
+
+Open the frontend URL printed by the script, normally
+`http://127.0.0.1:8180/app`. Keep the PowerShell window open.
+
+Stop the application:
+
+```powershell
+.\scripts\stop-local.ps1
+```
+
+The launcher starts the Python sandbox, FastAPI backend, and Flutter web app.
+It runs Flutter from LocalAppData so OneDrive cannot lock Flutter build files.
+Do not run `flutter run` directly inside this OneDrive checkout.
+
+## First setup on a new desktop or laptop
+
+Do these steps once on **each Windows computer**:
+
+1. Sign in to OneDrive and let this repository finish syncing.
+2. In File Explorer, right-click the repository folder and select
+   **Always keep on this device**.
+3. Install [Python 3.14](https://www.python.org/downloads/) and reopen
+   PowerShell. On Windows, the simplest command is:
+
+   ```powershell
+   winget install --id Python.Python.3.14 --exact
+   ```
+
+   Confirm it with:
+
+   ```powershell
+   py -3.14 --version
+   ```
+
+4. Install Flutter and confirm it is available:
+
+   ```powershell
+   flutter --version
+   flutter doctor
+   ```
+
+5. Open PowerShell in the synced repository root and repair/rebind the shared
+   environment for that computer:
+
+   ```powershell
+   .\scripts\setup-local.ps1 -Repair
+   .\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
+   ```
+
+Docker Desktop is required only for ROS 2 Assignments 5 and 6. Assignments
+1–4 work without Docker. For ROS assignments, start Docker Desktop, use Linux
+containers, and build the grader once:
+
+```powershell
+docker compose --profile build build ros2-grader-image
+```
+
+### Shared OneDrive environment
+
+The project keeps one generated Python environment at `venv/`. Every computer
+must use Windows, Python 3.14, and a compatible 64-bit architecture. The setup
+script records the computer and Python installation that last prepared the
+environment. When another computer runs the script, it rebinds the environment
+and reinstalls the exact versions in `backend/requirements.txt`.
+
+Virtual environments are not portable across Windows, macOS, Linux, different
+CPU architectures, or incompatible Python install layouts. For those cases,
+use a separate checkout or rebuild `venv/` on that system.
+
+Before switching computers:
+
+1. Run `.\scripts\stop-local.ps1`.
+2. Wait until OneDrive says **Up to date**.
+3. Close the repository on the first computer.
+4. On the other computer, wait for OneDrive, then run
+   `.\scripts\setup-local.ps1` before starting the app.
+
+Do not edit or run this checkout on both computers at the same time. Git is the
+authoritative source history; OneDrive provides working-folder sync.
+
+Always stop the application before running setup or repair. Windows cannot
+replace native Python package files while the backend is using them.
+
+## Local demo accounts
+
+The local database seeds these prototype accounts on first start:
+
+```text
+Student:    student / student
+Instructor: instructor / instructor
+```
+
+Change the credentials before a real classroom study. The login page does not
+display them.
 
 ## What is implemented
 
-- Versioned, database-backed assignment definitions
-- Stable assignment IDs and automatic version capture on every submission
-- Generic student endpoints for run, submit, hints, and protected solutions
-- Modular `AssignmentGrader` implementations
-- Server-only hidden grader configuration and reference solutions
-- Progressive deterministic tutoring, student questions, and an optional
-  OpenAI enhancement that never changes the test-based grade
-- Assignment-specific objectives, rubrics, misconceptions, tutor policies, and
-  simulation configuration
-- Instructor assignment studio with validation-before-publish
-- Student and instructor login with server-side sessions and role checks
-- Instructor student-account creation, manual password reset, and deactivation
-- Optional `study_accounts.json` import for manually managed prototype cohorts
-- PostgreSQL and Redis production services through Docker Compose
-- Dedicated secret-free sandbox service for live grading, plus Docker and
-  restricted-subprocess local adapters
-- Legacy `/grade/{id}` and `/assignments/` compatibility routes
-- Persistent Flutter drafts, scores, attempts, submission IDs, and solution state
-- Privacy-safe study sessions, active-time capture, learning events, participant
-  analytics, and authenticated CSV/Excel research exports
+- Six configurable, versioned assignments: four Python and two ROS 2 exercises
+- Test-case grading with server-only hidden evidence and maintained answers
+- Student coding workspace, results, progressive hints, and study progress
+- Instructor assignment, account, analytics, and research-export tools
+- Server-side sessions and role authorization
+- SQLite for simple local use and PostgreSQL migrations for hosted use
+- Dedicated local Python sandbox and Docker-based ROS 2 grader
+- Built-in tutoring plus optional OpenAI feedback that never changes grades
+- Privacy-safe learning events, attempts, participant analytics, CSV, and Excel
+  exports
 
 ## Technology stack
 
-| Layer | Technology | Responsibility |
+| Layer | Technology | Purpose |
 | --- | --- | --- |
-| Student and instructor interface | Flutter application written in Dart (project version 5.0.0) | Responsive assignment catalog, code workspace, results, tutoring, account administration, and research dashboards |
-| API and application services | Python 3.11, FastAPI, Uvicorn, and Pydantic | Authentication, assignment lifecycle, submissions, grading orchestration, tutoring, administration, and research APIs |
-| Data access and migrations | SQLAlchemy and Alembic | Versioned persistence models and repeatable database schema changes |
-| Database | SQLite locally; PostgreSQL for hosted environments | Users, sessions, assignments, versions, submissions, feedback, study activity, and audit records |
-| Python grading | Modular graders and a dedicated sandbox service | Executes restricted student Python with import, time, output, and request-size controls |
-| ROS 2 grading | ROS 2 Jazzy Docker grader | Builds and checks observable topic behavior for the code-only ROS assignments |
-| AI tutoring | Deterministic tutor plus optional OpenAI Responses API | Explains student-visible evidence and gives progressive help without changing test-based grades |
-| Jobs and managed assets | Inline jobs locally; optional Redis/RQ; controlled backend storage | Supports current synchronous work and a path to longer grading, simulation, and asset jobs |
-| Local infrastructure | PowerShell launchers and Docker Compose | Runs the frontend, API, sandbox, PostgreSQL, Redis, and grader images |
-| Hosted web infrastructure | Vercel frontend; Render API and sandbox | Serves the Flutter web build and isolated backend services when a release is promoted |
-| Quality assurance | Pytest, Flutter analyzer/tests, release web build, Docker grader checks, and SQA records | Verifies backend, UI, grading, safety, and release behavior |
+| Interface | Flutter and Dart | Student and instructor web experience |
+| API | Python 3.14, FastAPI, Uvicorn, Pydantic | Authentication, assignments, grading, tutoring, and research APIs |
+| Persistence | SQLAlchemy, Alembic, SQLite/PostgreSQL | Versioned assignments, users, attempts, and study data |
+| Python grading | Dedicated sandbox service | Bounded execution of untrusted Python submissions |
+| ROS 2 grading | ROS 2 Jazzy Docker image | Builds packages and checks observable topic behavior |
+| AI tutoring | Built-in tutor; optional OpenAI Responses API | Progressive feedback without grading or solution disclosure |
+| Hosted interface | Flutter web and Vercel when promoted | Serves an approved release |
+| Hosted API | Render when promoted | Runs the approved API and sandbox release |
 
-## Application black-box architecture
-
-From a user's perspective, the platform is one learning system. Students and
-instructors use different authorized capabilities, while all grading,
-protected assignment data, tutoring, and persistence remain behind the system
-boundary.
+## Application model
 
 ```mermaid
 flowchart LR
-    Student[Student] -->|Login, code, submissions, and questions| System[Robotics Programming Lab]
-    Instructor[Instructor] -->|Assignments, accounts, and review requests| System
-    System -->|Instructions, scores, evidence, hints, and progress| StudentResult[Student learning experience]
-    System -->|Published content, participant records, and exports| InstructorResult[Instructor study management]
+    Student[Student] -->|Login, code, run, submit, ask| Lab[Robotics Programming Lab]
+    Instructor[Instructor] -->|Manage assignments, accounts, and study| Lab
+    Lab -->|Scores, evidence, hints, and progress| Student
+    Lab -->|Analytics, exports, and administration| Instructor
 ```
-
-The student submits code and receives structured test evidence. The instructor
-manages assignments and study accounts and reviews privacy-safe learning data.
-Hidden tests, grader settings, credentials, and reference solutions are not
-part of the student-facing boundary.
 
 ## Technical architecture
 
 ```mermaid
 flowchart TB
-    Browser[Web browser] -->|Flutter web UI and HTTPS JSON| API[FastAPI application]
-
-    subgraph Backend[Application services]
-        API --> Auth[Authentication and role authorization]
-        API --> AssignmentEngine[Versioned assignment engine]
-        API --> Graders[Modular grader layer]
-        API --> TutorService[Built-in and optional AI tutor]
-        API --> ResearchService[Study tracking and exports]
-        API --> AdminService[Instructor administration]
-    end
-
-    Auth --> Database[(SQLite local / PostgreSQL hosted)]
-    AssignmentEngine --> Database
-    ResearchService --> Database
-    AdminService --> Database
-    AssignmentEngine --> Assets[Controlled backend asset storage]
-
-    Graders --> PythonSandbox[Dedicated Python sandbox service]
-    PythonSandbox --> PythonWorker[Restricted short-lived Python worker]
-    Graders --> ROSGrader[ROS 2 Jazzy Docker grader]
-
-    TutorService --> Fallback[Deterministic progressive feedback]
-    TutorService -. opt-in, sanitized context .-> OpenAI[OpenAI Responses API]
-
-    API -. optional longer jobs .-> Queue[Redis and RQ]
+    Browser[Flutter web UI] -->|HTTP JSON| API[FastAPI]
+    API --> Auth[Authentication and authorization]
+    API --> Engine[Versioned assignment engine]
+    API --> Tutor[Built-in and optional AI tutor]
+    API --> Research[Study tracking and exports]
+    Auth --> DB[(SQLite local / PostgreSQL hosted)]
+    Engine --> DB
+    Research --> DB
+    Engine --> PythonSandbox[Python sandbox service]
+    Engine --> ROS[ROS 2 Jazzy Docker grader]
+    Tutor --> BuiltIn[Deterministic feedback]
+    Tutor -. opt-in sanitized context .-> OpenAI[OpenAI API]
 ```
 
-The Flutter client contains presentation and local interaction state, but it
-does not grade submissions or hold protected answers. FastAPI is the trusted
-orchestration boundary. It authorizes requests, loads the exact assignment
-version, delegates code to an isolated grader, stores structured evidence, and
-then provides built-in or optional AI-enhanced tutoring. The deterministic
-grader remains the only scoring authority.
+Flutter never grades submissions or stores protected answers. FastAPI loads
+the exact assignment version, sends minimal code to the correct isolated
+grader, stores structured evidence, and supplies only student-visible evidence
+to the tutor. Test cases remain the scoring authority.
 
-## Repository layout
+## Repository map
 
-- `backend/`: FastAPI application, database models, graders, tutor, sandbox, and tests
-- `frontend/`: Flutter web/mobile student and instructor interface
-- `course_materials/`: controlled reference solutions and course source files
-- `manual_sqa_answers/`: instructor-only answer files for manual grader checks
-- `docs/`: architecture, deployment, research-data, and SQA documentation
-- `docker-compose.yml`: PostgreSQL, Redis, FastAPI, and persistent storage
+```text
+backend/              FastAPI app, data models, graders, assignments, and tests
+frontend/             Flutter student and instructor interface
+course_materials/     Controlled course source material
+manual_sqa_answers/   Maintained instructor answers for manual SQA
+docs/                 Architecture, deployment, research, and SQA documents
+scripts/              Setup, run, stop, verification, and release automation
+venv/                 Generated shared Python environment; never committed
+```
 
-## Local development
+The documentation index is [docs/README.md](docs/README.md). Engineering and
+security rules are in [AGENTS.md](AGENTS.md).
 
-The default local backend uses an ignored SQLite database so the project remains
-easy to run without Docker. Production and team environments should set
-`DATABASE_URL` to PostgreSQL.
+## AI option
 
-The project now uses a two-repository release workflow. All changes and SQA are
-performed in `Robotics-Programming-Lab-Staging`; the live
-`Robotics-Programming-Lab` repository receives only the exact approved commit.
-See the [staging and release workflow](docs/deployment/STAGING_AND_RELEASE_WORKFLOW.md).
-
-### Install
+AI is off by default. Normal grading and built-in hints do not require an API
+key. To intentionally test optional AI feedback, place `OPENAI_API_KEY` in the
+ignored `backend/.env` file and start with:
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
-Set-Location .\frontend
-flutter pub get
-Set-Location ..
+.\scripts\run-local.ps1 -EnableAi -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
 ```
 
-### Run
+Provider failure or missing credit must not block grading. Hidden tests,
+official solutions, secrets, and unrelated student data are excluded from the
+AI context.
 
-Run the complete local staging stack from the repository root:
+## Verification
+
+Run the complete OneDrive-safe local gate from the repository root:
 
 ```powershell
-Set-Location "C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging"
-.\scripts\stop-local.ps1
-.\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
+.\scripts\verify-local.ps1 -ApiBaseUrl http://127.0.0.1:5100
 ```
 
-This starts the dedicated sandbox, FastAPI backend, and Flutter web application
-while keeping AI off by default. It runs Flutter from a generated copy under
-`LocalAppData`, preventing OneDrive from locking Flutter build files. Keep the
-PowerShell window open and use the frontend URL printed by the script (with the
-ports above, `http://127.0.0.1:8180/app`).
+It runs backend tests, dependency checks, Python compilation, Flutter analysis
+and tests, a release web build from LocalAppData, Git whitespace validation,
+and managed-service health checks when the stack is running.
 
-The launcher defaults to frontend port `8080`, backend port `5000`, and sandbox
-port `5001` when the port parameters are omitted. Stop only the processes
-managed by the launcher with:
-
-```powershell
-.\scripts\stop-local.ps1
-```
-
-To troubleshoot the explicit-port example, check each managed service:
+Check the three local services manually when using the example ports:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8180/app
@@ -166,187 +226,21 @@ Invoke-RestMethod http://127.0.0.1:5100/health
 Invoke-RestMethod http://127.0.0.1:5101/health
 ```
 
-Do not use the retired `backend/run.py` command, and do not run `flutter run`
-directly inside the OneDrive checkout. Those older commands omit the dedicated
-sandbox and can trigger OneDrive build-directory locks.
-
-The backend seeds the configured assignments (including staging-only ROS
-Assignments 5 and 6) and two prototype accounts into the database on first
-start:
-
-```text
-Student:    student / student
-Instructor: instructor / instructor
-```
-
-The login page does not display these credentials. Override both passwords with
-server-side environment variables before sharing a live URL beyond the approved
-professor demo.
-
-The complete documentation map is in [`docs/README.md`](docs/README.md).
-Important entry points include the [V4 deployment guide](docs/deployment/V4_LIVE_DEPLOYMENT.md),
-the [V4.1 research data guide](docs/research/V4_1_RESEARCH_DATA_GUIDE.md),
-the [data dictionary](docs/research/DATA_DICTIONARY.md), and the
-[assignment content local SQA report](docs/sqa/ASSIGNMENT_CONTENT_LOCAL_SQA_REPORT_2026-08-21.md).
-
-## PostgreSQL, Redis, and Docker
-
-Copy `backend/.env.example` to the ignored `backend/.env` file and add database,
-email, and optional OpenAI settings. Compose loads this server-only file
-automatically. Then:
+For ROS 2 validation:
 
 ```powershell
-docker compose --profile build build sandbox-image
-docker compose up --build postgres redis backend
+.\scripts\check-ros2-local.ps1
 ```
 
-Compose defaults to `SANDBOX_BACKEND=docker`, executing every submission in a
-short-lived container with no network, capped memory/CPU, and a process limit.
-For ordinary zero-Docker development of Assignments 1 through 4, use
-`scripts/run-local.ps1`; it launches the dedicated local sandbox service with
-the restricted subprocess executor. Assignments 5 and 6 require Docker Desktop
-and the ROS 2 grader image.
+## Advanced configuration
 
-### Local ROS 2 assignments
+Local use defaults to an ignored SQLite database. Copy
+`backend/.env.example` to ignored `backend/.env` only when you need optional
+settings. PostgreSQL, Redis, production deployment, study-account import, API
+details, and research-data contracts are documented under `docs/` and
+`backend/README.md`.
 
-The staging catalog contains two ROS 2 Jazzy code-only exercises:
-
-- Assignment 5 publishes timed `geometry_msgs/Twist` movement and stop commands
-  on `/cmd_vel`.
-- Assignment 6 subscribes to synthetic `sensor_msgs/LaserScan` messages on
-  `/scan`, stops for a nearby obstacle or invalid scan, and resumes when the
-  path clears.
-
-Students can inspect each package tree but can edit only that package's
-`controller.py`. The grader builds the package and checks observable topic
-behavior without launching a simulator.
-
-Docker Desktop with Linux containers must be installed and running. Build the
-versioned grader image once, and rebuild it after changing either ROS worker:
-
-```powershell
-docker compose --profile build build ros2-grader-image
-docker image inspect robotics-lab-ros2-grader:jazzy-v1
-```
-
-Then use the normal local command:
-
-```powershell
-.\scripts\run-local.ps1
-```
-
-Assignments 1 through 4 still run when Docker is unavailable, but Assignments 5
-and 6 return an actionable Docker Desktop error instead of waiting
-indefinitely. Run `scripts/check-ros2-local.ps1` to verify the image and both
-maintained answers. The controller answers are stored at
-`manual_sqa_answers/assignment_5_ros2_drive_forward/controller.py` and
-`manual_sqa_answers/assignment_6_ros2_obstacle_stop/controller.py`. They are not
-returned by the student API or bundled into Flutter. Because they are committed
-as requested, anyone who can read this Git repository can read the answers; do
-not give students repository access if they must remain private.
-
-The live classroom deployment uses a second Render Docker web service defined
-in `render.yaml`. The main API sends only student code, requested result names,
-and an execution timeout to that service. The sandbox has no database or OpenAI
-credentials, and its short-lived worker environment excludes the service token.
-Production startup rejects the local subprocess backend.
-
-## Assignment API
-
-```text
-GET  /assignments
-GET  /assignments/{assignment_id}
-POST /assignments/{assignment_id}/run
-POST /assignments/{assignment_id}/submit
-POST /assignments/{assignment_id}/hint
-POST /assignments/{assignment_id}/solution
-```
-
-Authentication routes live under `/auth`. Instructor routes under `/admin`
-require an authenticated instructor account. A legacy `X-Admin-Token` remains
-available temporarily for older API clients, but the Flutter interface no
-longer asks for it.
-
-The student assignment endpoints never return `grader_config`, expected values,
-misconceptions used internally by the tutor, reference-solution paths, or the
-worked solution. A solution can be retrieved only using a submission ID for the
-current assignment version.
-
-## Study accounts
-
-Instructors can create, edit, reset, deactivate, and reactivate students from
-the instructor studio. Deactivation preserves attempts and study records.
-The v4 professor demo uses instructor-managed passwords. Self-service reset and
-email-delivery controls remain implemented but disabled by default.
-
-If those deferred features are enabled later, real email delivery requires the
-`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
-`SMTP_PASSWORD`, and `SMTP_FROM` values supplied by the chosen mail provider in
-the ignored `backend/.env` file. Restart the backend after changing them. The
-Student Accounts screen can report whether delivery is configured and provide a
-**Send test** action. Invitation and instructor-initiated email reset actions
-are blocked when SMTP is missing, so the interface never reports a development
-outbox message as a delivered email.
-
-For small prototype cohorts, copy
-`backend/data/study_accounts.example.json` to the ignored
-`backend/data/study_accounts.json`, edit it in VS Code, and use **Import
-study_accounts.json** on the Student Accounts screen. The database remains the
-login source of truth. Setting `"active": false` deactivates an account;
-removing a row from JSON does not delete it. Any `temporary_password` is hashed
-and cleared from the JSON file after import.
-
-Participant codes must be unique for student accounts. They are the identifiers
-shown in the research dashboard and exports; login IDs are intentionally
-excluded from those datasets.
-
-## Research study data
-
-PostgreSQL (or the local SQLite fallback) is the authoritative store for study
-sessions, active time, assignment attempts, hint/solution use, and learning
-events. The Flutter application sends a heartbeat every 30 seconds only while
-the page is visible. Code is saved only with an intentional run/submit and is
-not included in research dashboards or exports.
-
-Students can open **My study progress** from the account menu. Instructors can
-open **Research study dashboard** from the instructor studio, inspect a
-participant timeline, and download summary, attempt, or event CSV files plus a
-complete Excel workbook. All timestamps are stored in UTC and every assignment
-record includes its version.
-
-## AI tutoring
-
-Without an API key, the tutor produces deterministic progressive hints from
-sanitized grader evidence. With `OPENAI_API_KEY` in an ignored backend environment
-file, students can opt in to an enhanced feedback response and ask questions
-about their latest attempt. The test-case grader remains the only grading
-authority. The tutor explains the first problem, recommends small debugging
-steps, asks a guiding question, and avoids completed code.
-
-The model receives only the student's current code, optional current question,
-assignment learning context, and student-visible grader evidence. Hidden test
-implementations, protected expected values, grader configuration, credentials,
-and official solutions are never included. Model output must match a strict
-structured schema and pass a solution-leakage policy check; otherwise the
-platform returns a safe built-in response. OpenAI response storage is disabled.
-
-AI tutoring is disabled by default in the interface. Start the local stack with
-`.\scripts\run-local.ps1 -EnableAi` to make the opt-in switch available. If the
-key is missing, invalid, rate-limited, or out of credit, grading still completes
-and the built-in tutor remains available.
-
-## Verification
-
-Run the complete OneDrive-safe verification gate from the repository root:
-
-```powershell
-Set-Location "C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging"
-.\scripts\verify-local.ps1 -ApiBaseUrl http://127.0.0.1:5100
-```
-
-This runs backend tests, dependency and compilation checks, Flutter analysis and
-tests, a release web build from a safe `LocalAppData` copy, Git whitespace
-validation, and managed-service health checks when the local stack is running.
-
-Native Android builds additionally require Android Studio and the Android SDK.
-Windows desktop builds require the Visual Studio C++ desktop workload.
+Never commit `.env`, databases, credentials, API keys, Python environments,
+logs, or generated Flutter output. Do not promote staging to the live
+repository until the complete SQA gate passes and the project owner approves
+the exact commit.

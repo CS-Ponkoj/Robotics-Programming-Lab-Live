@@ -18,11 +18,18 @@ Direct local development can keep `SANDBOX_BACKEND=subprocess`.
 
 ## Run locally
 
+From the repository root, use the supported launcher so the backend and its
+dedicated sandbox start together:
+
 ```powershell
-..\venv\Scripts\python.exe run.py
+.\scripts\setup-local.ps1
+.\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
 ```
 
-OpenAPI documentation is available at `http://127.0.0.1:5000/docs`.
+OpenAPI documentation is available at `http://127.0.0.1:5100/docs` in local
+development. For backend-only diagnostics from this directory, use
+`..\venv\Scripts\python.exe -m uvicorn app:app --port 5100`; normal student
+execution still needs the sandbox started by the root launcher.
 
 ## Accounts and instructor access
 

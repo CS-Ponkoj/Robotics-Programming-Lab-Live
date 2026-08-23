@@ -1,6 +1,6 @@
 {
   "id": 3,
-  "version": 4,
+  "version": 5,
   "data_schema_version": 1,
   "title": "Assignment 3: Autonomous Robot Navigation in a Dynamic Office Environment",
   "description": "Compare two complete multi-floor routes using explicit obstacle detours, elevator delays, and destination-floor travel.",
@@ -16,7 +16,7 @@
     "Compare two route alternatives using the same complete cost model."
   ],
   "execution_settings": {
-    "runtime": "python3.11",
+    "runtime": "python3.14",
     "timeout_seconds": 5,
     "allowed_imports": ["math"],
     "network_enabled": false,

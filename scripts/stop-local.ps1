@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$stateFile = Join-Path $repositoryRoot ".local-run\state.json"
+Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
+$runtimeRoot = Get-RoboticsRuntimeRoot -RepositoryRoot $repositoryRoot
+$stateFile = Join-Path $runtimeRoot "state.json"
 
 if (-not (Test-Path -LiteralPath $stateFile)) {
     Write-Output "No managed local Robotics Programming Lab processes are recorded."

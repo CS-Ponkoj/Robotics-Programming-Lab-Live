@@ -1,6 +1,6 @@
 {
   "id": 1,
-  "version": 4,
+  "version": 5,
   "data_schema_version": 1,
   "title": "Assignment 1: Obstacle Avoidance: Bug Algorithm Scenario 1",
   "description": "Calculate a true Bug2 m-line route with valid hit and leave points.",
@@ -16,7 +16,7 @@
     "Verify that a Bug2 leave point is closer to the goal than the hit point."
   ],
   "execution_settings": {
-    "runtime": "python3.11",
+    "runtime": "python3.14",
     "timeout_seconds": 5,
     "allowed_imports": ["math"],
     "network_enabled": false,

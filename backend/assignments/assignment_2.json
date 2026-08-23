@@ -1,6 +1,6 @@
 {
   "id": 2,
-  "version": 3,
+  "version": 4,
   "data_schema_version": 1,
   "title": "Assignment 2: Obstacle Avoidance: Bug Algorithm Scenario 2",
   "description": "Calculate a geometrically consistent Bug2 detour around a rectangular obstacle.",
@@ -16,7 +16,7 @@
     "Compose a complete path length without omitting or double-counting segments."
   ],
   "execution_settings": {
-    "runtime": "python3.11",
+    "runtime": "python3.14",
     "timeout_seconds": 5,
     "allowed_imports": ["math"],
     "network_enabled": false,

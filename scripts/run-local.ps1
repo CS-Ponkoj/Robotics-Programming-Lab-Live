@@ -9,15 +9,13 @@ param(
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $backendRoot = Join-Path $repositoryRoot "backend"
-$python = Join-Path $repositoryRoot "venv\Scripts\python.exe"
-$stateRoot = Join-Path $repositoryRoot ".local-run"
+Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
+$python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot -EnsureDependencies
+$stateRoot = Get-RoboticsRuntimeRoot -RepositoryRoot $repositoryRoot
 $stateFile = Join-Path $stateRoot "state.json"
 $logRoot = Join-Path $stateRoot "logs"
-$safeFrontendRoot = Join-Path $env:LOCALAPPDATA "RoboticsProgrammingLab\frontend"
+$safeFrontendRoot = Join-Path $stateRoot "frontend"
 
-if (-not (Test-Path -LiteralPath $python)) {
-    throw "Python environment not found. Run: python -m venv venv; .\venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt"
-}
 if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
     throw "Flutter is not available on PATH. Install Flutter or open a terminal where 'flutter --version' works."
 }
@@ -110,7 +108,7 @@ function Wait-ForEndpoint {
             Start-Sleep -Milliseconds 500
         }
     }
-    throw "$Name did not become healthy at $Url. Review .local-run\logs."
+    throw "$Name did not become healthy at $Url. Review $logRoot."
 }
 
 function Wait-ForLogMessage {
@@ -127,11 +125,11 @@ function Wait-ForLogMessage {
             if ($content -and $content.Contains($Text)) { return }
         }
         if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {
-            throw "$Name exited before it became ready. Review .local-run\logs."
+            throw "$Name exited before it became ready. Review $logRoot."
         }
         Start-Sleep -Milliseconds 500
     }
-    throw "$Name did not become ready. Review .local-run\logs."
+    throw "$Name did not become ready. Review $logRoot."
 }
 
 $token = New-LocalToken

@@ -4,11 +4,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$python = Join-Path $repositoryRoot "venv\Scripts\python.exe"
-
-if (-not (Test-Path -LiteralPath $python)) {
-    throw "Python environment not found at $python."
-}
+Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
+$python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot -EnsureDependencies
 
 Push-Location (Join-Path $repositoryRoot "backend")
 try {
@@ -33,7 +30,7 @@ try {
     Pop-Location
 }
 
-$stateFile = Join-Path $repositoryRoot ".local-run\state.json"
+$stateFile = Join-Path (Get-RoboticsRuntimeRoot -RepositoryRoot $repositoryRoot) "state.json"
 if (Test-Path -LiteralPath $stateFile) {
     $state = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
     $backendHealth = Invoke-RestMethod -Uri "$($state.backendUrl)/health" -TimeoutSec 5

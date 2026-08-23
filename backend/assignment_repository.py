@@ -79,7 +79,7 @@ def _structured_source_values(source: dict, expected_values: dict) -> dict:
             "execution_settings": source.get(
                 "execution_settings",
                 {
-                    "runtime": "python3.11",
+                    "runtime": "python3.14",
                     "timeout_seconds": 5,
                     "allowed_imports": ["math", "numpy", "scipy"],
                 },

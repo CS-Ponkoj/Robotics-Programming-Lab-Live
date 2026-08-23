@@ -13,7 +13,7 @@ def valid_assignment_data():
     return {
         "learning_objectives": ["Interpret structured grader evidence."],
         "execution_settings": {
-            "runtime": "python3.11",
+            "runtime": "python3.14",
             "timeout_seconds": 5,
             "allowed_imports": ["math"],
         },

@@ -187,15 +187,21 @@ the appropriate API, test, browser, database, or deployed-service boundary.
 
 The supported developer shell is PowerShell on Windows.
 
-Install dependencies:
+Prepare the single ignored Python 3.14 environment and install pinned
+dependencies:
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
-Set-Location .\frontend
-flutter pub get
-Set-Location ..
+.\scripts\setup-local.ps1
 ```
+
+The checkout is intentionally inside OneDrive. It uses one shared `venv/` as
+requested. On every newly synced Windows computer, install Python 3.14 and run
+`.\scripts\setup-local.ps1 -Repair` once. The helper records the computer and
+base interpreter identity, rebinds the shared environment after a device
+switch, and reinstalls the pinned requirements when needed. Do not assume this
+environment is portable to another OS, CPU architecture, username, or Python
+install layout. Stop the app and wait for OneDrive to finish before switching
+computers; never run the checkout on two devices simultaneously.
 
 Start the complete local stack:
 
@@ -231,9 +237,9 @@ the same way as CI:
 
 ```powershell
 Set-Location .\backend
-..\venv\Scripts\python.exe -m pytest tests -q
-..\venv\Scripts\python.exe -m pip check
-..\venv\Scripts\python.exe -m compileall -q .
+& ..\venv\Scripts\python.exe -m pytest tests -q
+& ..\venv\Scripts\python.exe -m pip check
+& ..\venv\Scripts\python.exe -m compileall -q .
 Set-Location ..
 ```
 

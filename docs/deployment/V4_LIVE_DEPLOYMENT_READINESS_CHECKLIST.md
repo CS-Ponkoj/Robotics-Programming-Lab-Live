@@ -134,7 +134,7 @@ These checks describe the current local version. They do not by themselves appro
 | V4-SRC-004 | P0 | [ ] | Copy this reviewed checklist into the clean v4 branch before implementation. | File is present in the v4 branch and retains reviewer decisions. |
 | V4-SRC-005 | P1 | [ ] | Set a consistent release identity: Flutter `4.0.0+1`, API version `4.0.0`, and build commit SHA. | Version is visible in build metadata/health output and SQA report. |
 | V4-SRC-006 | P0 | [ ] | Run a tracked-file and Git-history secret scan before the first deployment. Rotate any exposed key rather than only deleting it. | Scan report contains no API keys, passwords, tokens, connection strings, or real participant data. |
-| V4-SRC-007 | P1 | [ ] | Pin direct Flutter dependencies instead of `any`, retain `pubspec.lock`, and record Python 3.11. | Clean CI install resolves the same versions twice. |
+| V4-SRC-007 | P1 | [ ] | Pin direct Flutter dependencies instead of `any`, retain `pubspec.lock`, and record Python 3.14. | Clean CI install resolves the same versions twice. |
 | V4-SRC-008 | P1 | [ ] | Record the final v4 commit SHA before deployment. Do not tag or publish until the user explicitly approves it. | Approved SHA appears in the release report. |
 
 ## 4. Confirmed blockers and required solutions
@@ -176,7 +176,7 @@ These checks describe the current local version. They do not by themselves appro
 
 | ID | Priority | Check | Requirement | Acceptance evidence |
 |---|---|---:|---|---|
-| V4-API-001 | P0 | [ ] | Add `render.yaml` or equivalent documented settings with Python 3.11, root/build/start commands, health path, and environment variables. | A clean Render deployment succeeds from the approved SHA without dashboard-only mystery steps. |
+| V4-API-001 | P0 | [ ] | Add `render.yaml` or equivalent documented settings with Python 3.14, root/build/start commands, health path, and environment variables. | A clean Render deployment succeeds from the approved SHA without dashboard-only mystery steps. |
 | V4-API-002 | P0 | [ ] | Bind Uvicorn to `0.0.0.0:$PORT`; do not hardcode port 5000 for the live process. | Render health check and public HTTPS URL succeed. |
 | V4-API-003 | P0 | [ ] | Keep all secrets in Render environment variables, never Vercel/Dart or Git. | Backend receives secrets; compiled frontend and repository scans are clean. |
 | V4-API-004 | P1 | [ ] | Use one worker for the initial free service and enforce execution concurrency limits. | Parallel run test returns controlled responses without exhausting memory. |

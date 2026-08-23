@@ -13,7 +13,7 @@ try {
 
     $tracked = @(git ls-files)
     $forbidden = @($tracked | Where-Object {
-        $_ -match '(^|/)(\.env|env|venv|build|\.dart_tool|\.local-run)(/|$)' -or
+        $_ -match '(^|/)(\.env|env|venv|venvs|build|\.dart_tool|\.local-run)(/|$)' -or
         $_ -match '\.(db|sqlite|sqlite3)$'
     })
     if ($forbidden.Count -gt 0) {

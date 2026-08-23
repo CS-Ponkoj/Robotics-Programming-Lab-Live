@@ -74,8 +74,13 @@ venv/
 *.pyc
 __pycache__/
 
+# Temporary Microsoft Office/editor lock files
+~$*
+~*.tmp
+
 # Ignore VSCode settings folder
 .vscode/
+.vs/
 
 # Ignore Windows folder settings
 desktop.ini

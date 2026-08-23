@@ -23,6 +23,8 @@ and verification records.
 ## SQA evidence
 
 - [Master SQA checklist](sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
+- [V5 Python 3.14 full local SQA report](sqa/V5_PYTHON_314_FULL_LOCAL_SQA_REPORT_2026-08-23.md)
+- [Python 3.14 and OneDrive local SQA report](sqa/PYTHON_314_ONEDRIVE_SQA_REPORT_2026-08-23.md)
 - [Assignment content local SQA report](sqa/ASSIGNMENT_CONTENT_LOCAL_SQA_REPORT_2026-08-21.md)
 - [AI Tutor Phase 1 staging SQA report](sqa/AI_TUTOR_PHASE1_SQA_REPORT_2026-08-21.md)
 - [V5 staging SQA report](sqa/V5_STAGING_SQA_REPORT.md)
