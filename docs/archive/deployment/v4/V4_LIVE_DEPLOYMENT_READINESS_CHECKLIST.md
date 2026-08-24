@@ -14,7 +14,7 @@ Target release: v4 live professor-review prototype
 Checklist owner: project developer / SQA reviewer
 Current release decision: **CLASSROOM CANDIDATE LOCALLY; deploy and complete the live sandbox/restart/restore gates before giving the URL to students.**
 
-This is the release gate for putting the current v3 application online without removing working functionality. The existing [master SQA checklist](../sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx) remains the general feature checklist; this document adds the v4 hosting, security, persistence, and live-parity gates.
+This is the release gate for putting the current v3 application online without removing working functionality. The existing [master SQA checklist](../../../sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx) remains the general feature checklist; this document adds the v4 hosting, security, persistence, and live-parity gates.
 
 ## How to use this checklist
 
@@ -322,7 +322,7 @@ Every row must be tested against the final Vercel URL, not localhost. Repeat the
 | V4-LIVE-007 | [ ] | Test malicious/oversized/infinite submissions and confirm controlled termination. |
 | V4-LIVE-008 | [ ] | Test Chrome desktop plus a narrow mobile viewport; inspect browser console and Render logs. |
 | V4-LIVE-009 | [ ] | Professor handoff rehearsal: open the link from a different network/device and use only the supplied instructions. |
-| V4-LIVE-010 | [ ] | Update the [master SQA checklist](../sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx) and issue a dated final v4 SQA report. |
+| V4-LIVE-010 | [ ] | Update the [master SQA checklist](../../../sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx) and issue a dated final v4 SQA report. |
 | V4-LIVE-011 | [ ] | Check out the exact deployed SHA in OneDrive and repeat the local backend + Flutter browser smoke test; confirm v4 remains locally runnable like v3. |
 
 ## 12. Rollback, recovery, and handoff

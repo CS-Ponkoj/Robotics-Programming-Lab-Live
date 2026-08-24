@@ -7,6 +7,9 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
 $python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot -EnsureDependencies
 
+& (Join-Path $PSScriptRoot "clean-local.ps1")
+if (-not $?) { throw "Safe local cleanup dry-run validation failed." }
+
 Push-Location (Join-Path $repositoryRoot "backend")
 try {
     & $python -m pytest tests -q

@@ -11,8 +11,7 @@ and verification records.
 ## Deployment and release
 
 - [Staging and release workflow](deployment/STAGING_AND_RELEASE_WORKFLOW.md)
-- [Historical V4 live deployment guide](deployment/V4_LIVE_DEPLOYMENT.md)
-- [Historical V4 live deployment readiness checklist](deployment/V4_LIVE_DEPLOYMENT_READINESS_CHECKLIST.md)
+- [Historical documentation archive](archive/README.md)
 
 ## Research data
 
@@ -26,17 +25,11 @@ and verification records.
   (historical workbook; the current PostgreSQL evidence is in the Markdown
   report below until the required spreadsheet runtime is available)
 - [Local PostgreSQL OneDrive handoff SQA report](sqa/LOCAL_POSTGRES_ONEDRIVE_HANDOFF_SQA_REPORT_2026-08-24.md)
-- [V5 Python 3.14 full local SQA report](sqa/V5_PYTHON_314_FULL_LOCAL_SQA_REPORT_2026-08-23.md)
-- [Python 3.14 and OneDrive local SQA report](sqa/PYTHON_314_ONEDRIVE_SQA_REPORT_2026-08-23.md)
-- [Assignment content local SQA report](sqa/ASSIGNMENT_CONTENT_LOCAL_SQA_REPORT_2026-08-21.md)
-- [AI Tutor Phase 1 staging SQA report](sqa/AI_TUTOR_PHASE1_SQA_REPORT_2026-08-21.md)
-- [V5 staging SQA report](sqa/V5_STAGING_SQA_REPORT.md)
-- [Stage 1 data-standardization SQA report](sqa/DATA_STANDARDIZATION_STAGE1_SQA_REPORT.md)
-- [V4.1 staging SQA report](sqa/V4_1_STAGING_SQA_REPORT.md)
-- [Secure-grader reliability SQA report](sqa/SECURE_GRADER_RELIABILITY_SQA_REPORT_2026-08-17.md)
-- [Demo-session SQA report](sqa/DEMO_SESSION_SQA_REPORT_2026-08-12.md)
-- [Assignment 5 ROS 2 local SQA report](sqa/ASSIGNMENT_5_ROS2_LOCAL_SQA_REPORT.md)
-- [Assignment 6 ROS 2 local SQA report](sqa/ASSIGNMENT_6_ROS2_LOCAL_SQA_REPORT.md)
+- [Repository cleanup SQA report](sqa/REPOSITORY_CLEANUP_SQA_REPORT_2026-08-24.md)
+
+Earlier dated reports remain available through the
+[historical documentation archive](archive/README.md). They are evidence from
+their recorded versions, not the current release decision.
 
 ## Placement rule
 
@@ -47,4 +40,6 @@ and verification records.
   `docs/deployment/`.
 - Put research schemas, collection guidance, and data definitions in
   `docs/research/`.
-- Put test checklists and dated evidence in `docs/sqa/`.
+- Keep the current test checklist and latest dated evidence in `docs/sqa/`.
+- Move superseded release evidence and deployment snapshots to `docs/archive/`
+  without rewriting their historical results.

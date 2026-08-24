@@ -122,7 +122,10 @@ backend/                          FastAPI application
   tests/                          Backend regression and security tests
 
 manual_sqa_answers/               Instructor-only manual verification answers
+course_materials/                 Controlled assignment sources and research references
+  archive/                        Historical supporting material, not runtime content
 docs/                             Architecture, deployment, research, and SQA records
+  archive/                        Superseded evidence retained for traceability
 scripts/                          Local run, verification, and release automation
 .github/workflows/ci.yml          Continuous-integration release gates
 render.yaml                       API and sandbox hosting configuration
@@ -275,7 +278,19 @@ complete `scripts/verify-local.ps1` gate.
 ```powershell
 git diff --check
 git status --short
+.\scripts\clean-local.ps1
 ```
+
+`scripts/clean-local.ps1` is dry-run by default. Use `-Execute` only after the
+managed application is stopped. Its allow-list may contain rebuildable caches
+and build output only. Never add `.git`, `venv`, databases,
+`local_database_backups`, `output`, `course_materials`, or
+`manual_sqa_answers` to that cleanup allow-list.
+
+Use Git maintenance commands for repository object cleanup; never delete files
+inside `.git` manually. Keep the current operating documents and latest SQA
+evidence in their active directories, and preserve superseded evidence under
+`docs/archive/` for research traceability.
 
 The release gate also requires migration validation, sandbox image build/smoke,
 correct and incorrect assignment solutions, unsafe-code rejection, browser SQA,

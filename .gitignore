@@ -1,53 +1,20 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.buildlog/
-.history
-.svn/
-migrate_working_dir/
-
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+# Secrets and local configuration
 .env
+*.local
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-.local-run/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-
-# Ignore virtual environment folders
+# Python environments, caches, and local coverage
 venv/
 env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local application runtime and data
+/.local-run/
 backend/*.db
 backend/managed_assets/
 backend/data/study_accounts.json
@@ -56,47 +23,49 @@ backend/data/*.db
 backend/data/*.sqlite
 backend/data/*.sqlite3
 backend/study_exports/
-
-# Ignore Python cache files
-__pycache__/
-*.py[cod]
-
-# Secrets
-.env
-
-
-# Python venvs
-env/
-venv/
-
-# OS / Editor
-.DS_Store
-*.pyc
-__pycache__/
-
-# Temporary Microsoft Office/editor lock files
-~$*
-~*.tmp
-
-# Ignore VSCode settings folder
-.vscode/
-.vs/
-
-# Ignore Windows folder settings
-desktop.ini
-
-# Generated local SQA exports (the maintained workbook remains at repository root)
-outputs/
 /output/
+/outputs/
 /tmp/
 
-# OneDrive-synchronized local PostgreSQL handoff artifacts. The directory and
-# its instructions are tracked, but dumps, manifests, and device locks are not.
+# OneDrive-synchronized PostgreSQL handoff artifacts
 /local_database_backups/*
 !/local_database_backups/.gitignore
 !/local_database_backups/README.md
 
+# Flutter and Dart generated files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+/frontend/build/
+/frontend/.flutter_build/
+app.*.symbols
+app.*.map.json
+/frontend/android/app/debug/
+/frontend/android/app/profile/
+/frontend/android/app/release/
 
+# Editors and operating systems
+.idea/
+.vscode/
+.vs/
+.atom/
+.history/
+.svn/
+.DS_Store
+desktop.ini
+*.iml
+*.ipr
+*.iws
+*.swp
+~$*
+~*.tmp
 
-# You may also ignore generated Flutter plugin files if they are re-generated,
-# but usually, it's fine to commit those if they are needed.
+# Other generated files
+*.class
+*.log
+.buildlog/
+migrate_working_dir/

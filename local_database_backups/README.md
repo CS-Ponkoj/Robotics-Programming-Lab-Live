@@ -18,3 +18,8 @@ volume has been recreated and the PostgreSQL application schema is missing.
 The current prototype backups are not encrypted. Before collecting real
 student or research data, move to approved managed storage or add an approved
 encrypted-backup procedure.
+
+Ignored SQLite files under `backend/` are legacy migration or diagnostic data,
+not disposable caches. Inspect and preserve their records before moving or
+deleting them. The safe cleanup script deliberately excludes every database
+file and this entire handoff directory.

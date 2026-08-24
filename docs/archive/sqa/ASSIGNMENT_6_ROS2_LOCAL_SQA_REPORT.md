@@ -52,7 +52,7 @@ hosted ROS worker and its deployment SQA are explicitly approved.
 | Hosted ROS worker | BLOCKED | Local Docker execution is not the approved production architecture. Deploy and secure a private Linux ROS worker before promotion. |
 | External computer/network | NOT RUN | Localhost was tested in a clean browser session and mobile viewport, not from a second physical device. |
 | Physical robot or simulator | NOT RUN | Assignment 6 intentionally uses synthetic LaserScan messages and observable topic grading without simulation. |
-| Excel evidence synchronization | BLOCKED | Copy this report into the [master SQA checklist](Robotics_Programming_Lab_Master_SQA_Checklist.xlsx) when the approved spreadsheet runtime is available. |
+| Excel evidence synchronization | BLOCKED | Copy this report into the [master SQA checklist](../../sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx) when the approved spreadsheet runtime is available. |
 
 ## Reproduction
 

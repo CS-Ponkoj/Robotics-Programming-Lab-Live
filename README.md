@@ -197,9 +197,10 @@ newer assignment. Test cases remain the scoring authority.
 ```text
 backend/              FastAPI app, data models, graders, assignments, and tests
 frontend/             Flutter student and instructor interface
-course_materials/     Controlled course source material
+course_materials/     Controlled course sources plus a labeled history archive
 manual_sqa_answers/   Maintained instructor answers for manual SQA
 docs/                 Architecture, deployment, research, and SQA documents
+  archive/             Superseded reports and deployment snapshots
 scripts/              Setup, run, stop, verification, and release automation
 venv/                 Generated shared Python environment; never committed
 ```
@@ -232,7 +233,8 @@ Run the complete OneDrive-safe local gate from the repository root:
 It runs backend tests, dependency checks, Python compilation, Flutter analysis
 and tests, a release web build from LocalAppData, an isolated PostgreSQL
 backup/restore and simulated-device-lock test, Git whitespace validation, and
-managed-service health checks when the stack is running.
+a dry-run validation of the safe cleanup allow-list. It also checks managed
+service health when the stack is running.
 
 Check the three local services manually when using the example ports:
 
@@ -247,6 +249,25 @@ For ROS 2 validation:
 ```powershell
 .\scripts\check-ros2-local.ps1
 ```
+
+## Safe local cleanup
+
+Preview rebuildable local artifacts from the repository root:
+
+```powershell
+.\scripts\clean-local.ps1
+```
+
+After stopping the application, remove only that fixed allow-list:
+
+```powershell
+.\scripts\stop-local.ps1
+.\scripts\clean-local.ps1 -Execute
+```
+
+The cleanup script protects `venv`, databases, PostgreSQL backups, generated
+PDF outputs, course materials, instructor answers, and Git history. Flutter and
+Python regenerate the removed caches during the next setup, test, or run.
 
 ## Advanced configuration
 
