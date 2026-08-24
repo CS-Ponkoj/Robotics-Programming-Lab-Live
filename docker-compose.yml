@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: robotics_lab
-      POSTGRES_USER: robotics
-      POSTGRES_PASSWORD: robotics
+      POSTGRES_DB: ${LOCAL_POSTGRES_DB:-robotics_lab}
+      POSTGRES_USER: ${LOCAL_POSTGRES_USER:-robotics}
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:-robotics-local-only}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${LOCAL_POSTGRES_PORT:-5432}:5432"
     volumes:
       - robotics_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U robotics -d robotics_lab"]
+      test: ["CMD-SHELL", "pg_isready -U ${LOCAL_POSTGRES_USER:-robotics} -d ${LOCAL_POSTGRES_DB:-robotics_lab}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -35,7 +35,7 @@ services:
     env_file:
       - backend/.env
     environment:
-      DATABASE_URL: postgresql+psycopg://robotics:robotics@postgres:5432/robotics_lab
+      DATABASE_URL: postgresql+psycopg://${LOCAL_POSTGRES_USER:-robotics}:${LOCAL_POSTGRES_PASSWORD:-robotics-local-only}@postgres:5432/${LOCAL_POSTGRES_DB:-robotics_lab}
       REDIS_URL: redis://redis:6379/0
       SANDBOX_BACKEND: ${SANDBOX_BACKEND:-docker}
       SANDBOX_IMAGE: robotics-lab-sandbox:latest

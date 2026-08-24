@@ -30,11 +30,15 @@ Run the complete application:
 .\scripts\run-local.ps1
 ```
 
-This starts the dedicated sandbox, API, and Flutter web application. Flutter is
-run from a generated LocalAppData copy to avoid OneDrive build-directory locks.
-The default database is the ignored `backend/robotics_lab_staging.db`, and AI is
-off. To test AI deliberately, use `-EnableAi`. To run final PostgreSQL parity
-testing, pass the separate staging Neon connection string through `-DatabaseUrl`.
+This starts local PostgreSQL 17, the dedicated sandbox, API, and Flutter web
+application. Flutter is run from a generated LocalAppData copy to avoid
+OneDrive build-directory locks. The live PostgreSQL Docker volume remains
+computer-local. The stop command creates a verified logical backup in
+`local_database_backups/` for sequential OneDrive handoff to another computer.
+The launcher also restores the verified dump after same-device Docker volume
+loss when the application schema is missing.
+AI is off. To test AI deliberately, use `-EnableAi`. To use an external staging
+database, pass its connection string through `-DatabaseUrl`.
 The launcher refuses to reuse ports already owned by an older project process;
 stop that process or provide different `-FrontendPort`, `-BackendPort`, and
 `-SandboxPort` values.
@@ -44,6 +48,10 @@ Stop the managed processes:
 ```powershell
 .\scripts\stop-local.ps1
 ```
+
+Do not close Docker or switch computers before this command finishes. Wait for
+OneDrive to synchronize `latest.dump` and `latest.json`. The device lock blocks
+ordinary startup on another computer until the first computer stops cleanly.
 
 Run the full automated SQA gate:
 
@@ -70,9 +78,11 @@ Before production promotion:
 - Flutter analysis, tests, and release web build pass;
 - the sandbox container builds in GitHub Actions;
 - correct and incorrect submissions behave as expected;
+- older browser drafts are not reused after an assignment version changes;
 - dangerous imports remain blocked;
 - instructor-created student login and student data isolation pass;
 - PostgreSQL persistence/restart testing passes;
+- the isolated PostgreSQL backup/restore, checksum, and device-lock test passes;
 - the workbook records zero open release blockers;
 - staging `main` is clean and pushed; and
 - the user explicitly approves the production release and release tag.

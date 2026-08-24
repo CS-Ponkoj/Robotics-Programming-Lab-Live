@@ -19,6 +19,9 @@ try {
     Pop-Location
 }
 
+& (Join-Path $PSScriptRoot "verify-database-handoff.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Local PostgreSQL handoff verification failed." }
+
 & (Join-Path $PSScriptRoot "verify_frontend_onedrive.ps1") -ApiBaseUrl $ApiBaseUrl
 if ($LASTEXITCODE -ne 0) { throw "Flutter verification failed." }
 

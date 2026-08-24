@@ -90,6 +90,12 @@ outputs/
 /output/
 /tmp/
 
+# OneDrive-synchronized local PostgreSQL handoff artifacts. The directory and
+# its instructions are tracked, but dumps, manifests, and device locks are not.
+/local_database_backups/*
+!/local_database_backups/.gitignore
+!/local_database_backups/README.md
+
 
 
 # You may also ignore generated Flutter plugin files if they are re-generated,

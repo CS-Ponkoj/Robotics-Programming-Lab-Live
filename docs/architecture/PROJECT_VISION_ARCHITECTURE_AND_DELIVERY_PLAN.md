@@ -56,7 +56,8 @@ simulation are pedagogically correct, secure, reproducible, and versioned.
 - Required student or instructor sign-in with an opaque server-side session.
 - Default local prototype student and instructor accounts.
 - Forgot-password flow using a one-time email link.
-- Assignment catalog containing four versioned robotics assignments.
+- Assignment catalog containing six versioned robotics assignments: four
+  Python exercises and two ROS 2 exercises.
 - Progress summary and assignment state badges.
 - Responsive desktop workspace with editor, instructions, and results panels.
 - Responsive mobile workspace with Code, Instructions, and Results tabs.
@@ -67,8 +68,8 @@ simulation are pedagogically correct, secure, reproducible, and versioned.
 - Deterministic built-in tutoring fallback.
 - Progressive hint levels 1 through 4.
 - Worked-solution protection until a current-version submission exists.
-- Persistent drafts, attempts, latest score, best score, submission ID, and
-  solution-reveal state.
+- Persistent drafts scoped to the exact assignment version, plus attempts,
+  latest score, best score, submission ID, and solution-reveal state.
 - Actionable loading, empty, and backend-error states.
 
 ### Instructor experience
@@ -94,7 +95,8 @@ simulation are pedagogically correct, secure, reproducible, and versioned.
 ### Backend and grading
 
 - FastAPI application with OpenAPI documentation.
-- SQLAlchemy persistence with local SQLite and PostgreSQL configuration.
+- SQLAlchemy persistence with PostgreSQL locally and when hosted, plus an
+  explicit disposable SQLite troubleshooting fallback.
 - Argon2id password hashing, opaque hashed session tokens, expiry, and logout.
 - Login throttling and generic forgot-password responses.
 - One-time expiring password-reset tokens that revoke existing sessions.
@@ -468,10 +470,10 @@ A feature is done when:
 | Hidden solution or test leakage | Academic integrity failure | Server-only packages, response allowlists, automated leak scans |
 | Unsafe code execution | Host or data compromise | Docker isolation, resource limits, no network, read-only packages |
 | AI reveals answers or becomes unavailable | Pedagogical harm or broken workflow | Sanitized evidence, strict tutor policy, evaluation, deterministic fallback |
-| Assignment edits invalidate student work | Incorrect grading and progress | Immutable versions and version recorded on every submission |
+| Assignment edits invalidate student work | Incorrect grading and progress | Immutable versions, version recorded on every submission, and browser drafts loaded only for the matching version |
 | Simulation jobs block API workers | Poor availability | Redis queue, background workers, cancellation, status polling |
 | Shared instructor token is compromised | Unauthorized content changes | Replace with authentication, RBAC, rotation, and audit logging |
-| Local-only SQLite behavior differs from production | Deployment defects | PostgreSQL CI/integration environment and migration tests |
+| Local and hosted database behavior diverges | Deployment defects | PostgreSQL by default locally and when hosted, plus migration tests |
 | Large generated files enter Git | Repository bloat and merge noise | Dedicated cleanup, ignores, pre-commit checks, artifact storage |
 
 ## Idea backlog

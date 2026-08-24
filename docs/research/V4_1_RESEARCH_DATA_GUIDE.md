@@ -4,8 +4,8 @@
 
 V4.1 adds classroom-study evidence without changing assignment grading,
 solution protection, authentication, or the optional AI tutor. PostgreSQL is
-the live source of truth; local development uses the same models with SQLite
-unless `DATABASE_URL` points to PostgreSQL.
+the source of truth locally and when hosted. SQLite remains an explicit
+disposable troubleshooting fallback.
 
 ## Data flow
 
@@ -37,15 +37,16 @@ grading but is excluded from research dashboards and exports.
 
 - Student: account menu -> **My study progress**
 - Instructor: instructor studio -> **Research study dashboard**
-- Raw database: Neon SQL Editor for authorized technical inspection
+- Raw hosted database: Neon SQL Editor for authorized technical inspection
+- Raw local database: PostgreSQL tools connected to `127.0.0.1:5432`
 - Export: student summary CSV, assignment attempts CSV, learning events CSV,
   or a three-sheet Excel workbook
 
-For local file locations, table definitions, standard execution statuses, and
-event payload rules, see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). The local
-SQLite database is the ignored `backend/robotics_lab_staging.db` file and can be
-opened read-only with a trusted VS Code SQLite viewer. Assignment source data is
-human-readable in `backend/assignments/assignment_*.json`.
+For local storage, table definitions, standard execution statuses, and event
+payload rules, see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). Verified
+PostgreSQL handoff dumps are synchronized under `local_database_backups/` but
+must be restored before inspection. Assignment source data is human-readable in
+`backend/assignments/assignment_*.json`.
 
 ## Privacy and data quality
 

@@ -11,8 +11,8 @@ and verification records.
 ## Deployment and release
 
 - [Staging and release workflow](deployment/STAGING_AND_RELEASE_WORKFLOW.md)
-- [V4 live deployment guide](deployment/V4_LIVE_DEPLOYMENT.md)
-- [V4 live deployment readiness checklist](deployment/V4_LIVE_DEPLOYMENT_READINESS_CHECKLIST.md)
+- [Historical V4 live deployment guide](deployment/V4_LIVE_DEPLOYMENT.md)
+- [Historical V4 live deployment readiness checklist](deployment/V4_LIVE_DEPLOYMENT_READINESS_CHECKLIST.md)
 
 ## Research data
 
@@ -23,6 +23,9 @@ and verification records.
 ## SQA evidence
 
 - [Master SQA checklist](sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
+  (historical workbook; the current PostgreSQL evidence is in the Markdown
+  report below until the required spreadsheet runtime is available)
+- [Local PostgreSQL OneDrive handoff SQA report](sqa/LOCAL_POSTGRES_ONEDRIVE_HANDOFF_SQA_REPORT_2026-08-24.md)
 - [V5 Python 3.14 full local SQA report](sqa/V5_PYTHON_314_FULL_LOCAL_SQA_REPORT_2026-08-23.md)
 - [Python 3.14 and OneDrive local SQA report](sqa/PYTHON_314_ONEDRIVE_SQA_REPORT_2026-08-23.md)
 - [Assignment content local SQA report](sqa/ASSIGNMENT_CONTENT_LOCAL_SQA_REPORT_2026-08-21.md)

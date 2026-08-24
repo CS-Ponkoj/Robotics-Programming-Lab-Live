@@ -27,7 +27,10 @@ after an instructor updates the assignment.
 | Data | Local location | Format | Human-readable? |
 |---|---|---|---|
 | Assignment source definitions | `backend/assignments/assignment_1.json` through `assignment_6.json` | JSON | Yes, open directly in VS Code |
-| Local application database | `backend/robotics_lab_staging.db` | SQLite | Use a SQLite viewer |
+| Active local application database | Computer-local Docker volume `robotics-lab-local_robotics_postgres_data` | PostgreSQL 17 | Use the application or an authorized PostgreSQL client |
+| Cross-device database handoff | `local_database_backups/latest.dump` plus `latest.json` | Verified PostgreSQL logical backup | Restore through `scripts/run-local.ps1` |
+| Legacy local source preserved during first migration | `backend/robotics_lab_staging.db` | SQLite | Read-only; not used by the default launcher after migration |
+| Student editor draft | Browser storage, keyed by assignment ID and assignment version | Local JSON preferences | View through the matching assignment workspace; older-version drafts are ignored |
 | Optional prototype account import | `backend/data/study_accounts.json` | JSON | Yes, but it can contain temporary passwords and is ignored by Git |
 | Safe account-import example | `backend/data/study_accounts.example.json` | JSON | Yes |
 | Research exports | Downloaded from the instructor Research Dashboard | CSV or Excel | Yes |
@@ -35,17 +38,20 @@ after an instructor updates the assignment.
 | Database table definitions | `backend/models.py` | Python/SQLAlchemy | Yes |
 | Database schema history | `backend/migrations/versions/` | Alembic/Python | Yes |
 
-The ignored SQLite file appears after the local application has been started.
-It is a developer database, not a file that should be committed or manually
-edited. PostgreSQL is the source of truth for a deployed study.
+The active PostgreSQL files stay inside Docker and are never synchronized by
+OneDrive. `scripts/stop-local.ps1` exports a complete validated dump, checksum
+manifest, and previous backup into the ignored OneDrive handoff directory.
+The launcher restores the verified dump for a new device, a newer synchronized
+backup, or a recreated same-device volume with no application schema.
+PostgreSQL is the source of truth. Never edit a dump or live database file.
 
-## How to see the local SQLite data without a terminal
+## How to see local data
 
 1. Start the staging application with `scripts/run-local.ps1`.
-2. In VS Code, install a trusted SQLite-viewer extension if one is not already
-   installed.
-3. Open `backend/robotics_lab_staging.db` from the Explorer.
-4. Inspect the tables listed below in read-only mode.
+2. Use **My study progress** as a student or **Research study dashboard** as an
+   instructor.
+3. For authorized technical inspection, connect a trusted PostgreSQL client to
+   `127.0.0.1:5432`, database `robotics_lab`, while the app is running.
 
 For ordinary study review, the safer option is the application itself:
 
@@ -53,7 +59,7 @@ For ordinary study review, the safer option is the application itself:
 - Instructor: instructor studio, then **Research study dashboard**.
 - Instructor export: download summary, attempts, events, or the Excel workbook.
 
-Do not open or share a live production database file. Authorized production
+Do not share handoff dumps or live production access. Authorized production
 inspection should use the Neon SQL Editor and participant codes.
 
 ## Main tables
@@ -161,6 +167,8 @@ configuration explicitly. All assignment files declare
 
 - Assignment content versions and data-schema versions must be positive.
 - Every stored submission receives its assignment version from the server.
+- Browser code drafts are loaded only when their saved assignment version
+  matches the version currently returned by the server.
 - Assignment-related events require assignment ID and version together.
 - The server rejects events for a version that is no longer current.
 - Submission modes and execution statuses use allowlisted values.

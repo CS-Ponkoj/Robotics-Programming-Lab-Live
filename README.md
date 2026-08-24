@@ -33,7 +33,9 @@ Stop the application:
 .\scripts\stop-local.ps1
 ```
 
-The launcher starts the Python sandbox, FastAPI backend, and Flutter web app.
+The launcher starts local PostgreSQL in Docker, the Python sandbox, FastAPI
+backend, and Flutter web app. On stop, it writes a verified complete PostgreSQL
+backup into the OneDrive-synchronized `local_database_backups/` directory.
 It runs Flutter from LocalAppData so OneDrive cannot lock Flutter build files.
 Do not run `flutter run` directly inside this OneDrive checkout.
 
@@ -57,14 +59,21 @@ Do these steps once on **each Windows computer**:
    py -3.14 --version
    ```
 
-4. Install Flutter and confirm it is available:
+4. Install Docker Desktop, select Linux containers, start it, and confirm:
+
+   ```powershell
+   docker version
+   docker compose version
+   ```
+
+5. Install Flutter and confirm it is available:
 
    ```powershell
    flutter --version
    flutter doctor
    ```
 
-5. Open PowerShell in the synced repository root and repair/rebind the shared
+6. Open PowerShell in the synced repository root and repair/rebind the shared
    environment for that computer:
 
    ```powershell
@@ -72,9 +81,8 @@ Do these steps once on **each Windows computer**:
    .\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
    ```
 
-Docker Desktop is required only for ROS 2 Assignments 5 and 6. Assignments
-1–4 work without Docker. For ROS assignments, start Docker Desktop, use Linux
-containers, and build the grader once:
+Docker Desktop is required for the default local PostgreSQL database and ROS 2
+Assignments 5 and 6. Build the ROS grader once on each computer:
 
 ```powershell
 docker compose --profile build build ros2-grader-image
@@ -94,11 +102,13 @@ use a separate checkout or rebuild `venv/` on that system.
 
 Before switching computers:
 
-1. Run `.\scripts\stop-local.ps1`.
-2. Wait until OneDrive says **Up to date**.
+1. Run `.\scripts\stop-local.ps1`. This creates and verifies `latest.dump`.
+2. Wait until OneDrive says **Up to date**, including
+   `local_database_backups/latest.dump` and `latest.json`.
 3. Close the repository on the first computer.
 4. On the other computer, wait for OneDrive, then run
-   `.\scripts\setup-local.ps1` before starting the app.
+   `.\scripts\setup-local.ps1` before starting the app. The launcher restores
+   a newer synchronized backup automatically.
 
 Do not edit or run this checkout on both computers at the same time. Git is the
 authoritative source history; OneDrive provides working-folder sync.
@@ -122,10 +132,12 @@ display them.
 
 - Six configurable, versioned assignments: four Python and two ROS 2 exercises
 - Test-case grading with server-only hidden evidence and maintained answers
-- Student coding workspace, results, progressive hints, and study progress
+- Student coding workspace, version-scoped local drafts, results, progressive
+  hints, and study progress
 - Instructor assignment, account, analytics, and research-export tools
 - Server-side sessions and role authorization
-- SQLite for simple local use and PostgreSQL migrations for hosted use
+- PostgreSQL in a local Docker volume with verified OneDrive handoff backups
+- Explicit `-UseSqlite` fallback for disposable troubleshooting only
 - Dedicated local Python sandbox and Docker-based ROS 2 grader
 - Built-in tutoring plus optional OpenAI feedback that never changes grades
 - Privacy-safe learning events, attempts, participant analytics, CSV, and Excel
@@ -137,7 +149,7 @@ display them.
 | --- | --- | --- |
 | Interface | Flutter and Dart | Student and instructor web experience |
 | API | Python 3.14, FastAPI, Uvicorn, Pydantic | Authentication, assignments, grading, tutoring, and research APIs |
-| Persistence | SQLAlchemy, Alembic, SQLite/PostgreSQL | Versioned assignments, users, attempts, and study data |
+| Persistence | SQLAlchemy, Alembic, PostgreSQL 17 | Versioned assignments, users, attempts, and study data |
 | Python grading | Dedicated sandbox service | Bounded execution of untrusted Python submissions |
 | ROS 2 grading | ROS 2 Jazzy Docker image | Builds packages and checks observable topic behavior |
 | AI tutoring | Built-in tutor; optional OpenAI Responses API | Progressive feedback without grading or solution disclosure |
@@ -163,9 +175,10 @@ flowchart TB
     API --> Engine[Versioned assignment engine]
     API --> Tutor[Built-in and optional AI tutor]
     API --> Research[Study tracking and exports]
-    Auth --> DB[(SQLite local / PostgreSQL hosted)]
+    Auth --> DB[(PostgreSQL)]
     Engine --> DB
     Research --> DB
+    DB -->|verified dump on stop| Backup[OneDrive handoff backup]
     Engine --> PythonSandbox[Python sandbox service]
     Engine --> ROS[ROS 2 Jazzy Docker grader]
     Tutor --> BuiltIn[Deterministic feedback]
@@ -175,7 +188,9 @@ flowchart TB
 Flutter never grades submissions or stores protected answers. FastAPI loads
 the exact assignment version, sends minimal code to the correct isolated
 grader, stores structured evidence, and supplies only student-visible evidence
-to the tutor. Test cases remain the scoring authority.
+to the tutor. Browser drafts are tied to the assignment version, so code saved
+for an older version is not silently reused after an instructor publishes a
+newer assignment. Test cases remain the scoring authority.
 
 ## Repository map
 
@@ -215,8 +230,9 @@ Run the complete OneDrive-safe local gate from the repository root:
 ```
 
 It runs backend tests, dependency checks, Python compilation, Flutter analysis
-and tests, a release web build from LocalAppData, Git whitespace validation,
-and managed-service health checks when the stack is running.
+and tests, a release web build from LocalAppData, an isolated PostgreSQL
+backup/restore and simulated-device-lock test, Git whitespace validation, and
+managed-service health checks when the stack is running.
 
 Check the three local services manually when using the example ports:
 
@@ -234,11 +250,19 @@ For ROS 2 validation:
 
 ## Advanced configuration
 
-Local use defaults to an ignored SQLite database. Copy
-`backend/.env.example` to ignored `backend/.env` only when you need optional
-settings. PostgreSQL, Redis, production deployment, study-account import, API
-details, and research-data contracts are documented under `docs/` and
-`backend/README.md`.
+Local use defaults to the Docker PostgreSQL service. Its live Docker volume is
+computer-local and must never be placed in OneDrive. OneDrive synchronizes only
+the verified logical dump and checksum manifest under
+`local_database_backups/`. The launcher restores that verified dump on a new
+computer, when it is newer than the local copy, or when the same computer's
+Docker volume has been recreated and no application schema remains. Use
+`-DatabasePort 55432` if port 5432 is occupied.
+Use `-UseSqlite` only for a disposable offline troubleshooting run; that mode is
+not part of the cross-device handoff workflow.
+
+Copy `backend/.env.example` to ignored `backend/.env` only when you need optional
+settings. Production deployment, study-account import, API details, and
+research-data contracts are documented under `docs/` and `backend/README.md`.
 
 Never commit `.env`, databases, credentials, API keys, Python environments,
 logs, or generated Flutter output. Do not promote staging to the live

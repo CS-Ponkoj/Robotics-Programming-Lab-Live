@@ -8,6 +8,7 @@ class LearningProgressStore {
   static const _latestScoresKey = 'learning.latest_scores.v1';
   static const _bestScoresKey = 'learning.best_scores.v1';
   static const _draftsKey = 'learning.code_drafts.v1';
+  static const _draftVersionsKey = 'learning.code_draft_versions.v1';
   static const _attemptCountsKey = 'learning.attempt_counts.v1';
   static const _revealedSolutionsKey = 'learning.revealed_solutions.v1';
   static const _submissionIdsKey = 'learning.submission_ids.v1';
@@ -15,6 +16,7 @@ class LearningProgressStore {
   final Map<int, int> latestScores = {};
   final Map<int, int> bestScores = {};
   final Map<int, String> codeDrafts = {};
+  final Map<int, int> codeDraftVersions = {};
   final Map<int, int> attemptCounts = {};
   final Set<int> revealedSolutions = {};
   final Map<int, String> submissionIds = {};
@@ -32,14 +34,24 @@ class LearningProgressStore {
 
   AssignmentProgressState assignmentState(
     int assignmentId, {
+    int? assignmentVersion,
     String starterCode = '',
   }) {
     return resolveAssignmentProgress(
       attemptCount: attemptCounts[assignmentId] ?? 0,
       bestScore: bestScores[assignmentId] ?? 0,
-      savedDraft: codeDrafts[assignmentId],
+      savedDraft: assignmentVersion == null
+          ? null
+          : draftFor(assignmentId, assignmentVersion),
       starterCode: starterCode,
     );
+  }
+
+  String? draftFor(int assignmentId, int assignmentVersion) {
+    if (codeDraftVersions[assignmentId] != assignmentVersion) {
+      return null;
+    }
+    return codeDrafts[assignmentId];
   }
 
   Future<void> load({ProgressStorage? storage}) async {
@@ -50,6 +62,9 @@ class LearningProgressStore {
     latestScores.addAll(_decodeIntMap(_getStringSafely(_latestScoresKey)));
     bestScores.addAll(_decodeIntMap(_getStringSafely(_bestScoresKey)));
     codeDrafts.addAll(_decodeStringMap(_getStringSafely(_draftsKey)));
+    codeDraftVersions.addAll(
+      _decodeIntMap(_getStringSafely(_draftVersionsKey)),
+    );
     attemptCounts.addAll(_decodeIntMap(_getStringSafely(_attemptCountsKey)));
     revealedSolutions.addAll(
       _decodeIntList(_getStringSafely(_revealedSolutionsKey))
@@ -65,14 +80,28 @@ class LearningProgressStore {
     latestScores.clear();
     bestScores.clear();
     codeDrafts.clear();
+    codeDraftVersions.clear();
     attemptCounts.clear();
     revealedSolutions.clear();
     submissionIds.clear();
   }
 
-  Future<void> saveDraft(int assignmentId, String code) async {
+  Future<void> saveDraft(
+    int assignmentId,
+    int assignmentVersion,
+    String code,
+  ) async {
     codeDrafts[assignmentId] = code;
-    await _storage?.setString(_draftsKey, _encodeMap(codeDrafts));
+    codeDraftVersions[assignmentId] = assignmentVersion;
+    await Future.wait([
+      if (_storage != null)
+        _storage!.setString(_draftsKey, _encodeMap(codeDrafts)),
+      if (_storage != null)
+        _storage!.setString(
+          _draftVersionsKey,
+          _encodeMap(codeDraftVersions),
+        ),
+    ]);
   }
 
   Future<void> recordAttempt(int assignmentId, int score) async {

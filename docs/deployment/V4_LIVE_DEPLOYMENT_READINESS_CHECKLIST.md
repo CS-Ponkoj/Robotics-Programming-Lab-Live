@@ -1,5 +1,10 @@
 # Robotics Programming Lab v4 Live Deployment Readiness Checklist
 
+> **Historical snapshot:** This checklist preserves the evidence and decisions
+> from the v4 deployment phase. It is not the current local release gate. Use
+> `STAGING_AND_RELEASE_WORKFLOW.md` and the newest report under `docs/sqa/` for
+> the PostgreSQL-based staging workflow.
+
 Last audited: 2026-08-04
 
 Target repository: `CS-Ponkoj/Robotics-Programming-Lab`

@@ -1,9 +1,11 @@
 param(
-    [string]$DatabaseUrl = "sqlite:///robotics_lab_staging.db",
+    [string]$DatabaseUrl = "",
+    [switch]$UseSqlite,
     [switch]$EnableAi,
     [int]$FrontendPort = 8080,
     [int]$BackendPort = 5000,
-    [int]$SandboxPort = 5001
+    [int]$SandboxPort = 5001,
+    [int]$DatabasePort = 5432
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +39,23 @@ if (Test-Path -LiteralPath $stateFile) {
 }
 
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
+$localDatabaseSession = $null
+
+if ($UseSqlite -and -not [string]::IsNullOrWhiteSpace($DatabaseUrl)) {
+    throw "Use either -UseSqlite or -DatabaseUrl, not both."
+}
+if ($UseSqlite) {
+    $DatabaseUrl = "sqlite:///robotics_lab_staging.db"
+} elseif ([string]::IsNullOrWhiteSpace($DatabaseUrl)) {
+    Import-Module (Join-Path $PSScriptRoot "local-database.psm1") -Force
+    $localDatabaseSession = Start-RoboticsLocalPostgres `
+        -RepositoryRoot $repositoryRoot `
+        -DatabasePort $DatabasePort
+    $DatabaseUrl = $localDatabaseSession.DatabaseUrl
+    if ($localDatabaseSession.RestoredBackup) {
+        Write-Output "Restored the newest verified OneDrive PostgreSQL backup."
+    }
+}
 
 function New-LocalToken {
     $bytes = New-Object byte[] 32
@@ -141,6 +160,20 @@ try {
     try {
         & $python -m alembic upgrade head
         if ($LASTEXITCODE -ne 0) { throw "Database migration failed." }
+        if ($localDatabaseSession -and -not $localDatabaseSession.HasSynchronizedBackup) {
+            $sqliteSource = Join-Path $backendRoot "robotics_lab_staging.db"
+            if (Test-Path -LiteralPath $sqliteSource) {
+                $importReport = Join-Path $localDatabaseSession.RuntimeRoot "sqlite-import-report.json"
+                & $python database_transfer.py `
+                    --sqlite $sqliteSource `
+                    --target-url $DatabaseUrl `
+                    --report $importReport `
+                    --if-empty
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Existing SQLite data could not be transferred to local PostgreSQL."
+                }
+            }
+        }
     } finally {
         Pop-Location
         [System.Environment]::SetEnvironmentVariable("DATABASE_URL", $previousDatabaseUrl, "Process")
@@ -158,7 +191,7 @@ try {
     $backendEnvironment = @{
         ENVIRONMENT = "development"
         DATABASE_URL = $DatabaseUrl
-        AUTO_CREATE_SCHEMA = "true"
+        AUTO_CREATE_SCHEMA = if ($DatabaseUrl.StartsWith("sqlite")) { "true" } else { "false" }
         PUBLIC_APP_URL = "http://127.0.0.1:$FrontendPort"
         ALLOWED_ORIGINS = "http://127.0.0.1:$FrontendPort,http://localhost:$FrontendPort"
         SANDBOX_BACKEND = "remote"
@@ -219,7 +252,13 @@ try {
         frontendUrl = "http://127.0.0.1:$FrontendPort"
         backendUrl = "http://127.0.0.1:$BackendPort"
         sandboxUrl = "http://127.0.0.1:$SandboxPort"
-        databaseUrl = $DatabaseUrl
+        databaseBackend = if ($DatabaseUrl.StartsWith("sqlite")) { "sqlite" } else { "postgresql" }
+        managedLocalDatabase = [bool]$localDatabaseSession
+        localDatabaseSessionId = if ($localDatabaseSession) { $localDatabaseSession.SessionId } else { $null }
+        localDatabaseProjectName = if ($localDatabaseSession) { $localDatabaseSession.ProjectName } else { $null }
+        localDatabasePort = if ($localDatabaseSession) { $localDatabaseSession.DatabasePort } else { $null }
+        localDatabaseBackupRoot = if ($localDatabaseSession) { $localDatabaseSession.BackupRoot } else { $null }
+        localDatabaseRuntimeRoot = if ($localDatabaseSession) { $localDatabaseSession.RuntimeRoot } else { $null }
         aiEnabled = [bool]$EnableAi
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8
 
@@ -227,11 +266,25 @@ try {
     Write-Output "Frontend: http://127.0.0.1:$FrontendPort"
     Write-Output "Backend:  http://127.0.0.1:$BackendPort/health"
     Write-Output "Sandbox:  http://127.0.0.1:$SandboxPort/health"
+    Write-Output "Database: $(if ($localDatabaseSession) { 'local PostgreSQL with OneDrive handoff backups' } elseif ($DatabaseUrl.StartsWith('sqlite')) { 'SQLite fallback' } else { 'externally configured' })"
     Write-Output "AI enabled: $([bool]$EnableAi)"
     Write-Output "Stop with: .\scripts\stop-local.ps1"
 } catch {
     foreach ($process in $processes) {
         Stop-ProjectProcessTree -ProcessId $process.id
+    }
+    if ($localDatabaseSession) {
+        try {
+            Complete-RoboticsLocalPostgres `
+                -RepositoryRoot $repositoryRoot `
+                -SessionId $localDatabaseSession.SessionId `
+                -DatabasePort $localDatabaseSession.DatabasePort `
+                -ProjectName $localDatabaseSession.ProjectName `
+                -BackupRoot $localDatabaseSession.BackupRoot `
+                -RuntimeRoot $localDatabaseSession.RuntimeRoot | Out-Host
+        } catch {
+            Write-Warning "Local PostgreSQL recovery backup failed after startup error: $_"
+        }
     }
     throw
 }

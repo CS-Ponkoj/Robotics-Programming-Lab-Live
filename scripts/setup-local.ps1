@@ -18,7 +18,12 @@ if (Test-Path -LiteralPath $stateFile) {
 $python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot `
     -EnsureDependencies -RefreshDependencies:$Repair
 
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    throw "Docker Desktop is required for local PostgreSQL. Install Docker Desktop, reopen PowerShell, and run setup again."
+}
+
 Write-Output "Local Python setup is ready."
 Write-Output "Python: $python"
 & $python --version
+Write-Output "Docker command is available. Start Docker Desktop before running the application."
 Write-Output "Start the application with: .\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101"

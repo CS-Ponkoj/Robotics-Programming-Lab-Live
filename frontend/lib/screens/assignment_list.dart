@@ -618,6 +618,7 @@ class ListAssignment extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = learningProgress.assignmentState(
       a.id,
+      assignmentVersion: a.version,
       starterCode: a.code,
     );
     final hasAccuracy = lastAttemptAccuracy.containsKey(a.id);
@@ -713,6 +714,7 @@ class AssignmentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final progressState = learningProgress.assignmentState(
       a.id,
+      assignmentVersion: a.version,
       starterCode: a.code,
     );
     final hasAccuracy = lastAttemptAccuracy.containsKey(a.id);

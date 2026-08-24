@@ -4,7 +4,8 @@
 
 - FastAPI provides student, instructor, grading, tutoring, and asset endpoints.
 - SQLAlchemy stores assignments, versions, submissions, evidence, and hint history.
-- PostgreSQL is the production database; SQLite is the zero-setup local fallback.
+- PostgreSQL is the default local and production database; SQLite is an explicit
+  disposable troubleshooting fallback.
 - Redis/RQ adapters are available for future long-running simulations and grading.
 - Submission execution can use a restricted local worker or per-run Docker sandbox.
 - Server-side sessions authorize student and instructor roles.
@@ -72,10 +73,26 @@ grader. Invalid assignments remain drafts.
 
 ## Database lifecycle
 
+The root launcher starts PostgreSQL 17 in a computer-local Docker volume. It
+runs Alembic before the API starts. On the first PostgreSQL setup, if no
+synchronized backup exists and the target is empty, the launcher copies every
+row from the canonical ignored `robotics_lab_staging.db` without modifying that
+SQLite source.
+
+`scripts/stop-local.ps1` creates a PostgreSQL custom-format dump, validates it
+with `pg_restore --list`, verifies its SHA-256 checksum after copying it to
+OneDrive, keeps the preceding successful backup, releases the device lock, and
+then stops PostgreSQL. A new computer restores a newer verified dump before the
+API starts. The same verified dump is also restored if the current computer's
+Docker volume is recreated and the application schema is missing. This is a
+sequential device handoff, not simultaneous database use.
+
 On an empty database, the existing `assignments/assignment_*.json` files are
-imported as version 1. After import, instructor edits are persisted in the
-database and automatically increase the assignment version when teaching,
-execution, grading, tutoring, or simulation content changes.
+imported with their declared versions. A newer bundled assignment version may
+upgrade an older database seed; otherwise instructor edits remain authoritative
+and are never overwritten at startup. Instructor changes automatically increase
+the assignment version when teaching, execution, grading, tutoring, or
+simulation content changes.
 
 ## Tests
 

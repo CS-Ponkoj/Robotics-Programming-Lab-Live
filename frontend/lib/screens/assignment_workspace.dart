@@ -37,6 +37,7 @@ class _MyHomePageState extends State<MyHomePage> {
   late Future<UnittestFeedbackDto> _feedback;
   late CodeController _controller;
   String _code = "";
+  int? _assignmentVersion;
   bool _enableFeedback = false;
   bool _submitted = false;
   bool _isRunning = false;
@@ -103,8 +104,10 @@ class _MyHomePageState extends State<MyHomePage> {
   void dispose() {
     _draftSaveTimer?.cancel();
     researchTracker.clearActiveAssignment(widget.id);
-    if (!_init) {
-      unawaited(learningProgress.saveDraft(widget.id, _code));
+    if (!_init && _assignmentVersion != null) {
+      unawaited(
+        learningProgress.saveDraft(widget.id, _assignmentVersion!, _code),
+      );
     }
     _controller.dispose();
     super.dispose();
@@ -112,10 +115,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _saveDraft(String code) {
     _code = code;
+    final assignmentVersion = _assignmentVersion;
+    if (assignmentVersion == null) {
+      return;
+    }
     _draftSaveTimer?.cancel();
     _draftSaveTimer = Timer(
       const Duration(milliseconds: 350),
-      () => unawaited(learningProgress.saveDraft(widget.id, code)),
+      () => unawaited(
+        learningProgress.saveDraft(widget.id, assignmentVersion, code),
+      ),
     );
   }
 
@@ -381,8 +390,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                     builder: (ctx, snap) {
                                       if (snap.hasData) {
                                         if (_init) {
-                                          _code = learningProgress
-                                                  .codeDrafts[widget.id] ??
+                                          _assignmentVersion =
+                                              snap.data!.version;
+                                          _code = learningProgress.draftFor(
+                                                widget.id,
+                                                snap.data!.version,
+                                              ) ??
                                               snap.data!.code;
                                           _selectedProjectFilePath =
                                               snap.data!.editableFilePath;

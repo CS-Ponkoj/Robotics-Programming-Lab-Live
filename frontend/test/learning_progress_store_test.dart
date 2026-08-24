@@ -9,7 +9,7 @@ void main() {
     final firstStore = LearningProgressStore();
     await firstStore.load(storage: storage);
 
-    await firstStore.saveDraft(2, 'total_path_length = 12');
+    await firstStore.saveDraft(2, 4, 'total_path_length = 12');
     await firstStore.recordAttempt(2, 50);
     await firstStore.recordAttempt(2, 100);
     await firstStore.recordSubmission(2, 'submission-abc');
@@ -19,6 +19,12 @@ void main() {
     await reloadedStore.load(storage: storage);
 
     expect(reloadedStore.codeDrafts[2], 'total_path_length = 12');
+    expect(reloadedStore.codeDraftVersions[2], 4);
+    expect(
+      reloadedStore.draftFor(2, 4),
+      'total_path_length = 12',
+    );
+    expect(reloadedStore.draftFor(2, 5), isNull);
     expect(reloadedStore.latestScores[2], 100);
     expect(reloadedStore.bestScores[2], 100);
     expect(reloadedStore.attemptCounts[2], 2);
@@ -43,23 +49,50 @@ void main() {
     final persistentStorage = InMemoryProgressStorage();
     final store = LearningProgressStore();
     await store.load(storage: persistentStorage);
-    await store.saveDraft(1, 'saved student draft');
+    await store.saveDraft(1, 5, 'saved student draft');
     await store.recordAttempt(1, 80);
 
     store.startEphemeralSession();
     expect(store.codeDrafts, isEmpty);
     expect(store.attemptCounts, isEmpty);
 
-    await store.saveDraft(2, 'temporary demo draft');
+    await store.saveDraft(2, 4, 'temporary demo draft');
     await store.recordAttempt(2, 100);
     expect(store.codeDrafts[2], 'temporary demo draft');
 
     final restored = LearningProgressStore();
     await restored.load(storage: persistentStorage);
     expect(restored.codeDrafts[1], 'saved student draft');
+    expect(restored.codeDraftVersions[1], 5);
     expect(restored.latestScores[1], 80);
     expect(restored.codeDrafts, isNot(contains(2)));
     expect(restored.latestScores, isNot(contains(2)));
+  });
+
+  test('legacy and older-version drafts are not reused', () async {
+    final storage = InMemoryProgressStorage();
+    await storage.initialize();
+    await storage.setString(
+      'learning.code_drafts.v1',
+      '{"1":"legacy assignment code"}',
+    );
+
+    final store = LearningProgressStore();
+    await store.load(storage: storage);
+
+    expect(store.draftFor(1, 5), isNull);
+    expect(
+      store.assignmentState(
+        1,
+        assignmentVersion: 5,
+        starterCode: 'current starter code',
+      ),
+      AssignmentProgressState.notStarted,
+    );
+
+    await store.saveDraft(1, 5, 'version 5 draft');
+    expect(store.draftFor(1, 5), 'version 5 draft');
+    expect(store.draftFor(1, 6), isNull);
   });
 
   test('an invalidated solution reveal is removed from persistence', () async {
@@ -81,25 +114,41 @@ void main() {
     await store.load(storage: storage);
 
     expect(
-      store.assignmentState(1, starterCode: 'answer = 0'),
+      store.assignmentState(
+        1,
+        assignmentVersion: 3,
+        starterCode: 'answer = 0',
+      ),
       AssignmentProgressState.notStarted,
     );
 
-    await store.saveDraft(1, 'answer = 14');
+    await store.saveDraft(1, 3, 'answer = 14');
     expect(
-      store.assignmentState(1, starterCode: 'answer = 0'),
+      store.assignmentState(
+        1,
+        assignmentVersion: 3,
+        starterCode: 'answer = 0',
+      ),
       AssignmentProgressState.inProgress,
     );
 
     await store.recordAttempt(1, 60);
     expect(
-      store.assignmentState(1, starterCode: 'answer = 0'),
+      store.assignmentState(
+        1,
+        assignmentVersion: 3,
+        starterCode: 'answer = 0',
+      ),
       AssignmentProgressState.attempted,
     );
 
     await store.recordAttempt(1, 100);
     expect(
-      store.assignmentState(1, starterCode: 'answer = 0'),
+      store.assignmentState(
+        1,
+        assignmentVersion: 3,
+        starterCode: 'answer = 0',
+      ),
       AssignmentProgressState.completed,
     );
   });

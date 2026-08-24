@@ -18,5 +18,16 @@ foreach ($entry in @($state.processes | Sort-Object { if ($_.name -eq "frontend"
     }
 }
 
+if ($state.managedLocalDatabase) {
+    Import-Module (Join-Path $PSScriptRoot "local-database.psm1") -Force
+    Complete-RoboticsLocalPostgres `
+        -RepositoryRoot $repositoryRoot `
+        -SessionId $state.localDatabaseSessionId `
+        -DatabasePort $state.localDatabasePort `
+        -ProjectName $state.localDatabaseProjectName `
+        -BackupRoot $state.localDatabaseBackupRoot `
+        -RuntimeRoot $state.localDatabaseRuntimeRoot | Out-Host
+}
+
 Remove-Item -LiteralPath $stateFile -Force
 Write-Output "Local Robotics Programming Lab services are stopped."

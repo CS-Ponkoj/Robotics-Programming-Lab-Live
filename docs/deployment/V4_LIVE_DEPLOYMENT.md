@@ -1,5 +1,10 @@
 # V4 live and local operation
 
+> **Historical snapshot:** This guide records the earlier v4 deployment. It is
+> not the current local startup guide. Local staging now defaults to Docker
+> PostgreSQL and must be started and stopped with the root scripts documented in
+> `README.md` and `STAGING_AND_RELEASE_WORKFLOW.md`.
+
 V4 keeps one codebase for both modes:
 
 - Local: Flutter web + FastAPI + ignored SQLite database.

@@ -37,6 +37,8 @@ functionality and must never depend on OpenAI.
   one-off public routes when configuration or a grader module is sufficient.
 - Give every assignment a stable ID and immutable version identity.
 - Save the assignment version with every attempt and submission.
+- Scope browser code drafts to both assignment ID and assignment version.
+  Never load an older-version draft into a newer assignment workspace.
 - Keep hidden tests, official solutions, reference answers, grader secrets, and
   sandbox credentials exclusively on the server.
 - Never reveal hidden-test contents or official solutions through an API, UI,
@@ -65,7 +67,8 @@ functionality and must never depend on OpenAI.
 | `C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging` | Canonical Windows staging checkout | Run ordinary local development, local execution, SQA, and staging Git work from this folder. It must track `CS-Ponkoj/Robotics-Programming-Lab-Staging`; do not treat temporary worktrees or `IUSE_Project-2026` as the canonical staging checkout. |
 | `CS-Ponkoj/Robotics-Programming-Lab-Staging` | Development, local execution, SQA, and release candidates | Make changes on focused branches and merge into staging `main` only after verification. |
 | `CS-Ponkoj/Robotics-Programming-Lab` | Live Vercel and Render deployment | Production `main` receives only an approved, tested staging commit. Do not patch production directly. |
-| Local SQLite | Fast developer feedback | May be used for ordinary local work; it is ignored and disposable. |
+| Local Docker PostgreSQL | Default local application data | Keep the active Docker volume computer-local. Use the verified OneDrive dump workflow for sequential desktop/laptop handoff. |
+| Local SQLite | Explicit troubleshooting fallback | Use only with `-UseSqlite`; it is ignored, disposable, and not synchronized as authoritative data. |
 | Staging PostgreSQL | Production-parity SQA | Must be separate from production and contain no live research records. |
 | Production Neon PostgreSQL | Live mutable data | Schema changes require Alembic migrations and recovery planning. |
 
@@ -203,7 +206,7 @@ environment is portable to another OS, CPU architecture, username, or Python
 install layout. Stop the app and wait for OneDrive to finish before switching
 computers; never run the checkout on two devices simultaneously.
 
-Start the complete local stack:
+Start the complete local stack, including Docker PostgreSQL:
 
 ```powershell
 .\scripts\run-local.ps1
@@ -215,6 +218,13 @@ Stop only the processes managed by the launcher:
 .\scripts\stop-local.ps1
 ```
 
+The stop command must finish successfully before switching computers. It
+creates and checksum-verifies `local_database_backups/latest.dump`, retains the
+previous successful dump, releases the OneDrive device lock, and stops the
+PostgreSQL container. Wait for OneDrive to report up to date before starting on
+another computer. Never place PostgreSQL's live data directory or Docker volume
+inside OneDrive and never run the database from two devices simultaneously.
+
 Run the full local verification gate:
 
 ```powershell
@@ -222,7 +232,8 @@ Run the full local verification gate:
 ```
 
 Use `-EnableAi` only for an intentional AI test. Use `-DatabaseUrl` with a
-separate staging PostgreSQL connection for final database-parity checks.
+separate staging PostgreSQL connection for hosted parity checks. Use
+`-UseSqlite` only for disposable troubleshooting.
 
 OneDrive can lock Flutter build artifacts. Use the supplied run and verification
 scripts, which build from a safe generated copy under LocalAppData. Do not solve
@@ -321,6 +332,10 @@ sufficient when an automated test can reasonably protect the behavior.
   application startup.
 - Never use `Base.metadata.create_all` as the production migration strategy.
 - Never silently drop, truncate, rename, or reinterpret research data.
+- Never synchronize an active PostgreSQL data directory through OneDrive.
+- Treat `local_database_backups/` as protected student/research data: never
+  commit its generated contents, wait for verified sync before device handoff,
+  and require approved encryption or managed storage before a real study.
 - Destructive migrations require an explicit backup, rollback plan, owner
   approval, and restoration rehearsal.
 - Store UTC timestamps and assignment versions with attempts and events.
@@ -545,6 +560,7 @@ Before handing off a change, ask:
 - Can a timeout or exception leave the UI running forever?
 - Are local and deployed paths driven by configuration from the same code?
 - Does the database change have a tested migration and rollback path?
+- Can an older browser draft be mistaken for the current assignment version?
 - Are untrusted submissions still isolated and bounded?
 - Does the feature work with AI disabled?
 - Are research records reproducible and privacy-preserving?
