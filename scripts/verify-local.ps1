@@ -7,12 +7,17 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
 $python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot -EnsureDependencies
 
+& (Join-Path $PSScriptRoot "verify-local-layout.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Portable local layout validation failed." }
+& (Join-Path $PSScriptRoot "verify-local-handoff-package.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Copyable local handoff package validation failed." }
+
 & (Join-Path $PSScriptRoot "clean-local.ps1")
 if (-not $?) { throw "Safe local cleanup dry-run validation failed." }
 
 Push-Location (Join-Path $repositoryRoot "backend")
 try {
-    & $python -m pytest tests -q
+    & $python -m pytest -p no:cacheprovider tests -q
     if ($LASTEXITCODE -ne 0) { throw "Backend tests failed." }
     & $python -m pip check
     if ($LASTEXITCODE -ne 0) { throw "Python dependency validation failed." }
@@ -30,6 +35,8 @@ if ($LASTEXITCODE -ne 0) { throw "Flutter verification failed." }
 
 Push-Location $repositoryRoot
 try {
+    & (Join-Path $PSScriptRoot "check-release.ps1") -AllowDirty -SkipRemoteCheck
+    if ($LASTEXITCODE -ne 0) { throw "Fresh-clone source validation failed." }
     git diff --check
     if ($LASTEXITCODE -ne 0) { throw "Git whitespace validation failed." }
 } finally {

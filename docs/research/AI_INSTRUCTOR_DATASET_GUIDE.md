@@ -84,10 +84,12 @@ This stage does not:
 8. Run the validator and backend tests before committing.
 
 ```powershell
-Set-Location .\backend
-..\venv\Scripts\python.exe instructor_dataset.py
-..\venv\Scripts\python.exe -m pytest tests\test_instructor_dataset.py -q
-Set-Location ..
+Import-Module .\scripts\local-environment.psm1 -Force
+$python = Get-RoboticsPythonExecutable -RepositoryRoot (Get-Location)
+Push-Location .\backend
+& $python instructor_dataset.py
+& $python -m pytest -p no:cacheprovider tests\test_instructor_dataset.py -q
+Pop-Location
 ```
 
 The validator checks schema correctness, assignment IDs and versions, unique

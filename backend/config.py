@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -7,9 +8,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BASE_DIR = Path(__file__).resolve().parent
 
 
+def configured_env_file() -> Path:
+    configured = os.getenv("ROBOTICS_ENV_FILE")
+    return Path(configured).expanduser() if configured else BASE_DIR / ".env"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=BASE_DIR / ".env",
+        env_file=None,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -92,4 +98,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    return Settings(_env_file=configured_env_file())

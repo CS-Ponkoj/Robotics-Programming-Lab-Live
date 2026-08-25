@@ -44,8 +44,9 @@ grading but is excluded from research dashboards and exports.
 
 For local storage, table definitions, standard execution statuses, and event
 payload rules, see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). Verified
-PostgreSQL handoff dumps are synchronized under `local_database_backups/` but
-must be restored before inspection. Assignment source data is human-readable in
+PostgreSQL handoff dumps and their checksum manifests are kept directly in the
+ignored `local_handoff_package` folder and restored automatically before use.
+Assignment source data is human-readable in
 `backend/assignments/assignment_*.json`.
 
 ## Privacy and data quality

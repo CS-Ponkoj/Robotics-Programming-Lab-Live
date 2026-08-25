@@ -12,6 +12,8 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $backendRoot = Join-Path $repositoryRoot "backend"
 Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
+$privateConfigPath = Get-RoboticsHandoffPrivateConfigPath -RepositoryRoot $repositoryRoot
+$handoffDatabaseRoot = Get-RoboticsHandoffDatabaseRoot -RepositoryRoot $repositoryRoot
 $python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot -EnsureDependencies
 $stateRoot = Get-RoboticsRuntimeRoot -RepositoryRoot $repositoryRoot
 $stateFile = Join-Path $stateRoot "state.json"
@@ -53,7 +55,7 @@ if ($UseSqlite) {
         -DatabasePort $DatabasePort
     $DatabaseUrl = $localDatabaseSession.DatabaseUrl
     if ($localDatabaseSession.RestoredBackup) {
-        Write-Output "Restored the newest verified OneDrive PostgreSQL backup."
+        Write-Output "Restored the newest verified PostgreSQL handoff backup."
     }
 }
 
@@ -198,6 +200,7 @@ try {
         SANDBOX_URL = "http://127.0.0.1:$SandboxPort"
         SANDBOX_API_TOKEN = $token
         OPENAI_API_KEY = ""
+        ROBOTICS_ENV_FILE = $privateConfigPath
     }
     if ($EnableAi) {
         $backendEnvironment.Remove("OPENAI_API_KEY")
@@ -262,11 +265,22 @@ try {
         aiEnabled = [bool]$EnableAi
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8
 
+    $databaseDescription = if (-not $localDatabaseSession) {
+        if ($DatabaseUrl.StartsWith("sqlite")) { "SQLite fallback" } else { "externally configured" }
+    } elseif ($localDatabaseSession.BackupRoot.Equals(
+        $handoffDatabaseRoot,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+        "local PostgreSQL with the unified local handoff package"
+    } else {
+        "local PostgreSQL with verified handoff backups"
+    }
+
     Write-Output "Robotics Programming Lab is ready."
     Write-Output "Frontend: http://127.0.0.1:$FrontendPort"
     Write-Output "Backend:  http://127.0.0.1:$BackendPort/health"
     Write-Output "Sandbox:  http://127.0.0.1:$SandboxPort/health"
-    Write-Output "Database: $(if ($localDatabaseSession) { 'local PostgreSQL with OneDrive handoff backups' } elseif ($DatabaseUrl.StartsWith('sqlite')) { 'SQLite fallback' } else { 'externally configured' })"
+    Write-Output "Database: $databaseDescription"
     Write-Output "AI enabled: $([bool]$EnableAi)"
     Write-Output "Stop with: .\scripts\stop-local.ps1"
 } catch {

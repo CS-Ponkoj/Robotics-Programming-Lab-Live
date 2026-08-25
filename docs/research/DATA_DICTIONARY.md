@@ -28,7 +28,8 @@ after an instructor updates the assignment.
 |---|---|---|---|
 | Assignment source definitions | `backend/assignments/assignment_1.json` through `assignment_6.json` | JSON | Yes, open directly in VS Code |
 | Active local application database | Computer-local Docker volume `robotics-lab-local_robotics_postgres_data` | PostgreSQL 17 | Use the application or an authorized PostgreSQL client |
-| Cross-device database handoff | `local_database_backups/latest.dump` plus `latest.json` | Verified PostgreSQL logical backup | Restore through `scripts/run-local.ps1` |
+| Cross-device database handoff | `local_handoff_package/latest.dump` plus `latest.json` | Verified PostgreSQL logical backup | Restored automatically by `scripts/run-local.ps1` |
+| Private local configuration | `local_handoff_package/.env` | Ignored environment settings | Read directly by the launcher and backend |
 | Legacy local source preserved during first migration | `backend/robotics_lab_staging.db` | SQLite | Read-only; not used by the default launcher after migration |
 | Student editor draft | Browser storage, keyed by assignment ID and assignment version | Local JSON preferences | View through the matching assignment workspace; older-version drafts are ignored |
 | Optional prototype account import | `backend/data/study_accounts.json` | JSON | Yes, but it can contain temporary passwords and is ignored by Git |
@@ -38,12 +39,12 @@ after an instructor updates the assignment.
 | Database table definitions | `backend/models.py` | Python/SQLAlchemy | Yes |
 | Database schema history | `backend/migrations/versions/` | Alembic/Python | Yes |
 
-The active PostgreSQL files stay inside Docker and are never synchronized by
-OneDrive. `scripts/stop-local.ps1` exports a complete validated dump, checksum
-manifest, and previous backup into the ignored OneDrive handoff directory.
-The launcher restores the verified dump for a new device, a newer synchronized
-backup, or a recreated same-device volume with no application schema.
-PostgreSQL is the source of truth. Never edit a dump or live database file.
+The active PostgreSQL files stay inside Docker and are never synchronized.
+`scripts/stop-local.ps1` exports a complete validated dump, checksum manifest,
+and previous backup directly into `local_handoff_package`. The launcher
+restores the verified dump for a new device or a recreated same-device volume
+with no application schema. PostgreSQL is the runtime source of truth. Never
+edit a dump or live database file. The package is refreshed by every clean stop.
 
 ## How to see local data
 

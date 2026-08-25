@@ -2,7 +2,8 @@
 .env
 *.local
 
-# Python environments, caches, and local coverage
+# Generated Python environments, caches, and local coverage. These are
+# intentionally rebuilt per computer by scripts/setup-local.ps1.
 venv/
 env/
 __pycache__/
@@ -27,10 +28,10 @@ backend/study_exports/
 /outputs/
 /tmp/
 
-# OneDrive-synchronized PostgreSQL handoff artifacts
-/local_database_backups/*
-!/local_database_backups/.gitignore
-!/local_database_backups/README.md
+# Active private local package. Only its safety instructions are tracked.
+/local_handoff_package/*
+!/local_handoff_package/.gitignore
+!/local_handoff_package/README.md
 
 # Flutter and Dart generated files
 .dart_tool/

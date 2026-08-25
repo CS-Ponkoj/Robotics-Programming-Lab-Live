@@ -67,7 +67,9 @@ functionality and must never depend on OpenAI.
 | `C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging` | Canonical Windows staging checkout | Run ordinary local development, local execution, SQA, and staging Git work from this folder. It must track `CS-Ponkoj/Robotics-Programming-Lab-Staging`; do not treat temporary worktrees or `IUSE_Project-2026` as the canonical staging checkout. |
 | `CS-Ponkoj/Robotics-Programming-Lab-Staging` | Development, local execution, SQA, and release candidates | Make changes on focused branches and merge into staging `main` only after verification. |
 | `CS-Ponkoj/Robotics-Programming-Lab` | Live Vercel and Render deployment | Production `main` receives only an approved, tested staging commit. Do not patch production directly. |
-| Local Docker PostgreSQL | Default local application data | Keep the active Docker volume computer-local. Use the verified OneDrive dump workflow for sequential desktop/laptop handoff. |
+| Secondary laptop or lab checkout | Temporary local clone outside OneDrive | Clone or fast-forward from staging Git. Never copy generated environments or build caches between computers. |
+| `local_handoff_package/` | Ignored copyable local data | May contain a verified database and private backend configuration. Never commit or publicly share it, and never place a Python virtual environment inside it. |
+| Local Docker PostgreSQL | Default local application data | Keep the active Docker volume computer-local. Use the verified `local_handoff_package` dump for sequential handoff. |
 | Local SQLite | Explicit troubleshooting fallback | Use only with `-UseSqlite`; it is ignored, disposable, and not synchronized as authoritative data. |
 | Staging PostgreSQL | Production-parity SQA | Must be separate from production and contain no live research records. |
 | Production Neon PostgreSQL | Live mutable data | Schema changes require Alembic migrations and recovery planning. |
@@ -200,14 +202,12 @@ dependencies:
 .\scripts\setup-local.ps1
 ```
 
-The checkout is intentionally inside OneDrive. It uses one shared `venv/` as
-requested. On every newly synced Windows computer, install Python 3.14 and run
-`.\scripts\setup-local.ps1 -Repair` once. The helper records the computer and
-base interpreter identity, rebinds the shared environment after a device
-switch, and reinstalls the pinned requirements when needed. Do not assume this
-environment is portable to another OS, CPU architecture, username, or Python
-install layout. Stop the app and wait for OneDrive to finish before switching
-computers; never run the checkout on two devices simultaneously.
+The main desktop checkout is intentionally inside OneDrive. Secondary laptops
+and lab computers must use a Git clone in a normal local folder outside
+OneDrive. Setup creates the Python environment under the current computer's
+LocalAppData and installs the pinned requirements. Generated Python and Flutter
+files are never synchronized or committed. Use `-Repair` only when ordinary
+setup reports an incomplete environment.
 
 Start the complete local stack, including Docker PostgreSQL:
 
@@ -222,11 +222,19 @@ Stop only the processes managed by the launcher:
 ```
 
 The stop command must finish successfully before switching computers. It
-creates and checksum-verifies `local_database_backups/latest.dump`, retains the
-previous successful dump, releases the OneDrive device lock, and stops the
-PostgreSQL container. Wait for OneDrive to report up to date before starting on
-another computer. Never place PostgreSQL's live data directory or Docker volume
-inside OneDrive and never run the database from two devices simultaneously.
+creates and checksum-verifies `local_handoff_package/latest.dump`, retains the
+previous successful dump, releases the device lock, and stops PostgreSQL. Wait
+for the whole package to finish copying or synchronizing before starting
+elsewhere. Never place PostgreSQL's live data directory or Docker volume inside
+OneDrive and never run the same package from two devices simultaneously.
+
+For an explicit copy-and-paste handoff, run
+`scripts/create-local-handoff-package.ps1` only while the app is stopped and
+copy the entire ignored `local_handoff_package` folder into the destination
+clone. The app reads its root `.env` and PostgreSQL backup files directly;
+never create a second active database folder or duplicate `backend/.env`.
+Fresh Windows clones must use `git -c core.longpaths=true clone` because tracked
+course-material filenames exceed Git's default Windows checkout limit.
 
 Run the full local verification gate:
 
@@ -246,15 +254,11 @@ locking problems by committing generated build output or deleting broad folders.
 
 ### Backend
 
-Run backend tests from the `backend` directory so backend-local imports resolve
-the same way as CI:
+Use the root verification script so it resolves the device-local Python
+environment and runs backend checks from the correct directory:
 
 ```powershell
-Set-Location .\backend
-& ..\venv\Scripts\python.exe -m pytest tests -q
-& ..\venv\Scripts\python.exe -m pip check
-& ..\venv\Scripts\python.exe -m compileall -q .
-Set-Location ..
+.\scripts\verify-local.ps1
 ```
 
 Run a focused test first when possible, then the entire backend suite before
@@ -284,7 +288,7 @@ git status --short
 `scripts/clean-local.ps1` is dry-run by default. Use `-Execute` only after the
 managed application is stopped. Its allow-list may contain rebuildable caches
 and build output only. Never add `.git`, `venv`, databases,
-`local_database_backups`, `output`, `course_materials`, or
+`local_handoff_package`, `output`, `course_materials`, or
 `manual_sqa_answers` to that cleanup allow-list.
 
 Use Git maintenance commands for repository object cleanup; never delete files
@@ -348,9 +352,10 @@ sufficient when an automated test can reasonably protect the behavior.
 - Never use `Base.metadata.create_all` as the production migration strategy.
 - Never silently drop, truncate, rename, or reinterpret research data.
 - Never synchronize an active PostgreSQL data directory through OneDrive.
-- Treat `local_database_backups/` as protected student/research data: never
-  commit its generated contents, wait for verified sync before device handoff,
-  and require approved encryption or managed storage before a real study.
+- Treat `local_handoff_package/` as protected student/research data: never
+  commit its generated contents, wait for verified copying or sync before
+  device handoff, and require approved encryption or managed storage before a
+  real study. Its database and private configuration are never release artifacts.
 - Destructive migrations require an explicit backup, rollback plan, owner
   approval, and restoration rehearsal.
 - Store UTC timestamps and assignment versions with attempts and events.
@@ -491,6 +496,9 @@ Treat every submission as hostile input.
 
 Forbidden tracked paths include environment directories, `.env`, `.dart_tool`,
 Flutter `build`, `.local-run`, local databases, caches, and generated logs.
+Real database dumps must also remain untracked. A clone must instead contain
+the assignment sources, migrations, demo seed logic, tests, and setup scripts
+needed to create a safe fresh demo database.
 
 ## Git and change hygiene
 

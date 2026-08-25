@@ -4,7 +4,9 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
+_configured_env = os.getenv("ROBOTICS_ENV_FILE")
+if _configured_env:
+    load_dotenv(dotenv_path=_configured_env)
 
 
 def get_one_sentence_hint(assignment_id, prompt, code, test_output, client=None):

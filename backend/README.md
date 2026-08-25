@@ -13,8 +13,9 @@
 - Research sessions and learning events use participant codes in dashboards and
   exports; submitted code and login IDs are excluded from research datasets.
 
-Docker Compose loads secrets and instructor settings from the ignored
-`backend/.env` file and defaults submission execution to the Docker sandbox.
+Docker Compose and the supported local launcher load secrets and instructor
+settings directly from ignored `local_handoff_package/.env`. Submission
+execution defaults to the Docker sandbox.
 Direct local development can keep `SANDBOX_BACKEND=subprocess`.
 
 ## Run locally
@@ -28,9 +29,8 @@ dedicated sandbox start together:
 ```
 
 OpenAPI documentation is available at `http://127.0.0.1:5100/docs` in local
-development. For backend-only diagnostics from this directory, use
-`..\venv\Scripts\python.exe -m uvicorn app:app --port 5100`; normal student
-execution still needs the sandbox started by the root launcher.
+development. Use the root launcher for normal work because it resolves the
+device-local Python environment, database, sandbox, and API together.
 
 ## Accounts and instructor access
 
@@ -80,10 +80,10 @@ row from the canonical ignored `robotics_lab_staging.db` without modifying that
 SQLite source.
 
 `scripts/stop-local.ps1` creates a PostgreSQL custom-format dump, validates it
-with `pg_restore --list`, verifies its SHA-256 checksum after copying it to
-OneDrive, keeps the preceding successful backup, releases the device lock, and
-then stops PostgreSQL. A new computer restores a newer verified dump before the
-API starts. The same verified dump is also restored if the current computer's
+with `pg_restore --list`, verifies its SHA-256 checksum, writes it directly to
+`local_handoff_package`, keeps the preceding successful backup, releases the
+device lock, and then stops PostgreSQL. A new computer restores the verified
+dump before the API starts. The same dump is restored if the current computer's
 Docker volume is recreated and the application schema is missing. This is a
 sequential device handoff, not simultaneous database use.
 
@@ -96,7 +96,6 @@ simulation content changes.
 
 ## Tests
 
-```powershell
-..\venv\Scripts\python.exe -m pytest -q
-..\venv\Scripts\python.exe -m pip check
-```
+From the repository root, run `scripts/verify-local.ps1`. It resolves the
+device-local Python environment and performs the complete backend, frontend,
+database-handoff, sandbox, and repository checks.

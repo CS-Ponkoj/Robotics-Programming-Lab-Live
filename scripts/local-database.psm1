@@ -36,7 +36,8 @@ function Get-LocalDatabaseConfiguration {
 
     $root = [System.IO.Path]::GetFullPath($RepositoryRoot)
     if ([string]::IsNullOrWhiteSpace($BackupRoot)) {
-        $BackupRoot = Join-Path $root "local_database_backups"
+        Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
+        $BackupRoot = Get-RoboticsDatabaseBackupRoot -RepositoryRoot $root
     }
     if ([string]::IsNullOrWhiteSpace($RuntimeRoot)) {
         Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
@@ -278,7 +279,7 @@ function Start-RoboticsLocalPostgres {
     $existingLock = Read-JsonFile -Path $lockPath
     $device = if ([string]::IsNullOrWhiteSpace($env:COMPUTERNAME)) { "unknown-windows-device" } else { $env:COMPUTERNAME }
     if ($existingLock -and $existingLock.device -ne $device) {
-        throw "The database is assigned to '$($existingLock.device)' since $($existingLock.acquired_at_utc). Stop the app there and wait for OneDrive to sync before starting here."
+        throw "The database is assigned to '$($existingLock.device)' since $($existingLock.acquired_at_utc). Stop the app there and wait for the package to finish synchronizing before starting here."
     }
 
     $sessionId = [guid]::NewGuid().ToString("N")
@@ -308,13 +309,13 @@ function Start-RoboticsLocalPostgres {
             $manifest = Read-JsonFile -Path $manifestPath
             $actualHash = (Get-FileHash -LiteralPath $backupPath -Algorithm SHA256).Hash
             if ($actualHash -ne $manifest.sha256) {
-                throw "The synchronized database backup checksum does not match its manifest. Wait for OneDrive to finish syncing."
+                throw "The database backup checksum does not match its manifest. Wait for the package to finish synchronizing."
             }
             $latestHash = $actualHash
             $lastHash = if ($syncState) { $syncState.last_backup_sha256 } else { $null }
             $dirty = $syncState -and [bool]$syncState.dirty
             if ($dirty -and $lastHash -ne $latestHash) {
-                throw "This computer has unexported database changes while OneDrive contains a different backup. Do not overwrite either copy; resolve the handoff first."
+                throw "This computer has unexported database changes while the package contains a different backup. Do not overwrite either copy; resolve the handoff first."
             }
             $hasApplicationSchema = Test-LocalPostgresApplicationSchema -Configuration $configuration
             if ($lastHash -ne $latestHash -or -not $hasApplicationSchema) {
@@ -391,7 +392,7 @@ function Complete-RoboticsLocalPostgres {
     $incomingDump = Join-Path $configuration.BackupRoot "latest.dump.incoming"
     Copy-Item -LiteralPath $temporaryDump -Destination $incomingDump -Force
     if ((Get-FileHash -LiteralPath $incomingDump -Algorithm SHA256).Hash -ne $hash) {
-        throw "OneDrive backup copy verification failed. The previous backup and device lock were preserved."
+        throw "Database backup copy verification failed. The previous backup and device lock were preserved."
     }
 
     $latestDump = Join-Path $configuration.BackupRoot "latest.dump"

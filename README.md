@@ -7,12 +7,17 @@ remain the only grading authority. AI tutoring is optional and off by default.
 This is the **staging repository**. Development and SQA happen here before an
 approved release is promoted to the separate live repository.
 
-## Run it on this computer
+## Quick start
 
 Open PowerShell in the repository root. The path may differ between computers;
 you do not need to type a fixed username or OneDrive path.
 
-First setup on this computer:
+For a new computer, follow the complete
+[first-time run guide](docs/guides/FIRST_TIME_RUN.md). It covers required
+software, Git-clone setup, automatic package installation, ROS setup, and the
+single local data package.
+
+Prepare this computer once, or after dependency changes:
 
 ```powershell
 .\scripts\setup-local.ps1
@@ -34,87 +39,26 @@ Stop the application:
 ```
 
 The launcher starts local PostgreSQL in Docker, the Python sandbox, FastAPI
-backend, and Flutter web app. On stop, it writes a verified complete PostgreSQL
-backup into the OneDrive-synchronized `local_database_backups/` directory.
-It runs Flutter from LocalAppData so OneDrive cannot lock Flutter build files.
-Do not run `flutter run` directly inside this OneDrive checkout.
+backend, and Flutter web app. Python and Flutter generated files stay in this
+computer's LocalAppData. Database backups and private settings are read from
+the single ignored `local_handoff_package` folder. If no backup exists there,
+the computer starts a fresh demo database and creates one at the next clean
+stop. Do not run
+manual Flutter, pip, or PostgreSQL restore commands; the scripts handle them.
 
-## First setup on a new desktop or laptop
+### Copy the same local data to another computer
 
-Do these steps once on **each Windows computer**:
-
-1. Sign in to OneDrive and let this repository finish syncing.
-2. In File Explorer, right-click the repository folder and select
-   **Always keep on this device**.
-3. Install [Python 3.14](https://www.python.org/downloads/) and reopen
-   PowerShell. On Windows, the simplest command is:
-
-   ```powershell
-   winget install --id Python.Python.3.14 --exact
-   ```
-
-   Confirm it with:
-
-   ```powershell
-   py -3.14 --version
-   ```
-
-4. Install Docker Desktop, select Linux containers, start it, and confirm:
-
-   ```powershell
-   docker version
-   docker compose version
-   ```
-
-5. Install Flutter and confirm it is available:
-
-   ```powershell
-   flutter --version
-   flutter doctor
-   ```
-
-6. Open PowerShell in the synced repository root and repair/rebind the shared
-   environment for that computer:
-
-   ```powershell
-   .\scripts\setup-local.ps1 -Repair
-   .\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
-   ```
-
-Docker Desktop is required for the default local PostgreSQL database and ROS 2
-Assignments 5 and 6. Build the ROS grader once on each computer:
+While the application is stopped, create the ignored handoff package:
 
 ```powershell
-docker compose --profile build build ros2-grader-image
+.\scripts\create-local-handoff-package.ps1 -IncludePrivateConfig
 ```
 
-### Shared OneDrive environment
-
-The project keeps one generated Python environment at `venv/`. Every computer
-must use Windows, Python 3.14, and a compatible 64-bit architecture. The setup
-script records the computer and Python installation that last prepared the
-environment. When another computer runs the script, it rebinds the environment
-and reinstalls the exact versions in `backend/requirements.txt`.
-
-Virtual environments are not portable across Windows, macOS, Linux, different
-CPU architectures, or incompatible Python install layouts. For those cases,
-use a separate checkout or rebuild `venv/` on that system.
-
-Before switching computers:
-
-1. Run `.\scripts\stop-local.ps1`. This creates and verifies `latest.dump`.
-2. Wait until OneDrive says **Up to date**, including
-   `local_database_backups/latest.dump` and `latest.json`.
-3. Close the repository on the first computer.
-4. On the other computer, wait for OneDrive, then run
-   `.\scripts\setup-local.ps1` before starting the app. The launcher restores
-   a newer synchronized backup automatically.
-
-Do not edit or run this checkout on both computers at the same time. Git is the
-authoritative source history; OneDrive provides working-folder sync.
-
-Always stop the application before running setup or repair. Windows cannot
-replace native Python package files while the backend is using them.
+Copy the complete `local_handoff_package` folder into the root of a fresh Git
+clone. The normal setup and run commands use it directly. It contains the
+verified database and optional private `.env`, but not the Python
+virtual environment. Python packages are rebuilt safely under LocalAppData on
+the destination computer.
 
 ## Local demo accounts
 
@@ -136,7 +80,7 @@ display them.
   hints, and study progress
 - Instructor assignment, account, analytics, and research-export tools
 - Server-side sessions and role authorization
-- PostgreSQL in a local Docker volume with verified OneDrive handoff backups
+- PostgreSQL in a local Docker volume with verified package backups
 - Explicit `-UseSqlite` fallback for disposable troubleshooting only
 - Dedicated local Python sandbox and Docker-based ROS 2 grader
 - Built-in tutoring plus optional OpenAI feedback that never changes grades
@@ -178,7 +122,7 @@ flowchart TB
     Auth --> DB[(PostgreSQL)]
     Engine --> DB
     Research --> DB
-    DB -->|verified dump on stop| Backup[OneDrive handoff backup]
+    DB -->|verified dump on stop| Backup[local_handoff_package]
     Engine --> PythonSandbox[Python sandbox service]
     Engine --> ROS[ROS 2 Jazzy Docker grader]
     Tutor --> BuiltIn[Deterministic feedback]
@@ -202,7 +146,8 @@ manual_sqa_answers/   Maintained instructor answers for manual SQA
 docs/                 Architecture, deployment, research, and SQA documents
   archive/             Superseded reports and deployment snapshots
 scripts/              Setup, run, stop, verification, and release automation
-venv/                 Generated shared Python environment; never committed
+local_handoff_package/ Ignored, copyable database and private configuration
+LocalAppData           Generated Python, Flutter, and runtime files; never committed
 ```
 
 The documentation index is [docs/README.md](docs/README.md). Engineering and
@@ -212,7 +157,7 @@ security rules are in [AGENTS.md](AGENTS.md).
 
 AI is off by default. Normal grading and built-in hints do not require an API
 key. To intentionally test optional AI feedback, place `OPENAI_API_KEY` in the
-ignored `backend/.env` file and start with:
+ignored `local_handoff_package/.env` file and start with:
 
 ```powershell
 .\scripts\run-local.ps1 -EnableAi -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
@@ -224,13 +169,13 @@ AI context.
 
 ## Verification
 
-Run the complete OneDrive-safe local gate from the repository root:
+Run the complete local gate from the repository root:
 
 ```powershell
 .\scripts\verify-local.ps1 -ApiBaseUrl http://127.0.0.1:5100
 ```
 
-It runs backend tests, dependency checks, Python compilation, Flutter analysis
+It checks fresh-clone completeness, then runs backend tests, dependency checks, Python compilation, Flutter analysis
 and tests, a release web build from LocalAppData, an isolated PostgreSQL
 backup/restore and simulated-device-lock test, Git whitespace validation, and
 a dry-run validation of the safe cleanup allow-list. It also checks managed
@@ -265,24 +210,23 @@ After stopping the application, remove only that fixed allow-list:
 .\scripts\clean-local.ps1 -Execute
 ```
 
-The cleanup script protects `venv`, databases, PostgreSQL backups, generated
+The cleanup script protects databases, PostgreSQL backups, generated
 PDF outputs, course materials, instructor answers, and Git history. Flutter and
 Python regenerate the removed caches during the next setup, test, or run.
 
 ## Advanced configuration
 
 Local use defaults to the Docker PostgreSQL service. Its live Docker volume is
-computer-local and must never be placed in OneDrive. OneDrive synchronizes only
-the verified logical dump and checksum manifest under
-`local_database_backups/`. The launcher restores that verified dump on a new
-computer, when it is newer than the local copy, or when the same computer's
-Docker volume has been recreated and no application schema remains. Use
-`-DatabasePort 55432` if port 5432 is occupied.
+computer-local and must never be synchronized. The verified logical dump,
+checksum manifest, previous recovery copy, and private `.env` all live directly
+inside `local_handoff_package`. The launcher restores that dump on a new
+computer or when the computer's Docker volume has been recreated and no
+application schema remains. Use `-DatabasePort 55432` if port 5432 is occupied.
 Use `-UseSqlite` only for a disposable offline troubleshooting run; that mode is
 not part of the cross-device handoff workflow.
 
-Copy `backend/.env.example` to ignored `backend/.env` only when you need optional
-settings. Production deployment, study-account import, API details, and
+Copy `backend/.env.example` to ignored `local_handoff_package/.env` only when
+you need optional settings. Production deployment, study-account import, API details, and
 research-data contracts are documented under `docs/` and `backend/README.md`.
 
 Never commit `.env`, databases, credentials, API keys, Python environments,

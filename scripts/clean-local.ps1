@@ -14,8 +14,7 @@ $protectedRoots = @(
     (Join-Path $repoRoot 'venv'),
     (Join-Path $repoRoot 'backend\data'),
     (Join-Path $repoRoot 'course_materials'),
-    (Join-Path $repoRoot 'manual_sqa_answers'),
-    (Join-Path $repoRoot 'local_database_backups'),
+    (Join-Path $repoRoot 'local_handoff_package'),
     (Join-Path $repoRoot 'output')
 )
 
@@ -27,7 +26,8 @@ $relativeTargets = @(
     'frontend\.flutter_build',
     'frontend\.flutter-plugins-dependencies',
     'frontend\build',
-    'backend\.pytest_cache'
+    'backend\.pytest_cache',
+    'manual_sqa_answers\__pycache__'
 )
 
 $targetPaths = [System.Collections.Generic.List[string]]::new()

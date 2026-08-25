@@ -20,9 +20,10 @@ Install once:
 .\scripts\setup-local.ps1
 ```
 
-Python 3.14 is required. The OneDrive checkout uses the single ignored
-`venv/`. On a newly synced Windows computer, run
-`.\scripts\setup-local.ps1 -Repair` once before testing.
+Python 3.14 is required. Setup creates an ignored device-local environment
+under LocalAppData. A laptop or lab computer should clone the staging repository
+outside OneDrive and run the same setup command. Use `-Repair` only when normal
+setup reports an incomplete environment.
 
 Run the complete application:
 
@@ -31,10 +32,11 @@ Run the complete application:
 ```
 
 This starts local PostgreSQL 17, the dedicated sandbox, API, and Flutter web
-application. Flutter is run from a generated LocalAppData copy to avoid
-OneDrive build-directory locks. The live PostgreSQL Docker volume remains
-computer-local. The stop command creates a verified logical backup in
-`local_database_backups/` for sequential OneDrive handoff to another computer.
+application. Python and Flutter generated files stay under LocalAppData. The
+live PostgreSQL Docker volume remains computer-local. Every clean stop creates
+a verified logical backup directly in ignored `local_handoff_package`. The
+same folder also supplies the backend `.env`, so a complete package can be
+copied into a fresh clone without changing the normal launcher command.
 The launcher also restores the verified dump after same-device Docker volume
 loss when the application schema is missing.
 AI is off. To test AI deliberately, use `-EnableAi`. To use an external staging
@@ -50,7 +52,7 @@ Stop the managed processes:
 ```
 
 Do not close Docker or switch computers before this command finishes. Wait for
-OneDrive to synchronize `latest.dump` and `latest.json`. The device lock blocks
+the complete `local_handoff_package` to finish copying or synchronizing. The device lock blocks
 ordinary startup on another computer until the first computer stops cleanly.
 
 Run the full automated SQA gate:
