@@ -24,6 +24,7 @@ DEFAULT_ACCOUNT_ROLES = (
     {"login_id": "instructor", "role": "instructor"},
     {"login_id": "student", "role": "student"},
 )
+DEFAULT_ACCOUNT_LOGIN_IDS = {item["login_id"] for item in DEFAULT_ACCOUNT_ROLES}
 
 
 def seed_demo_accounts(
@@ -140,6 +141,10 @@ def sync_accounts_from_json(session: Session, path: Path) -> dict:
         role = str(account.get("role", "")).strip().lower()
         temporary_password = account.get("temporary_password")
         active = bool(account.get("active", True))
+        if login_id in DEFAULT_ACCOUNT_LOGIN_IDS:
+            # Password-authenticated default accounts are persistent study
+            # accounts. Only server-issued /auth/demo sessions are ephemeral.
+            account["demo"] = False
         sanitized_accounts.append(_safe_account_payload(account))
         if not login_id:
             report["errors"].append(f"Account {index} has no login_id.")

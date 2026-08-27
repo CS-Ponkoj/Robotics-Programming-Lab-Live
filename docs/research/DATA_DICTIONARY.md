@@ -14,6 +14,7 @@ Assignment = what the instructor gives the student
 Submission = one intentional Run tests or Submit action
 Grader evidence = what the deterministic tests observed
 Study session = one period when a student uses the application
+Assignment activity = version-specific active time for one student
 Learning event = an important action inside that session
 Hint interaction = feedback requested for one submission
 ```
@@ -39,12 +40,14 @@ after an instructor updates the assignment.
 | Database table definitions | `backend/models.py` | Python/SQLAlchemy | Yes |
 | Database schema history | `backend/migrations/versions/` | Alembic/Python | Yes |
 
-The active PostgreSQL files stay inside Docker and are never synchronized.
-`scripts/stop-local.ps1` exports a complete validated dump, checksum manifest,
-and previous backup directly into `local_handoff_package`. The launcher
+The active PostgreSQL files stay inside Docker and are never synchronized. The
+managed backup worker exports changed PostgreSQL data every 10 minutes.
+`scripts/stop-local.ps1` exports the final complete validated dump, checksum
+manifest, and previous backup directly into `local_handoff_package`. The launcher
 restores the verified dump for a new device or a recreated same-device volume
 with no application schema. PostgreSQL is the runtime source of truth. Never
-edit a dump or live database file. The package is refreshed by every clean stop.
+edit a dump or live database file. The package is refreshed automatically and
+again by every clean stop.
 
 ## How to see local data
 
@@ -102,6 +105,7 @@ One row represents one deliberate code execution.
 | `execution_succeeded` | Whether execution completed |
 | `execution_status` | Standard failure/success category |
 | `passed`, `score` | Deterministic grader result |
+| `active_seconds_at_attempt` | Phase 1 active-time snapshot; null for attempts recorded before tracking |
 | `evidence` | Versioned test evidence and safe execution details |
 | `created_at` | UTC attempt time |
 
@@ -122,6 +126,17 @@ Standard `execution_status` values are:
 
 One row represents a period of active student use. It stores a participant-code
 snapshot, start/end times, last activity, and capped active seconds.
+
+### `assignment_activities`
+
+One row stores time for one student, assignment ID, and exact assignment
+version. It records first/latest activity, accumulated active seconds, first
+successful completion time, and active seconds accumulated before first
+completion. The unique key prevents two versions from being mixed.
+
+Historical attempts are not given invented timing. When an older attempt has no
+matching activity row, the API returns null time values with
+`not_collected`; the interface displays **Not available**.
 
 ### `learning_events`
 
@@ -175,6 +190,24 @@ configuration explicitly. All assignment files declare
 - Submission modes and execution statuses use allowlisted values.
 - Alembic migration `0003_standardize_existing_data` adds and backfills the
   standardized columns without deleting existing research rows.
+- Alembic migration `0004_basic_research_analytics` adds assignment activity
+  tracking and nullable active-time snapshots without changing old attempts.
+
+## Phase 1 analytics interfaces
+
+| Interface | Purpose |
+| --- | --- |
+| `GET /research/metrics` | Versioned definitions for the 55 implemented basic metrics |
+| `GET /research/me` | Student-self overview and assignment/version summaries |
+| `GET /research/me/attempts` | Paginated student-self attempt history |
+| `GET /admin/research/summary` | Classroom, participant, assignment, and data-health summaries |
+| `GET /admin/research/students/{student_id}` | Instructor-authorized participant detail |
+| `GET /admin/research/students/{student_id}/attempts` | Paginated instructor-authorized participant history |
+| `GET /admin/research/assignments` | Filterable current assignment/version summaries |
+| `GET /admin/research/export` | Privacy-safe CSV or Excel datasets, including Phase 1 assignment summaries |
+
+The phase mapping and timing rules are in
+`docs/research/V5_2_ANALYTICS_PHASES.md`.
 
 ## Privacy boundary
 

@@ -3,7 +3,8 @@
 Copy this entire folder into the root of a fresh staging Git clone. The normal
 `setup-local.ps1` and `run-local.ps1` commands detect it automatically.
 
-A populated local copy contains one flat set of active private files:
+A populated local copy contains one active private data set and may contain an
+optional history subfolder:
 
 ```text
 local_handoff_package/
@@ -12,10 +13,12 @@ local_handoff_package/
 ├── latest.json             checksum and backup metadata
 ├── previous.dump           optional recovery copy
 ├── previous.json           optional recovery manifest
-└── package.json            package metadata
+├── package.json            package metadata
+└── history/                optional older recovery files
 ```
 
-Create or refresh it only while the application is stopped:
+The managed launcher refreshes changed database data every 10 minutes. Create a
+final device-handoff backup only while the application is stopped:
 
 ```powershell
 .\scripts\stop-local.ps1
@@ -31,3 +34,6 @@ commit, email, or publicly share a populated package.
 The Python virtual environment is not included. It contains device-specific
 paths and compiled packages. On the destination computer, normal setup rebuilds
 the exact pinned environment safely under LocalAppData.
+
+Copy only this complete folder to another computer. The former
+`local_database_backups` folder is obsolete and is not read by the application.

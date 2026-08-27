@@ -12,6 +12,9 @@
 - Instructor tools manage study accounts without exposing password hashes.
 - Research sessions and learning events use participant codes in dashboards and
   exports; submitted code and login IDs are excluded from research datasets.
+- Phase 1 analytics keep assignment versions separate, preserve null historical
+  time, expose paginated attempt history, and provide privacy-safe classroom,
+  participant, assignment, and data-health summaries.
 
 Docker Compose and the supported local launcher load secrets and instructor
 settings directly from ignored `local_handoff_package/.env`. Submission
@@ -39,6 +42,10 @@ The Flutter application signs in through `/auth/login` and sends an opaque
 Bearer session token. Instructor APIs verify the instructor role. The
 `ADMIN_API_TOKEN` option is retained only for compatibility with older API
 clients and is not used by the current Flutter instructor interface.
+
+These password accounts are persistent prototype accounts and may use the
+analytics catalog. The credential-free `/auth/demo` session is the only
+ephemeral demo identity; it cannot create persistent research records.
 
 An instructor can create students, generate a temporary password, send an email
 activation link, reset access, and deactivate or reactivate accounts. Accounts
@@ -71,6 +78,19 @@ message was delivered.
 Instructor publishing runs the server-side reference solution through the hidden
 grader. Invalid assignments remain drafts.
 
+## Phase 1 research analytics
+
+`GET /research/me` returns a student's own overview and version-specific
+assignment summaries. `GET /research/me/attempts` is the paginated history.
+Instructor equivalents are available under `/admin/research/`, and exports now
+include participant-assignment and class-assignment datasets. Authenticated
+clients can read the 55 implemented definitions from `GET /research/metrics`.
+
+The browser heartbeat remains 30 seconds and is sent only while visible and
+recently interactive within the 15-minute idle window. New submissions store a
+nullable active-time snapshot. Old attempts are never backfilled with invented
+time and display as `Not available`.
+
 ## Database lifecycle
 
 The root launcher starts PostgreSQL 17 in a computer-local Docker volume. It
@@ -79,8 +99,10 @@ synchronized backup exists and the target is empty, the launcher copies every
 row from the canonical ignored `robotics_lab_staging.db` without modifying that
 SQLite source.
 
-`scripts/stop-local.ps1` creates a PostgreSQL custom-format dump, validates it
-with `pg_restore --list`, verifies its SHA-256 checksum, writes it directly to
+While the managed stack is running, `scripts/backup-local-database.ps1` creates
+a PostgreSQL custom-format dump every 10 minutes when the database change
+position advances. It validates the dump with `pg_restore --list` and verifies
+its SHA-256 checksum. `scripts/stop-local.ps1` always writes the final dump to
 `local_handoff_package`, keeps the preceding successful backup, releases the
 device lock, and then stops PostgreSQL. A new computer restores the verified
 dump before the API starts. The same dump is restored if the current computer's

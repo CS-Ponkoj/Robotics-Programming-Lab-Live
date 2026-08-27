@@ -8,7 +8,7 @@
       "email": "",
       "participant_code": null,
       "active": true,
-      "demo": true
+      "demo": false
     },
     {
       "login_id": "student",
@@ -17,7 +17,7 @@
       "email": "",
       "participant_code": "DEMO",
       "active": true,
-      "demo": true
+      "demo": false
     },
     {
       "login_id": "STU-001",

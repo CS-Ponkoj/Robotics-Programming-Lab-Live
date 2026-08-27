@@ -55,6 +55,11 @@ Do not close Docker or switch computers before this command finishes. Wait for
 the complete `local_handoff_package` to finish copying or synchronizing. The device lock blocks
 ordinary startup on another computer until the first computer stops cleanly.
 
+The local launcher also saves changed PostgreSQL data every 10 minutes while it
+is running. This protects recent work but does not release the device lock.
+Closing the browser is not a handoff; the explicit stop command remains
+mandatory before another computer starts the package.
+
 Run the full automated SQA gate:
 
 ```powershell

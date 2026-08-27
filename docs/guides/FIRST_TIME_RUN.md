@@ -87,6 +87,11 @@ Open `http://127.0.0.1:8180/app`. Stop safely with:
 .\scripts\stop-local.ps1
 ```
 
+The managed launcher backs up changed PostgreSQL data every 10 minutes while
+the stack is running. Closing the browser does not close the backend or create a
+device handoff. Before changing computers, always run `stop-local.ps1` and wait
+for `local_handoff_package` to finish copying or synchronizing.
+
 A clean stop validates and saves PostgreSQL directly to:
 
 ```text
@@ -96,6 +101,7 @@ local_handoff_package/
 ├── latest.json
 ├── previous.dump
 ├── previous.json
+├── history/              optional older recovery files
 └── package.json
 ```
 
@@ -121,6 +127,7 @@ and then start on the other computer.
 | A port is in use | Run `stop-local.ps1`, or choose unused port parameters. |
 | Database is assigned to another device | Stop it there and wait for the package to finish copying or syncing. |
 | Only one of `latest.dump` or `latest.json` exists | Restore the complete pair from a known-good package copy. |
+| An old `local_database_backups` folder exists | It is obsolete. Preserve unique old files under `local_handoff_package/history`, then use only the complete handoff package. |
 | Python environment is incomplete | Stop the app, then run `setup-local.ps1 -Repair`. |
 | ROS grading image is missing | Run the ROS image build command from step 4. |
 | Flutter reports a locked build directory | Use `run-local.ps1`; do not run Flutter directly in the OneDrive source folder. |

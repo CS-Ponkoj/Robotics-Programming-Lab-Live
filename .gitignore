@@ -32,6 +32,8 @@ backend/study_exports/
 /local_handoff_package/*
 !/local_handoff_package/.gitignore
 !/local_handoff_package/README.md
+# Obsolete pre-handoff-package backup location; ignored if an old copy reappears.
+/local_database_backups/
 
 # Flutter and Dart generated files
 .dart_tool/

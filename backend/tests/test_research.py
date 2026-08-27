@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,7 +7,7 @@ from sqlalchemy import select
 
 from app import create_app
 from config import Settings
-from models import HintInteraction
+from models import HintInteraction, Submission
 
 
 @pytest.fixture()
@@ -338,3 +339,211 @@ def test_learning_event_validation_limits_untrusted_data(research_client):
         json={"active_seconds": 61},
     )
     assert too_much_time.status_code == 400
+
+
+def test_phase1_activity_completion_catalog_and_pagination(research_client):
+    student = _login(
+        research_client, "research-student", "Research-Student-4827"
+    )
+    instructor = _login(research_client, "instructor", "instructor")
+    assignment = research_client.get(
+        "/assignments/1", headers=_bearer(student)
+    ).json()
+    study_session = _start(
+        research_client, student, "browser-session-phase1"
+    ).json()
+    session_id = study_session["id"]
+
+    opened = research_client.post(
+        f"/research/sessions/{session_id}/events",
+        headers=_bearer(student),
+        json={
+            "event_type": "assignment_opened",
+            "assignment_id": 1,
+            "assignment_version": assignment["version"],
+            "event_data": {"source": "assignment_catalog"},
+        },
+    )
+    assert opened.status_code == 201
+    assert research_client.post(
+        f"/research/sessions/{session_id}/heartbeat",
+        headers=_bearer(student),
+        json={
+            "active_seconds": 30,
+            "assignment_id": 1,
+            "assignment_version": assignment["version"],
+        },
+    ).status_code == 200
+
+    answer_path = (
+        Path(__file__).resolve().parents[2]
+        / "manual_sqa_answers"
+        / "assignment_1_answer.py"
+    )
+    correct = research_client.post(
+        "/assignments/1/run",
+        headers=_bearer(student),
+        json={
+            "code": answer_path.read_text(encoding="utf-8"),
+            "study_session_id": session_id,
+        },
+    )
+    assert correct.status_code == 200
+    assert correct.json()["pass"] is True
+
+    payload = research_client.get(
+        "/research/me", headers=_bearer(student)
+    ).json()
+    row = next(
+        item
+        for item in payload["assignment_summaries"]
+        if item["assignment_id"] == 1 and item["is_current_version"]
+    )
+    assert row["status"] == "completed"
+    assert row["attempt_count"] == 1
+    assert row["attempts_to_first_success"] == 1
+    assert row["first_score"] == row["latest_score"] == row["best_score"] == 100
+    assert row["score_improvement"] == 0
+    assert row["total_active_seconds"] == 30
+    assert row["active_seconds_to_first_attempt"] == 30
+    assert row["active_seconds_to_completion"] == 30
+    assert row["elapsed_seconds_to_completion"] is not None
+    assert row["completion_time_availability"] == "available"
+
+    catalog = research_client.get(
+        "/research/metrics", headers=_bearer(student)
+    )
+    assert catalog.status_code == 200
+    assert catalog.json()["phase"] == 1
+    assert len(catalog.json()["metrics"]) == 55
+    assert {item["implementation_status"] for item in catalog.json()["metrics"]} == {
+        "implemented"
+    }
+
+    first_page = research_client.get(
+        "/research/me/attempts?page=1&page_size=1",
+        headers=_bearer(student),
+    )
+    assert first_page.status_code == 200
+    assert first_page.json()["total"] == 1
+    assert len(first_page.json()["items"]) == 1
+    assert "code" not in first_page.json()["items"][0]
+
+    student_id = student["user"]["id"]
+    instructor_page = research_client.get(
+        f"/admin/research/students/{student_id}/attempts?page=1&page_size=1",
+        headers=_bearer(instructor),
+    )
+    assert instructor_page.status_code == 200
+    assert instructor_page.json()["total"] == 1
+    assert research_client.get(
+        f"/admin/research/students/{student_id}/attempts",
+        headers=_bearer(student),
+    ).status_code == 403
+    assert research_client.get("/research/me/attempts").status_code == 401
+
+
+def test_phase1_keeps_versions_separate_and_marks_historical_time_unavailable(
+    research_client,
+):
+    student = _login(
+        research_client, "research-student", "Research-Student-4827"
+    )
+    assignment = research_client.get(
+        "/assignments/2", headers=_bearer(student)
+    ).json()
+    user_id = student["user"]["id"]
+    with research_client.app.state.SessionLocal() as session:
+        session.add_all(
+            [
+                Submission(
+                    assignment_id=2,
+                    assignment_version=assignment["version"],
+                    student_id="research-student",
+                    user_id=user_id,
+                    mode="submit",
+                    code="historical source is not returned",
+                    execution_succeeded=True,
+                    execution_status="completed",
+                    passed=True,
+                    score=100,
+                    evidence={"tests": []},
+                ),
+                Submission(
+                    assignment_id=2,
+                    assignment_version=max(1, assignment["version"] - 1),
+                    student_id="research-student",
+                    user_id=user_id,
+                    mode="run",
+                    code="historical source is not returned",
+                    execution_succeeded=True,
+                    execution_status="completed",
+                    passed=False,
+                    score=40,
+                    evidence={"tests": []},
+                ),
+            ]
+        )
+        session.commit()
+
+    payload = research_client.get(
+        "/research/me", headers=_bearer(student)
+    ).json()
+    rows = [
+        item for item in payload["assignment_summaries"] if item["assignment_id"] == 2
+    ]
+    assert len(rows) == (1 if assignment["version"] == 1 else 2)
+    current = next(item for item in rows if item["is_current_version"])
+    assert current["status"] == "completed"
+    assert current["total_active_seconds"] is None
+    assert current["active_seconds_to_completion"] is None
+    assert current["elapsed_seconds_to_completion"] is None
+    assert current["time_availability"] == "not_collected"
+    assert current["completion_time_availability"] == "not_collected"
+
+
+def test_phase1_records_oversized_attempt_and_instructor_safe_aggregates(
+    research_client,
+):
+    student = _login(
+        research_client, "research-student", "Research-Student-4827"
+    )
+    instructor = _login(research_client, "instructor", "instructor")
+    study_session = _start(
+        research_client, student, "browser-session-oversized"
+    ).json()
+    oversized = research_client.post(
+        "/assignments/1/submit",
+        headers=_bearer(student),
+        json={
+            "code": "x" * 50_001,
+            "study_session_id": study_session["id"],
+        },
+    )
+    assert oversized.status_code == 413
+
+    mine = research_client.get("/research/me", headers=_bearer(student)).json()
+    row = next(
+        item
+        for item in mine["assignment_summaries"]
+        if item["assignment_id"] == 1 and item["is_current_version"]
+    )
+    assert row["oversized_submission_count"] == 1
+    assert row["rejection_count"] == 0
+
+    dashboard = research_client.get(
+        "/admin/research/summary", headers=_bearer(instructor)
+    )
+    assert dashboard.status_code == 200
+    body = dashboard.json()
+    assert body["overview"]["active_participants"] >= 1
+    assert body["data_health"]["demo_data_contamination"] == 0
+    assert "login_id" not in dashboard.text
+    assert "password" not in dashboard.text.lower()
+    assignment_data = research_client.get(
+        "/admin/research/assignments?assignment_id=1",
+        headers=_bearer(instructor),
+    )
+    assert assignment_data.status_code == 200
+    assert len(assignment_data.json()["assignments"]) == 1
+    assert "hidden-test" not in assignment_data.text.lower()

@@ -99,6 +99,20 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'Robotics Programming Lab',
       theme: buildAppTheme(),
+      builder: (context, child) => Focus(
+        canRequestFocus: false,
+        onKeyEvent: (_, __) {
+          researchTracker.recordUserInteraction();
+          return KeyEventResult.ignored;
+        },
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => researchTracker.recordUserInteraction(),
+          onPointerMove: (_) => researchTracker.recordUserInteraction(),
+          onPointerSignal: (_) => researchTracker.recordUserInteraction(),
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
       home: _restoringSession
           ? const Scaffold(
               body: Center(

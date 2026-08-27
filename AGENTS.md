@@ -228,6 +228,13 @@ for the whole package to finish copying or synchronizing before starting
 elsewhere. Never place PostgreSQL's live data directory or Docker volume inside
 OneDrive and never run the same package from two devices simultaneously.
 
+While the managed local stack is running, `backup-local-database.ps1` creates a
+checksum-verified backup every 10 minutes when PostgreSQL has changed. It is a
+recovery safeguard, not a device-handoff signal: closing the browser does not
+stop the stack or release its device lock. Always use `stop-local.ps1` before
+switching computers, and copy only the complete `local_handoff_package` folder.
+The obsolete `local_database_backups` location is not part of the application.
+
 For an explicit copy-and-paste handoff, run
 `scripts/create-local-handoff-package.ps1` only while the app is stopped and
 copy the entire ignored `local_handoff_package` folder into the destination

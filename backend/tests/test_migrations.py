@@ -12,6 +12,7 @@ import models  # noqa: F401
 
 EXPECTED_TABLES = {
     "alembic_version",
+    "assignment_activities",
     "assignments",
     "audit_events",
     "auth_sessions",

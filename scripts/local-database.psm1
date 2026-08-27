@@ -174,6 +174,169 @@ function Export-PostgresDump {
     }
 }
 
+function Get-PostgresChangePosition {
+    param([Parameter(Mandatory = $true)]$Configuration)
+
+    $result = Invoke-RoboticsCompose -Configuration $Configuration -Quiet -Arguments @(
+        "exec", "-T", "postgres", "psql",
+        "-U", $Configuration.DatabaseUser,
+        "-d", $Configuration.DatabaseName,
+        "-At", "-c",
+        "SELECT system_identifier::text || '|' || pg_current_wal_lsn()::text FROM pg_control_system();"
+    )
+    $value = (@($result) | Select-Object -Last 1).ToString().Trim()
+    $parts = $value.Split('|', 2)
+    if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[0]) -or [string]::IsNullOrWhiteSpace($parts[1])) {
+        throw "PostgreSQL did not return a valid database change position."
+    }
+    return [pscustomobject]@{
+        SystemIdentifier = $parts[0]
+        WalLsn = $parts[1]
+    }
+}
+
+function Get-BackupMutexName {
+    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
+
+    $bytes = [Text.Encoding]::UTF8.GetBytes(
+        [System.IO.Path]::GetFullPath($RepositoryRoot).ToLowerInvariant()
+    )
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $key = ([BitConverter]::ToString($sha.ComputeHash($bytes)) -replace '-', '').Substring(0, 24)
+    } finally {
+        $sha.Dispose()
+    }
+    return "Local\RoboticsLabDatabaseBackup-$key"
+}
+
+function Save-RoboticsLocalPostgresBackup {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string]$SessionId,
+        [int]$DatabasePort = $script:DefaultDatabasePort,
+        [string]$ProjectName = $script:DefaultProjectName,
+        [string]$BackupRoot = "",
+        [string]$RuntimeRoot = "",
+        [switch]$SkipIfUnchanged,
+        [int]$MutexTimeoutSeconds = 30
+    )
+
+    $configuration = Get-LocalDatabaseConfiguration `
+        -RepositoryRoot $RepositoryRoot `
+        -DatabasePort $DatabasePort `
+        -ProjectName $ProjectName `
+        -BackupRoot $BackupRoot `
+        -RuntimeRoot $RuntimeRoot
+    $lockPath = Join-Path $configuration.BackupRoot "active-device.json"
+    $lock = Read-JsonFile -Path $lockPath
+    $device = if ([string]::IsNullOrWhiteSpace($env:COMPUTERNAME)) { "unknown-windows-device" } else { $env:COMPUTERNAME }
+    if (-not $lock -or $lock.device -ne $device -or $lock.session_id -ne $SessionId) {
+        throw "The local database lock does not belong to this application session. The backup was not changed."
+    }
+
+    $mutex = [Threading.Mutex]::new($false, (Get-BackupMutexName -RepositoryRoot $configuration.RepositoryRoot))
+    $ownsMutex = $false
+    try {
+        try {
+            $ownsMutex = $mutex.WaitOne([TimeSpan]::FromSeconds($MutexTimeoutSeconds))
+        } catch [Threading.AbandonedMutexException] {
+            $ownsMutex = $true
+        }
+        if (-not $ownsMutex) {
+            throw "Another database backup is still running. No backup files were changed."
+        }
+
+        Wait-ForLocalPostgres -Configuration $configuration
+        $changePosition = Get-PostgresChangePosition -Configuration $configuration
+        $autoStatePath = Join-Path $configuration.RuntimeRoot "database-auto-backup.json"
+        $autoState = Read-JsonFile -Path $autoStatePath
+        if (
+            $SkipIfUnchanged -and
+            $autoState -and
+            $autoState.system_identifier -eq $changePosition.SystemIdentifier -and
+            $autoState.wal_lsn -eq $changePosition.WalLsn
+        ) {
+            return [pscustomobject]@{
+                Saved = $false
+                Reason = "unchanged"
+                Path = Join-Path $configuration.BackupRoot "latest.dump"
+            }
+        }
+
+        $temporaryDump = Join-Path $configuration.RuntimeRoot "database-backup-$([guid]::NewGuid().ToString('N')).dump"
+        try {
+            Export-PostgresDump -Configuration $configuration -Destination $temporaryDump
+            $hash = (Get-FileHash -LiteralPath $temporaryDump -Algorithm SHA256).Hash
+            $size = (Get-Item -LiteralPath $temporaryDump).Length
+            $schemaOutput = Invoke-RoboticsCompose -Configuration $configuration -Quiet -Arguments @(
+                "exec", "-T", "postgres", "psql",
+                "-U", $configuration.DatabaseUser,
+                "-d", $configuration.DatabaseName,
+                "-At", "-c", "SELECT version_num FROM alembic_version LIMIT 1;"
+            )
+            $schemaVersion = (@($schemaOutput) | Select-Object -Last 1).ToString().Trim()
+
+            $incomingDump = Join-Path $configuration.BackupRoot "latest.dump.incoming"
+            Copy-Item -LiteralPath $temporaryDump -Destination $incomingDump -Force
+            if ((Get-FileHash -LiteralPath $incomingDump -Algorithm SHA256).Hash -ne $hash) {
+                throw "Database backup copy verification failed. The previous backup and device lock were preserved."
+            }
+
+            $latestDump = Join-Path $configuration.BackupRoot "latest.dump"
+            $latestManifest = Join-Path $configuration.BackupRoot "latest.json"
+            $previousDump = Join-Path $configuration.BackupRoot "previous.dump"
+            $previousManifest = Join-Path $configuration.BackupRoot "previous.json"
+            if (Test-Path -LiteralPath $latestDump) {
+                Copy-Item -LiteralPath $latestDump -Destination $previousDump -Force
+            }
+            if (Test-Path -LiteralPath $latestManifest) {
+                Copy-Item -LiteralPath $latestManifest -Destination $previousManifest -Force
+            }
+            Move-Item -LiteralPath $incomingDump -Destination $latestDump -Force
+            Save-JsonAtomic -Path $latestManifest -Value ([ordered]@{
+                format = "postgresql-custom-dump"
+                created_at_utc = [DateTime]::UtcNow.ToString("o")
+                source_device = $device
+                database = $configuration.DatabaseName
+                alembic_version = $schemaVersion
+                bytes = $size
+                sha256 = $hash
+                system_identifier = $changePosition.SystemIdentifier
+                wal_lsn = $changePosition.WalLsn
+            })
+            Save-JsonAtomic -Path $autoStatePath -Value ([ordered]@{
+                system_identifier = $changePosition.SystemIdentifier
+                wal_lsn = $changePosition.WalLsn
+                last_backup_sha256 = $hash
+                updated_at_utc = [DateTime]::UtcNow.ToString("o")
+            })
+
+            $syncStatePath = Join-Path $configuration.RuntimeRoot "database-sync.json"
+            Save-JsonAtomic -Path $syncStatePath -Value ([ordered]@{
+                device = $device
+                dirty = $true
+                last_backup_sha256 = $hash
+                session_id = $SessionId
+                updated_at_utc = [DateTime]::UtcNow.ToString("o")
+            })
+            return [pscustomobject]@{
+                Saved = $true
+                Reason = "changed"
+                Path = $latestDump
+                Sha256 = $hash
+            }
+        } finally {
+            if (Test-Path -LiteralPath $temporaryDump) {
+                Remove-Item -LiteralPath $temporaryDump -Force
+            }
+        }
+    } finally {
+        if ($ownsMutex) { $mutex.ReleaseMutex() }
+        $mutex.Dispose()
+    }
+}
+
 function Reset-PostgresDatabase {
     param([Parameter(Mandatory = $true)]$Configuration)
 
@@ -369,64 +532,27 @@ function Complete-RoboticsLocalPostgres {
         -ProjectName $ProjectName `
         -BackupRoot $BackupRoot `
         -RuntimeRoot $RuntimeRoot
-    $lockPath = Join-Path $configuration.BackupRoot "active-device.json"
-    $lock = Read-JsonFile -Path $lockPath
-    $device = if ([string]::IsNullOrWhiteSpace($env:COMPUTERNAME)) { "unknown-windows-device" } else { $env:COMPUTERNAME }
-    if (-not $lock -or $lock.device -ne $device -or $lock.session_id -ne $SessionId) {
-        throw "The local database lock does not belong to this application session. The backup was not changed."
-    }
-
-    Wait-ForLocalPostgres -Configuration $configuration
-    $temporaryDump = Join-Path $configuration.RuntimeRoot "database-backup-incoming.dump"
-    Export-PostgresDump -Configuration $configuration -Destination $temporaryDump
-    $hash = (Get-FileHash -LiteralPath $temporaryDump -Algorithm SHA256).Hash
-    $size = (Get-Item -LiteralPath $temporaryDump).Length
-    $schemaOutput = Invoke-RoboticsCompose -Configuration $configuration -Quiet -Arguments @(
-        "exec", "-T", "postgres", "psql",
-        "-U", $configuration.DatabaseUser,
-        "-d", $configuration.DatabaseName,
-        "-At", "-c", "SELECT version_num FROM alembic_version LIMIT 1;"
-    )
-    $schemaVersion = (@($schemaOutput) | Select-Object -Last 1).ToString().Trim()
-
-    $incomingDump = Join-Path $configuration.BackupRoot "latest.dump.incoming"
-    Copy-Item -LiteralPath $temporaryDump -Destination $incomingDump -Force
-    if ((Get-FileHash -LiteralPath $incomingDump -Algorithm SHA256).Hash -ne $hash) {
-        throw "Database backup copy verification failed. The previous backup and device lock were preserved."
-    }
-
-    $latestDump = Join-Path $configuration.BackupRoot "latest.dump"
-    $latestManifest = Join-Path $configuration.BackupRoot "latest.json"
-    $previousDump = Join-Path $configuration.BackupRoot "previous.dump"
-    $previousManifest = Join-Path $configuration.BackupRoot "previous.json"
-    if (Test-Path -LiteralPath $latestDump) {
-        Copy-Item -LiteralPath $latestDump -Destination $previousDump -Force
-    }
-    if (Test-Path -LiteralPath $latestManifest) {
-        Copy-Item -LiteralPath $latestManifest -Destination $previousManifest -Force
-    }
-    Move-Item -LiteralPath $incomingDump -Destination $latestDump -Force
-    Save-JsonAtomic -Path $latestManifest -Value ([ordered]@{
-        format = "postgresql-custom-dump"
-        created_at_utc = [DateTime]::UtcNow.ToString("o")
-        source_device = $device
-        database = $configuration.DatabaseName
-        alembic_version = $schemaVersion
-        bytes = $size
-        sha256 = $hash
-    })
+    $backup = Save-RoboticsLocalPostgresBackup `
+        -RepositoryRoot $configuration.RepositoryRoot `
+        -SessionId $SessionId `
+        -DatabasePort $configuration.DatabasePort `
+        -ProjectName $configuration.ProjectName `
+        -BackupRoot $configuration.BackupRoot `
+        -RuntimeRoot $configuration.RuntimeRoot `
+        -MutexTimeoutSeconds 60
 
     $syncStatePath = Join-Path $configuration.RuntimeRoot "database-sync.json"
     Save-JsonAtomic -Path $syncStatePath -Value ([ordered]@{
-        device = $device
+        device = if ([string]::IsNullOrWhiteSpace($env:COMPUTERNAME)) { "unknown-windows-device" } else { $env:COMPUTERNAME }
         dirty = $false
-        last_backup_sha256 = $hash
+        last_backup_sha256 = $backup.Sha256
         session_id = $null
         updated_at_utc = [DateTime]::UtcNow.ToString("o")
     })
+    $lockPath = Join-Path $configuration.BackupRoot "active-device.json"
     Remove-Item -LiteralPath $lockPath -Force
     Invoke-RoboticsCompose -Configuration $configuration -Quiet -Arguments @("stop", "postgres") | Out-Null
-    Write-Output "Verified PostgreSQL backup saved to $latestDump"
+    Write-Output "Verified PostgreSQL backup saved to $($backup.Path)"
 }
 
-Export-ModuleMember -Function Start-RoboticsLocalPostgres, Complete-RoboticsLocalPostgres
+Export-ModuleMember -Function Start-RoboticsLocalPostgres, Save-RoboticsLocalPostgresBackup, Complete-RoboticsLocalPostgres

@@ -9,11 +9,71 @@ import 'package:iuse_demo/services/research_visibility.dart';
 
 const _researchTimeout = Duration(seconds: 20);
 const _heartbeatInterval = Duration(seconds: 30);
+const _researchIdleWindow = Duration(minutes: 15);
 
 Future<Map<String, dynamic>> fetchMyResearchData() async {
+  final responses = await Future.wait([
+    http
+        .get(
+          Uri.parse('$apiBaseUrl/research/me'),
+          headers: AuthApi.authorizedHeaders(),
+        )
+        .timeout(_researchTimeout),
+    http
+        .get(
+          Uri.parse('$apiBaseUrl/research/metrics'),
+          headers: AuthApi.authorizedHeaders(),
+        )
+        .timeout(_researchTimeout),
+  ]);
+  _requireResearchSuccess(responses[0]);
+  _requireResearchSuccess(responses[1]);
+  final data = Map<String, dynamic>.from(
+    jsonDecode(responses[0].body) as Map,
+  );
+  data['metric_catalog'] = Map<String, dynamic>.from(
+    jsonDecode(responses[1].body) as Map,
+  );
+  return data;
+}
+
+Future<List<Map<String, dynamic>>> fetchResearchParticipants() async {
+  final data = await fetchInstructorResearchData();
+  return (data['participants'] as List)
+      .map((item) => Map<String, dynamic>.from(item as Map))
+      .toList();
+}
+
+Future<Map<String, dynamic>> fetchInstructorResearchData() async {
+  final responses = await Future.wait([
+    http
+        .get(
+          Uri.parse('$apiBaseUrl/admin/research/summary'),
+          headers: AuthApi.authorizedHeaders(),
+        )
+        .timeout(_researchTimeout),
+    http
+        .get(
+          Uri.parse('$apiBaseUrl/research/metrics'),
+          headers: AuthApi.authorizedHeaders(),
+        )
+        .timeout(_researchTimeout),
+  ]);
+  _requireResearchSuccess(responses[0]);
+  _requireResearchSuccess(responses[1]);
+  final data = Map<String, dynamic>.from(
+    jsonDecode(responses[0].body) as Map,
+  );
+  data['metric_catalog'] = Map<String, dynamic>.from(
+    jsonDecode(responses[1].body) as Map,
+  );
+  return data;
+}
+
+Future<Map<String, dynamic>> fetchMetricCatalog() async {
   final response = await http
       .get(
-        Uri.parse('$apiBaseUrl/research/me'),
+        Uri.parse('$apiBaseUrl/research/metrics'),
         headers: AuthApi.authorizedHeaders(),
       )
       .timeout(_researchTimeout);
@@ -21,18 +81,42 @@ Future<Map<String, dynamic>> fetchMyResearchData() async {
   return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
 }
 
-Future<List<Map<String, dynamic>>> fetchResearchParticipants() async {
+Future<Map<String, dynamic>> fetchMyAttemptHistory({
+  int page = 1,
+  int pageSize = 50,
+  int? assignmentId,
+  int? assignmentVersion,
+}) async {
+  final uri = Uri.parse('$apiBaseUrl/research/me/attempts').replace(
+    queryParameters: {
+      'page': '$page',
+      'page_size': '$pageSize',
+      if (assignmentId != null) 'assignment_id': '$assignmentId',
+      if (assignmentVersion != null) 'assignment_version': '$assignmentVersion',
+    },
+  );
   final response = await http
-      .get(
-        Uri.parse('$apiBaseUrl/admin/research/summary'),
-        headers: AuthApi.authorizedHeaders(),
-      )
+      .get(uri, headers: AuthApi.authorizedHeaders())
       .timeout(_researchTimeout);
   _requireResearchSuccess(response);
-  final data = jsonDecode(response.body) as Map<String, dynamic>;
-  return (data['participants'] as List)
-      .map((item) => Map<String, dynamic>.from(item as Map))
-      .toList();
+  return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+}
+
+Future<Map<String, dynamic>> fetchStudentAttemptHistory(
+  String studentId, {
+  int page = 1,
+  int pageSize = 50,
+}) async {
+  final uri = Uri.parse(
+    '$apiBaseUrl/admin/research/students/$studentId/attempts',
+  ).replace(
+    queryParameters: {'page': '$page', 'page_size': '$pageSize'},
+  );
+  final response = await http
+      .get(uri, headers: AuthApi.authorizedHeaders())
+      .timeout(_researchTimeout);
+  _requireResearchSuccess(response);
+  return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
 }
 
 Future<Map<String, dynamic>> fetchStudentResearchData(String studentId) async {
@@ -68,18 +152,34 @@ Future<bool> downloadResearchDataset({
 class ResearchTracker {
   ResearchTracker({
     this.heartbeatInterval = _heartbeatInterval,
+    this.idleWindow = _researchIdleWindow,
     bool Function()? pageVisible,
-  }) : _pageVisible = pageVisible ?? isResearchPageVisible;
+    DateTime Function()? clock,
+  })  : _pageVisible = pageVisible ?? isResearchPageVisible,
+        _clock = clock ?? DateTime.now {
+    _lastInteractionAt = _clock();
+  }
 
   final Duration heartbeatInterval;
+  final Duration idleWindow;
   final bool Function() _pageVisible;
+  final DateTime Function() _clock;
   String? _studySessionId;
   Future<void>? _starting;
   Timer? _heartbeatTimer;
   int? _assignmentId;
   int? _assignmentVersion;
+  late DateTime _lastInteractionAt;
 
   String? get studySessionId => _studySessionId;
+
+  void recordUserInteraction() {
+    _lastInteractionAt = _clock();
+  }
+
+  bool isRecentlyActive([DateTime? now]) {
+    return (now ?? _clock()).difference(_lastInteractionAt) <= idleWindow;
+  }
 
   Future<void> start() async {
     if (_studySessionId != null) {
@@ -169,7 +269,7 @@ class ResearchTracker {
   }
 
   Future<void> _heartbeat() async {
-    if (!_pageVisible()) {
+    if (!_pageVisible() || !isRecentlyActive()) {
       return;
     }
     final sessionId = _studySessionId;

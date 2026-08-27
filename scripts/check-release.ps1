@@ -38,6 +38,7 @@ try {
         "scripts/setup-local.ps1",
         "scripts/create-local-handoff-package.ps1",
         "scripts/run-local.ps1",
+        "scripts/backup-local-database.ps1",
         "scripts/stop-local.ps1",
         "scripts/local-environment.psm1",
         "scripts/local-database.psm1",

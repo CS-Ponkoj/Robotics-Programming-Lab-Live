@@ -96,6 +96,36 @@ try {
     $sourceUrl = "sqlite:///$((Join-Path $repositoryRoot 'backend\robotics_lab_staging.db').Replace('\', '/'))"
     $sourceCounts = Get-ApplicationTableCounts -DatabaseUrl $sourceUrl
 
+    $automaticBackup = Save-RoboticsLocalPostgresBackup `
+        -RepositoryRoot $repositoryRoot `
+        -SessionId $first.SessionId `
+        -DatabasePort $databasePort `
+        -ProjectName $projectName `
+        -BackupRoot $backupRoot `
+        -RuntimeRoot $runtimeOne `
+        -SkipIfUnchanged
+    if (-not $automaticBackup.Saved) {
+        throw "The first automatic database backup was unexpectedly skipped."
+    }
+    $automaticManifest = Get-Content -LiteralPath (Join-Path $backupRoot "latest.json") -Raw | ConvertFrom-Json
+    if (
+        [string]::IsNullOrWhiteSpace($automaticManifest.system_identifier) -or
+        [string]::IsNullOrWhiteSpace($automaticManifest.wal_lsn)
+    ) {
+        throw "The automatic backup manifest is missing its PostgreSQL change position."
+    }
+    $unchangedBackup = Save-RoboticsLocalPostgresBackup `
+        -RepositoryRoot $repositoryRoot `
+        -SessionId $first.SessionId `
+        -DatabasePort $databasePort `
+        -ProjectName $projectName `
+        -BackupRoot $backupRoot `
+        -RuntimeRoot $runtimeOne `
+        -SkipIfUnchanged
+    if ($unchangedBackup.Saved -or $unchangedBackup.Reason -ne "unchanged") {
+        throw "An unchanged database was not skipped by the automatic backup check."
+    }
+
     Complete-RoboticsLocalPostgres `
         -RepositoryRoot $repositoryRoot `
         -SessionId $first.SessionId `
@@ -183,7 +213,7 @@ try {
         -ProjectName $projectName `
         -BackupRoot $backupRoot `
         -RuntimeRoot $runtimeTwo | Out-Host
-    Write-Output "PASS: SQLite migration, PostgreSQL backup, checksum, lock release, same-device recovery, and clean-device restore preserved every application table count."
+    Write-Output "PASS: automatic backup/unchanged skip, SQLite migration, PostgreSQL backup, checksum, lock release, same-device recovery, and clean-device restore preserved every application table count."
     Write-Output $restoredCounts
 } finally {
     Remove-TestDatabase

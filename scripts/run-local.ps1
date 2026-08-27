@@ -5,7 +5,8 @@ param(
     [int]$FrontendPort = 8080,
     [int]$BackendPort = 5000,
     [int]$SandboxPort = 5001,
-    [int]$DatabasePort = 5432
+    [int]$DatabasePort = 5432,
+    [ValidateRange(1, 1440)][int]$BackupIntervalMinutes = 10
 )
 
 $ErrorActionPreference = "Stop"
@@ -211,6 +212,23 @@ try {
     $processes += [pscustomobject]@{ name = "backend"; id = $backend.Id }
     Wait-ForEndpoint -Name "Backend" -Url "http://127.0.0.1:$BackendPort/health"
 
+    if ($localDatabaseSession) {
+        $powerShell = (Get-Process -Id $PID).Path
+        $backupScript = Join-Path $PSScriptRoot "backup-local-database.ps1"
+        $backupWorker = Start-ProjectProcess -Name "database-backup" -FilePath $powerShell `
+            -ArgumentList @(
+                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$backupScript`"",
+                "-SessionId", $localDatabaseSession.SessionId,
+                "-DatabasePort", "$($localDatabaseSession.DatabasePort)",
+                "-ProjectName", $localDatabaseSession.ProjectName,
+                "-BackupRoot", "`"$($localDatabaseSession.BackupRoot)`"",
+                "-RuntimeRoot", "`"$($localDatabaseSession.RuntimeRoot)`"",
+                "-IntervalMinutes", "$BackupIntervalMinutes"
+            ) `
+            -WorkingDirectory $repositoryRoot
+        $processes += [pscustomobject]@{ name = "database-backup"; id = $backupWorker.Id }
+    }
+
     $resolvedSafeRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "RoboticsProgrammingLab"))
     $resolvedFrontend = [System.IO.Path]::GetFullPath($safeFrontendRoot)
     if (-not $resolvedFrontend.StartsWith($resolvedSafeRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -282,6 +300,9 @@ try {
     Write-Output "Sandbox:  http://127.0.0.1:$SandboxPort/health"
     Write-Output "Database: $databaseDescription"
     Write-Output "AI enabled: $([bool]$EnableAi)"
+    if ($localDatabaseSession) {
+        Write-Output "Automatic database backup: every $BackupIntervalMinutes minute(s) while the local stack is running"
+    }
     Write-Output "Stop with: .\scripts\stop-local.ps1"
 } catch {
     foreach ($process in $processes) {

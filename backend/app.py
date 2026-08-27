@@ -8,7 +8,7 @@ from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -88,6 +88,15 @@ from schemas import (
     SubmissionRequest,
     SubmissionResponse,
     TutorQuestionRequest,
+)
+from metric_catalog import implemented_metric_catalog
+from analytics_service import (
+    add_assignment_active_time,
+    assignment_catalog,
+    classroom_analytics_payload,
+    current_assignment_active_seconds,
+    mark_first_completion,
+    paginated_attempts,
 )
 from tutor import TutorService
 from validation import validate_assignment
@@ -464,8 +473,65 @@ def create_app(
     def require_code(request_body: SubmissionRequest, request: Request) -> None:
         if not request_body.code.strip():
             raise HTTPException(400, "A non-empty code string is required.")
-        if len(request_body.code) > request.app.state.settings.max_submission_chars:
-            raise HTTPException(413, "Submitted code is too large.")
+
+    def reject_oversized_submission(
+        request: Request,
+        session: Session,
+        assignment: Assignment,
+        body: SubmissionRequest,
+        mode: str,
+        user: User,
+        study_session: StudySession | None,
+    ) -> None:
+        if len(body.code) <= request.app.state.settings.max_submission_chars:
+            return
+        submission = Submission(
+            id=str(uuid4()),
+            assignment_id=assignment.id,
+            assignment_version=assignment.version,
+            data_schema_version=assignment.data_schema_version,
+            student_id=user.login_id,
+            user_id=user.id,
+            study_session_id=study_session.id if study_session else None,
+            mode=mode,
+            code="",
+            execution_succeeded=False,
+            execution_status="rejected",
+            passed=False,
+            score=0,
+            active_seconds_at_attempt=(
+                None
+                if is_ephemeral_demo(request, user)
+                else current_assignment_active_seconds(
+                    session,
+                    user=user,
+                    assignment_id=assignment.id,
+                    assignment_version=assignment.version,
+                )
+            ),
+            evidence={
+                "data_schema_version": assignment.data_schema_version,
+                "execution_succeeded": False,
+                "execution_status": "rejected",
+                "passed": False,
+                "score": 0,
+                "rejection_reason": "size_limit",
+                "tests": [],
+            },
+        )
+        if not is_ephemeral_demo(request, user):
+            session.add(submission)
+            session.commit()
+            session.refresh(submission)
+            record_submission_event(
+                session,
+                study_session=study_session,
+                user=user,
+                assignment=assignment,
+                submission=submission,
+                ai_tutor_requested=False,
+            )
+        raise HTTPException(413, "Submitted code is too large.")
 
     def store_submission(
         request: Request,
@@ -502,6 +568,16 @@ def create_app(
             execution_status=result.execution_status.value,
             passed=result.passed,
             score=result.score,
+            active_seconds_at_attempt=(
+                None
+                if is_ephemeral_demo(request, user)
+                else current_assignment_active_seconds(
+                    session,
+                    user=user,
+                    assignment_id=assignment.id,
+                    assignment_version=assignment.version,
+                )
+            ),
             evidence=evidence,
         )
         if is_ephemeral_demo(request, user):
@@ -574,7 +650,9 @@ def create_app(
         submission: Submission,
         ai_tutor_requested: bool,
     ) -> None:
+        mark_first_completion(session, user=user, submission=submission)
         if study_session is None:
+            session.commit()
             return
         record_learning_event(
             session,
@@ -872,6 +950,15 @@ def create_app(
                 raise HTTPException(409, "Assignment version is no longer current.")
         study_session.active_seconds += body.active_seconds
         study_session.last_active_at = utc_now()
+        if body.assignment_id is not None and body.assignment_version is not None:
+            add_assignment_active_time(
+                session,
+                user=user,
+                assignment_id=body.assignment_id,
+                assignment_version=body.assignment_version,
+                active_seconds=body.active_seconds,
+                occurred_at=study_session.last_active_at,
+            )
         session.commit()
         session.refresh(study_session)
         return study_session
@@ -949,28 +1036,62 @@ def create_app(
             )
         return student_research_payload(session, user)
 
+    @application.get("/research/metrics")
+    def research_metric_catalog(
+        _user: User = Depends(current_user),
+    ):
+        return implemented_metric_catalog()
+
+    @application.get("/research/me/attempts")
+    def my_attempt_history(
+        request: Request,
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=50, ge=1, le=100),
+        assignment_id: int | None = Query(default=None, ge=1),
+        assignment_version: int | None = Query(default=None, ge=1),
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        if user.role != "student":
+            raise HTTPException(403, "Student access required.")
+        if is_ephemeral_demo(request, user):
+            raise HTTPException(
+                409,
+                "Demo progress is temporary and has no saved research data.",
+            )
+        return paginated_attempts(
+            session,
+            user=user,
+            page=page,
+            page_size=page_size,
+            assignment_id=assignment_id,
+            assignment_version=assignment_version,
+        )
+
     @application.get("/admin/research/summary")
     def admin_research_summary(
         session: Session = Depends(session_dependency),
         _actor: User | None = Depends(admin_dependency),
     ):
-        dataset = build_research_dataset(session)
-        students = session.scalars(
-            select(User).where(User.role == "student")
-        ).all()
-        ids_by_participant = {
-            participant_label(student): student.id
-            for student in students
-        }
-        return {
-            "participants": [
-                {
-                    **row,
-                    "student_id": ids_by_participant.get(row["participant_code"]),
-                }
-                for row in dataset["student_summary"]
+        return classroom_analytics_payload(session)
+
+    @application.get("/admin/research/assignments")
+    def admin_assignment_research_summary(
+        assignment_id: int | None = Query(default=None, ge=1),
+        assignment_version: int | None = Query(default=None, ge=1),
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        rows = assignment_catalog(session)
+        if assignment_id is not None:
+            rows = [row for row in rows if row["assignment_id"] == assignment_id]
+        if assignment_version is not None:
+            rows = [
+                row
+                for row in rows
+                if row["assignment_version"] == assignment_version
             ]
-        }
+        return {"assignments": rows}
 
     @application.get("/admin/research/students/{student_id}")
     def admin_student_research_data(
@@ -982,6 +1103,28 @@ def create_app(
         if student is None or student.role != "student":
             raise HTTPException(404, "Student account not found.")
         return student_research_payload(session, student)
+
+    @application.get("/admin/research/students/{student_id}/attempts")
+    def admin_student_attempt_history(
+        student_id: str,
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=50, ge=1, le=100),
+        assignment_id: int | None = Query(default=None, ge=1),
+        assignment_version: int | None = Query(default=None, ge=1),
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        student = session.get(User, student_id)
+        if student is None or student.role != "student" or student.is_demo:
+            raise HTTPException(404, "Student account not found.")
+        return paginated_attempts(
+            session,
+            user=student,
+            page=page,
+            page_size=page_size,
+            assignment_id=assignment_id,
+            assignment_version=assignment_version,
+        )
 
     @application.get("/admin/research/export")
     def admin_research_export(
@@ -1062,6 +1205,9 @@ def create_app(
         require_code(body, request)
         assignment = get_assignment_or_404(session, assignment_id)
         study_session = study_session_for_submission(request, session, body, user)
+        reject_oversized_submission(
+            request, session, assignment, body, "run", user, study_session
+        )
         grader = grader_for(assignment, request)
         result = execute_with_capacity(
             request,
@@ -1110,6 +1256,9 @@ def create_app(
         require_code(body, request)
         assignment = get_assignment_or_404(session, assignment_id)
         study_session = study_session_for_submission(request, session, body, user)
+        reject_oversized_submission(
+            request, session, assignment, body, "submit", user, study_session
+        )
         grader = grader_for(assignment, request)
         result = execute_with_capacity(
             request,

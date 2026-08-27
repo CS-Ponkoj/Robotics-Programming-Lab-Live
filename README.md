@@ -43,7 +43,9 @@ backend, and Flutter web app. Python and Flutter generated files stay in this
 computer's LocalAppData. Database backups and private settings are read from
 the single ignored `local_handoff_package` folder. If no backup exists there,
 the computer starts a fresh demo database and creates one at the next clean
-stop. Do not run
+stop. While the stack is running, a managed worker also creates a verified
+backup every 10 minutes when the database has changed. Closing the browser does
+not stop that worker. Do not run
 manual Flutter, pip, or PostgreSQL restore commands; the scripts handle them.
 
 ### Copy the same local data to another computer
@@ -60,7 +62,7 @@ verified database and optional private `.env`, but not the Python
 virtual environment. Python packages are rebuilt safely under LocalAppData on
 the destination computer.
 
-## Local demo accounts
+## Local prototype accounts
 
 The local database seeds these prototype accounts on first start:
 
@@ -70,7 +72,9 @@ Instructor: instructor / instructor
 ```
 
 Change the credentials before a real classroom study. The login page does not
-display them.
+display them. Password login creates a normal persistent account session. The
+separate **Try the student demo** button creates the temporary, non-persistent
+demo session.
 
 ## What is implemented
 
@@ -86,6 +90,9 @@ display them.
 - Built-in tutoring plus optional OpenAI feedback that never changes grades
 - Privacy-safe learning events, attempts, participant analytics, CSV, and Excel
   exports
+- V5.2 Phase 1 research analytics with assignment-version summaries, active and
+  elapsed completion time, paginated attempt history, classroom/participant/
+  assignment catalogs, and instructor data-health checks
 
 ## Technology stack
 
@@ -122,7 +129,7 @@ flowchart TB
     Auth --> DB[(PostgreSQL)]
     Engine --> DB
     Research --> DB
-    DB -->|verified dump on stop| Backup[local_handoff_package]
+    DB -->|verified dump every 10 min and on stop| Backup[local_handoff_package]
     Engine --> PythonSandbox[Python sandbox service]
     Engine --> ROS[ROS 2 Jazzy Docker grader]
     Tutor --> BuiltIn[Deterministic feedback]
@@ -221,7 +228,11 @@ computer-local and must never be synchronized. The verified logical dump,
 checksum manifest, previous recovery copy, and private `.env` all live directly
 inside `local_handoff_package`. The launcher restores that dump on a new
 computer or when the computer's Docker volume has been recreated and no
-application schema remains. Use `-DatabasePort 55432` if port 5432 is occupied.
+application schema remains. Copy only this complete folder to another computer;
+the obsolete `local_database_backups` folder is not used. Automatic backups run
+every 10 minutes by default and skip unchanged databases. A clean
+`stop-local.ps1` run still creates the required final handoff backup and releases
+the device lock. Use `-DatabasePort 55432` if port 5432 is occupied.
 Use `-UseSqlite` only for a disposable offline troubleshooting run; that mode is
 not part of the cross-device handoff workflow.
 

@@ -1,11 +1,17 @@
 import csv
 import io
-from collections import defaultdict
 from datetime import datetime
 from typing import Any, Iterable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from analytics_service import (
+    assignment_catalog,
+    participant_label as analytics_participant_label,
+    record_assignment_open,
+    student_analytics_payload,
+)
 
 from data_contracts import (
     AUTOMATIC_LEARNING_EVENT_TYPES,
@@ -13,7 +19,7 @@ from data_contracts import (
     LearningEventType,
     normalize_event_data,
 )
-from models import LearningEvent, StudySession, Submission, User, utc_now
+from models import LearningEvent, StudySession, User
 
 
 AUTOMATIC_EVENT_TYPES = AUTOMATIC_LEARNING_EVENT_TYPES
@@ -21,8 +27,7 @@ AUTOMATIC_EVENT_TYPES = AUTOMATIC_LEARNING_EVENT_TYPES
 
 def participant_label(user: User) -> str:
     """Return a research-safe identifier without exposing the login ID."""
-    value = (user.participant_code or "").strip()
-    return value or f"UNASSIGNED-{user.id[:8].upper()}"
+    return analytics_participant_label(user)
 
 
 def get_user_study_session(
@@ -69,181 +74,47 @@ def record_learning_event(
         client_occurred_at=client_occurred_at,
     )
     session.add(event)
+    if normalized_event_type == "assignment_opened":
+        record_assignment_open(
+            session,
+            user=user,
+            assignment_id=assignment_id,
+            assignment_version=assignment_version,
+        )
     if commit:
         session.commit()
         session.refresh(event)
     return event
 
 
-def _submission_rows(session: Session) -> list[tuple[Submission, User]]:
-    submissions = session.scalars(
-        select(Submission).order_by(Submission.created_at)
-    ).all()
-    users = {
-        user.id: user
-        for user in session.scalars(select(User).where(User.role == "student")).all()
-    }
-    users_by_login = {user.login_id: user for user in users.values()}
-    result = []
-    for submission in submissions:
-        user = users.get(submission.user_id) or users_by_login.get(
-            submission.student_id
-        )
-        if user is not None:
-            result.append((submission, user))
-    return result
-
-
 def build_research_dataset(session: Session) -> dict[str, list[dict[str, Any]]]:
     students = session.scalars(
-        select(User).where(User.role == "student").order_by(User.created_at)
+        select(User)
+        .where(User.role == "student", User.is_demo.is_(False))
+        .order_by(User.created_at)
     ).all()
-    study_sessions = session.scalars(
-        select(StudySession).order_by(StudySession.started_at)
-    ).all()
-    events = session.scalars(
-        select(LearningEvent).order_by(LearningEvent.created_at)
-    ).all()
-    submission_rows = _submission_rows(session)
-
-    sessions_by_user: dict[str, list[StudySession]] = defaultdict(list)
-    events_by_user: dict[str, list[LearningEvent]] = defaultdict(list)
-    submissions_by_user: dict[str, list[Submission]] = defaultdict(list)
-    for item in study_sessions:
-        sessions_by_user[item.user_id].append(item)
-    for item in events:
-        events_by_user[item.user_id].append(item)
-    for submission, user in submission_rows:
-        submissions_by_user[user.id].append(submission)
-
-    summary_rows: list[dict[str, Any]] = []
-    for user in students:
-        user_submissions = submissions_by_user[user.id]
-        user_events = events_by_user[user.id]
-        scores = [item.score for item in user_submissions]
-        completed = {item.assignment_id for item in user_submissions if item.passed}
-        summary_rows.append(
-            {
-                "participant_code": participant_label(user),
-                "account_active": user.is_active,
-                "study_sessions": len(sessions_by_user[user.id]),
-                "active_seconds": sum(
-                    item.active_seconds for item in sessions_by_user[user.id]
-                ),
-                "attempts": len(user_submissions),
-                "assignments_completed": len(completed),
-                "average_score": round(sum(scores) / len(scores), 1) if scores else 0,
-                "best_score": max(scores, default=0),
-                "hints_requested": sum(
-                    item.event_type == "hint_requested"
-                    and item.event_data.get(
-                        "interaction_type", "progressive_hint"
-                    )
-                    == "progressive_hint"
-                    for item in user_events
-                ),
-                "tutor_questions_asked": sum(
-                    item.event_type == "hint_requested"
-                    and item.event_data.get("interaction_type")
-                    == "student_question"
-                    for item in user_events
-                ),
-                "solutions_revealed": sum(
-                    item.event_type == "solution_revealed" for item in user_events
-                ),
-                "ai_tutor_uses": sum(
-                    item.event_type in {"assignment_run", "assignment_submitted"}
-                    and bool(item.event_data.get("ai_tutor_requested"))
-                    for item in user_events
-                ),
-                "last_activity_at": _latest_activity(
-                    sessions_by_user[user.id], user_submissions, user_events
-                ),
-            }
-        )
-
-    attempt_rows = [
-        {
-            "participant_code": participant_label(user),
-            "submission_id": submission.id,
-            "study_session_id": submission.study_session_id or "",
-            "assignment_id": submission.assignment_id,
-            "assignment_version": submission.assignment_version,
-            "data_schema_version": submission.data_schema_version,
-            "execution_status": submission.execution_status,
-            "mode": submission.mode,
-            "execution_succeeded": submission.execution_succeeded,
-            "passed": submission.passed,
-            "score": submission.score,
-            "created_at": submission.created_at,
-        }
-        for submission, user in submission_rows
-    ]
-
-    users_by_id = {user.id: user for user in students}
-    event_rows = []
-    for event in events:
-        user = users_by_id.get(event.user_id)
-        if user is None:
-            continue
-        event_rows.append(
-            {
-                "participant_code": participant_label(user),
-                "event_id": event.id,
-                "study_session_id": event.study_session_id,
-                "assignment_id": event.assignment_id or "",
-                "assignment_version": event.assignment_version or "",
-                "event_type": event.event_type,
-                "event_data": event.event_data,
-                "client_occurred_at": event.client_occurred_at or "",
-                "created_at": event.created_at,
-            }
+    payloads = [student_analytics_payload(session, user) for user in students]
+    summary_rows = [payload["summary"] for payload in payloads]
+    attempt_rows = [row for payload in payloads for row in payload["attempts"]]
+    event_rows = [row for payload in payloads for row in payload["events"]]
+    assignment_rows = []
+    for payload in payloads:
+        participant_code = payload["summary"]["participant_code"]
+        assignment_rows.extend(
+            {"participant_code": participant_code, **row}
+            for row in payload["assignment_summaries"]
         )
     return {
         "student_summary": summary_rows,
         "assignment_attempts": attempt_rows,
+        "assignment_summary": assignment_rows,
+        "class_assignment_summary": assignment_catalog(session, payloads),
         "learning_events": event_rows,
     }
 
 
 def student_research_payload(session: Session, user: User) -> dict[str, Any]:
-    dataset = build_research_dataset(session)
-    label = participant_label(user)
-    summary = next(
-        (
-            row
-            for row in dataset["student_summary"]
-            if row["participant_code"] == label
-        ),
-        {
-            "participant_code": label,
-            "account_active": user.is_active,
-            "study_sessions": 0,
-            "active_seconds": 0,
-            "attempts": 0,
-            "assignments_completed": 0,
-            "average_score": 0,
-            "best_score": 0,
-            "hints_requested": 0,
-            "tutor_questions_asked": 0,
-            "solutions_revealed": 0,
-            "ai_tutor_uses": 0,
-            "last_activity_at": None,
-        },
-    )
-    return {
-        "summary": summary,
-        "attempts": [
-            row
-            for row in dataset["assignment_attempts"]
-            if row["participant_code"] == label
-        ],
-        "events": [
-            row
-            for row in dataset["learning_events"]
-            if row["participant_code"] == label
-        ],
-    }
+    return student_analytics_payload(session, user)
 
 
 def csv_bytes(rows: Iterable[dict[str, Any]]) -> bytes:
@@ -285,17 +156,6 @@ def xlsx_bytes(dataset: dict[str, list[dict[str, Any]]]) -> bytes:
     output = io.BytesIO()
     workbook.save(output)
     return output.getvalue()
-
-
-def _latest_activity(
-    sessions: list[StudySession],
-    submissions: list[Submission],
-    events: list[LearningEvent],
-) -> datetime | None:
-    timestamps = [item.last_active_at for item in sessions]
-    timestamps.extend(item.created_at for item in submissions)
-    timestamps.extend(item.created_at for item in events)
-    return max(timestamps, default=None)
 
 
 def _export_value(value: Any) -> Any:

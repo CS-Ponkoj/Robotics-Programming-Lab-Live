@@ -116,6 +116,9 @@ class Submission(Base):
     )
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
     score: Mapped[int] = mapped_column(Integer, default=0)
+    active_seconds_at_attempt: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
     evidence: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
@@ -200,6 +203,9 @@ class User(Base):
     learning_events: Mapped[list["LearningEvent"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    assignment_activities: Mapped[list["AssignmentActivity"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class StudySession(Base):
@@ -233,6 +239,58 @@ class StudySession(Base):
     events: Mapped[list["LearningEvent"]] = relationship(
         back_populates="study_session", cascade="all, delete-orphan"
     )
+
+
+class AssignmentActivity(Base):
+    """Version-specific active-time record for one student and assignment."""
+
+    __tablename__ = "assignment_activities"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "assignment_id",
+            "assignment_version",
+            name="uq_assignment_activity_user_assignment_version",
+        ),
+        CheckConstraint(
+            "assignment_version >= 1",
+            name="ck_assignment_activities_version_positive",
+        ),
+        CheckConstraint(
+            "active_seconds >= 0",
+            name="ck_assignment_activities_active_seconds_nonnegative",
+        ),
+        CheckConstraint(
+            "active_seconds_to_completion IS NULL OR "
+            "active_seconds_to_completion >= 0",
+            name="ck_assignment_activities_completion_seconds_nonnegative",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    assignment_id: Mapped[int] = mapped_column(Integer, index=True)
+    assignment_version: Mapped[int] = mapped_column(Integer)
+    data_schema_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1"
+    )
+    first_active_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    last_active_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    active_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    first_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    active_seconds_to_completion: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+
+    user: Mapped[User] = relationship(back_populates="assignment_activities")
 
 
 class LearningEvent(Base):

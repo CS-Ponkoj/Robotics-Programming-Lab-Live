@@ -98,6 +98,50 @@ def test_startup_removes_legacy_demo_flag_from_password_accounts(auth_client):
     assert corrected == {"instructor": False, "student": False}
 
 
+def test_account_file_cannot_reapply_demo_flag_to_password_accounts(tmp_path):
+    account_file = tmp_path / "study_accounts.json"
+    account_file.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "accounts": [
+                    {
+                        "login_id": "student",
+                        "role": "student",
+                        "participant_code": "DEMO",
+                        "active": True,
+                        "demo": True,
+                    },
+                    {
+                        "login_id": "instructor",
+                        "role": "instructor",
+                        "active": True,
+                        "demo": True,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(
+        database_url="sqlite://",
+        admin_api_token="legacy-admin",
+        study_accounts_file=account_file,
+    )
+
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = login(client, "student", "student")
+        instructor = login(client, "instructor", "instructor")
+
+    assert student["user"]["is_demo"] is False
+    assert instructor["user"]["is_demo"] is False
+    sanitized = json.loads(account_file.read_text(encoding="utf-8"))
+    assert {item["login_id"]: item["demo"] for item in sanitized["accounts"]} == {
+        "student": False,
+        "instructor": False,
+    }
+
+
 def test_login_rejects_invalid_credentials_and_throttles(auth_client):
     for _ in range(5):
         response = auth_client.post(
