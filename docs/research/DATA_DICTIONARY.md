@@ -32,8 +32,7 @@ after an instructor updates the assignment.
 | Private local configuration | `local_handoff_package/.env` | Ignored environment settings | Read directly by the launcher and backend |
 | Legacy local source preserved during first migration | `backend/robotics_lab_staging.db` | SQLite | Read-only; not used by the default launcher after migration |
 | Student editor draft | Browser storage, keyed by authenticated user, assignment ID, and assignment version | Local JSON preferences | View through the matching assignment workspace; another login and older versions are isolated |
-| Optional prototype account import | `local_handoff_package/study_accounts.json` | JSON | Yes, but it can contain temporary passwords and is ignored by Git |
-| Safe account-import example | `backend/data/study_accounts.example.json` | JSON | Yes |
+| Password-free prototype account roster | `backend/data/study_accounts.json` | JSON | Yes; tracked by Git, with `temporary_password` always `null` |
 | Research exports | Downloaded from the instructor Research Dashboard | CSV or Excel | Yes |
 | Data definitions and validation | `backend/data_contracts.py` | Python | Yes; this is the executable contract |
 | Database table definitions | `backend/models.py` | Python/SQLAlchemy | Yes |
@@ -41,8 +40,7 @@ after an instructor updates the assignment.
 
 Neon PostgreSQL is the staging source of truth. Authorized computers connect to
 the same database through the ignored `.env`; OneDrive and Git never carry the
-live database. Old local PostgreSQL dumps remain recovery archives only. Never
-edit a dump or database file directly.
+live database. Local PostgreSQL dumps are not part of the current architecture.
 
 ## How to see local data
 
@@ -58,7 +56,7 @@ For ordinary study review, the safer option is the application itself:
 - Instructor: instructor studio, then **Research study dashboard**.
 - Instructor export: download summary, attempts, events, or the Excel workbook.
 
-Do not share handoff dumps or live production access. Authorized production
+Do not share database credentials or live production access. Authorized production
 inspection should use the Neon SQL Editor and participant codes.
 
 ## Main tables

@@ -2,17 +2,18 @@
 
 **Date:** 2026-08-28
 **Repository:** `Robotics-Programming-Lab-Staging`
-**Branch:** `feature/neon-account-management`
-**Publication status:** Local implementation only; not committed or pushed
+**Branch:** `main`
+**Implementation commit:** `573375a` (`v5.3`) on staging `origin/main`
+**Final QA follow-up:** local until separately authorized for publication
 
 ## Result
 
 The requested staging changes passed the available Windows local QA. The
-application now uses the dedicated Neon database `robotics_lab_staging` by
-default, preserves the local Docker PostgreSQL fallback, supports student and
-instructor account management in Instructor Studio, and isolates browser
-progress by authenticated user. The existing local PostgreSQL study records
-were migrated to Neon and reconciled by table counts.
+application now uses the dedicated Neon database `robotics_lab_staging`, supports
+student and instructor account management in Instructor Studio, and isolates
+browser progress by authenticated user. The earlier local PostgreSQL study
+records were migrated to Neon and reconciled by table counts. The subsequent
+Neon-only architecture removed the local PostgreSQL fallback.
 
 This report does not claim production deployment or physical Ubuntu validation.
 
@@ -25,7 +26,7 @@ This report does not claim production deployment or physical Ubuntu validation.
 | Core analytics reconciliation | PASS | Neon contains 3 users, 6 assignments, 65 submissions, 2 assignment-activity rows, 44 learning events, and 22 study sessions before and after restart. |
 | Dave account retained | PASS | Dave remains active with 0 submissions and 0 completed assignments. |
 | Default student account restored | PASS | The active default student password hash verifies against the required prototype password. No password is recorded in this report. |
-| Private account JSON | PASS | `local_handoff_package/study_accounts.json` contains account metadata; imported temporary passwords are cleared after hashing. |
+| Versioned account roster | PASS | `backend/data/study_accounts.json` contains password-free account metadata and is eligible for Git tracking. Password hashes remain in Neon. |
 
 ## Functional and regression QA
 
@@ -35,10 +36,10 @@ This report does not claim production deployment or physical Ubuntu validation.
 | Dave fresh progress | Verified zero database attempts/completions and isolated browser state | PASS | A browser that still shows an old page must sign out or refresh after receiving the new frontend build. |
 | Instructor Studio | Create, list, edit, reset, activate, and deactivate student/instructor accounts | PASS | Passwords are intentionally shown only once when manually generated. |
 | Instructor safety | Prevent self-deactivation and disabling the last active instructor | PASS | Deletion is intentionally replaced by deactivation to preserve research history. |
-| File-based management | Import create/update/password/role/active changes from private JSON | PASS | The JSON is ignored by Git because it may briefly contain a temporary password. |
+| File-based management | Import role, active, email, and participant-code changes from the tracked password-free roster | PASS | New accounts and password changes must use Instructor Studio. |
 | Neon restart persistence | Stopped and restarted the full local stack; row counts and Dave state remained unchanged | PASS | Availability still depends on internet access and the Neon service. |
-| Local PostgreSQL fallback | Started with `-UseLocalPostgres`, verified frontend/API/sandbox health, stopped cleanly, and produced a validated final dump | PASS | Fallback data is a separate snapshot; it does not continuously synchronize with Neon. |
-| Backend suite | 182 tests | PASS | None observed. |
+| Neon-only transition | The former local PostgreSQL fallback was verified before retirement; current launchers now require the authorized Neon staging database | SUPERSEDED | See the Neon-only architecture SQA report for the current runtime gate. |
+| Backend suite | 183 tests | PASS | None observed. |
 | Python dependencies | `pip check` | PASS | None observed. |
 | Python compilation | `compileall` | PASS | None observed. |
 | Flutter analysis | Static analyzer | PASS | None observed. |
@@ -46,6 +47,7 @@ This report does not claim production deployment or physical Ubuntu validation.
 | Flutter web release | Release web build with staging API URL | PASS | This was a local build, not a public deployment. |
 | Service health | Frontend HTTP 200; backend and sandbox report healthy | PASS | Authenticated browser mutation was covered by API/widget tests rather than changing the shared staging data manually. |
 | PowerShell launcher syntax | Parser check | PASS | None observed. |
+| Legacy database recovery | Migrated the pre-V5.2 SQLite schema without `assignment_activities` into the current PostgreSQL schema and reconciled every table count | PASS | The missing historical table is correctly treated as empty; current targets must still contain it. |
 | Ubuntu Bash validation | `bash -n` and ShellCheck on this Windows host | NOT RUN | WSL/Bash and ShellCheck are unavailable on this computer; existing Ubuntu support tests were not repeated. |
 
 ## Security and privacy checks

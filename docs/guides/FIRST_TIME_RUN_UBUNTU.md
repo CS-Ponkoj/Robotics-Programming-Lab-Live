@@ -1,7 +1,7 @@
 # First-time run on Ubuntu 22.04 or 24.04 LTS
 
 This guide supports x86-64 Ubuntu with Bash. It uses the same staging source and
-the same `local_handoff_package` format as Windows. Python environments, Flutter
+Neon database as Windows. Python environments, Flutter
 builds, logs, and runtime files stay under the Ubuntu user's local data
 directories, outside the Git clone.
 
@@ -101,10 +101,10 @@ git clone https://github.com/CS-Ponkoj/Robotics-Programming-Lab-Staging.git
 cd Robotics-Programming-Lab-Staging
 ```
 
-Copy the private `local_handoff_package` folder into this clone. Its ignored
-`.env` connects Ubuntu to the shared Neon staging database, and its
-`study_accounts.json` supports file-based account changes. Never commit or
-share this folder.
+Before running a local backend, obtain an authorized private `.env` through the
+project's approved secret-delivery method and place it in
+`local_handoff_package`. Git intentionally does not distribute Neon or OpenAI
+credentials.
 
 ## 3. Prepare this computer
 
@@ -175,10 +175,10 @@ backend and sandbox health endpoints.
 
 ## 8. Prepare another authorized computer
 
-Copy the ignored `local_handoff_package` folder to the destination clone using
-a secure method. Do not copy Python environments, Flutter builds, Docker
-volumes, or log folders. Use `--use-local-postgres` only for an intentional
-offline fallback.
+Clone the source and provision its private Neon configuration through the
+approved secret-delivery method. Do not copy Python environments, Flutter
+builds, Docker volumes, or log folders. Local database fallbacks are not
+supported.
 
 ## 9. Update the project later
 
@@ -201,12 +201,12 @@ Rebuild the ROS image only when its Dockerfile or dependencies changed.
 | `docker: permission denied` | Sign out and back in after IT adds your account to the Docker group; do not run the application with `sudo`. |
 | Docker daemon is unavailable | Run `sudo systemctl start docker`, or ask lab IT. |
 | `uv`, `flutter`, or `docker compose` is not found | Complete prerequisite installation, reopen Bash, and verify the command. |
-| A port is already used | Stop the old stack or choose different `--frontend-port`, `--backend-port`, `--sandbox-port`, or `--database-port` values. |
+| A port is already used | Stop the old stack or choose different `--frontend-port`, `--backend-port`, or `--sandbox-port` values. |
 | Neon cannot connect | Check internet access and the ignored `.env`; never paste the connection string into Git or support messages. |
 | Python environment is incomplete | Stop the app and run `./scripts/setup-local.sh --repair`. |
 | ROS image is missing | Run `./scripts/check-ros2-local.sh --build`. |
 | Flutter cannot find a browser | Open the printed URL manually; the launcher uses the web-server device. |
 
-The handoff package is ignored by Git and is not encrypted. It may contain API
+The private configuration folder is ignored by Git and is not encrypted. It may contain API
 keys, database credentials, and temporary account passwords. Do not commit,
 email, publicly share, or leave it on an untrusted computer.

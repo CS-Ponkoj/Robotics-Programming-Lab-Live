@@ -1,32 +1,23 @@
-# Local handoff package
+# Private staging configuration
 
-Copy this entire folder into the root of a fresh staging Git clone. The normal
-Windows PowerShell or Ubuntu Bash setup and run commands detect it
-automatically.
-
-A populated copy contains the private configuration and account-import data:
+This ignored folder contains only the local secrets used by the Neon-backed
+staging application:
 
 ```text
 local_handoff_package/
 ├── .env                    private backend and optional AI configuration
-├── study_accounts.json     editable account-import data
-├── study_accounts_import_report.json  generated import result
-└── legacy dump files       optional recovery archives from local PostgreSQL
+├── .gitignore              secret-safety rule
+└── README.md               this file
 ```
 
-The application reads `.env` and `study_accounts.json` here directly. When
-Neon is configured, accounts, attempts, and analytics live in the shared
-`robotics_lab_staging` database rather than in a synchronized local dump.
-Generated contents are intentionally ignored by Git and may contain database
-credentials, API keys, or temporary passwords. Never commit, email, or publicly
-share a populated package.
+The application reads `.env` directly. The password-free account roster is
+tracked at `backend/data/study_accounts.json`. Accounts, password hashes,
+attempts, and analytics live in the shared Neon `robotics_lab_staging` database.
+Local database dumps, manifests, device locks, and backup history are not part
+of the current architecture.
 
-The Python virtual environment is not included. It contains device-specific
-paths and compiled packages. On the destination computer, normal setup rebuilds
-the exact pinned environment in that operating system's local user-data
-directory. PostgreSQL custom-format dumps are shared by the supported Windows
-and Ubuntu launchers.
-
-Copy only this complete private folder to another authorized computer. The
-former `local_database_backups` folder is obsolete. Old dump files in this
-folder are retained for recovery but are not updated during Neon-backed runs.
+The private contents are intentionally ignored by Git and may contain database
+credentials or API keys. Never commit or publicly share them. For a future
+no-copy multi-computer workflow, use a hosted staging backend
+whose secret environment is configured once; Git clones then need only its
+public HTTPS URL.

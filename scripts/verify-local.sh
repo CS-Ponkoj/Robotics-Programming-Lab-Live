@@ -43,8 +43,6 @@ robotics_assert_path_under "$runtime_root" "${XDG_STATE_HOME:-$HOME/.local/state
   uv pip check --python "$python"
   PYTHONPYCACHEPREFIX="$runtime_root/python-cache" "$python" -m compileall -q .
 )
-"$SCRIPT_DIR/verify-linux-database-handoff.sh"
-
 safe_frontend="$runtime_root/frontend-sqa"
 robotics_assert_path_under "$safe_frontend" "$runtime_root"
 rm -rf -- "$safe_frontend"

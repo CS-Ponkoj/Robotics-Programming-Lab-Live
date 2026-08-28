@@ -33,20 +33,13 @@ if (-not $resolvedCache.StartsWith($localPrefix, [System.StringComparison]::Ordi
     throw "Python bytecode cache must stay under LocalAppData."
 }
 
-$backupRoot = [System.IO.Path]::GetFullPath(
-    (Get-RoboticsDatabaseBackupRoot -RepositoryRoot $repositoryRoot)
-)
-$expectedBackupRoot = [System.IO.Path]::GetFullPath(
+$packageRoot = [System.IO.Path]::GetFullPath(
     (Get-RoboticsHandoffPackageRoot -RepositoryRoot $repositoryRoot)
 )
-if (-not $backupRoot.Equals($expectedBackupRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "The package root is not the default database backup location."
-}
-
 $configPath = [System.IO.Path]::GetFullPath(
     (Get-RoboticsHandoffPrivateConfigPath -RepositoryRoot $repositoryRoot)
 )
-$expectedConfigPath = Join-Path $expectedBackupRoot ".env"
+$expectedConfigPath = Join-Path $packageRoot ".env"
 if (-not $configPath.Equals(
     [System.IO.Path]::GetFullPath($expectedConfigPath),
     [System.StringComparison]::OrdinalIgnoreCase
@@ -55,8 +48,7 @@ if (-not $configPath.Equals(
 }
 
 Write-Output "PASS: generated Python environment and bytecode cache remain device-local."
-Write-Output "PASS: database backup and private configuration share one active package folder."
+Write-Output "PASS: private Neon configuration remains in the expected ignored package folder."
 Write-Output "Python environment: $environmentRoot"
 Write-Output "Python cache: $resolvedCache"
-Write-Output "Database backup: $backupRoot"
 Write-Output "Private config: $configPath"

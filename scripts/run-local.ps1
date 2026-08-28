@@ -1,13 +1,8 @@
 param(
-    [string]$DatabaseUrl = "",
-    [switch]$UseSqlite,
-    [switch]$UseLocalPostgres,
     [switch]$EnableAi,
     [int]$FrontendPort = 8080,
     [int]$BackendPort = 5000,
-    [int]$SandboxPort = 5001,
-    [int]$DatabasePort = 5432,
-    [ValidateRange(1, 1440)][int]$BackupIntervalMinutes = 10
+    [int]$SandboxPort = 5001
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,7 +10,6 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $backendRoot = Join-Path $repositoryRoot "backend"
 Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
 $privateConfigPath = Get-RoboticsHandoffPrivateConfigPath -RepositoryRoot $repositoryRoot
-$handoffDatabaseRoot = Get-RoboticsHandoffDatabaseRoot -RepositoryRoot $repositoryRoot
 $python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot -EnsureDependencies
 $stateRoot = Get-RoboticsRuntimeRoot -RepositoryRoot $repositoryRoot
 $stateFile = Join-Path $stateRoot "state.json"
@@ -43,48 +37,29 @@ if (Test-Path -LiteralPath $stateFile) {
 }
 
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
-$localDatabaseSession = $null
-
-if (($UseSqlite -and $UseLocalPostgres) -or
-    ($UseSqlite -and -not [string]::IsNullOrWhiteSpace($DatabaseUrl)) -or
-    ($UseLocalPostgres -and -not [string]::IsNullOrWhiteSpace($DatabaseUrl))) {
-    throw "Use only one database option: -UseSqlite, -UseLocalPostgres, or -DatabaseUrl."
+if (-not (Test-Path -LiteralPath $privateConfigPath)) {
+    throw "Neon configuration is missing. Add NEON_DATABASE_URL to local_handoff_package/.env."
 }
-if (-not $UseSqlite -and -not $UseLocalPostgres -and
-    [string]::IsNullOrWhiteSpace($DatabaseUrl) -and
-    (Test-Path -LiteralPath $privateConfigPath)) {
-    $previousConfigPath = [Environment]::GetEnvironmentVariable("ROBOTICS_ENV_FILE", "Process")
-    [Environment]::SetEnvironmentVariable("ROBOTICS_ENV_FILE", $privateConfigPath, "Process")
+$previousConfigPath = [Environment]::GetEnvironmentVariable("ROBOTICS_ENV_FILE", "Process")
+[Environment]::SetEnvironmentVariable("ROBOTICS_ENV_FILE", $privateConfigPath, "Process")
+try {
+    Push-Location $backendRoot
     try {
-        Push-Location $backendRoot
-        try {
-            $configuredCloudUrl = (& $python -c "from config import get_settings; print(get_settings().cloud_database_url or '')" 2>$null | Select-Object -Last 1)
-        } finally {
-            Pop-Location
-        }
-        if ($LASTEXITCODE -ne 0) {
-            throw "The configured Neon database URL could not be resolved."
-        }
-        if (-not [string]::IsNullOrWhiteSpace($configuredCloudUrl)) {
-            $DatabaseUrl = $configuredCloudUrl.Trim()
-            Write-Output "Using the configured Neon staging database."
-        }
+        $databaseUrl = (& $python -c "from config import get_settings; print(get_settings().cloud_database_url or '')" 2>$null | Select-Object -Last 1)
     } finally {
-        [Environment]::SetEnvironmentVariable("ROBOTICS_ENV_FILE", $previousConfigPath, "Process")
+        Pop-Location
     }
-}
-if ($UseSqlite) {
-    $DatabaseUrl = "sqlite:///robotics_lab_staging.db"
-} elseif ($UseLocalPostgres -or [string]::IsNullOrWhiteSpace($DatabaseUrl)) {
-    Import-Module (Join-Path $PSScriptRoot "local-database.psm1") -Force
-    $localDatabaseSession = Start-RoboticsLocalPostgres `
-        -RepositoryRoot $repositoryRoot `
-        -DatabasePort $DatabasePort
-    $DatabaseUrl = $localDatabaseSession.DatabaseUrl
-    if ($localDatabaseSession.RestoredBackup) {
-        Write-Output "Restored the newest verified PostgreSQL handoff backup."
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($databaseUrl)) {
+        throw "NEON_DATABASE_URL is missing or invalid in local_handoff_package/.env."
     }
+    $databaseUrl = $databaseUrl.Trim()
+    if (-not $databaseUrl.Contains(".neon.tech")) {
+        throw "The local launcher supports the configured Neon database only."
+    }
+} finally {
+    [Environment]::SetEnvironmentVariable("ROBOTICS_ENV_FILE", $previousConfigPath, "Process")
 }
+Write-Output "Using the configured Neon staging database."
 
 function New-LocalToken {
     $bytes = New-Object byte[] 32
@@ -184,25 +159,11 @@ $token = New-LocalToken
 $processes = @()
 try {
     $previousDatabaseUrl = [System.Environment]::GetEnvironmentVariable("DATABASE_URL", "Process")
-    [System.Environment]::SetEnvironmentVariable("DATABASE_URL", $DatabaseUrl, "Process")
+    [System.Environment]::SetEnvironmentVariable("DATABASE_URL", $databaseUrl, "Process")
     Push-Location $backendRoot
     try {
         & $python -m alembic upgrade head
         if ($LASTEXITCODE -ne 0) { throw "Database migration failed." }
-        if ($localDatabaseSession -and -not $localDatabaseSession.HasSynchronizedBackup) {
-            $sqliteSource = Join-Path $backendRoot "robotics_lab_staging.db"
-            if (Test-Path -LiteralPath $sqliteSource) {
-                $importReport = Join-Path $localDatabaseSession.RuntimeRoot "sqlite-import-report.json"
-                & $python database_transfer.py `
-                    --sqlite $sqliteSource `
-                    --target-url $DatabaseUrl `
-                    --report $importReport `
-                    --if-empty
-                if ($LASTEXITCODE -ne 0) {
-                    throw "Existing SQLite data could not be transferred to local PostgreSQL."
-                }
-            }
-        }
     } finally {
         Pop-Location
         [System.Environment]::SetEnvironmentVariable("DATABASE_URL", $previousDatabaseUrl, "Process")
@@ -219,8 +180,8 @@ try {
 
     $backendEnvironment = @{
         ENVIRONMENT = "development"
-        DATABASE_URL = $DatabaseUrl
-        AUTO_CREATE_SCHEMA = if ($DatabaseUrl.StartsWith("sqlite")) { "true" } else { "false" }
+        DATABASE_URL = $databaseUrl
+        AUTO_CREATE_SCHEMA = "false"
         PUBLIC_APP_URL = "http://127.0.0.1:$FrontendPort"
         ALLOWED_ORIGINS = "http://127.0.0.1:$FrontendPort,http://localhost:$FrontendPort"
         SANDBOX_BACKEND = "remote"
@@ -237,23 +198,6 @@ try {
         -WorkingDirectory $backendRoot -Environment $backendEnvironment
     $processes += [pscustomobject]@{ name = "backend"; id = $backend.Id }
     Wait-ForEndpoint -Name "Backend" -Url "http://127.0.0.1:$BackendPort/health"
-
-    if ($localDatabaseSession) {
-        $powerShell = (Get-Process -Id $PID).Path
-        $backupScript = Join-Path $PSScriptRoot "backup-local-database.ps1"
-        $backupWorker = Start-ProjectProcess -Name "database-backup" -FilePath $powerShell `
-            -ArgumentList @(
-                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$backupScript`"",
-                "-SessionId", $localDatabaseSession.SessionId,
-                "-DatabasePort", "$($localDatabaseSession.DatabasePort)",
-                "-ProjectName", $localDatabaseSession.ProjectName,
-                "-BackupRoot", "`"$($localDatabaseSession.BackupRoot)`"",
-                "-RuntimeRoot", "`"$($localDatabaseSession.RuntimeRoot)`"",
-                "-IntervalMinutes", "$BackupIntervalMinutes"
-            ) `
-            -WorkingDirectory $repositoryRoot
-        $processes += [pscustomobject]@{ name = "database-backup"; id = $backupWorker.Id }
-    }
 
     $resolvedSafeRoot = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "RoboticsProgrammingLab"))
     $resolvedFrontend = [System.IO.Path]::GetFullPath($safeFrontendRoot)
@@ -299,59 +243,21 @@ try {
         frontendUrl = "http://127.0.0.1:$FrontendPort"
         backendUrl = "http://127.0.0.1:$BackendPort"
         sandboxUrl = "http://127.0.0.1:$SandboxPort"
-        databaseBackend = if ($DatabaseUrl.StartsWith("sqlite")) { "sqlite" } else { "postgresql" }
-        managedLocalDatabase = [bool]$localDatabaseSession
-        localDatabaseSessionId = if ($localDatabaseSession) { $localDatabaseSession.SessionId } else { $null }
-        localDatabaseProjectName = if ($localDatabaseSession) { $localDatabaseSession.ProjectName } else { $null }
-        localDatabasePort = if ($localDatabaseSession) { $localDatabaseSession.DatabasePort } else { $null }
-        localDatabaseBackupRoot = if ($localDatabaseSession) { $localDatabaseSession.BackupRoot } else { $null }
-        localDatabaseRuntimeRoot = if ($localDatabaseSession) { $localDatabaseSession.RuntimeRoot } else { $null }
+        databaseBackend = "postgresql"
+        databaseProvider = "neon"
         aiEnabled = [bool]$EnableAi
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8
-
-    $databaseDescription = if (-not $localDatabaseSession) {
-        if ($DatabaseUrl.StartsWith("sqlite")) {
-            "SQLite fallback"
-        } elseif ($DatabaseUrl.Contains("neon.tech")) {
-            "Neon staging PostgreSQL"
-        } else {
-            "externally configured PostgreSQL"
-        }
-    } elseif ($localDatabaseSession.BackupRoot.Equals(
-        $handoffDatabaseRoot,
-        [System.StringComparison]::OrdinalIgnoreCase
-    )) {
-        "local PostgreSQL with the unified local handoff package"
-    } else {
-        "local PostgreSQL with verified handoff backups"
-    }
 
     Write-Output "Robotics Programming Lab is ready."
     Write-Output "Frontend: http://127.0.0.1:$FrontendPort"
     Write-Output "Backend:  http://127.0.0.1:$BackendPort/health"
     Write-Output "Sandbox:  http://127.0.0.1:$SandboxPort/health"
-    Write-Output "Database: $databaseDescription"
+    Write-Output "Database: Neon staging PostgreSQL"
     Write-Output "AI enabled: $([bool]$EnableAi)"
-    if ($localDatabaseSession) {
-        Write-Output "Automatic database backup: every $BackupIntervalMinutes minute(s) while the local stack is running"
-    }
     Write-Output "Stop with: .\scripts\stop-local.ps1"
 } catch {
     foreach ($process in $processes) {
         Stop-ProjectProcessTree -ProcessId $process.id
-    }
-    if ($localDatabaseSession) {
-        try {
-            Complete-RoboticsLocalPostgres `
-                -RepositoryRoot $repositoryRoot `
-                -SessionId $localDatabaseSession.SessionId `
-                -DatabasePort $localDatabaseSession.DatabasePort `
-                -ProjectName $localDatabaseSession.ProjectName `
-                -BackupRoot $localDatabaseSession.BackupRoot `
-                -RuntimeRoot $localDatabaseSession.RuntimeRoot | Out-Host
-        } catch {
-            Write-Warning "Local PostgreSQL recovery backup failed after startup error: $_"
-        }
     }
     throw
 }

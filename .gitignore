@@ -18,7 +18,6 @@ htmlcov/
 /.local-run/
 backend/*.db
 backend/managed_assets/
-backend/data/study_accounts.json
 backend/data/study_accounts_import_report*.json
 backend/data/*.db
 backend/data/*.sqlite

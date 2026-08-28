@@ -52,21 +52,17 @@ password, reset access, and deactivate or reactivate accounts. The API prevents
 self-deactivation and disabling the last active instructor. Accounts should be
 deactivated instead of deleted so study records remain attributable.
 
-For manual prototype management, copy
-`data/study_accounts.example.json` to the ignored
-`../local_handoff_package/study_accounts.json`. Import it from the instructor screen or
-`POST /admin/accounts/import`. The database is authoritative: a missing JSON
-row does nothing, while `"active": false` deactivates an account.
-`temporary_password` values are hashed and removed from the JSON file after a
-successful import.
+The password-free prototype roster is tracked at `data/study_accounts.json`.
+It may contain login IDs, roles, email fields, participant codes, and active
+flags, but every `temporary_password` must remain `null`. Import it from the
+instructor screen or `POST /admin/accounts/import`. The database is
+authoritative: a missing JSON row does nothing, while `"active": false`
+deactivates an existing account.
 
-You can edit `../local_handoff_package/study_accounts.json` directly in VS Code
-or Notepad. Add a
-row to create an account, enter a new `temporary_password` to change its
-password, or set `"active": false` to remove its login access while preserving
-its study records. To rename a login ID safely, add the new ID and deactivate
-the old ID. Do not commit this ignored file because it can briefly contain
-plain-text temporary passwords.
+Create new accounts and set or reset passwords in Instructor Studio. Passwords
+are hashed and stored in Neon, never in the tracked roster or Git history. To
+rename a login ID safely, create the replacement account in Instructor Studio
+and deactivate the old ID.
 
 Email/reset features are disabled by default for the v4 professor demo. If they
 are enabled in a later release, configure SMTP settings in `.env` to deliver one-time activation and reset
@@ -100,9 +96,9 @@ The root launcher uses the dedicated Neon `robotics_lab_staging` database when
 the API starts, and every authorized computer sees the same committed accounts,
 attempts, and analytics. The older Neon `neondb` database is separate.
 
-Use `-UseLocalPostgres` or `--use-local-postgres` for an intentional offline
-fallback. Only that fallback starts PostgreSQL 17 in Docker and maintains the
-legacy verified dump/device-lock workflow.
+The local application runtime supports Neon PostgreSQL only. Backend unit tests
+may still use temporary SQLite databases for fast, isolated test fixtures; that
+is not a supported application runtime mode.
 
 On an empty database, the existing `assignments/assignment_*.json` files are
 imported with their declared versions. A newer bundled assignment version may
@@ -115,4 +111,4 @@ simulation content changes.
 
 From the repository root, run `scripts/verify-local.ps1`. It resolves the
 device-local Python environment and performs the complete backend, frontend,
-database-handoff, sandbox, and repository checks.
+Neon-configuration, sandbox, and repository checks.

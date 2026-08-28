@@ -20,6 +20,9 @@ from auth_service import (
 from models import User
 
 
+REPOSITORY_ACCOUNT_ROSTER = Path(__file__).resolve().parent / "data" / "study_accounts.json"
+
+
 DEFAULT_ACCOUNT_ROLES = (
     {"login_id": "instructor", "role": "instructor"},
     {"login_id": "student", "role": "student"},
@@ -131,6 +134,7 @@ def sync_accounts_from_json(session: Session, path: Path) -> dict:
         report["errors"].append("The account file must contain an accounts list.")
         return report
 
+    repository_roster = path.resolve() == REPOSITORY_ACCOUNT_ROSTER.resolve()
     sanitized_accounts: list[dict] = []
     for index, raw_account in enumerate(accounts, start=1):
         if not isinstance(raw_account, dict):
@@ -140,6 +144,11 @@ def sync_accounts_from_json(session: Session, path: Path) -> dict:
         login_id = normalize_login_id(str(account.get("login_id", "")))
         role = str(account.get("role", "")).strip().lower()
         temporary_password = account.get("temporary_password")
+        if repository_roster and isinstance(temporary_password, str) and temporary_password:
+            report["errors"].append(
+                f"{login_id or f'Account {index}'}: tracked account roster cannot contain a temporary_password. Use Instructor Studio."
+            )
+            continue
         active = bool(account.get("active", True))
         if login_id in DEFAULT_ACCOUNT_LOGIN_IDS:
             # Password-authenticated default accounts are persistent study
@@ -250,8 +259,6 @@ def sync_accounts_from_json(session: Session, path: Path) -> dict:
         "version": payload.get("version", 1),
         "accounts": sanitized_accounts,
     }
-    if sanitized_payload != payload:
+    if sanitized_payload != payload and not repository_roster:
         _write_json_atomic(path, sanitized_payload)
-    report_path = path.with_name("study_accounts_import_report.json")
-    _write_json_atomic(report_path, report)
     return report

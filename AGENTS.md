@@ -68,10 +68,8 @@ functionality and must never depend on OpenAI.
 | `CS-Ponkoj/Robotics-Programming-Lab-Staging` | Development, local execution, SQA, and release candidates | Make changes on focused branches and merge into staging `main` only after verification. |
 | `CS-Ponkoj/Robotics-Programming-Lab` | Live Vercel and Render deployment | Production `main` receives only an approved, tested staging commit. Do not patch production directly. |
 | Secondary Windows or Ubuntu laptop/lab checkout | Temporary local clone outside OneDrive | Clone or fast-forward from staging Git. Never copy generated environments or build caches between computers. |
-| `local_handoff_package/` | Ignored copyable local data | May contain a verified database and private backend configuration. Never commit or publicly share it, and never place a Python virtual environment inside it. |
+| `local_handoff_package/` | Ignored private local configuration | Contains `.env`; it does not contain accounts or the active database. Never commit or publicly share it, and never place a Python virtual environment inside it. |
 | Neon `robotics_lab_staging` database | Default staging application data | Shared across authorized devices through ignored private configuration; keep it separate from production `neondb`. |
-| Local Docker PostgreSQL | Explicit offline fallback | Use `-UseLocalPostgres` or `--use-local-postgres`; keep its active volume computer-local. |
-| Local SQLite | Explicit troubleshooting fallback | Use only with `-UseSqlite`; it is ignored, disposable, and not synchronized as authoritative data. |
 | Staging PostgreSQL | Production-parity SQA | Must be separate from production and contain no live research records. |
 | Production Neon PostgreSQL | Live mutable data | Schema changes require Alembic migrations and recovery planning. |
 
@@ -230,8 +228,8 @@ Ubuntu uses the equivalent commands:
 Windows stores generated environments and runtime data under LocalAppData.
 Ubuntu stores them under the user's XDG data and state directories. Neither
 operating system may place generated environments, Flutter builds, or logs in
-the Git clone. Both use the same ignored `local_handoff_package` format and may
-restore the other operating system's verified PostgreSQL custom dump.
+the Git clone. Both use the same ignored `local_handoff_package` configuration
+format and connect to the same authorized Neon staging database.
 
 Stop only the processes managed by the launcher:
 
@@ -242,15 +240,14 @@ Stop only the processes managed by the launcher:
 The stop command ends only the processes owned by the launcher. Neon preserves
 the shared database independently of the browser or local processes. The
 ignored handoff package contains the connection settings and editable account
-JSON, not the active database. Legacy dump files remain protected recovery
-artifacts and are used only by the explicit local PostgreSQL fallback.
-The obsolete `local_database_backups` location is not part of the application.
+JSON, not the active database. Local dump files, backup manifests, device locks,
+and the obsolete `local_database_backups` location are not part of the application.
 
-For an explicit copy-and-paste handoff, run the PowerShell or Bash
-`create-local-handoff-package` script only while the app is stopped and
-copy the entire ignored `local_handoff_package` folder into the destination
-clone. The app reads its root `.env` and PostgreSQL backup files directly;
-never create a second active database folder or duplicate `backend/.env`.
+For an authorized new-device setup, securely provision the ignored
+`local_handoff_package` folder containing `.env`. The password-free account
+roster is distributed by Git at `backend/data/study_accounts.json`. The app
+connects to Neon; never create a duplicate `backend/.env`, and never put secrets
+or passwords in Git.
 Fresh Windows clones must use `git -c core.longpaths=true clone` because tracked
 course-material filenames exceed Git's default Windows checkout limit.
 
@@ -376,10 +373,9 @@ sufficient when an automated test can reasonably protect the behavior.
 - Never use `Base.metadata.create_all` as the production migration strategy.
 - Never silently drop, truncate, rename, or reinterpret research data.
 - Never synchronize an active PostgreSQL data directory through OneDrive.
-- Treat `local_handoff_package/` as protected student/research data: never
-  commit its generated contents, wait for verified copying or sync before
-  device handoff, and require approved encryption or managed storage before a
-  real study. Its database and private configuration are never release artifacts.
+- Treat `local_handoff_package/` as protected configuration: never commit its
+  contents, provision it only through an approved secure channel, and require
+  managed secret storage before a real study. It is never a release artifact.
 - Destructive migrations require an explicit backup, rollback plan, owner
   approval, and restoration rehearsal.
 - Store UTC timestamps and assignment versions with attempts and events.
@@ -519,8 +515,8 @@ Treat every submission as hostile input.
   latest commit is not sufficient.
 
 Forbidden tracked paths include environment directories, `.env`, `.dart_tool`,
-Flutter `build`, `.local-run`, local databases, caches, and generated logs.
-Real database dumps must also remain untracked. A clone must instead contain
+Flutter `build`, `.local-run`, local databases, database dumps, caches, and
+generated logs. A clone must instead contain
 the assignment sources, migrations, demo seed logic, tests, and setup scripts
 needed to create a safe fresh demo database.
 

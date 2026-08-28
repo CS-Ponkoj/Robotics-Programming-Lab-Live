@@ -1,56 +1,4 @@
 services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: ${LOCAL_POSTGRES_DB:-robotics_lab}
-      POSTGRES_USER: ${LOCAL_POSTGRES_USER:-robotics}
-      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:-robotics-local-only}
-    ports:
-      - "127.0.0.1:${LOCAL_POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - robotics_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${LOCAL_POSTGRES_USER:-robotics} -d ${LOCAL_POSTGRES_DB:-robotics_lab}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  redis:
-    image: redis:8-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - robotics_redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    working_dir: /app/backend
-    env_file:
-      - path: local_handoff_package/.env
-        required: false
-    environment:
-      DATABASE_URL: postgresql+psycopg://${LOCAL_POSTGRES_USER:-robotics}:${LOCAL_POSTGRES_PASSWORD:-robotics-local-only}@postgres:5432/${LOCAL_POSTGRES_DB:-robotics_lab}
-      REDIS_URL: redis://redis:6379/0
-      SANDBOX_BACKEND: ${SANDBOX_BACKEND:-docker}
-      SANDBOX_IMAGE: robotics-lab-sandbox:latest
-    ports:
-      - "5000:5000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - robotics_assets:/app/backend/managed_assets
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
   sandbox-image:
     image: robotics-lab-sandbox:latest
     build:
@@ -64,8 +12,3 @@ services:
       context: backend
       dockerfile: Dockerfile.ros2
     profiles: ["build"]
-
-volumes:
-  robotics_postgres_data:
-  robotics_redis_data:
-  robotics_assets:

@@ -35,14 +35,6 @@ robotics_python() {
   printf '%s\n' "$(robotics_environment_root)/bin/python"
 }
 
-robotics_device_name() {
-  if [[ -n "${ROBOTICS_DEVICE_NAME:-}" ]]; then
-    printf '%s\n' "$ROBOTICS_DEVICE_NAME"
-  else
-    hostname
-  fi
-}
-
 robotics_require_command() {
   local command_name="$1"
   local help_text="$2"
@@ -103,64 +95,6 @@ robotics_assert_path_under() {
 
 robotics_sha256() {
   sha256sum -- "$1" | awk '{print toupper($1)}'
-}
-
-robotics_json_field() {
-  local path="$1"
-  local field="$2"
-  local default_value="${3:-}"
-  local python
-  python="$(robotics_python)"
-  if [[ ! -f "$path" ]]; then
-    printf '%s\n' "$default_value"
-    return 0
-  fi
-  "$python" - "$path" "$field" "$default_value" <<'PY'
-import json
-import sys
-
-path, field, default = sys.argv[1:]
-with open(path, encoding="utf-8-sig") as stream:
-    value = json.load(stream)
-for part in field.split("."):
-    if not isinstance(value, dict) or part not in value:
-        value = default
-        break
-    value = value[part]
-if value is None:
-    value = default
-if isinstance(value, bool):
-    print("true" if value else "false")
-else:
-    print(value)
-PY
-}
-
-robotics_write_json_atomic() {
-  local destination="$1"
-  local json_payload="$2"
-  local python
-  python="$(robotics_python)"
-  mkdir -p -- "$(dirname -- "$destination")"
-  "$python" - "$destination" "$json_payload" <<'PY'
-import json
-import os
-import sys
-import tempfile
-
-destination, payload = sys.argv[1:]
-parent = os.path.dirname(destination)
-value = json.loads(payload)
-fd, temporary = tempfile.mkstemp(prefix=os.path.basename(destination) + ".", suffix=".tmp", dir=parent)
-try:
-    with os.fdopen(fd, "w", encoding="utf-8") as stream:
-        json.dump(value, stream, indent=2)
-        stream.write("\n")
-    os.replace(temporary, destination)
-finally:
-    if os.path.exists(temporary):
-        os.unlink(temporary)
-PY
 }
 
 robotics_wait_for_http() {

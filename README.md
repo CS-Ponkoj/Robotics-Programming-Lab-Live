@@ -1,6 +1,7 @@
 # Robotics Programming Lab
 
-A local-first robotics education platform. Students complete Python and ROS 2
+A robotics education platform with a local development workflow and shared
+Neon data. Students complete Python and ROS 2
 assignments in Flutter, FastAPI runs the assignment workflow, and test cases
 remain the only grading authority. AI tutoring is optional and off by default.
 
@@ -46,23 +47,20 @@ Stop the application:
 ./scripts/stop-local.sh
 ```
 
-When `NEON_DATABASE_URL` exists in the ignored `local_handoff_package/.env`,
-the launcher uses the shared `robotics_lab_staging` Neon database. It also
+The launcher requires `NEON_DATABASE_URL` in the ignored
+`local_handoff_package/.env` and uses the shared `robotics_lab_staging` Neon
+database. It also
 starts the local Python sandbox, FastAPI backend, and Flutter web app. Python
 and Flutter generated files stay in this computer's local user-data
 directories, outside the clone. AI remains off by default.
 
-Use `-UseLocalPostgres` on Windows or `--use-local-postgres` on Ubuntu only for
-an explicit offline/local-database run. Old dump files are retained as recovery
-archives but are not updated while Neon is active.
-
 ### Use the same data on another computer
 
-Copy the private `local_handoff_package` folder into the root of a fresh clone.
-Its `.env` connects every authorized device to the same Neon staging database,
-and `study_accounts.json` provides the optional file-based account importer.
-Do not copy Python environments or Flutter build files. Never run concurrent
-classroom tests from multiple devices unless that shared access is intentional.
+Every authorized backend connects to the same Neon database. A local backend
+still needs a securely provisioned private `.env`; Git intentionally does not
+distribute database or OpenAI credentials. A future hosted staging backend
+removes that per-device secret requirement because local Flutter clients need
+only its public HTTPS URL.
 
 ## Prototype accounts
 
@@ -79,11 +77,11 @@ separate **Try the student demo** button creates the temporary, non-persistent
 demo session.
 
 Instructors can manage student and instructor accounts from **Manage
-accounts**. For file-based management without signing in, edit the ignored
-`local_handoff_package/study_accounts.json`, then restart the backend or select
-**Import study_accounts.json**. Set `active` to `false` instead of deleting an
-account so its research history remains intact. Imported temporary passwords
-are removed from the JSON after they are securely hashed in PostgreSQL.
+accounts**. The password-free roster is tracked at
+`backend/data/study_accounts.json`, so every Git clone receives the same account
+IDs, roles, and active flags. Password creation and reset must be performed in
+Instructor Studio; password hashes remain only in Neon. Set `active` to `false`
+instead of deleting an account so its research history remains intact.
 
 ## What is implemented
 
@@ -94,8 +92,6 @@ are removed from the JSON after they are securely hashed in PostgreSQL.
 - Instructor assignment, account, analytics, and research-export tools
 - Server-side sessions and role authorization
 - Shared Neon PostgreSQL with a dedicated staging database
-- Optional local Docker PostgreSQL fallback with verified recovery dumps
-- Explicit `-UseSqlite` fallback for disposable troubleshooting only
 - Dedicated local Python sandbox and Docker-based ROS 2 grader
 - Built-in tutoring plus optional OpenAI feedback that never changes grades
 - Privacy-safe learning events, attempts, participant analytics, CSV, and Excel
@@ -162,7 +158,7 @@ manual_sqa_answers/   Maintained instructor answers for manual SQA
 docs/                 Architecture, deployment, research, and SQA documents
   archive/             Superseded reports and deployment snapshots
 scripts/              PowerShell and Bash setup, run, stop, and verification
-local_handoff_package/ Ignored private Neon configuration and account import data
+local_handoff_package/ Ignored private Neon and optional AI configuration
 OS user-data folder    Generated Python, Flutter, logs, and runtime state
 ```
 
@@ -203,11 +199,10 @@ On Ubuntu:
 ./scripts/verify-local.sh --api-base-url http://127.0.0.1:5100
 ```
 
-It checks fresh-clone completeness, then runs backend tests, dependency checks, Python compilation, Flutter analysis
-and tests, a release web build from LocalAppData, an isolated PostgreSQL
-backup/restore and simulated-device-lock test, Git whitespace validation, and
-a dry-run validation of the safe cleanup allow-list. It also checks managed
-service health when the stack is running.
+It checks source completeness, private Neon configuration, backend tests,
+dependency integrity, Python compilation, Flutter analysis and tests, a release
+web build from LocalAppData, Git whitespace, and the safe cleanup allow-list.
+It also checks managed service health when the stack is running.
 
 Check the three local services manually when using the example ports:
 
@@ -241,23 +236,20 @@ After stopping the application, remove only that fixed allow-list:
 .\scripts\clean-local.ps1 -Execute
 ```
 
-The cleanup script protects databases, PostgreSQL backups, generated
-PDF outputs, course materials, instructor answers, and Git history. Flutter and
-Python regenerate the removed caches during the next setup, test, or run.
+The cleanup script protects private configuration, generated PDF outputs,
+course materials, instructor answers, and Git history. Flutter and Python
+regenerate the removed caches during the next setup, test, or run.
 
 ## Advanced configuration
 
-Local staging uses the shared `robotics_lab_staging` database in Neon whenever
-`NEON_DATABASE_URL` is present in `local_handoff_package/.env`. The database
-name is derived safely, so the older `neondb` database remains separate and
-untouched. Use Neon's dashboard or SQL editor for authorized inspection and
-backup controls.
+Local staging always uses the shared `robotics_lab_staging` Neon database. The
+database name is derived safely from `NEON_DATABASE_URL`, so the older `neondb`
+database remains separate and untouched. Use Neon's dashboard or SQL editor
+for authorized inspection, monitoring, and backup controls. Local PostgreSQL
+and runtime SQLite database modes are no longer supported.
 
-Use `-UseLocalPostgres` or `--use-local-postgres` for an intentional offline
-Docker PostgreSQL run. That fallback retains the verified dump and device-lock
-workflow. Use `-UseSqlite` only for disposable troubleshooting. The ignored
-handoff folder remains private because it contains the Neon connection string,
-optional OpenAI key, and editable account-import file.
+The ignored private folder contains only the Neon/OpenAI environment settings
+and its short instructions. The password-free account roster is tracked in Git.
 
 Copy `backend/.env.example` to ignored `local_handoff_package/.env` only when
 you need optional settings. Production deployment, study-account import, API details, and

@@ -128,4 +128,4 @@ if ($remaining) {
 }
 
 Write-Host "Removed $($validatedTargets.Count) generated target(s), approximately $([math]::Round($totalBytes / 1MB, 2)) MB."
-Write-Host 'Protected environments, databases, backups, outputs, course materials, and instructor answers were not touched.'
+Write-Host 'Protected environments, private configuration, outputs, course materials, and instructor answers were not touched.'

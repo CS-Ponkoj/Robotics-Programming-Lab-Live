@@ -9,8 +9,8 @@ $python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot -EnsureDe
 
 & (Join-Path $PSScriptRoot "verify-local-layout.ps1")
 if ($LASTEXITCODE -ne 0) { throw "Portable local layout validation failed." }
-& (Join-Path $PSScriptRoot "verify-local-handoff-package.ps1")
-if ($LASTEXITCODE -ne 0) { throw "Copyable local handoff package validation failed." }
+& (Join-Path $PSScriptRoot "verify-private-config.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Private Neon configuration validation failed." }
 
 & (Join-Path $PSScriptRoot "clean-local.ps1")
 if (-not $?) { throw "Safe local cleanup dry-run validation failed." }
@@ -26,9 +26,6 @@ try {
 } finally {
     Pop-Location
 }
-
-& (Join-Path $PSScriptRoot "verify-database-handoff.ps1")
-if ($LASTEXITCODE -ne 0) { throw "Local PostgreSQL handoff verification failed." }
 
 & (Join-Path $PSScriptRoot "verify_frontend_onedrive.ps1") -ApiBaseUrl $ApiBaseUrl
 if ($LASTEXITCODE -ne 0) { throw "Flutter verification failed." }

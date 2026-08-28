@@ -39,17 +39,17 @@ grading but is excluded from research dashboards and exports.
 - Student: account menu -> **My study progress**
 - Instructor: instructor studio -> **Research study dashboard**
 - Raw staging database: Neon SQL Editor for authorized technical inspection
-- Offline fallback database: PostgreSQL tools connected to `127.0.0.1:5432`
+- Shared staging database: Neon SQL Editor or an approved PostgreSQL client
 - Export: student summary CSV, assignment attempts CSV, learning events CSV,
   or a three-sheet Excel workbook
 
 For storage definitions, standard execution statuses, and event payload rules,
 see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). The ignored
 `local_handoff_package/.env` supplies the Neon connection on authorized
-computers, while `local_handoff_package/study_accounts.json` provides optional
-file-based account management. Verified PostgreSQL dumps in that folder are
-legacy recovery archives used only by the explicit local fallback. Assignment
-source data is human-readable in `backend/assignments/assignment_*.json`.
+computers. The password-free account roster is tracked at
+`backend/data/study_accounts.json`; passwords and password hashes never belong
+in Git. Assignment source data is human-readable in
+`backend/assignments/assignment_*.json`.
 
 ## Privacy and data quality
 

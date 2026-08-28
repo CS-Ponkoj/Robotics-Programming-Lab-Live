@@ -29,50 +29,10 @@ function Get-RoboticsHandoffPackageRoot {
     return Join-Path ([System.IO.Path]::GetFullPath($RepositoryRoot)) "local_handoff_package"
 }
 
-function Get-RoboticsHandoffDatabaseRoot {
-    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
-
-    return Get-RoboticsHandoffPackageRoot -RepositoryRoot $RepositoryRoot
-}
-
 function Get-RoboticsHandoffPrivateConfigPath {
     param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
 
     return Join-Path (Get-RoboticsHandoffPackageRoot -RepositoryRoot $RepositoryRoot) ".env"
-}
-
-function Test-RoboticsHandoffDatabase {
-    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
-
-    $databaseRoot = Get-RoboticsHandoffDatabaseRoot -RepositoryRoot $RepositoryRoot
-    $dumpExists = Test-Path -LiteralPath (Join-Path $databaseRoot "latest.dump")
-    $manifestExists = Test-Path -LiteralPath (Join-Path $databaseRoot "latest.json")
-    if ($dumpExists -xor $manifestExists) {
-        throw "The local handoff package database is incomplete. Copy both latest.dump and latest.json."
-    }
-    return ($dumpExists -and $manifestExists)
-}
-
-function Get-RoboticsDatabaseBackupRoot {
-    param(
-        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
-        [string]$ExplicitPath = ""
-    )
-
-    $configuredPath = if (-not [string]::IsNullOrWhiteSpace($ExplicitPath)) {
-        $ExplicitPath
-    } elseif (-not [string]::IsNullOrWhiteSpace($env:ROBOTICS_DATABASE_BACKUP_ROOT)) {
-        $env:ROBOTICS_DATABASE_BACKUP_ROOT
-    } else {
-        ""
-    }
-    if (-not [string]::IsNullOrWhiteSpace($configuredPath)) {
-        $expanded = [System.Environment]::ExpandEnvironmentVariables($configuredPath)
-        return [System.IO.Path]::GetFullPath($expanded)
-    }
-
-    Test-RoboticsHandoffDatabase -RepositoryRoot $RepositoryRoot | Out-Null
-    return Get-RoboticsHandoffDatabaseRoot -RepositoryRoot $RepositoryRoot
 }
 
 function Get-Python314BaseExecutable {
@@ -176,4 +136,4 @@ function Get-RoboticsPythonExecutable {
     return $python
 }
 
-Export-ModuleMember -Function Get-RoboticsRuntimeRoot, Get-RoboticsEnvironmentRoot, Get-RoboticsHandoffPackageRoot, Get-RoboticsHandoffDatabaseRoot, Get-RoboticsHandoffPrivateConfigPath, Test-RoboticsHandoffDatabase, Get-RoboticsDatabaseBackupRoot, Get-RoboticsPythonExecutable
+Export-ModuleMember -Function Get-RoboticsRuntimeRoot, Get-RoboticsEnvironmentRoot, Get-RoboticsHandoffPackageRoot, Get-RoboticsHandoffPrivateConfigPath, Get-RoboticsPythonExecutable

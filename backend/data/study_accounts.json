@@ -3,7 +3,7 @@
   "accounts": [
     {
       "login_id": "instructor",
-      "temporary_password": "instructor",
+      "temporary_password": null,
       "role": "instructor",
       "email": "",
       "participant_code": null,
@@ -12,7 +12,7 @@
     },
     {
       "login_id": "student",
-      "temporary_password": "student",
+      "temporary_password": null,
       "role": "student",
       "email": "",
       "participant_code": "DEMO",
@@ -20,11 +20,11 @@
       "demo": false
     },
     {
-      "login_id": "STU-001",
-      "temporary_password": "replace-before-import",
+      "login_id": "dave",
+      "temporary_password": null,
       "role": "student",
-      "email": "student@example.com",
-      "participant_code": "P001",
+      "email": "",
+      "participant_code": null,
       "active": true,
       "demo": false
     }

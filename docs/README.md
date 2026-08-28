@@ -31,12 +31,13 @@ and verification records.
 ## SQA evidence
 
 - [Master SQA checklist](sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
+- [Neon-only database architecture SQA report](sqa/NEON_ONLY_DATABASE_SQA_REPORT_2026-08-28.md)
 - [Neon and account management SQA report](sqa/NEON_ACCOUNT_MANAGEMENT_SQA_REPORT_2026-08-28.md)
 - [Ubuntu local support SQA report](sqa/UBUNTU_LOCAL_SUPPORT_SQA_REPORT_2026-08-28.md)
-- [Automatic local database backup SQA report](sqa/AUTOMATIC_LOCAL_DATABASE_BACKUP_SQA_REPORT_2026-08-26.md)
+- [Automatic local database backup SQA report (historical; superseded by Neon-only runtime)](sqa/AUTOMATIC_LOCAL_DATABASE_BACKUP_SQA_REPORT_2026-08-26.md)
 - [V5.2 Basic Analytics SQA report](sqa/V5_2_BASIC_ANALYTICS_SQA_REPORT_2026-08-26.md)
-- [Historical PostgreSQL OneDrive handoff SQA report](sqa/LOCAL_POSTGRES_ONEDRIVE_HANDOFF_SQA_REPORT_2026-08-24.md)
-- [Copyable local handoff package SQA report](sqa/COPYABLE_LOCAL_HANDOFF_PACKAGE_SQA_REPORT_2026-08-25.md)
+- [Historical PostgreSQL OneDrive handoff SQA report (superseded)](sqa/LOCAL_POSTGRES_ONEDRIVE_HANDOFF_SQA_REPORT_2026-08-24.md)
+- [Historical copyable database handoff package SQA report (superseded)](sqa/COPYABLE_LOCAL_HANDOFF_PACKAGE_SQA_REPORT_2026-08-25.md)
 - [Repository cleanup SQA report](sqa/REPOSITORY_CLEANUP_SQA_REPORT_2026-08-24.md)
 
 Earlier dated reports remain available through the

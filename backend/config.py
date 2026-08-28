@@ -37,9 +37,7 @@ class Settings(BaseSettings):
     enable_email_features: bool = False
     demo_student_password: str = "student"
     demo_instructor_password: str = "instructor"
-    study_accounts_file: Path = (
-        BASE_DIR.parent / "local_handoff_package" / "study_accounts.json"
-    )
+    study_accounts_file: Path = BASE_DIR / "data" / "study_accounts.json"
     public_app_url: str = "http://127.0.0.1:8080"
     auth_session_hours: int = 12
     password_reset_minutes: int = 30

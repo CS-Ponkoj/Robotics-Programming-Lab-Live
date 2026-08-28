@@ -50,10 +50,11 @@ Set-Location .\Robotics-Programming-Lab-Staging
 git config core.longpaths true
 ```
 
-Copy the private `local_handoff_package` folder into the root of the clone. Its
-ignored `.env` connects the clone to the shared Neon staging database, and its
-`study_accounts.json` supports file-based account changes. Never commit or
-share this folder.
+Before running a local backend, obtain an authorized private `.env` through the
+project's approved secret-delivery method and place it in
+`local_handoff_package`. Git intentionally does not distribute Neon or OpenAI
+credentials. A future hosted staging backend will let local Flutter clients use
+only a public HTTPS API URL.
 
 ## 3. Prepare the computer
 
@@ -91,20 +92,19 @@ Open `http://127.0.0.1:8180/app`. Stop safely with:
 Closing the browser does not close the backend. Run `stop-local.ps1` before
 updating the repository or switching work to another computer.
 
-A Neon-configured package normally contains:
+A Neon-configured private folder contains only:
 
 ```text
 local_handoff_package/
 ├── .env
-├── study_accounts.json
-├── study_accounts_import_report.json  generated after import
-└── legacy dump files                    optional recovery archives
+├── .gitignore
+└── README.md
 ```
 
 The database itself is stored in Neon, so authorized computers see the same
-accounts, attempts, and analytics. Edit `study_accounts.json` only for account
-management; never edit legacy dump files. Use `-UseLocalPostgres` only for an
-intentional offline fallback.
+accounts, attempts, and analytics. The password-free roster arrives through Git
+at `backend/data/study_accounts.json`; use Instructor Studio to create or reset
+passwords. Local PostgreSQL and SQLite application modes are not supported.
 
 ## Optional verification
 
@@ -121,11 +121,11 @@ intentional offline fallback.
 | Docker is unavailable | Start Docker Desktop and select Linux containers. |
 | A port is in use | Run `stop-local.ps1`, or choose unused port parameters. |
 | Neon cannot connect | Check internet access and the ignored `.env`; do not paste the connection string into Git or support messages. |
-| An old `local_database_backups` folder exists | It is obsolete. Preserve unique old files under `local_handoff_package/history`, then use only the complete handoff package. |
+| An old `local_database_backups` folder exists | It is obsolete. Confirm Neon contains the required data, then archive or remove it outside the active project. |
 | Python environment is incomplete | Stop the app, then run `setup-local.ps1 -Repair`. |
 | ROS grading image is missing | Run the ROS image build command from step 4. |
 | Flutter reports a locked build directory | Use `run-local.ps1`; do not run Flutter directly in the OneDrive source folder. |
 
-The package is ignored by Git and is not encrypted. It may contain API keys,
-database credentials, and temporary account passwords. Do not commit, email,
-publicly share, or leave it on an untrusted computer.
+The private folder is ignored by Git and is not encrypted. It may contain API
+keys, database credentials, and temporary account passwords. Do not commit,
+email, publicly share, or leave it on an untrusted computer.

@@ -11,26 +11,13 @@ if (-not (Test-Path -LiteralPath $stateFile)) {
 
 $state = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
 foreach ($entry in @($state.processes | Sort-Object {
-    if ($_.name -eq "database-backup") { 0 }
-    elseif ($_.name -eq "frontend") { 1 }
-    else { 2 }
+    if ($_.name -eq "frontend") { 0 } else { 1 }
 })) {
     $process = Get-Process -Id $entry.id -ErrorAction SilentlyContinue
     if ($process) {
         & taskkill.exe /PID $entry.id /T /F 2>$null | Out-Null
         Write-Output "Stopped $($entry.name) process $($entry.id)."
     }
-}
-
-if ($state.managedLocalDatabase) {
-    Import-Module (Join-Path $PSScriptRoot "local-database.psm1") -Force
-    Complete-RoboticsLocalPostgres `
-        -RepositoryRoot $repositoryRoot `
-        -SessionId $state.localDatabaseSessionId `
-        -DatabasePort $state.localDatabasePort `
-        -ProjectName $state.localDatabaseProjectName `
-        -BackupRoot $state.localDatabaseBackupRoot `
-        -RuntimeRoot $state.localDatabaseRuntimeRoot | Out-Host
 }
 
 Remove-Item -LiteralPath $stateFile -Force

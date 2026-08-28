@@ -43,7 +43,8 @@ Run the complete application:
 This connects to the dedicated Neon `robotics_lab_staging` database and starts
 the sandbox, API, and Flutter web application. Python and Flutter generated
 files stay outside the clone. The ignored `local_handoff_package` supplies the
-Neon connection, optional AI configuration, and editable account-import JSON.
+Neon connection and optional AI configuration. Git supplies the password-free
+account roster at `backend/data/study_accounts.json`.
 AI is off. To test AI deliberately, use `-EnableAi`. To use an external staging
 The launcher refuses to reuse ports already owned by an older project process;
 stop that process or provide different `-FrontendPort`, `-BackendPort`, and
@@ -60,9 +61,8 @@ Stop the managed processes:
 ```
 
 Closing the browser is not enough; use the stop command to end the managed API,
-sandbox, and Flutter processes. Neon keeps the shared data. Use
-`-UseLocalPostgres` or `--use-local-postgres` only when intentionally testing the
-legacy offline fallback and its backup/device-lock workflow.
+sandbox, and Flutter processes. Neon keeps the shared data independently of the
+local processes.
 
 Run the full automated SQA gate:
 
@@ -100,8 +100,7 @@ Before production promotion:
 - older browser drafts are not reused after an assignment version changes;
 - dangerous imports remain blocked;
 - instructor-created student login and student data isolation pass;
-- PostgreSQL persistence/restart testing passes;
-- the isolated PostgreSQL backup/restore, checksum, and device-lock test passes;
+- Neon persistence/restart testing and database-health checks pass;
 - the workbook records zero open release blockers;
 - staging `main` is clean and pushed; and
 - the user explicitly approves the production release and release tag.

@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+import account_sync
 from account_sync import seed_demo_accounts
 from app import create_app
 from config import Settings
@@ -614,3 +615,42 @@ def test_json_file_creates_updates_and_sanitizes_accounts(tmp_path):
                 select(User).where(User.login_id == "json-student")
             )
             assert user.is_active is False
+
+
+def test_tracked_account_roster_rejects_plaintext_passwords(tmp_path, monkeypatch):
+    account_file = tmp_path / "study_accounts.json"
+    payload = {
+        "version": 1,
+        "accounts": [
+            {
+                "login_id": "tracked-student",
+                "temporary_password": "must-not-enter-git",
+                "role": "student",
+                "email": "",
+                "participant_code": "PTRACK",
+                "active": True,
+                "demo": False,
+            }
+        ],
+    }
+    account_file.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(account_sync, "REPOSITORY_ACCOUNT_ROSTER", account_file.resolve())
+    settings = Settings(
+        database_url="sqlite://",
+        admin_api_token="legacy-admin",
+        study_accounts_file=account_file,
+    )
+
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        report = client.post(
+            "/admin/accounts/import",
+            headers={"X-Admin-Token": "legacy-admin"},
+        )
+        assert report.status_code == 200
+        assert "tracked account roster cannot contain" in report.json()["errors"][0]
+        assert client.post(
+            "/auth/login",
+            json={"login_id": "tracked-student", "password": "must-not-enter-git"},
+        ).status_code == 401
+
+    assert json.loads(account_file.read_text(encoding="utf-8")) == payload
