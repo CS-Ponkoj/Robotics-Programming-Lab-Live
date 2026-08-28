@@ -15,6 +15,7 @@ database_port="5432"
 backup_interval="10"
 database_url=""
 use_sqlite="false"
+use_local_postgres="false"
 enable_ai="false"
 
 while [[ "$#" -gt 0 ]]; do
@@ -26,6 +27,7 @@ while [[ "$#" -gt 0 ]]; do
     --backup-interval-minutes) backup_interval="$2"; shift 2 ;;
     --database-url) database_url="$2"; shift 2 ;;
     --use-sqlite) use_sqlite="true"; shift ;;
+    --use-local-postgres) use_local_postgres="true"; shift ;;
     --enable-ai) enable_ai="true"; shift ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
   esac
@@ -40,8 +42,12 @@ python="$(robotics_python)"
   printf 'The Ubuntu Python environment is missing. Run ./scripts/setup-local.sh first.\n' >&2
   exit 1
 }
-if [[ "$use_sqlite" == "true" && -n "$database_url" ]]; then
-  printf 'Use either --use-sqlite or --database-url, not both.\n' >&2
+database_option_count=0
+[[ "$use_sqlite" == "true" ]] && database_option_count=$((database_option_count + 1))
+[[ "$use_local_postgres" == "true" ]] && database_option_count=$((database_option_count + 1))
+[[ -n "$database_url" ]] && database_option_count=$((database_option_count + 1))
+if [[ "$database_option_count" -gt 1 ]]; then
+  printf 'Use only one database option: --use-sqlite, --use-local-postgres, or --database-url.\n' >&2
   exit 2
 fi
 for port in "$frontend_port" "$backend_port" "$sandbox_port"; do
@@ -113,9 +119,17 @@ database_session_id=""
 database_project="${ROBOTICS_DATABASE_PROJECT_NAME:-robotics-lab-local}"
 database_restored_backup="false"
 has_backup="false"
+if [[ "$use_sqlite" != "true" && "$use_local_postgres" != "true" && -z "$database_url" && -f "$handoff_root/.env" ]]; then
+  database_url="$(
+    cd -- "$backend_root"
+    ROBOTICS_ENV_FILE="$handoff_root/.env" "$python" -c \
+      'from config import get_settings; print(get_settings().cloud_database_url or "")'
+  )"
+  [[ -n "$database_url" ]] && printf 'Using the configured Neon staging database.\n'
+fi
 if [[ "$use_sqlite" == "true" ]]; then
   database_url="sqlite:///robotics_lab_staging.db"
-elif [[ -z "$database_url" ]]; then
+elif [[ "$use_local_postgres" == "true" || -z "$database_url" ]]; then
   database_result="$(robotics_start_local_postgres "$database_port" "$database_project" "$handoff_root" "$runtime_root")"
   IFS='|' read -r database_session_id database_project database_port database_restored_backup latest_hash <<< "$database_result"
   database_url="postgresql+psycopg://robotics:robotics-local-only@127.0.0.1:$database_port/robotics_lab"
@@ -208,7 +222,16 @@ printf 'Robotics Programming Lab is ready.\n'
 printf 'Frontend: http://127.0.0.1:%s/app\n' "$frontend_port"
 printf 'Backend:  http://127.0.0.1:%s/health\n' "$backend_port"
 printf 'Sandbox:  http://127.0.0.1:%s/health\n' "$sandbox_port"
-printf 'Database: %s\n' "$([[ "$managed_database" == "true" ]] && printf 'local PostgreSQL with unified handoff package' || printf 'external or SQLite')"
+if [[ "$managed_database" == "true" ]]; then
+  database_description='local PostgreSQL with unified handoff package'
+elif [[ "$database_url" == sqlite* ]]; then
+  database_description='SQLite fallback'
+elif [[ "$database_url" == *neon.tech* ]]; then
+  database_description='Neon staging PostgreSQL'
+else
+  database_description='externally configured PostgreSQL'
+fi
+printf 'Database: %s\n' "$database_description"
 [[ "$database_restored_backup" == "true" ]] && printf 'Restored the newest verified PostgreSQL handoff backup.\n'
 printf 'AI enabled: %s\n' "$enable_ai"
 [[ "$managed_database" == "true" ]] && printf 'Automatic database backup: every %s minute(s)\n' "$backup_interval"

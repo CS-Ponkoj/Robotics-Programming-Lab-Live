@@ -22,11 +22,13 @@ class LearningProgressStore {
   final Map<int, String> submissionIds = {};
 
   ProgressStorage? _storage;
+  String? _userScope;
 
   bool get isLoaded => _storage != null;
 
   void startEphemeralSession() {
     _storage = InMemoryProgressStorage();
+    _userScope = null;
     _clearState();
   }
 
@@ -57,7 +59,27 @@ class LearningProgressStore {
   Future<void> load({ProgressStorage? storage}) async {
     _storage = storage ?? createProgressStorage();
     await _storage!.initialize();
+    _userScope = null;
 
+    _readState();
+  }
+
+  Future<void> loadForUser(
+    String userId, {
+    ProgressStorage? storage,
+    bool migrateLegacy = false,
+  }) async {
+    _storage = storage ?? createProgressStorage();
+    await _storage!.initialize();
+    _userScope = userId;
+
+    if (migrateLegacy && _getStringSafely(_latestScoresKey) == null) {
+      await _copyLegacyProgress();
+    }
+    _readState();
+  }
+
+  void _readState() {
     _clearState();
     latestScores.addAll(_decodeIntMap(_getStringSafely(_latestScoresKey)));
     bestScores.addAll(_decodeIntMap(_getStringSafely(_bestScoresKey)));
@@ -74,6 +96,23 @@ class LearningProgressStore {
     submissionIds.addAll(
       _decodeStringMap(_getStringSafely(_submissionIdsKey)),
     );
+  }
+
+  Future<void> _copyLegacyProgress() async {
+    for (final key in [
+      _latestScoresKey,
+      _bestScoresKey,
+      _draftsKey,
+      _draftVersionsKey,
+      _attemptCountsKey,
+      _revealedSolutionsKey,
+      _submissionIdsKey,
+    ]) {
+      final legacyValue = _storage?.getString(key);
+      if (legacyValue != null) {
+        await _storage?.setString(_scopedKey(key), legacyValue);
+      }
+    }
   }
 
   void _clearState() {
@@ -95,10 +134,10 @@ class LearningProgressStore {
     codeDraftVersions[assignmentId] = assignmentVersion;
     await Future.wait([
       if (_storage != null)
-        _storage!.setString(_draftsKey, _encodeMap(codeDrafts)),
+        _storage!.setString(_scopedKey(_draftsKey), _encodeMap(codeDrafts)),
       if (_storage != null)
         _storage!.setString(
-          _draftVersionsKey,
+          _scopedKey(_draftVersionsKey),
           _encodeMap(codeDraftVersions),
         ),
     ]);
@@ -114,12 +153,18 @@ class LearningProgressStore {
 
     await Future.wait([
       if (_storage != null)
-        _storage!.setString(_latestScoresKey, _encodeMap(latestScores)),
-      if (_storage != null)
-        _storage!.setString(_bestScoresKey, _encodeMap(bestScores)),
+        _storage!.setString(
+          _scopedKey(_latestScoresKey),
+          _encodeMap(latestScores),
+        ),
       if (_storage != null)
         _storage!.setString(
-          _attemptCountsKey,
+          _scopedKey(_bestScoresKey),
+          _encodeMap(bestScores),
+        ),
+      if (_storage != null)
+        _storage!.setString(
+          _scopedKey(_attemptCountsKey),
           _encodeMap(attemptCounts),
         ),
     ]);
@@ -131,7 +176,7 @@ class LearningProgressStore {
     }
     submissionIds[assignmentId] = submissionId;
     await _storage?.setString(
-      _submissionIdsKey,
+      _scopedKey(_submissionIdsKey),
       _encodeMap(submissionIds),
     );
   }
@@ -139,7 +184,7 @@ class LearningProgressStore {
   Future<void> recordSolutionReveal(int assignmentId) async {
     revealedSolutions.add(assignmentId);
     await _storage?.setString(
-      _revealedSolutionsKey,
+      _scopedKey(_revealedSolutionsKey),
       jsonEncode(revealedSolutions.toList()..sort()),
     );
   }
@@ -147,7 +192,7 @@ class LearningProgressStore {
   Future<void> clearSolutionReveal(int assignmentId) async {
     revealedSolutions.remove(assignmentId);
     await _storage?.setString(
-      _revealedSolutionsKey,
+      _scopedKey(_revealedSolutionsKey),
       jsonEncode(revealedSolutions.toList()..sort()),
     );
   }
@@ -209,9 +254,14 @@ class LearningProgressStore {
 
   String? _getStringSafely(String key) {
     try {
-      return _storage?.getString(key);
+      return _storage?.getString(_scopedKey(key));
     } on Object {
       return null;
     }
+  }
+
+  String _scopedKey(String key) {
+    final scope = _userScope;
+    return scope == null ? key : 'learning.user.$scope.$key';
   }
 }

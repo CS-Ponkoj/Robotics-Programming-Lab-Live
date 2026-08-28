@@ -46,40 +46,27 @@ Stop the application:
 ./scripts/stop-local.sh
 ```
 
-The launcher starts local PostgreSQL in Docker, the Python sandbox, FastAPI
-backend, and Flutter web app. Python and Flutter generated files stay in this
-computer's local user-data directories, outside the clone. Database backups and private settings are read from
-the single ignored `local_handoff_package` folder. If no backup exists there,
-the computer starts a fresh demo database and creates one at the next clean
-stop. While the stack is running, a managed worker also creates a verified
-backup every 10 minutes when the database has changed. Closing the browser does
-not stop that worker. Do not run
-manual Flutter, pip, or PostgreSQL restore commands; the scripts handle them.
+When `NEON_DATABASE_URL` exists in the ignored `local_handoff_package/.env`,
+the launcher uses the shared `robotics_lab_staging` Neon database. It also
+starts the local Python sandbox, FastAPI backend, and Flutter web app. Python
+and Flutter generated files stay in this computer's local user-data
+directories, outside the clone. AI remains off by default.
 
-### Copy the same local data to another computer
+Use `-UseLocalPostgres` on Windows or `--use-local-postgres` on Ubuntu only for
+an explicit offline/local-database run. Old dump files are retained as recovery
+archives but are not updated while Neon is active.
 
-While the application is stopped, create the ignored handoff package:
+### Use the same data on another computer
 
-```powershell
-.\scripts\create-local-handoff-package.ps1 -IncludePrivateConfig
-```
+Copy the private `local_handoff_package` folder into the root of a fresh clone.
+Its `.env` connects every authorized device to the same Neon staging database,
+and `study_accounts.json` provides the optional file-based account importer.
+Do not copy Python environments or Flutter build files. Never run concurrent
+classroom tests from multiple devices unless that shared access is intentional.
 
-On Ubuntu, use:
+## Prototype accounts
 
-```bash
-./scripts/create-local-handoff-package.sh --include-private-config
-```
-
-Copy the complete `local_handoff_package` folder into the root of a fresh Git
-clone. The normal setup and run commands use it directly. It contains the
-verified database and optional private `.env`, but not the Python
-virtual environment. Python packages are rebuilt safely in the destination
-computer's local user-data directory. Verified PostgreSQL dumps are portable
-between the supported Windows and Ubuntu workflows.
-
-## Local prototype accounts
-
-The local database seeds these prototype accounts on first start:
+The staging database seeds these prototype accounts when it is initialized:
 
 ```text
 Student:    student / student
@@ -91,6 +78,13 @@ display them. Password login creates a normal persistent account session. The
 separate **Try the student demo** button creates the temporary, non-persistent
 demo session.
 
+Instructors can manage student and instructor accounts from **Manage
+accounts**. For file-based management without signing in, edit the ignored
+`local_handoff_package/study_accounts.json`, then restart the backend or select
+**Import study_accounts.json**. Set `active` to `false` instead of deleting an
+account so its research history remains intact. Imported temporary passwords
+are removed from the JSON after they are securely hashed in PostgreSQL.
+
 ## What is implemented
 
 - Six configurable, versioned assignments: four Python and two ROS 2 exercises
@@ -99,7 +93,8 @@ demo session.
   hints, and study progress
 - Instructor assignment, account, analytics, and research-export tools
 - Server-side sessions and role authorization
-- PostgreSQL in a local Docker volume with verified package backups
+- Shared Neon PostgreSQL with a dedicated staging database
+- Optional local Docker PostgreSQL fallback with verified recovery dumps
 - Explicit `-UseSqlite` fallback for disposable troubleshooting only
 - Dedicated local Python sandbox and Docker-based ROS 2 grader
 - Built-in tutoring plus optional OpenAI feedback that never changes grades
@@ -141,10 +136,9 @@ flowchart TB
     API --> Engine[Versioned assignment engine]
     API --> Tutor[Built-in and optional AI tutor]
     API --> Research[Study tracking and exports]
-    Auth --> DB[(PostgreSQL)]
+    Auth --> DB[(Neon PostgreSQL)]
     Engine --> DB
     Research --> DB
-    DB -->|verified dump every 10 min and on stop| Backup[local_handoff_package]
     Engine --> PythonSandbox[Python sandbox service]
     Engine --> ROS[ROS 2 Jazzy Docker grader]
     Tutor --> BuiltIn[Deterministic feedback]
@@ -168,7 +162,7 @@ manual_sqa_answers/   Maintained instructor answers for manual SQA
 docs/                 Architecture, deployment, research, and SQA documents
   archive/             Superseded reports and deployment snapshots
 scripts/              PowerShell and Bash setup, run, stop, and verification
-local_handoff_package/ Ignored, cross-platform database and private configuration
+local_handoff_package/ Ignored private Neon configuration and account import data
 OS user-data folder    Generated Python, Flutter, logs, and runtime state
 ```
 
@@ -253,18 +247,17 @@ Python regenerate the removed caches during the next setup, test, or run.
 
 ## Advanced configuration
 
-Local use defaults to the Docker PostgreSQL service. Its live Docker volume is
-computer-local and must never be synchronized. The verified logical dump,
-checksum manifest, previous recovery copy, and private `.env` all live directly
-inside `local_handoff_package`. The launcher restores that dump on a new
-computer or when the computer's Docker volume has been recreated and no
-application schema remains. Copy only this complete folder to another computer;
-the obsolete `local_database_backups` folder is not used. Automatic backups run
-every 10 minutes by default and skip unchanged databases. A clean
-`stop-local.ps1` run still creates the required final handoff backup and releases
-the device lock. Use `-DatabasePort 55432` if port 5432 is occupied.
-Use `-UseSqlite` only for a disposable offline troubleshooting run; that mode is
-not part of the cross-device handoff workflow.
+Local staging uses the shared `robotics_lab_staging` database in Neon whenever
+`NEON_DATABASE_URL` is present in `local_handoff_package/.env`. The database
+name is derived safely, so the older `neondb` database remains separate and
+untouched. Use Neon's dashboard or SQL editor for authorized inspection and
+backup controls.
+
+Use `-UseLocalPostgres` or `--use-local-postgres` for an intentional offline
+Docker PostgreSQL run. That fallback retains the verified dump and device-lock
+workflow. Use `-UseSqlite` only for disposable troubleshooting. The ignored
+handoff folder remains private because it contains the Neon connection string,
+optional OpenAI key, and editable account-import file.
 
 Copy `backend/.env.example` to ignored `local_handoff_package/.env` only when
 you need optional settings. Production deployment, study-account import, API details, and

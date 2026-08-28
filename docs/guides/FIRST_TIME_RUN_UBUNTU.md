@@ -101,14 +101,10 @@ git clone https://github.com/CS-Ponkoj/Robotics-Programming-Lab-Staging.git
 cd Robotics-Programming-Lab-Staging
 ```
 
-If you want the same accounts, attempts, analytics, and private settings, stop
-the application on the source computer and copy its complete
-`local_handoff_package` folder into this clone. A Windows-created PostgreSQL
-dump can be restored on Ubuntu, and an Ubuntu-created dump can be restored on
-Windows. If you do not copy a package, the application starts with fresh demo
-data.
-
-Never start a copied package while it is still active on another computer.
+Copy the private `local_handoff_package` folder into this clone. Its ignored
+`.env` connects Ubuntu to the shared Neon staging database, and its
+`study_accounts.json` supports file-based account changes. Never commit or
+share this folder.
 
 ## 3. Prepare this computer
 
@@ -149,9 +145,8 @@ dependencies changed:
 ./scripts/run-local.sh --frontend-port 8180 --backend-port 5100 --sandbox-port 5101
 ```
 
-Open `http://127.0.0.1:8180/app` in the browser. The launcher starts PostgreSQL,
-the Python sandbox, FastAPI, Flutter web, and the automatic backup worker. AI is
-off by default.
+Open `http://127.0.0.1:8180/app` in the browser. The launcher connects to Neon
+and starts the Python sandbox, FastAPI, and Flutter web. AI is off by default.
 
 To intentionally test optional AI feedback, place `OPENAI_API_KEY` in the
 ignored `local_handoff_package/.env` and add `--enable-ai`. Never commit or
@@ -163,13 +158,9 @@ print that file.
 ./scripts/stop-local.sh
 ```
 
-The stop command stops only processes recorded by this Ubuntu launcher, creates
-and verifies the final PostgreSQL dump, releases the device lock, and stops the
-managed PostgreSQL container. Closing the browser is not enough.
-
-Before switching computers, wait until the complete `local_handoff_package`
-has finished copying. The live Docker volume is computer-local; the verified
-dump is the portable database.
+The stop command stops only processes recorded by this Ubuntu launcher.
+Closing the browser is not enough. Neon keeps the shared data; no local database
+handoff is required.
 
 ## 7. Verify the installation
 
@@ -182,17 +173,12 @@ With the application stopped, run the complete Ubuntu gate:
 When the application is running, the same command also checks the managed
 backend and sandbox health endpoints.
 
-## 8. Create a manual handoff package
+## 8. Prepare another authorized computer
 
-Stop the application first, then run:
-
-```bash
-./scripts/create-local-handoff-package.sh --include-private-config
-```
-
-Copy the entire ignored `local_handoff_package` folder to the destination
-clone. Do not copy Python environments, Flutter builds, Docker volumes, or log
-folders.
+Copy the ignored `local_handoff_package` folder to the destination clone using
+a secure method. Do not copy Python environments, Flutter builds, Docker
+volumes, or log folders. Use `--use-local-postgres` only for an intentional
+offline fallback.
 
 ## 9. Update the project later
 
@@ -216,12 +202,11 @@ Rebuild the ROS image only when its Dockerfile or dependencies changed.
 | Docker daemon is unavailable | Run `sudo systemctl start docker`, or ask lab IT. |
 | `uv`, `flutter`, or `docker compose` is not found | Complete prerequisite installation, reopen Bash, and verify the command. |
 | A port is already used | Stop the old stack or choose different `--frontend-port`, `--backend-port`, `--sandbox-port`, or `--database-port` values. |
-| Database is assigned to another device | Stop it on that device and copy the complete package only after the final backup finishes. |
-| Only one of `latest.dump` or `latest.json` exists | Replace both with a complete known-good pair. Never edit either file. |
+| Neon cannot connect | Check internet access and the ignored `.env`; never paste the connection string into Git or support messages. |
 | Python environment is incomplete | Stop the app and run `./scripts/setup-local.sh --repair`. |
 | ROS image is missing | Run `./scripts/check-ros2-local.sh --build`. |
 | Flutter cannot find a browser | Open the printed URL manually; the launcher uses the web-server device. |
 
 The handoff package is ignored by Git and is not encrypted. It may contain API
-keys, password hashes, student work, analytics, and research records. Do not
-commit, email, publicly share, or leave it on an untrusted computer.
+keys, database credentials, and temporary account passwords. Do not commit,
+email, publicly share, or leave it on an untrusted computer.

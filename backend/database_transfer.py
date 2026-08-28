@@ -23,12 +23,19 @@ APPLICATION_TABLES = (
     "assignments",
     "study_sessions",
     "submissions",
+    "assignment_activities",
     "hint_interactions",
     "learning_events",
     "auth_sessions",
     "password_reset_tokens",
     "audit_events",
 )
+
+# V5.2 added this table after the original SQLite prototype and early local
+# PostgreSQL backups already existed.  Treat its absence in a source database
+# as an empty table so those backups remain recoverable.  The migrated target
+# must still contain the current table through Alembic.
+OPTIONAL_LEGACY_SOURCE_TABLES = frozenset({"assignment_activities"})
 
 
 class DatabaseTransferError(RuntimeError):
@@ -39,27 +46,45 @@ def _build_engine(database_url: str) -> Engine:
     return create_engine(normalize_database_url(database_url), pool_pre_ping=True)
 
 
-def _reflect_application_tables(engine: Engine) -> MetaData:
+def _reflect_application_tables(
+    engine: Engine,
+    *,
+    optional_missing: frozenset[str] = frozenset(),
+) -> MetaData:
     available = set(inspect(engine).get_table_names())
-    missing = set(APPLICATION_TABLES) - available
+    missing = set(APPLICATION_TABLES) - available - optional_missing
     if missing:
         raise DatabaseTransferError(
             "Database schema is incomplete; missing tables: "
             + ", ".join(sorted(missing))
         )
     metadata = MetaData()
-    metadata.reflect(bind=engine, only=APPLICATION_TABLES)
+    metadata.reflect(
+        bind=engine,
+        only=[name for name in APPLICATION_TABLES if name in available],
+    )
     return metadata
 
 
-def table_counts(engine: Engine) -> dict[str, int]:
-    metadata = _reflect_application_tables(engine)
+def table_counts(
+    engine: Engine,
+    *,
+    optional_missing: frozenset[str] = frozenset(),
+) -> dict[str, int]:
+    metadata = _reflect_application_tables(
+        engine,
+        optional_missing=optional_missing,
+    )
     with engine.connect() as connection:
         return {
-            table_name: int(
-                connection.execute(
-                    select(func.count()).select_from(metadata.tables[table_name])
-                ).scalar_one()
+            table_name: (
+                int(
+                    connection.execute(
+                        select(func.count()).select_from(metadata.tables[table_name])
+                    ).scalar_one()
+                )
+                if table_name in metadata.tables
+                else 0
             )
             for table_name in APPLICATION_TABLES
         }
@@ -91,9 +116,15 @@ def transfer_database(source_url: str, target_url: str) -> dict[str, object]:
     source_engine = _build_engine(source_url)
     target_engine = _build_engine(target_url)
     try:
-        source_metadata = _reflect_application_tables(source_engine)
+        source_metadata = _reflect_application_tables(
+            source_engine,
+            optional_missing=OPTIONAL_LEGACY_SOURCE_TABLES,
+        )
         target_metadata = _reflect_application_tables(target_engine)
-        source_counts = table_counts(source_engine)
+        source_counts = table_counts(
+            source_engine,
+            optional_missing=OPTIONAL_LEGACY_SOURCE_TABLES,
+        )
         target_counts = table_counts(target_engine)
         nonempty = {name: count for name, count in target_counts.items() if count}
         if nonempty:
@@ -106,9 +137,16 @@ def transfer_database(source_url: str, target_url: str) -> dict[str, object]:
             if target.dialect.name == "postgresql":
                 target.execute(text("SET CONSTRAINTS ALL DEFERRED"))
             for table_name in APPLICATION_TABLES:
-                source_table = source_metadata.tables[table_name]
                 target_table = target_metadata.tables[table_name]
-                rows = [dict(row) for row in source.execute(select(source_table)).mappings()]
+                source_table = source_metadata.tables.get(table_name)
+                rows = (
+                    [
+                        dict(row)
+                        for row in source.execute(select(source_table)).mappings()
+                    ]
+                    if source_table is not None
+                    else []
+                )
                 for batch in _batched(rows):
                     target.execute(target_table.insert(), batch)
             _reset_postgresql_sequences(target)
@@ -151,7 +189,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Copy an existing SQLite Robotics Lab database to PostgreSQL."
     )
-    parser.add_argument("--sqlite", required=True, type=Path)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--sqlite", type=Path)
+    source.add_argument("--source-url")
     parser.add_argument("--target-url", required=True)
     parser.add_argument("--report", type=Path)
     parser.add_argument(
@@ -161,11 +201,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.sqlite.is_file():
+    if args.sqlite is not None and not args.sqlite.is_file():
         raise DatabaseTransferError(f"SQLite source does not exist: {args.sqlite}")
 
     transfer = transfer_database_if_empty if args.if_empty else transfer_database
-    result = transfer(_sqlite_url(args.sqlite), args.target_url)
+    source_url = args.source_url or _sqlite_url(args.sqlite)
+    result = transfer(source_url, args.target_url)
     serialized = json.dumps(result, indent=2, sort_keys=True)
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)

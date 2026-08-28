@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -9,8 +10,9 @@ from database_transfer import (
     table_counts,
     transfer_database,
     transfer_database_if_empty,
+    main,
 )
-from models import Assignment, Submission, User
+from models import Assignment, AssignmentActivity, Submission, User
 
 
 def _database_url(path: Path) -> str:
@@ -68,19 +70,57 @@ def test_transfer_database_copies_all_rows_and_relationships(tmp_path):
                 "evidence": {"checks": [True]},
             },
         )
+        connection.execute(
+            AssignmentActivity.__table__.insert(),
+            {
+                "id": "activity-1",
+                "user_id": "user-1",
+                "assignment_id": assignment_id,
+                "assignment_version": 3,
+                "active_seconds": 120,
+            },
+        )
     source.dispose()
 
     result = transfer_database(source_url, target_url)
 
     assert result["status"] == "copied"
-    assert result["total_rows"] == 3
+    assert result["total_rows"] == 4
     assert table_counts(create_engine(target_url))["submissions"] == 1
+    assert table_counts(create_engine(target_url))["assignment_activities"] == 1
     target = create_engine(target_url)
     with target.connect() as connection:
         submission = connection.execute(select(Submission.__table__)).mappings().one()
         assert submission["assignment_version"] == 3
         assert submission["evidence"] == {"checks": [True]}
     target.dispose()
+
+
+def test_transfer_accepts_legacy_source_without_assignment_activities(tmp_path):
+    source_url = _create_database(tmp_path / "legacy-source.db")
+    target_url = _create_database(tmp_path / "target.db")
+    source = create_engine(source_url)
+    with source.begin() as connection:
+        AssignmentActivity.__table__.drop(connection)
+        connection.execute(
+            User.__table__.insert(),
+            {
+                "id": "legacy-user",
+                "login_id": "legacy-student",
+                "password_hash": "hashed",
+                "role": "student",
+                "is_active": True,
+                "is_demo": False,
+                "must_change_password": False,
+            },
+        )
+    source.dispose()
+
+    result = transfer_database(source_url, target_url)
+
+    assert result["status"] == "copied"
+    assert result["tables"]["users"] == 1
+    assert result["tables"]["assignment_activities"] == 0
 
 
 def test_transfer_database_refuses_to_merge_into_nonempty_target(tmp_path):
@@ -129,3 +169,21 @@ def test_transfer_database_if_empty_preserves_existing_target(tmp_path):
 
     assert result["status"] == "skipped_nonempty_target"
     assert result["tables"]["users"] == 1
+
+
+def test_command_accepts_database_source_url(tmp_path, monkeypatch):
+    source_url = _create_database(tmp_path / "source.db")
+    target_url = _create_database(tmp_path / "target.db")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "database_transfer.py",
+            "--source-url",
+            source_url,
+            "--target-url",
+            target_url,
+        ],
+    )
+
+    assert main() == 0

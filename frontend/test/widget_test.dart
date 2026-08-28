@@ -704,7 +704,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(home: LoginPage(onAuthenticated: (_) {})),
+      MaterialApp(home: LoginPage(onAuthenticated: (_) async {})),
     );
 
     expect(find.byKey(const Key('login-id-field')), findsOneWidget);

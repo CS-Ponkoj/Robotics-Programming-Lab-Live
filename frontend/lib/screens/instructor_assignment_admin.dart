@@ -78,7 +78,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
             icon: const Icon(Icons.insights_rounded),
           ),
           IconButton(
-            tooltip: 'Manage student accounts',
+            tooltip: 'Manage accounts',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -109,7 +109,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Your instructor login authorizes assignment and student '
+                  'Your instructor login authorizes assignment and account '
                   'management. '
                   'Publishing is blocked until the reference solution passes '
                   'the hidden grader.',
@@ -130,7 +130,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
                           );
                         },
                         icon: const Icon(Icons.manage_accounts_outlined),
-                        label: const Text('Manage student accounts'),
+                        label: const Text('Manage accounts'),
                       ),
                       FilledButton.tonalIcon(
                         onPressed: () {

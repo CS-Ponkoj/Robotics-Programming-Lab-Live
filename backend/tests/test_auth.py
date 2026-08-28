@@ -226,6 +226,56 @@ def test_instructor_creates_resets_and_deactivates_student(auth_client):
     ).status_code == 401
 
 
+def test_instructor_manages_instructor_accounts_without_locking_out_last_admin(
+    auth_client,
+):
+    primary = login(auth_client, "instructor", "instructor")
+    headers = bearer(primary["token"])
+
+    created = auth_client.post(
+        "/admin/instructors",
+        headers=headers,
+        json={
+            "login_id": "second-instructor",
+            "temporary_password": "Instructor-Password-4827",
+        },
+    )
+    assert created.status_code == 201
+    instructor_id = created.json()["user"]["id"]
+    login(auth_client, "second-instructor", "Instructor-Password-4827")
+
+    listed = auth_client.get("/admin/instructors", headers=headers)
+    assert listed.status_code == 200
+    assert {item["login_id"] for item in listed.json()["instructors"]} >= {
+        "instructor",
+        "second-instructor",
+    }
+
+    reset = auth_client.post(
+        f"/admin/instructors/{instructor_id}/reset-password",
+        headers=headers,
+        json={"temporary_password": "Replacement-Password-5938"},
+    )
+    assert reset.status_code == 200
+    login(auth_client, "second-instructor", "Replacement-Password-5938")
+
+    deactivated = auth_client.patch(
+        f"/admin/instructors/{instructor_id}",
+        headers=headers,
+        json={"active": False},
+    )
+    assert deactivated.status_code == 200
+    assert deactivated.json()["is_active"] is False
+
+    primary_id = primary["user"]["id"]
+    self_deactivation = auth_client.patch(
+        f"/admin/instructors/{primary_id}",
+        headers=headers,
+        json={"active": False},
+    )
+    assert self_deactivation.status_code == 409
+
+
 def test_forgot_password_sends_single_use_link_and_revokes_sessions(auth_client):
     instructor = login(auth_client, "instructor", "instructor")
     created = auth_client.post(

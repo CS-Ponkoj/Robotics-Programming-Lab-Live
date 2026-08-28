@@ -3,9 +3,10 @@
 ## Purpose
 
 V4.1 adds classroom-study evidence without changing assignment grading,
-solution protection, authentication, or the optional AI tutor. PostgreSQL is
-the source of truth locally and when hosted. SQLite remains an explicit
-disposable troubleshooting fallback.
+solution protection, authentication, or the optional AI tutor. The dedicated
+Neon PostgreSQL database `robotics_lab_staging` is the staging source of truth
+on every authorized computer. Local Docker PostgreSQL remains an explicit
+offline fallback, and SQLite remains a disposable troubleshooting fallback.
 
 ## Data flow
 
@@ -37,17 +38,18 @@ grading but is excluded from research dashboards and exports.
 
 - Student: account menu -> **My study progress**
 - Instructor: instructor studio -> **Research study dashboard**
-- Raw hosted database: Neon SQL Editor for authorized technical inspection
-- Raw local database: PostgreSQL tools connected to `127.0.0.1:5432`
+- Raw staging database: Neon SQL Editor for authorized technical inspection
+- Offline fallback database: PostgreSQL tools connected to `127.0.0.1:5432`
 - Export: student summary CSV, assignment attempts CSV, learning events CSV,
   or a three-sheet Excel workbook
 
-For local storage, table definitions, standard execution statuses, and event
-payload rules, see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). Verified
-PostgreSQL handoff dumps and their checksum manifests are kept directly in the
-ignored `local_handoff_package` folder and restored automatically before use.
-Assignment source data is human-readable in
-`backend/assignments/assignment_*.json`.
+For storage definitions, standard execution statuses, and event payload rules,
+see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). The ignored
+`local_handoff_package/.env` supplies the Neon connection on authorized
+computers, while `local_handoff_package/study_accounts.json` provides optional
+file-based account management. Verified PostgreSQL dumps in that folder are
+legacy recovery archives used only by the explicit local fallback. Assignment
+source data is human-readable in `backend/assignments/assignment_*.json`.
 
 ## Privacy and data quality
 

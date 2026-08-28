@@ -6,18 +6,36 @@ import 'package:iuse_demo/services/auth_api.dart';
 
 const _studentAdminTimeout = Duration(seconds: 20);
 
-Future<List<Map<String, dynamic>>> fetchStudents() async {
-  final response = await http
-      .get(
-        Uri.parse('$apiBaseUrl/admin/students'),
-        headers: AuthApi.authorizedHeaders(),
-      )
-      .timeout(_studentAdminTimeout);
-  _requireSuccess(response);
-  final data = jsonDecode(response.body) as Map<String, dynamic>;
-  return (data['students'] as List)
-      .map((value) => Map<String, dynamic>.from(value as Map))
-      .toList();
+Future<List<Map<String, dynamic>>> fetchAccounts() async {
+  final responses = await Future.wait([
+    http
+        .get(
+          Uri.parse('$apiBaseUrl/admin/students'),
+          headers: AuthApi.authorizedHeaders(),
+        )
+        .timeout(_studentAdminTimeout),
+    http
+        .get(
+          Uri.parse('$apiBaseUrl/admin/instructors'),
+          headers: AuthApi.authorizedHeaders(),
+        )
+        .timeout(_studentAdminTimeout),
+  ]);
+  for (final response in responses) {
+    _requireSuccess(response);
+  }
+  final students = jsonDecode(responses[0].body) as Map<String, dynamic>;
+  final instructors = jsonDecode(responses[1].body) as Map<String, dynamic>;
+  final accounts = [
+    ...(students['students'] as List),
+    ...(instructors['instructors'] as List),
+  ].map((value) => Map<String, dynamic>.from(value as Map)).toList();
+  accounts.sort(
+    (left, right) => (left['login_id'] as String).compareTo(
+      right['login_id'] as String,
+    ),
+  );
+  return accounts;
 }
 
 Future<Map<String, dynamic>> fetchEmailStatus() async {
@@ -42,8 +60,9 @@ Future<void> sendTestEmail(String recipient) async {
   _requireSuccess(response);
 }
 
-Future<Map<String, dynamic>> createStudent({
+Future<Map<String, dynamic>> createAccount({
   required String loginId,
+  required String role,
   String? temporaryPassword,
   String? email,
   String? participantCode,
@@ -51,7 +70,8 @@ Future<Map<String, dynamic>> createStudent({
 }) async {
   final response = await http
       .post(
-        Uri.parse('$apiBaseUrl/admin/students'),
+        Uri.parse(
+            '$apiBaseUrl/admin/${role == 'instructor' ? 'instructors' : 'students'}'),
         headers: AuthApi.authorizedHeaders(json: true),
         body: jsonEncode({
           'login_id': loginId,
@@ -68,15 +88,18 @@ Future<Map<String, dynamic>> createStudent({
   return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
 }
 
-Future<Map<String, dynamic>> updateStudent(
-  String studentId, {
+Future<Map<String, dynamic>> updateAccount(
+  String accountId, {
+  required String role,
   String? email,
   String? participantCode,
   bool? active,
 }) async {
   final response = await http
       .patch(
-        Uri.parse('$apiBaseUrl/admin/students/$studentId'),
+        Uri.parse(
+          '$apiBaseUrl/admin/${role == 'instructor' ? 'instructors' : 'students'}/$accountId',
+        ),
         headers: AuthApi.authorizedHeaders(json: true),
         body: jsonEncode({
           if (email != null) 'email': _nullIfEmpty(email),
@@ -90,14 +113,17 @@ Future<Map<String, dynamic>> updateStudent(
   return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
 }
 
-Future<Map<String, dynamic>> resetStudentPassword(
-  String studentId, {
+Future<Map<String, dynamic>> resetAccountPassword(
+  String accountId, {
+  required String role,
   String? temporaryPassword,
   bool sendEmail = false,
 }) async {
   final response = await http
       .post(
-        Uri.parse('$apiBaseUrl/admin/students/$studentId/reset-password'),
+        Uri.parse(
+          '$apiBaseUrl/admin/${role == 'instructor' ? 'instructors' : 'students'}/$accountId/reset-password',
+        ),
         headers: AuthApi.authorizedHeaders(json: true),
         body: jsonEncode({
           if (temporaryPassword != null && temporaryPassword.isNotEmpty)

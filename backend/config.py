@@ -1,6 +1,7 @@
 from functools import lru_cache
 import os
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,6 +23,8 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     database_url: str = f"sqlite:///{(BASE_DIR / 'robotics_lab.db').as_posix()}"
+    neon_database_url: str | None = None
+    neon_database_name: str = "robotics_lab_staging"
     auto_create_schema: bool = True
     redis_url: str = "redis://127.0.0.1:6379/0"
     openai_api_key: str | None = None
@@ -34,7 +37,9 @@ class Settings(BaseSettings):
     enable_email_features: bool = False
     demo_student_password: str = "student"
     demo_instructor_password: str = "instructor"
-    study_accounts_file: Path = BASE_DIR / "data" / "study_accounts.json"
+    study_accounts_file: Path = (
+        BASE_DIR.parent / "local_handoff_package" / "study_accounts.json"
+    )
     public_app_url: str = "http://127.0.0.1:8080"
     auth_session_hours: int = 12
     password_reset_minutes: int = 30
@@ -68,6 +73,15 @@ class Settings(BaseSettings):
             for origin in self.allowed_origins.split(",")
             if origin.strip()
         ]
+
+    @property
+    def cloud_database_url(self) -> str | None:
+        if not self.neon_database_url:
+            return None
+        parsed = urlsplit(self.neon_database_url)
+        return urlunsplit(
+            parsed._replace(path=f"/{self.neon_database_name}")
+        )
 
     def validate_runtime(self) -> None:
         if self.environment.lower() != "production":

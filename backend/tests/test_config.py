@@ -10,3 +10,19 @@ def test_get_settings_uses_configured_env_file(tmp_path, monkeypatch):
         assert get_settings().openai_hint_model == "package-test-model"
     finally:
         get_settings.cache_clear()
+
+
+def test_cloud_database_url_uses_dedicated_staging_database():
+    from config import Settings
+
+    settings = Settings(
+        neon_database_url=(
+            "postgresql://account:secret@example.neon.tech/neondb"
+            "?sslmode=require&channel_binding=require"
+        )
+    )
+
+    assert settings.cloud_database_url == (
+        "postgresql://account:secret@example.neon.tech/robotics_lab_staging"
+        "?sslmode=require&channel_binding=require"
+    )

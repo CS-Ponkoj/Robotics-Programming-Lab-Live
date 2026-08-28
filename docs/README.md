@@ -31,6 +31,7 @@ and verification records.
 ## SQA evidence
 
 - [Master SQA checklist](sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
+- [Neon and account management SQA report](sqa/NEON_ACCOUNT_MANAGEMENT_SQA_REPORT_2026-08-28.md)
 - [Ubuntu local support SQA report](sqa/UBUNTU_LOCAL_SUPPORT_SQA_REPORT_2026-08-28.md)
 - [Automatic local database backup SQA report](sqa/AUTOMATIC_LOCAL_DATABASE_BACKUP_SQA_REPORT_2026-08-26.md)
 - [V5.2 Basic Analytics SQA report](sqa/V5_2_BASIC_ANALYTICS_SQA_REPORT_2026-08-26.md)

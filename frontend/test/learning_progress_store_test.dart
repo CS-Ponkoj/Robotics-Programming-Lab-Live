@@ -44,6 +44,26 @@ void main() {
     expect(store.bestScores[1], 100);
   });
 
+  test('persistent progress is isolated by authenticated user', () async {
+    final storage = InMemoryProgressStorage();
+    final firstStudent = LearningProgressStore();
+    await firstStudent.loadForUser('student-a', storage: storage);
+    await firstStudent.recordAttempt(5, 100);
+    await firstStudent.recordAttempt(6, 100);
+
+    final secondStudent = LearningProgressStore();
+    await secondStudent.loadForUser('student-b', storage: storage);
+    expect(secondStudent.attemptCounts, isEmpty);
+    expect(secondStudent.bestScores, isEmpty);
+
+    await secondStudent.recordAttempt(1, 50);
+
+    final restoredFirstStudent = LearningProgressStore();
+    await restoredFirstStudent.loadForUser('student-a', storage: storage);
+    expect(restoredFirstStudent.bestScores, {5: 100, 6: 100});
+    expect(restoredFirstStudent.attemptCounts, {5: 1, 6: 1});
+  });
+
   test('demo progress is memory-only and leaves saved student data unchanged',
       () async {
     final persistentStorage = InMemoryProgressStorage();

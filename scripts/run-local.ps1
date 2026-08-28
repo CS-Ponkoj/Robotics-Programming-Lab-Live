@@ -1,6 +1,7 @@
 param(
     [string]$DatabaseUrl = "",
     [switch]$UseSqlite,
+    [switch]$UseLocalPostgres,
     [switch]$EnableAi,
     [int]$FrontendPort = 8080,
     [int]$BackendPort = 5000,
@@ -44,12 +45,37 @@ if (Test-Path -LiteralPath $stateFile) {
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 $localDatabaseSession = $null
 
-if ($UseSqlite -and -not [string]::IsNullOrWhiteSpace($DatabaseUrl)) {
-    throw "Use either -UseSqlite or -DatabaseUrl, not both."
+if (($UseSqlite -and $UseLocalPostgres) -or
+    ($UseSqlite -and -not [string]::IsNullOrWhiteSpace($DatabaseUrl)) -or
+    ($UseLocalPostgres -and -not [string]::IsNullOrWhiteSpace($DatabaseUrl))) {
+    throw "Use only one database option: -UseSqlite, -UseLocalPostgres, or -DatabaseUrl."
+}
+if (-not $UseSqlite -and -not $UseLocalPostgres -and
+    [string]::IsNullOrWhiteSpace($DatabaseUrl) -and
+    (Test-Path -LiteralPath $privateConfigPath)) {
+    $previousConfigPath = [Environment]::GetEnvironmentVariable("ROBOTICS_ENV_FILE", "Process")
+    [Environment]::SetEnvironmentVariable("ROBOTICS_ENV_FILE", $privateConfigPath, "Process")
+    try {
+        Push-Location $backendRoot
+        try {
+            $configuredCloudUrl = (& $python -c "from config import get_settings; print(get_settings().cloud_database_url or '')" 2>$null | Select-Object -Last 1)
+        } finally {
+            Pop-Location
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "The configured Neon database URL could not be resolved."
+        }
+        if (-not [string]::IsNullOrWhiteSpace($configuredCloudUrl)) {
+            $DatabaseUrl = $configuredCloudUrl.Trim()
+            Write-Output "Using the configured Neon staging database."
+        }
+    } finally {
+        [Environment]::SetEnvironmentVariable("ROBOTICS_ENV_FILE", $previousConfigPath, "Process")
+    }
 }
 if ($UseSqlite) {
     $DatabaseUrl = "sqlite:///robotics_lab_staging.db"
-} elseif ([string]::IsNullOrWhiteSpace($DatabaseUrl)) {
+} elseif ($UseLocalPostgres -or [string]::IsNullOrWhiteSpace($DatabaseUrl)) {
     Import-Module (Join-Path $PSScriptRoot "local-database.psm1") -Force
     $localDatabaseSession = Start-RoboticsLocalPostgres `
         -RepositoryRoot $repositoryRoot `
@@ -284,7 +310,13 @@ try {
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8
 
     $databaseDescription = if (-not $localDatabaseSession) {
-        if ($DatabaseUrl.StartsWith("sqlite")) { "SQLite fallback" } else { "externally configured" }
+        if ($DatabaseUrl.StartsWith("sqlite")) {
+            "SQLite fallback"
+        } elseif ($DatabaseUrl.Contains("neon.tech")) {
+            "Neon staging PostgreSQL"
+        } else {
+            "externally configured PostgreSQL"
+        }
     } elseif ($localDatabaseSession.BackupRoot.Equals(
         $handoffDatabaseRoot,
         [System.StringComparison]::OrdinalIgnoreCase

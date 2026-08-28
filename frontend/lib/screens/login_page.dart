@@ -10,7 +10,7 @@ class LoginPage extends StatefulWidget {
     required this.onAuthenticated,
   });
 
-  final ValueChanged<AuthenticatedUser> onAuthenticated;
+  final Future<void> Function(AuthenticatedUser) onAuthenticated;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -51,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
         _loginIdController.text.trim(),
         _passwordController.text,
       );
-      widget.onAuthenticated(session.user);
+      await widget.onAuthenticated(session.user);
     } on Object catch (error) {
       if (mounted) {
         setState(() => _error = _displayError(error));
@@ -70,7 +70,7 @@ class _LoginPageState extends State<LoginPage> {
     });
     try {
       final session = await AuthApi.demoLogin();
-      widget.onAuthenticated(session.user);
+      await widget.onAuthenticated(session.user);
     } on Object catch (error) {
       if (mounted) {
         setState(() => _error = _displayError(error));

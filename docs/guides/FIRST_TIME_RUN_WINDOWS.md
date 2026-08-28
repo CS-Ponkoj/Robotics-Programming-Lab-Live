@@ -50,13 +50,10 @@ Set-Location .\Robotics-Programming-Lab-Staging
 git config core.longpaths true
 ```
 
-If you want the same accounts, attempts, analytics, and private settings, stop
-the source app and copy its complete `local_handoff_package` folder into the
-root of the clone. Otherwise the clone starts with fresh demo data.
-
-The verified PostgreSQL dump format is shared with Ubuntu. You can move a
-complete package between the supported Windows and Ubuntu workflows after a
-clean stop.
+Copy the private `local_handoff_package` folder into the root of the clone. Its
+ignored `.env` connects the clone to the shared Neon staging database, and its
+`study_accounts.json` supports file-based account changes. Never commit or
+share this folder.
 
 ## 3. Prepare the computer
 
@@ -91,29 +88,23 @@ Open `http://127.0.0.1:8180/app`. Stop safely with:
 .\scripts\stop-local.ps1
 ```
 
-The managed launcher backs up changed PostgreSQL data every 10 minutes while
-the stack is running. Closing the browser does not close the backend or create a
-device handoff. Before changing computers, always run `stop-local.ps1` and wait
-for `local_handoff_package` to finish copying or synchronizing.
+Closing the browser does not close the backend. Run `stop-local.ps1` before
+updating the repository or switching work to another computer.
 
-A clean stop validates and saves PostgreSQL directly to:
+A Neon-configured package normally contains:
 
 ```text
 local_handoff_package/
 ├── .env
-├── latest.dump
-├── latest.json
-├── previous.dump
-├── previous.json
-├── history/              optional older recovery files
-└── package.json
+├── study_accounts.json
+├── study_accounts_import_report.json  generated after import
+└── legacy dump files                    optional recovery archives
 ```
 
-The live PostgreSQL Docker volume remains computer-local. The files above are
-the portable backup and configuration used directly by the app. Do not edit
-the dump or manifest, and never run the same copied package on two computers at
-once. Stop first, wait for file copying or OneDrive synchronization to finish,
-and then start on the other computer.
+The database itself is stored in Neon, so authorized computers see the same
+accounts, attempts, and analytics. Edit `study_accounts.json` only for account
+management; never edit legacy dump files. Use `-UseLocalPostgres` only for an
+intentional offline fallback.
 
 ## Optional verification
 
@@ -129,13 +120,12 @@ and then start on the other computer.
 | `git`, `py`, `docker`, or `flutter` is not found | Install that prerequisite, reopen PowerShell, and verify its version. |
 | Docker is unavailable | Start Docker Desktop and select Linux containers. |
 | A port is in use | Run `stop-local.ps1`, or choose unused port parameters. |
-| Database is assigned to another device | Stop it there and wait for the package to finish copying or syncing. |
-| Only one of `latest.dump` or `latest.json` exists | Restore the complete pair from a known-good package copy. |
+| Neon cannot connect | Check internet access and the ignored `.env`; do not paste the connection string into Git or support messages. |
 | An old `local_database_backups` folder exists | It is obsolete. Preserve unique old files under `local_handoff_package/history`, then use only the complete handoff package. |
 | Python environment is incomplete | Stop the app, then run `setup-local.ps1 -Repair`. |
 | ROS grading image is missing | Run the ROS image build command from step 4. |
 | Flutter reports a locked build directory | Use `run-local.ps1`; do not run Flutter directly in the OneDrive source folder. |
 
 The package is ignored by Git and is not encrypted. It may contain API keys,
-password hashes, student work, analytics, and research records. Do not commit,
-email, publicly share, or leave it on an untrusted computer.
+database credentials, and temporary account passwords. Do not commit, email,
+publicly share, or leave it on an untrusted computer.

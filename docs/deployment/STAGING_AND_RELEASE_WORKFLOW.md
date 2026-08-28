@@ -40,17 +40,11 @@ Run the complete application:
 ./scripts/run-local.sh
 ```
 
-This starts local PostgreSQL 17, the dedicated sandbox, API, and Flutter web
-application. Python and Flutter generated files stay outside the clone in the
-operating system's user-data directory. The
-live PostgreSQL Docker volume remains computer-local. Every clean stop creates
-a verified logical backup directly in ignored `local_handoff_package`. The
-same folder also supplies the backend `.env`, so a complete package can be
-copied into a fresh clone without changing the normal launcher command.
-The launcher also restores the verified dump after same-device Docker volume
-loss when the application schema is missing.
+This connects to the dedicated Neon `robotics_lab_staging` database and starts
+the sandbox, API, and Flutter web application. Python and Flutter generated
+files stay outside the clone. The ignored `local_handoff_package` supplies the
+Neon connection, optional AI configuration, and editable account-import JSON.
 AI is off. To test AI deliberately, use `-EnableAi`. To use an external staging
-database, pass its connection string through `-DatabaseUrl`.
 The launcher refuses to reuse ports already owned by an older project process;
 stop that process or provide different `-FrontendPort`, `-BackendPort`, and
 `-SandboxPort` values.
@@ -65,14 +59,10 @@ Stop the managed processes:
 ./scripts/stop-local.sh
 ```
 
-Do not close Docker or switch computers before this command finishes. Wait for
-the complete `local_handoff_package` to finish copying or synchronizing. The device lock blocks
-ordinary startup on another computer until the first computer stops cleanly.
-
-The local launcher also saves changed PostgreSQL data every 10 minutes while it
-is running. This protects recent work but does not release the device lock.
-Closing the browser is not a handoff; the explicit stop command remains
-mandatory before another computer starts the package.
+Closing the browser is not enough; use the stop command to end the managed API,
+sandbox, and Flutter processes. Neon keeps the shared data. Use
+`-UseLocalPostgres` or `--use-local-postgres` only when intentionally testing the
+legacy offline fallback and its backup/device-lock workflow.
 
 Run the full automated SQA gate:
 

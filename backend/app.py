@@ -15,7 +15,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from account_sync import seed_demo_accounts, sync_accounts_from_json
+from account_sync import (
+    active_instructor_count,
+    seed_demo_accounts,
+    sync_accounts_from_json,
+)
 from assignment_repository import (
     AssignmentRepository,
     to_admin_payload,
@@ -1780,6 +1784,201 @@ def create_app(
         record_audit(
             session,
             action="student.password_reset",
+            resource_type="user",
+            resource_id=user.id,
+            actor_user_id=actor.id if actor else None,
+            details={"login_id": user.login_id, "email_sent": email_sent},
+        )
+        session.refresh(user)
+        return {
+            "user": admin_user_payload(user),
+            "temporary_password": temporary_password,
+            "email_sent": email_sent,
+        }
+
+    @application.get("/admin/instructors")
+    def admin_instructors(
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        instructors = session.scalars(
+            select(User).where(User.role == "instructor").order_by(User.login_id)
+        ).all()
+        return {
+            "instructors": [admin_user_payload(user) for user in instructors]
+        }
+
+    @application.post(
+        "/admin/instructors",
+        response_model=AdminStudentCreated,
+        status_code=201,
+    )
+    def admin_create_instructor(
+        body: AdminStudentCreate,
+        request: Request,
+        session: Session = Depends(session_dependency),
+        actor: User | None = Depends(admin_dependency),
+    ):
+        if body.participant_code:
+            raise HTTPException(400, "Instructor accounts cannot have participant codes.")
+        if body.send_invitation_email and not request.app.state.settings.enable_email_features:
+            raise HTTPException(404, "Not found.")
+        email = normalize_email(body.email)
+        if email and ("@" not in email or email.startswith("@") or email.endswith("@")):
+            raise HTTPException(400, "Enter a valid email address.")
+        if body.send_invitation_email and not email:
+            raise HTTPException(400, "An email address is required for invitations.")
+        email_service = EmailService(
+            request.app.state.settings, request.app.state.email_outbox
+        )
+        if body.send_invitation_email and not email_service.configured:
+            raise HTTPException(
+                503,
+                "Real email delivery is not configured. Add SMTP settings "
+                "to local_handoff_package/.env and restart the backend.",
+            )
+        temporary_password = body.temporary_password or generate_temporary_password()
+        try:
+            user = create_user(
+                session,
+                login_id=body.login_id,
+                password=temporary_password,
+                role="instructor",
+                email=email,
+                participant_code=None,
+                is_active=body.active,
+                must_change_password=body.send_invitation_email,
+                created_by=actor.id if actor else None,
+            )
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+
+        email_sent = False
+        if body.send_invitation_email:
+            try:
+                email_sent = send_password_email(
+                    request, session, user, purpose="account_activation"
+                )
+            except Exception as error:
+                user.is_active = False
+                session.commit()
+                raise HTTPException(
+                    502,
+                    "The account was created but the invitation email failed. "
+                    "The account was disabled.",
+                ) from error
+        record_audit(
+            session,
+            action="instructor.created",
+            resource_type="user",
+            resource_id=user.id,
+            actor_user_id=actor.id if actor else None,
+            details={"login_id": user.login_id, "invitation_email": email_sent},
+        )
+        return {
+            "user": admin_user_payload(user),
+            "temporary_password": (
+                None if body.send_invitation_email else temporary_password
+            ),
+            "email_sent": email_sent,
+        }
+
+    @application.patch(
+        "/admin/instructors/{instructor_id}",
+        response_model=AdminUserResponse,
+    )
+    def admin_update_instructor(
+        instructor_id: str,
+        body: AdminStudentUpdate,
+        session: Session = Depends(session_dependency),
+        actor: User | None = Depends(admin_dependency),
+    ):
+        user = session.get(User, instructor_id)
+        if user is None or user.role != "instructor":
+            raise HTTPException(404, "Instructor account not found.")
+        if body.participant_code:
+            raise HTTPException(400, "Instructor accounts cannot have participant codes.")
+        if body.active is False:
+            if actor is not None and actor.id == user.id:
+                raise HTTPException(
+                    409, "Sign in with another instructor account to deactivate this account."
+                )
+            if active_instructor_count(session) <= 1:
+                raise HTTPException(409, "The last active instructor cannot be disabled.")
+        if "email" in body.model_fields_set:
+            email = normalize_email(body.email)
+            if email and ("@" not in email or email.startswith("@") or email.endswith("@")):
+                raise HTTPException(400, "Enter a valid email address.")
+            duplicate = (
+                session.scalar(
+                    select(User).where(User.email == email, User.id != user.id)
+                )
+                if email
+                else None
+            )
+            if duplicate is not None:
+                raise HTTPException(409, "Email address already exists.")
+            user.email = email
+        if body.active is not None:
+            user.is_active = body.active
+        session.commit()
+        if body.active is False:
+            revoke_user_sessions(session, user.id)
+        record_audit(
+            session,
+            action="instructor.updated",
+            resource_type="user",
+            resource_id=user.id,
+            actor_user_id=actor.id if actor else None,
+            details={"login_id": user.login_id, "active": user.is_active},
+        )
+        session.refresh(user)
+        return admin_user_payload(user)
+
+    @application.post(
+        "/admin/instructors/{instructor_id}/reset-password",
+        response_model=AdminStudentCreated,
+    )
+    def admin_reset_instructor_password(
+        instructor_id: str,
+        body: AdminPasswordReset,
+        request: Request,
+        session: Session = Depends(session_dependency),
+        actor: User | None = Depends(admin_dependency),
+    ):
+        user = session.get(User, instructor_id)
+        if user is None or user.role != "instructor":
+            raise HTTPException(404, "Instructor account not found.")
+        if body.send_email:
+            if not request.app.state.settings.enable_email_features:
+                raise HTTPException(404, "Not found.")
+            if not user.email:
+                raise HTTPException(400, "The instructor has no email address.")
+            email_service = EmailService(
+                request.app.state.settings, request.app.state.email_outbox
+            )
+            if not email_service.configured:
+                raise HTTPException(
+                    503,
+                    "Real email delivery is not configured. Add SMTP settings "
+                    "to local_handoff_package/.env and restart the backend.",
+                )
+            try:
+                email_sent = send_password_email(
+                    request, session, user, purpose="password_reset"
+                )
+            except Exception as error:
+                raise HTTPException(502, "Password reset email delivery failed.") from error
+            temporary_password = None
+        else:
+            temporary_password = (
+                body.temporary_password or generate_temporary_password()
+            )
+            change_password(session, user, temporary_password)
+            email_sent = False
+        record_audit(
+            session,
+            action="instructor.password_reset",
             resource_type="user",
             resource_id=user.id,
             actor_user_id=actor.id if actor else None,

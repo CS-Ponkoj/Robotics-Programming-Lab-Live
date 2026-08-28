@@ -23,39 +23,34 @@ These records are connected by IDs. For example, a submission contains the
 assignment ID and exact assignment version, so results remain interpretable
 after an instructor updates the assignment.
 
-## Where local data is stored
+## Where data is stored
 
 | Data | Local location | Format | Human-readable? |
 |---|---|---|---|
 | Assignment source definitions | `backend/assignments/assignment_1.json` through `assignment_6.json` | JSON | Yes, open directly in VS Code |
-| Active local application database | Computer-local Docker volume `robotics-lab-local_robotics_postgres_data` | PostgreSQL 17 | Use the application or an authorized PostgreSQL client |
-| Cross-device database handoff | `local_handoff_package/latest.dump` plus `latest.json` | Verified PostgreSQL logical backup | Restored automatically by `scripts/run-local.ps1` |
+| Active staging application database | Neon database `robotics_lab_staging` | PostgreSQL | Use the application or authorized Neon SQL Editor |
 | Private local configuration | `local_handoff_package/.env` | Ignored environment settings | Read directly by the launcher and backend |
 | Legacy local source preserved during first migration | `backend/robotics_lab_staging.db` | SQLite | Read-only; not used by the default launcher after migration |
-| Student editor draft | Browser storage, keyed by assignment ID and assignment version | Local JSON preferences | View through the matching assignment workspace; older-version drafts are ignored |
-| Optional prototype account import | `backend/data/study_accounts.json` | JSON | Yes, but it can contain temporary passwords and is ignored by Git |
+| Student editor draft | Browser storage, keyed by authenticated user, assignment ID, and assignment version | Local JSON preferences | View through the matching assignment workspace; another login and older versions are isolated |
+| Optional prototype account import | `local_handoff_package/study_accounts.json` | JSON | Yes, but it can contain temporary passwords and is ignored by Git |
 | Safe account-import example | `backend/data/study_accounts.example.json` | JSON | Yes |
 | Research exports | Downloaded from the instructor Research Dashboard | CSV or Excel | Yes |
 | Data definitions and validation | `backend/data_contracts.py` | Python | Yes; this is the executable contract |
 | Database table definitions | `backend/models.py` | Python/SQLAlchemy | Yes |
 | Database schema history | `backend/migrations/versions/` | Alembic/Python | Yes |
 
-The active PostgreSQL files stay inside Docker and are never synchronized. The
-managed backup worker exports changed PostgreSQL data every 10 minutes.
-`scripts/stop-local.ps1` exports the final complete validated dump, checksum
-manifest, and previous backup directly into `local_handoff_package`. The launcher
-restores the verified dump for a new device or a recreated same-device volume
-with no application schema. PostgreSQL is the runtime source of truth. Never
-edit a dump or live database file. The package is refreshed automatically and
-again by every clean stop.
+Neon PostgreSQL is the staging source of truth. Authorized computers connect to
+the same database through the ignored `.env`; OneDrive and Git never carry the
+live database. Old local PostgreSQL dumps remain recovery archives only. Never
+edit a dump or database file directly.
 
 ## How to see local data
 
 1. Start the staging application with `scripts/run-local.ps1`.
 2. Use **My study progress** as a student or **Research study dashboard** as an
    instructor.
-3. For authorized technical inspection, connect a trusted PostgreSQL client to
-   `127.0.0.1:5432`, database `robotics_lab`, while the app is running.
+3. For authorized technical inspection, use the Neon SQL Editor for the
+   `robotics_lab_staging` database.
 
 For ordinary study review, the safer option is the application itself:
 

@@ -10,7 +10,7 @@ class StudentAccountsPage extends StatefulWidget {
 }
 
 class _StudentAccountsPageState extends State<StudentAccountsPage> {
-  List<Map<String, dynamic>> _students = [];
+  List<Map<String, dynamic>> _accounts = [];
   Map<String, dynamic> _emailStatus = const {'configured': false};
   bool _loading = true;
   String? _error;
@@ -27,13 +27,13 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
       _error = null;
     });
     try {
-      final students = await fetchStudents();
+      final accounts = await fetchAccounts();
       final emailStatus = instructorEmailToolsEnabled
           ? await fetchEmailStatus()
           : const <String, dynamic>{'configured': false};
       if (mounted) {
         setState(() {
-          _students = students;
+          _accounts = accounts;
           _emailStatus = emailStatus;
         });
       }
@@ -48,13 +48,14 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     }
   }
 
-  Future<void> _createStudent() async {
+  Future<void> _createAccount() async {
     final loginController = TextEditingController();
     final participantController = TextEditingController();
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool sendEmail = false;
+    String role = 'student';
     final emailConfigured = _emailStatus['configured'] == true;
     bool saving = false;
     String? dialogError;
@@ -74,12 +75,14 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                 dialogError = null;
               });
               try {
-                final created = await createStudent(
+                final created = await createAccount(
                   loginId: loginController.text.trim(),
+                  role: role,
                   temporaryPassword: sendEmail ? null : passwordController.text,
                   email:
                       instructorEmailToolsEnabled ? emailController.text : null,
-                  participantCode: participantController.text,
+                  participantCode:
+                      role == 'student' ? participantController.text : null,
                   sendInvitationEmail: sendEmail,
                 );
                 if (dialogContext.mounted) {
@@ -94,7 +97,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
             }
 
             return AlertDialog(
-              title: const Text('Create student account'),
+              title: const Text('Create account'),
               content: SizedBox(
                 width: 520,
                 child: Form(
@@ -108,7 +111,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                           autofocus: true,
                           enabled: !saving,
                           decoration: const InputDecoration(
-                            labelText: 'Student login ID',
+                            labelText: 'Login ID',
                             border: OutlineInputBorder(),
                           ),
                           validator: (value) =>
@@ -117,14 +120,39 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                   : null,
                         ),
                         const SizedBox(height: 14),
-                        TextFormField(
-                          controller: participantController,
-                          enabled: !saving,
+                        DropdownButtonFormField<String>(
+                          value: role,
                           decoration: const InputDecoration(
-                            labelText: 'Participant code (optional)',
+                            labelText: 'Account role',
                             border: OutlineInputBorder(),
                           ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'student',
+                              child: Text('Student'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'instructor',
+                              child: Text('Instructor'),
+                            ),
+                          ],
+                          onChanged: saving
+                              ? null
+                              : (value) => setDialogState(
+                                    () => role = value ?? 'student',
+                                  ),
                         ),
+                        if (role == 'student') ...[
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: participantController,
+                            enabled: !saving,
+                            decoration: const InputDecoration(
+                              labelText: 'Participant code (optional)',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ],
                         if (instructorEmailToolsEnabled) ...[
                           const SizedBox(height: 14),
                           TextFormField(
@@ -222,7 +250,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     if (result != null) {
       await _load();
       if (mounted) {
-        await _showCredentials(result, title: 'Student account created');
+        await _showCredentials(result, title: 'Account created');
       }
     }
   }
@@ -255,7 +283,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                 ),
               ] else if (emailSent)
                 const Text(
-                  'A one-time password setup link was sent to the student.',
+                  'A one-time password setup link was sent to the account owner.',
                 ),
             ],
           ),
@@ -270,7 +298,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     );
   }
 
-  Future<void> _editStudent(Map<String, dynamic> student) async {
+  Future<void> _editAccount(Map<String, dynamic> student) async {
     final emailController =
         TextEditingController(text: student['email']?.toString() ?? '');
     final participantController = TextEditingController(
@@ -294,11 +322,14 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
               dialogError = null;
             });
             try {
-              await updateStudent(
+              await updateAccount(
                 student['id'] as String,
+                role: student['role'] as String,
                 email:
                     instructorEmailToolsEnabled ? emailController.text : null,
-                participantCode: participantController.text,
+                participantCode: student['role'] == 'student'
+                    ? participantController.text
+                    : null,
               );
               if (dialogContext.mounted) {
                 Navigator.of(dialogContext).pop(true);
@@ -320,14 +351,15 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextFormField(
-                      controller: participantController,
-                      enabled: !saving,
-                      decoration: const InputDecoration(
-                        labelText: 'Participant code',
-                        border: OutlineInputBorder(),
+                    if (student['role'] == 'student')
+                      TextFormField(
+                        controller: participantController,
+                        enabled: !saving,
+                        decoration: const InputDecoration(
+                          labelText: 'Participant code',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                    ),
                     if (instructorEmailToolsEnabled) ...[
                       const SizedBox(height: 14),
                       TextFormField(
@@ -412,8 +444,9 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
               dialogError = null;
             });
             try {
-              final value = await resetStudentPassword(
+              final value = await resetAccountPassword(
                 student['id'] as String,
+                role: student['role'] as String,
                 temporaryPassword: sendEmail ? null : passwordController.text,
                 sendEmail: sendEmail,
               );
@@ -495,7 +528,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isActive ? 'Deactivate student?' : 'Reactivate student?'),
+        title: Text(isActive ? 'Deactivate account?' : 'Reactivate account?'),
         content: Text(
           isActive
               ? '${student['login_id']} will be signed out and unable to log in. '
@@ -518,8 +551,9 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
       return;
     }
     try {
-      await updateStudent(
+      await updateAccount(
         student['id'] as String,
+        role: student['role'] as String,
         active: !isActive,
       );
       await _load();
@@ -637,7 +671,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     final emailConfigured = _emailStatus['configured'] == true;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Student accounts'),
+        title: const Text('Account management'),
         actions: [
           IconButton(
             tooltip: 'Import study_accounts.json',
@@ -645,8 +679,8 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
             icon: const Icon(Icons.sync_rounded),
           ),
           IconButton(
-            tooltip: 'Create student',
-            onPressed: _loading ? null : _createStudent,
+            tooltip: 'Create account',
+            onPressed: _loading ? null : _createAccount,
             icon: const Icon(Icons.person_add_alt_1_rounded),
           ),
         ],
@@ -660,7 +694,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Study participant access',
+                  'Student and instructor access',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
@@ -722,18 +756,18 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                 Expanded(
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
-                      : _students.isEmpty
+                      : _accounts.isEmpty
                           ? const Center(
-                              child: Text('No student accounts found.'),
+                              child: Text('No accounts found.'),
                             )
                           : RefreshIndicator(
                               onRefresh: _load,
                               child: ListView.separated(
-                                itemCount: _students.length,
+                                itemCount: _accounts.length,
                                 separatorBuilder: (_, __) =>
                                     const SizedBox(height: 8),
                                 itemBuilder: (context, index) {
-                                  final student = _students[index];
+                                  final student = _accounts[index];
                                   final active =
                                       student['is_active'] as bool? ?? false;
                                   return Card(
@@ -756,6 +790,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                           Text(student['login_id'] as String),
                                       subtitle: Text(
                                         [
+                                          student['role'],
                                           student['participant_code'],
                                           if (instructorEmailToolsEnabled)
                                             student['email'],
@@ -772,7 +807,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                         onSelected: (value) {
                                           switch (value) {
                                             case 'edit':
-                                              _editStudent(student);
+                                              _editAccount(student);
                                             case 'reset':
                                               _resetPassword(student);
                                             case 'active':
@@ -810,9 +845,9 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _loading ? null : _createStudent,
+        onPressed: _loading ? null : _createAccount,
         icon: const Icon(Icons.person_add_alt_1_rounded),
-        label: const Text('New student'),
+        label: const Text('New account'),
       ),
     );
   }

@@ -69,7 +69,8 @@ functionality and must never depend on OpenAI.
 | `CS-Ponkoj/Robotics-Programming-Lab` | Live Vercel and Render deployment | Production `main` receives only an approved, tested staging commit. Do not patch production directly. |
 | Secondary Windows or Ubuntu laptop/lab checkout | Temporary local clone outside OneDrive | Clone or fast-forward from staging Git. Never copy generated environments or build caches between computers. |
 | `local_handoff_package/` | Ignored copyable local data | May contain a verified database and private backend configuration. Never commit or publicly share it, and never place a Python virtual environment inside it. |
-| Local Docker PostgreSQL | Default local application data | Keep the active Docker volume computer-local. Use the verified `local_handoff_package` dump for sequential handoff. |
+| Neon `robotics_lab_staging` database | Default staging application data | Shared across authorized devices through ignored private configuration; keep it separate from production `neondb`. |
+| Local Docker PostgreSQL | Explicit offline fallback | Use `-UseLocalPostgres` or `--use-local-postgres`; keep its active volume computer-local. |
 | Local SQLite | Explicit troubleshooting fallback | Use only with `-UseSqlite`; it is ignored, disposable, and not synchronized as authoritative data. |
 | Staging PostgreSQL | Production-parity SQA | Must be separate from production and contain no live research records. |
 | Production Neon PostgreSQL | Live mutable data | Schema changes require Alembic migrations and recovery planning. |
@@ -212,7 +213,7 @@ user-data directory and installs the pinned requirements. Generated Python and
 Flutter files are never synchronized or committed. Use `-Repair` on Windows or
 `--repair` on Ubuntu only when ordinary setup reports an incomplete environment.
 
-Start the complete local stack, including Docker PostgreSQL:
+Start the complete local stack connected to Neon staging:
 
 ```powershell
 .\scripts\run-local.ps1
@@ -238,20 +239,11 @@ Stop only the processes managed by the launcher:
 .\scripts\stop-local.ps1
 ```
 
-The stop command must finish successfully before switching computers. It
-creates and checksum-verifies `local_handoff_package/latest.dump`, retains the
-previous successful dump, releases the device lock, and stops PostgreSQL. Wait
-for the whole package to finish copying or synchronizing before starting
-elsewhere. Never place PostgreSQL's live data directory or Docker volume inside
-OneDrive and never run the same package from two devices simultaneously.
-
-While the managed local stack is running, the operating-system-specific
-`backup-local-database` script creates a
-checksum-verified backup every 10 minutes when PostgreSQL has changed. It is a
-recovery safeguard, not a device-handoff signal: closing the browser does not
-stop the stack or release its device lock. Always use the operating system's
-`stop-local` script before switching computers, and copy only the complete
-`local_handoff_package` folder.
+The stop command ends only the processes owned by the launcher. Neon preserves
+the shared database independently of the browser or local processes. The
+ignored handoff package contains the connection settings and editable account
+JSON, not the active database. Legacy dump files remain protected recovery
+artifacts and are used only by the explicit local PostgreSQL fallback.
 The obsolete `local_database_backups` location is not part of the application.
 
 For an explicit copy-and-paste handoff, run the PowerShell or Bash

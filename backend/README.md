@@ -47,19 +47,21 @@ These password accounts are persistent prototype accounts and may use the
 analytics catalog. The credential-free `/auth/demo` session is the only
 ephemeral demo identity; it cannot create persistent research records.
 
-An instructor can create students, generate a temporary password, send an email
-activation link, reset access, and deactivate or reactivate accounts. Accounts
-should be deactivated instead of deleted so study records remain attributable.
+An instructor can create student or instructor accounts, generate a temporary
+password, reset access, and deactivate or reactivate accounts. The API prevents
+self-deactivation and disabling the last active instructor. Accounts should be
+deactivated instead of deleted so study records remain attributable.
 
 For manual prototype management, copy
 `data/study_accounts.example.json` to the ignored
-`data/study_accounts.json`. Import it from the instructor screen or
+`../local_handoff_package/study_accounts.json`. Import it from the instructor screen or
 `POST /admin/accounts/import`. The database is authoritative: a missing JSON
 row does nothing, while `"active": false` deactivates an account.
 `temporary_password` values are hashed and removed from the JSON file after a
 successful import.
 
-You can edit `data/study_accounts.json` directly in VS Code or Notepad. Add a
+You can edit `../local_handoff_package/study_accounts.json` directly in VS Code
+or Notepad. Add a
 row to create an account, enter a new `temporary_password` to change its
 password, or set `"active": false` to remove its login access while preserving
 its study records. To rename a login ID safely, add the new ID and deactivate
@@ -93,21 +95,14 @@ time and display as `Not available`.
 
 ## Database lifecycle
 
-The root launcher starts PostgreSQL 17 in a computer-local Docker volume. It
-runs Alembic before the API starts. On the first PostgreSQL setup, if no
-synchronized backup exists and the target is empty, the launcher copies every
-row from the canonical ignored `robotics_lab_staging.db` without modifying that
-SQLite source.
+The root launcher uses the dedicated Neon `robotics_lab_staging` database when
+`NEON_DATABASE_URL` exists in the ignored handoff `.env`. It runs Alembic before
+the API starts, and every authorized computer sees the same committed accounts,
+attempts, and analytics. The older Neon `neondb` database is separate.
 
-While the managed stack is running, `scripts/backup-local-database.ps1` creates
-a PostgreSQL custom-format dump every 10 minutes when the database change
-position advances. It validates the dump with `pg_restore --list` and verifies
-its SHA-256 checksum. `scripts/stop-local.ps1` always writes the final dump to
-`local_handoff_package`, keeps the preceding successful backup, releases the
-device lock, and then stops PostgreSQL. A new computer restores the verified
-dump before the API starts. The same dump is restored if the current computer's
-Docker volume is recreated and the application schema is missing. This is a
-sequential device handoff, not simultaneous database use.
+Use `-UseLocalPostgres` or `--use-local-postgres` for an intentional offline
+fallback. Only that fallback starts PostgreSQL 17 in Docker and maintains the
+legacy verified dump/device-lock workflow.
 
 On an empty database, the existing `assignments/assignment_*.json` files are
 imported with their declared versions. A newer bundled assignment version may
