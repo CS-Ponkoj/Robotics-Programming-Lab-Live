@@ -14,16 +14,21 @@ and secrets remain external environment values.
 
 ## Local staging workflow
 
-Install once:
+Install once with the command for the current operating system:
 
 ```powershell
 .\scripts\setup-local.ps1
 ```
 
+```bash
+./scripts/setup-local.sh
+```
+
 Python 3.14 is required. Setup creates an ignored device-local environment
-under LocalAppData. A laptop or lab computer should clone the staging repository
-outside OneDrive and run the same setup command. Use `-Repair` only when normal
-setup reports an incomplete environment.
+under Windows LocalAppData or the Ubuntu XDG user-data directory. A laptop or
+lab computer should clone the staging repository outside OneDrive and run its
+operating-system setup command. Use `-Repair` on Windows or `--repair` on Ubuntu
+only when normal setup reports an incomplete environment.
 
 Run the complete application:
 
@@ -31,8 +36,13 @@ Run the complete application:
 .\scripts\run-local.ps1
 ```
 
+```bash
+./scripts/run-local.sh
+```
+
 This starts local PostgreSQL 17, the dedicated sandbox, API, and Flutter web
-application. Python and Flutter generated files stay under LocalAppData. The
+application. Python and Flutter generated files stay outside the clone in the
+operating system's user-data directory. The
 live PostgreSQL Docker volume remains computer-local. Every clean stop creates
 a verified logical backup directly in ignored `local_handoff_package`. The
 same folder also supplies the backend `.env`, so a complete package can be
@@ -51,6 +61,10 @@ Stop the managed processes:
 .\scripts\stop-local.ps1
 ```
 
+```bash
+./scripts/stop-local.sh
+```
+
 Do not close Docker or switch computers before this command finishes. Wait for
 the complete `local_handoff_package` to finish copying or synchronizing. The device lock blocks
 ordinary startup on another computer until the first computer stops cleanly.
@@ -65,6 +79,14 @@ Run the full automated SQA gate:
 ```powershell
 .\scripts\verify-local.ps1
 ```
+
+```bash
+./scripts/verify-local.sh
+```
+
+The Windows and Ubuntu workflows use the same source and handoff-package
+contract. A physical Ubuntu 22.04 or 24.04 lab-computer smoke test is required
+before an Ubuntu classroom release is declared hardware-compatible.
 
 ## Change workflow
 

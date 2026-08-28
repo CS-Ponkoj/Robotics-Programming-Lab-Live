@@ -10,7 +10,9 @@ and verification records.
 
 ## Local operation
 
-- [First-time run on a Windows computer](guides/FIRST_TIME_RUN.md)
+- [First-time run operating-system chooser](guides/FIRST_TIME_RUN.md)
+- [First-time run on Windows](guides/FIRST_TIME_RUN_WINDOWS.md)
+- [First-time run on Ubuntu](guides/FIRST_TIME_RUN_UBUNTU.md)
 
 ## Deployment and release
 
@@ -29,6 +31,7 @@ and verification records.
 ## SQA evidence
 
 - [Master SQA checklist](sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
+- [Ubuntu local support SQA report](sqa/UBUNTU_LOCAL_SUPPORT_SQA_REPORT_2026-08-28.md)
 - [Automatic local database backup SQA report](sqa/AUTOMATIC_LOCAL_DATABASE_BACKUP_SQA_REPORT_2026-08-26.md)
 - [V5.2 Basic Analytics SQA report](sqa/V5_2_BASIC_ANALYTICS_SQA_REPORT_2026-08-26.md)
 - [Historical PostgreSQL OneDrive handoff SQA report](sqa/LOCAL_POSTGRES_ONEDRIVE_HANDOFF_SQA_REPORT_2026-08-24.md)

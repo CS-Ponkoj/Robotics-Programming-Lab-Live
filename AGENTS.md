@@ -67,7 +67,7 @@ functionality and must never depend on OpenAI.
 | `C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging` | Canonical Windows staging checkout | Run ordinary local development, local execution, SQA, and staging Git work from this folder. It must track `CS-Ponkoj/Robotics-Programming-Lab-Staging`; do not treat temporary worktrees or `IUSE_Project-2026` as the canonical staging checkout. |
 | `CS-Ponkoj/Robotics-Programming-Lab-Staging` | Development, local execution, SQA, and release candidates | Make changes on focused branches and merge into staging `main` only after verification. |
 | `CS-Ponkoj/Robotics-Programming-Lab` | Live Vercel and Render deployment | Production `main` receives only an approved, tested staging commit. Do not patch production directly. |
-| Secondary laptop or lab checkout | Temporary local clone outside OneDrive | Clone or fast-forward from staging Git. Never copy generated environments or build caches between computers. |
+| Secondary Windows or Ubuntu laptop/lab checkout | Temporary local clone outside OneDrive | Clone or fast-forward from staging Git. Never copy generated environments or build caches between computers. |
 | `local_handoff_package/` | Ignored copyable local data | May contain a verified database and private backend configuration. Never commit or publicly share it, and never place a Python virtual environment inside it. |
 | Local Docker PostgreSQL | Default local application data | Keep the active Docker volume computer-local. Use the verified `local_handoff_package` dump for sequential handoff. |
 | Local SQLite | Explicit troubleshooting fallback | Use only with `-UseSqlite`; it is ignored, disposable, and not synchronized as authoritative data. |
@@ -193,7 +193,10 @@ the appropriate API, test, browser, database, or deployed-service boundary.
 
 ## Local setup and execution
 
-The supported developer shell is PowerShell on Windows.
+The supported local environments are Windows 10/11 with PowerShell and x86-64
+Ubuntu 22.04/24.04 LTS with Bash. Use
+`docs/guides/FIRST_TIME_RUN_WINDOWS.md` or
+`docs/guides/FIRST_TIME_RUN_UBUNTU.md` for first-time setup.
 
 Prepare the single ignored Python 3.14 environment and install pinned
 dependencies:
@@ -204,16 +207,30 @@ dependencies:
 
 The main desktop checkout is intentionally inside OneDrive. Secondary laptops
 and lab computers must use a Git clone in a normal local folder outside
-OneDrive. Setup creates the Python environment under the current computer's
-LocalAppData and installs the pinned requirements. Generated Python and Flutter
-files are never synchronized or committed. Use `-Repair` only when ordinary
-setup reports an incomplete environment.
+OneDrive. Setup creates the Python environment under that computer's local
+user-data directory and installs the pinned requirements. Generated Python and
+Flutter files are never synchronized or committed. Use `-Repair` on Windows or
+`--repair` on Ubuntu only when ordinary setup reports an incomplete environment.
 
 Start the complete local stack, including Docker PostgreSQL:
 
 ```powershell
 .\scripts\run-local.ps1
 ```
+
+Ubuntu uses the equivalent commands:
+
+```bash
+./scripts/setup-local.sh
+./scripts/run-local.sh --frontend-port 8180 --backend-port 5100 --sandbox-port 5101
+./scripts/stop-local.sh
+```
+
+Windows stores generated environments and runtime data under LocalAppData.
+Ubuntu stores them under the user's XDG data and state directories. Neither
+operating system may place generated environments, Flutter builds, or logs in
+the Git clone. Both use the same ignored `local_handoff_package` format and may
+restore the other operating system's verified PostgreSQL custom dump.
 
 Stop only the processes managed by the launcher:
 
@@ -228,15 +245,17 @@ for the whole package to finish copying or synchronizing before starting
 elsewhere. Never place PostgreSQL's live data directory or Docker volume inside
 OneDrive and never run the same package from two devices simultaneously.
 
-While the managed local stack is running, `backup-local-database.ps1` creates a
+While the managed local stack is running, the operating-system-specific
+`backup-local-database` script creates a
 checksum-verified backup every 10 minutes when PostgreSQL has changed. It is a
 recovery safeguard, not a device-handoff signal: closing the browser does not
-stop the stack or release its device lock. Always use `stop-local.ps1` before
-switching computers, and copy only the complete `local_handoff_package` folder.
+stop the stack or release its device lock. Always use the operating system's
+`stop-local` script before switching computers, and copy only the complete
+`local_handoff_package` folder.
 The obsolete `local_database_backups` location is not part of the application.
 
-For an explicit copy-and-paste handoff, run
-`scripts/create-local-handoff-package.ps1` only while the app is stopped and
+For an explicit copy-and-paste handoff, run the PowerShell or Bash
+`create-local-handoff-package` script only while the app is stopped and
 copy the entire ignored `local_handoff_package` folder into the destination
 clone. The app reads its root `.env` and PostgreSQL backup files directly;
 never create a second active database folder or duplicate `backend/.env`.
@@ -249,12 +268,18 @@ Run the full local verification gate:
 .\scripts\verify-local.ps1
 ```
 
-Use `-EnableAi` only for an intentional AI test. Use `-DatabaseUrl` with a
-separate staging PostgreSQL connection for hosted parity checks. Use
-`-UseSqlite` only for disposable troubleshooting.
+On Ubuntu:
+
+```bash
+./scripts/verify-local.sh
+```
+
+Use `-EnableAi` on Windows or `--enable-ai` on Ubuntu only for an intentional AI
+test. External database and SQLite troubleshooting flags also follow each
+script's native PowerShell or GNU-style spelling.
 
 OneDrive can lock Flutter build artifacts. Use the supplied run and verification
-scripts, which build from a safe generated copy under LocalAppData. Do not solve
+scripts, which build from a safe generated copy outside the clone. Do not solve
 locking problems by committing generated build output or deleting broad folders.
 
 ## Required verification
@@ -532,7 +557,7 @@ Follow `docs/deployment/STAGING_AND_RELEASE_WORKFLOW.md` and the guarded scripts
 
 Before promotion:
 
-- run `scripts/verify-local.ps1`;
+- run `scripts/verify-local.ps1` on Windows or `scripts/verify-local.sh` on Ubuntu;
 - verify PostgreSQL migrations and persistence;
 - verify the dedicated sandbox and adversarial execution cases;
 - verify student and instructor end-to-end workflows;

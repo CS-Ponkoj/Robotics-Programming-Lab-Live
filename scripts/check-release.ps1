@@ -46,9 +46,21 @@ try {
         "scripts/verify-local-layout.ps1",
         "scripts/verify-local-handoff-package.ps1",
         "scripts/verify-portable-clone.ps1",
+        "scripts/setup-local.sh",
+        "scripts/create-local-handoff-package.sh",
+        "scripts/run-local.sh",
+        "scripts/backup-local-database.sh",
+        "scripts/stop-local.sh",
+        "scripts/check-ros2-local.sh",
+        "scripts/linux-local-common.sh",
+        "scripts/linux-local-database.sh",
+        "scripts/verify-linux-database-handoff.sh",
+        "scripts/verify-local.sh",
         "local_handoff_package/.gitignore",
         "local_handoff_package/README.md",
-        "docs/guides/FIRST_TIME_RUN.md"
+        "docs/guides/FIRST_TIME_RUN.md",
+        "docs/guides/FIRST_TIME_RUN_WINDOWS.md",
+        "docs/guides/FIRST_TIME_RUN_UBUNTU.md"
     )
     $missingCloneFiles = @($requiredCloneFiles | Where-Object { $_ -notin $tracked })
     if ($missingCloneFiles.Count -gt 0) {

@@ -9,13 +9,13 @@ approved release is promoted to the separate live repository.
 
 ## Quick start
 
-Open PowerShell in the repository root. The path may differ between computers;
-you do not need to type a fixed username or OneDrive path.
+Open a terminal in the repository root. Follow the
+[first-time run chooser](docs/guides/FIRST_TIME_RUN.md), then use the guide for
+[Windows](docs/guides/FIRST_TIME_RUN_WINDOWS.md) or
+[Ubuntu](docs/guides/FIRST_TIME_RUN_UBUNTU.md). Both operating systems run the
+same source, database schema, assignments, and graders.
 
-For a new computer, follow the complete
-[first-time run guide](docs/guides/FIRST_TIME_RUN.md). It covers required
-software, Git-clone setup, automatic package installation, ROS setup, and the
-single local data package.
+### Windows PowerShell
 
 Prepare this computer once, or after dependency changes:
 
@@ -38,9 +38,17 @@ Stop the application:
 .\scripts\stop-local.ps1
 ```
 
+### Ubuntu Bash
+
+```bash
+./scripts/setup-local.sh
+./scripts/run-local.sh --frontend-port 8180 --backend-port 5100 --sandbox-port 5101
+./scripts/stop-local.sh
+```
+
 The launcher starts local PostgreSQL in Docker, the Python sandbox, FastAPI
 backend, and Flutter web app. Python and Flutter generated files stay in this
-computer's LocalAppData. Database backups and private settings are read from
+computer's local user-data directories, outside the clone. Database backups and private settings are read from
 the single ignored `local_handoff_package` folder. If no backup exists there,
 the computer starts a fresh demo database and creates one at the next clean
 stop. While the stack is running, a managed worker also creates a verified
@@ -56,11 +64,18 @@ While the application is stopped, create the ignored handoff package:
 .\scripts\create-local-handoff-package.ps1 -IncludePrivateConfig
 ```
 
+On Ubuntu, use:
+
+```bash
+./scripts/create-local-handoff-package.sh --include-private-config
+```
+
 Copy the complete `local_handoff_package` folder into the root of a fresh Git
 clone. The normal setup and run commands use it directly. It contains the
 verified database and optional private `.env`, but not the Python
-virtual environment. Python packages are rebuilt safely under LocalAppData on
-the destination computer.
+virtual environment. Python packages are rebuilt safely in the destination
+computer's local user-data directory. Verified PostgreSQL dumps are portable
+between the supported Windows and Ubuntu workflows.
 
 ## Local prototype accounts
 
@@ -152,9 +167,9 @@ course_materials/     Controlled course sources plus a labeled history archive
 manual_sqa_answers/   Maintained instructor answers for manual SQA
 docs/                 Architecture, deployment, research, and SQA documents
   archive/             Superseded reports and deployment snapshots
-scripts/              Setup, run, stop, verification, and release automation
-local_handoff_package/ Ignored, copyable database and private configuration
-LocalAppData           Generated Python, Flutter, and runtime files; never committed
+scripts/              PowerShell and Bash setup, run, stop, and verification
+local_handoff_package/ Ignored, cross-platform database and private configuration
+OS user-data folder    Generated Python, Flutter, logs, and runtime state
 ```
 
 The documentation index is [docs/README.md](docs/README.md). Engineering and
@@ -174,12 +189,24 @@ Provider failure or missing credit must not block grading. Hidden tests,
 official solutions, secrets, and unrelated student data are excluded from the
 AI context.
 
+Ubuntu uses the equivalent command:
+
+```bash
+./scripts/run-local.sh --enable-ai --frontend-port 8180 --backend-port 5100 --sandbox-port 5101
+```
+
 ## Verification
 
 Run the complete local gate from the repository root:
 
 ```powershell
 .\scripts\verify-local.ps1 -ApiBaseUrl http://127.0.0.1:5100
+```
+
+On Ubuntu:
+
+```bash
+./scripts/verify-local.sh --api-base-url http://127.0.0.1:5100
 ```
 
 It checks fresh-clone completeness, then runs backend tests, dependency checks, Python compilation, Flutter analysis
@@ -201,6 +228,9 @@ For ROS 2 validation:
 ```powershell
 .\scripts\check-ros2-local.ps1
 ```
+
+On Ubuntu, use `./scripts/check-ros2-local.sh`; add `--build` only for the
+first build or after ROS image inputs change.
 
 ## Safe local cleanup
 

@@ -1,7 +1,8 @@
 # Local handoff package
 
 Copy this entire folder into the root of a fresh staging Git clone. The normal
-`setup-local.ps1` and `run-local.ps1` commands detect it automatically.
+Windows PowerShell or Ubuntu Bash setup and run commands detect it
+automatically.
 
 A populated local copy contains one active private data set and may contain an
 optional history subfolder:
@@ -25,6 +26,13 @@ final device-handoff backup only while the application is stopped:
 .\scripts\create-local-handoff-package.ps1 -IncludePrivateConfig
 ```
 
+On Ubuntu:
+
+```bash
+./scripts/stop-local.sh
+./scripts/create-local-handoff-package.sh --include-private-config
+```
+
 The application reads `.env` here directly and restores/saves PostgreSQL here;
 these are not duplicate copy-only files. The generated contents are
 intentionally ignored by Git. They may contain API
@@ -33,7 +41,9 @@ commit, email, or publicly share a populated package.
 
 The Python virtual environment is not included. It contains device-specific
 paths and compiled packages. On the destination computer, normal setup rebuilds
-the exact pinned environment safely under LocalAppData.
+the exact pinned environment in that operating system's local user-data
+directory. PostgreSQL custom-format dumps are shared by the supported Windows
+and Ubuntu launchers.
 
 Copy only this complete folder to another computer. The former
 `local_database_backups` folder is obsolete and is not read by the application.
