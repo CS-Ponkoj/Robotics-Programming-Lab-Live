@@ -42,7 +42,7 @@ Run the complete application:
 
 This connects to the dedicated Neon `robotics_lab_staging` database and starts
 the sandbox, API, and Flutter web application. Python and Flutter generated
-files stay outside the clone. The ignored `local_handoff_package` supplies the
+files stay outside the clone. The ignored repository-root `.env` supplies the
 Neon connection and optional AI configuration. Git supplies the password-free
 account roster at `backend/data/study_accounts.json`.
 AI is off. To test AI deliberately, use `-EnableAi`. To use an external staging

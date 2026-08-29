@@ -27,10 +27,6 @@ backend/study_exports/
 /outputs/
 /tmp/
 
-# Active private local package. Only its safety instructions are tracked.
-/local_handoff_package/*
-!/local_handoff_package/.gitignore
-!/local_handoff_package/README.md
 # Obsolete pre-handoff-package backup location; ignored if an old copy reappears.
 /local_database_backups/
 

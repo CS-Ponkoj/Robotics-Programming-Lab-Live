@@ -12,9 +12,9 @@ Neon PostgreSQL staging database. Local PostgreSQL, runtime SQLite, database
 dump restore, periodic/final backup workers, package manifests, and device locks
 were removed from the supported launch path.
 
-The ignored `local_handoff_package` now contains only the private `.env`,
-`.gitignore`, and its README. The password-free account roster is tracked at
-`backend/data/study_accounts.json`; passwords and hashes remain outside Git.
+The private configuration is now one ignored `.env` in the repository root.
+The password-free account roster is tracked at `backend/data/study_accounts.json`;
+passwords and hashes remain outside Git.
 Docker remains required for the Python and ROS 2 grading containers; it no
 longer hosts the application database.
 
@@ -24,7 +24,7 @@ longer hosts the application database.
 |---|---|---:|---|
 | Windows launcher | Started with the configured Neon staging URL, applied Alembic migrations, and recorded `databaseProvider=neon` | PASS | Internet and Neon availability are required |
 | Managed shutdown | Stopped only launcher-owned frontend, backend, and sandbox processes | PASS | None observed |
-| Private package | Validator confirmed the ignored `.env`, tracked password-free roster, and absence of obsolete dumps/manifests/history | PASS | Secrets must be provisioned through a secure channel on each authorized computer |
+| Private configuration | Validator confirmed the ignored repository-root `.env`, tracked password-free roster, and absence of obsolete dumps/manifests/history | PASS | The `.env` must be provisioned through a secure channel on each authorized computer |
 | Account roster safety | Tracked roster contains no temporary passwords; backend rejects passwords placed in the canonical roster | PASS | Create and reset passwords through Instructor Studio |
 | Local fallback removal | PostgreSQL Compose service, transfer module, dump scripts, backup worker, device lock, and runtime fallback switches removed | PASS | No offline database mode remains |
 | Account import | Focused authentication/account tests | PASS | 16 tests passed |

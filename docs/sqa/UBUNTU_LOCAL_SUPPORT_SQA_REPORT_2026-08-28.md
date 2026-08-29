@@ -42,6 +42,13 @@ The Ubuntu implementation passes the automated Ubuntu 22.04/24.04 container chec
 
 ## Supported workflow
 
+> **Current architecture note (2026-08-28):** This section records the earlier
+> local-PostgreSQL portability test. The application now uses Neon PostgreSQL
+> and one ignored `.env` in the repository root. The handoff package, database
+> dump, backup worker, and cross-device database lock described below have been
+> retired. See `NEON_ONLY_DATABASE_SQA_REPORT_2026-08-28.md` for the current
+> verified workflow.
+
 - Windows uses the existing PowerShell scripts.
 - Ubuntu x86-64 22.04/24.04 uses the new Bash scripts.
 - Generated Python environments, Flutter build files, logs, and process state stay outside the Git clone on Ubuntu.

@@ -27,8 +27,8 @@ robotics_environment_root() {
   printf '%s\n' "$(robotics_data_root)/environments/$(robotics_project_key)/venv"
 }
 
-robotics_handoff_root() {
-  printf '%s\n' "$(robotics_repository_root)/local_handoff_package"
+robotics_private_config() {
+  printf '%s\n' "$(robotics_repository_root)/.env"
 }
 
 robotics_python() {

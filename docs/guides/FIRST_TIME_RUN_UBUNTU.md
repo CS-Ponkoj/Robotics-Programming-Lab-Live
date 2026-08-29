@@ -103,7 +103,7 @@ cd Robotics-Programming-Lab-Staging
 
 Before running a local backend, obtain an authorized private `.env` through the
 project's approved secret-delivery method and place it in
-`local_handoff_package`. Git intentionally does not distribute Neon or OpenAI
+the repository root as `.env`. Git intentionally does not distribute Neon or OpenAI
 credentials.
 
 ## 3. Prepare this computer
@@ -149,7 +149,7 @@ Open `http://127.0.0.1:8180/app` in the browser. The launcher connects to Neon
 and starts the Python sandbox, FastAPI, and Flutter web. AI is off by default.
 
 To intentionally test optional AI feedback, place `OPENAI_API_KEY` in the
-ignored `local_handoff_package/.env` and add `--enable-ai`. Never commit or
+ignored repository-root `.env` and add `--enable-ai`. Never commit or
 print that file.
 
 ## 6. Stop safely

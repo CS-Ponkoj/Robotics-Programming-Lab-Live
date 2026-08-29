@@ -23,16 +23,10 @@ function Get-RoboticsEnvironmentRoot {
     return Join-Path $env:LOCALAPPDATA "RoboticsProgrammingLab\environments\$projectKey\venv"
 }
 
-function Get-RoboticsHandoffPackageRoot {
+function Get-RoboticsPrivateConfigPath {
     param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
 
-    return Join-Path ([System.IO.Path]::GetFullPath($RepositoryRoot)) "local_handoff_package"
-}
-
-function Get-RoboticsHandoffPrivateConfigPath {
-    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
-
-    return Join-Path (Get-RoboticsHandoffPackageRoot -RepositoryRoot $RepositoryRoot) ".env"
+    return Join-Path ([System.IO.Path]::GetFullPath($RepositoryRoot)) ".env"
 }
 
 function Get-Python314BaseExecutable {
@@ -136,4 +130,4 @@ function Get-RoboticsPythonExecutable {
     return $python
 }
 
-Export-ModuleMember -Function Get-RoboticsRuntimeRoot, Get-RoboticsEnvironmentRoot, Get-RoboticsHandoffPackageRoot, Get-RoboticsHandoffPrivateConfigPath, Get-RoboticsPythonExecutable
+Export-ModuleMember -Function Get-RoboticsRuntimeRoot, Get-RoboticsEnvironmentRoot, Get-RoboticsPrivateConfigPath, Get-RoboticsPythonExecutable

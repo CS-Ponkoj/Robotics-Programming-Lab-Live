@@ -35,7 +35,7 @@ environment_root="$(robotics_environment_root)"
 runtime_root="$(robotics_runtime_root)"
 robotics_assert_path_under "$environment_root" "$(robotics_data_root)/environments"
 robotics_assert_path_under "$runtime_root" "${XDG_STATE_HOME:-$HOME/.local/state}/RoboticsProgrammingLab/runtime"
-[[ "$(realpath -m -- "$(robotics_handoff_root)")" == "$(realpath -m -- "$repository_root/local_handoff_package")" ]]
+[[ "$(realpath -m -- "$(robotics_private_config)")" == "$(realpath -m -- "$repository_root/.env")" ]]
 
 (
   cd -- "$repository_root/backend"

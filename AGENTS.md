@@ -68,7 +68,7 @@ functionality and must never depend on OpenAI.
 | `CS-Ponkoj/Robotics-Programming-Lab-Staging` | Development, local execution, SQA, and release candidates | Make changes on focused branches and merge into staging `main` only after verification. |
 | `CS-Ponkoj/Robotics-Programming-Lab` | Live Vercel and Render deployment | Production `main` receives only an approved, tested staging commit. Do not patch production directly. |
 | Secondary Windows or Ubuntu laptop/lab checkout | Temporary local clone outside OneDrive | Clone or fast-forward from staging Git. Never copy generated environments or build caches between computers. |
-| `local_handoff_package/` | Ignored private local configuration | Contains `.env`; it does not contain accounts or the active database. Never commit or publicly share it, and never place a Python virtual environment inside it. |
+| Repository-root `.env` | Ignored private local configuration | Contains Neon and optional AI settings; it does not contain accounts or the active database. Never commit or publicly share it. |
 | Neon `robotics_lab_staging` database | Default staging application data | Shared across authorized devices through ignored private configuration; keep it separate from production `neondb`. |
 | Staging PostgreSQL | Production-parity SQA | Must be separate from production and contain no live research records. |
 | Production Neon PostgreSQL | Live mutable data | Schema changes require Alembic migrations and recovery planning. |
@@ -141,54 +141,54 @@ change.
 
 ## Working method
 
-Engineering principles:
+Act as the project owner's professional software engineer and technical
+partner. Prioritize correct, maintainable, secure, and practical code.
 
-- Prefer clean, correct, maintainable code over fast implementation.
-- Use the simplest design that satisfies current requirements and known future
-  plans; do not add abstractions, dependencies, or services without a clear
-  need.
-- Explain technical decisions, failures, and limitations in simple language.
-- Proactively check related edge cases, regressions, security risks, and stale
-  supporting documentation while keeping the change focused.
-- Preserve existing functionality and unrelated user work unless the owner
-  explicitly authorizes a broader change.
+- Make the smallest professional change that fully solves the task.
+- Follow the existing architecture, conventions, and applicable instructions.
+- Preserve existing functionality unless the owner explicitly requests a
+  change.
+- Do not overengineer, add unnecessary dependencies, or refactor unrelated
+  code.
+- Work incrementally on one clearly defined change at a time.
+- Stop when the requested task is correctly implemented and appropriately
+  validated.
+- Preserve unrelated user work and files.
 
-Use an incremental, evidence-driven workflow:
+For each task:
 
-1. Inspect the current behavior, relevant tests, working tree, branch, and
-   remotes before editing.
-2. State the smallest safe change and its acceptance check.
-3. Preserve unrelated user changes in a dirty working tree.
-4. Implement one focused change.
-5. Run the closest focused check immediately.
-6. Fix failures before beginning the next change.
-7. Run the proportional regression suite.
-8. Run the complete release gate when behavior, dependencies, data, deployment,
-   authentication, grading, or shared UI changes.
-9. Record evidence and remaining limitations honestly.
-10. At the beginning and end of each task, check whether durable repository
-    facts or engineering rules have changed enough to require an `AGENTS.md`
-    update. Update it in the same verified staging workflow when needed; do not
-    create documentation churn for ordinary implementation details.
+1. Inspect only the relevant code and current behavior.
+2. Understand the confirmed cause or requirement.
+3. Implement the smallest clean, practical solution.
+4. Run the closest relevant test or validation.
+5. Fix failures caused by the change before beginning another change.
+6. Report what changed, what was tested, and any meaningful limitation.
 
-The current development priority is the complete local staging application.
-Build and verify changes in the canonical staging checkout first. Do not expand
-the scope to production hosting, the public/live repository, Android packaging,
-or mobile-store release work unless the project owner explicitly starts that
-phase. A local feature is not ready merely because its happy path works: make
-one focused change, run its closest acceptance check, correct any failure, and
-only then begin the next change. After all focused checks pass, run the complete
-local release gate and perform the applicable student, instructor, browser,
-sandbox, and assignment-answer checks.
+Use broader regression testing only when a change is large, risky,
+cross-cutting, release-related, or explicitly requested. Add or update tests
+when behavior meaningfully changes; do not add unnecessary tests for trivial
+changes. Verify affected UI and API behavior when practical. Compilation alone
+is not evidence that observable behavior works.
 
-Keep implementation and supporting evidence synchronized. When code,
-assignment content, dependencies, commands, schemas, or behavior changes,
-update the relevant README, long-form documentation, automated tests, SQA
-Markdown report, and master SQA workbook in the same verified change. Prefer a
-small accurate documentation update over leaving a known-stale checklist.
+Clearly separate confirmed bugs, possible risks or improvements, untested
+items, and external limitations or blockers. Mention directly related problems
+encountered during the task, but do not investigate unrelated issues.
 
-Do not claim a feature works because it compiles. Verify observable behavior at
-the appropriate API, test, browser, database, or deployed-service boundary.
+Explain technical ideas in simple words and lead with the result or
+recommendation. For architecture, stacks, and workflows, explain what each
+component does, why it is needed, how components communicate, its advantages
+and limitations, and what is needed now versus later. Use a small diagram or
+table only when it materially improves understanding. Ask a question only when
+the answer would materially change the solution or require new authorization;
+otherwise make a safe, reasonable assumption.
+
+The current priority is the complete local staging application. Do not expand
+the scope to production, Android packaging, or mobile-store release work unless
+the owner explicitly starts that phase.
+
+Update documentation, tests, SQA evidence, or this file only when the change
+makes existing material inaccurate or when the task explicitly requires it.
+Avoid documentation churn for ordinary implementation details.
 
 ## Local setup and execution
 
@@ -228,8 +228,8 @@ Ubuntu uses the equivalent commands:
 Windows stores generated environments and runtime data under LocalAppData.
 Ubuntu stores them under the user's XDG data and state directories. Neither
 operating system may place generated environments, Flutter builds, or logs in
-the Git clone. Both use the same ignored `local_handoff_package` configuration
-format and connect to the same authorized Neon staging database.
+the Git clone. Both read the same ignored repository-root `.env` format and
+connect to the same authorized Neon staging database.
 
 Stop only the processes managed by the launcher:
 
@@ -239,15 +239,14 @@ Stop only the processes managed by the launcher:
 
 The stop command ends only the processes owned by the launcher. Neon preserves
 the shared database independently of the browser or local processes. The
-ignored handoff package contains the connection settings and editable account
-JSON, not the active database. Local dump files, backup manifests, device locks,
-and the obsolete `local_database_backups` location are not part of the application.
+ignored root `.env` contains connection settings, not accounts or the active
+database. Local dump files, backup manifests, device locks, and the obsolete
+`local_database_backups` location are not part of the application.
 
-For an authorized new-device setup, securely provision the ignored
-`local_handoff_package` folder containing `.env`. The password-free account
-roster is distributed by Git at `backend/data/study_accounts.json`. The app
-connects to Neon; never create a duplicate `backend/.env`, and never put secrets
-or passwords in Git.
+For an authorized new-device setup, securely provision the ignored repository
+root `.env`. The password-free account roster is distributed by Git at
+`backend/data/study_accounts.json`. Never create a duplicate `backend/.env`, and
+never put secrets or passwords in Git.
 Fresh Windows clones must use `git -c core.longpaths=true clone` because tracked
 course-material filenames exceed Git's default Windows checkout limit.
 
@@ -308,8 +307,8 @@ git status --short
 
 `scripts/clean-local.ps1` is dry-run by default. Use `-Execute` only after the
 managed application is stopped. Its allow-list may contain rebuildable caches
-and build output only. Never add `.git`, `venv`, databases,
-`local_handoff_package`, `output`, `course_materials`, or
+and build output only. Never add `.git`, `.env`, `venv`, databases,
+`output`, `course_materials`, or
 `manual_sqa_answers` to that cleanup allow-list.
 
 Use Git maintenance commands for repository object cleanup; never delete files
@@ -327,15 +326,9 @@ A change is complete only when:
 
 - the requested behavior is implemented;
 - the closest focused tests pass;
-- relevant regression tests pass;
-- error, empty, loading, timeout, and authorization states are handled;
-- no secrets or generated artifacts are added;
-- documentation and SQA evidence are updated when behavior or operations change;
-- the working-tree diff contains only intended changes; and
-- known limitations are reported instead of hidden.
-
-Compilation alone is not sufficient. Manual browser testing alone is not
-sufficient when an automated test can reasonably protect the behavior.
+- broader regression checks pass when the change's scope or risk requires them;
+- no secrets, generated artifacts, or unrelated changes are introduced; and
+- meaningful limitations and untested items are reported honestly.
 
 ## Backend engineering rules
 
@@ -373,9 +366,9 @@ sufficient when an automated test can reasonably protect the behavior.
 - Never use `Base.metadata.create_all` as the production migration strategy.
 - Never silently drop, truncate, rename, or reinterpret research data.
 - Never synchronize an active PostgreSQL data directory through OneDrive.
-- Treat `local_handoff_package/` as protected configuration: never commit its
-  contents, provision it only through an approved secure channel, and require
-  managed secret storage before a real study. It is never a release artifact.
+- Treat the repository-root `.env` as protected configuration: never commit it,
+  provision it only through an approved secure channel, and require managed
+  secret storage before a real study. It is never a release artifact.
 - Destructive migrations require an explicit backup, rollback plan, owner
   approval, and restoration rehearsal.
 - Store UTC timestamps and assignment versions with attempts and events.
@@ -536,6 +529,11 @@ needed to create a safe fresh demo database.
 - Do not amend, force-push, tag, publish, promote, or create a release unless the
   owner explicitly requests it.
 - Before committing, review the staged diff and run `git diff --check`.
+- Before an authorized push, verify the branch, working tree, exact staged
+  files, and absence of secrets or accidental files.
+- If manual QA or a broader regression check is advisable before pushing, tell
+  the owner and recommend it, especially for risky or cross-cutting changes.
+- After an authorized push, confirm the expected commit exists on the remote.
 - Before production promotion, require a clean staging `main`, passing CI, an
   updated SQA record, and explicit owner approval.
 

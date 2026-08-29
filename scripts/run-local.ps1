@@ -9,7 +9,7 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $backendRoot = Join-Path $repositoryRoot "backend"
 Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
-$privateConfigPath = Get-RoboticsHandoffPrivateConfigPath -RepositoryRoot $repositoryRoot
+$privateConfigPath = Get-RoboticsPrivateConfigPath -RepositoryRoot $repositoryRoot
 $python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot -EnsureDependencies
 $stateRoot = Get-RoboticsRuntimeRoot -RepositoryRoot $repositoryRoot
 $stateFile = Join-Path $stateRoot "state.json"
@@ -38,7 +38,7 @@ if (Test-Path -LiteralPath $stateFile) {
 
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 if (-not (Test-Path -LiteralPath $privateConfigPath)) {
-    throw "Neon configuration is missing. Add NEON_DATABASE_URL to local_handoff_package/.env."
+    throw "Neon configuration is missing. Add NEON_DATABASE_URL to the repository root .env file."
 }
 $previousConfigPath = [Environment]::GetEnvironmentVariable("ROBOTICS_ENV_FILE", "Process")
 [Environment]::SetEnvironmentVariable("ROBOTICS_ENV_FILE", $privateConfigPath, "Process")
@@ -50,7 +50,7 @@ try {
         Pop-Location
     }
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($databaseUrl)) {
-        throw "NEON_DATABASE_URL is missing or invalid in local_handoff_package/.env."
+        throw "NEON_DATABASE_URL is missing or invalid in the repository root .env file."
     }
     $databaseUrl = $databaseUrl.Trim()
     if (-not $databaseUrl.Contains(".neon.tech")) {

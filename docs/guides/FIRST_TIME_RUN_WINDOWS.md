@@ -52,7 +52,7 @@ git config core.longpaths true
 
 Before running a local backend, obtain an authorized private `.env` through the
 project's approved secret-delivery method and place it in
-`local_handoff_package`. Git intentionally does not distribute Neon or OpenAI
+the repository root as `.env`. Git intentionally does not distribute Neon or OpenAI
 credentials. A future hosted staging backend will let local Flutter clients use
 only a public HTTPS API URL.
 
@@ -92,13 +92,10 @@ Open `http://127.0.0.1:8180/app`. Stop safely with:
 Closing the browser does not close the backend. Run `stop-local.ps1` before
 updating the repository or switching work to another computer.
 
-A Neon-configured private folder contains only:
+A Neon-configured checkout contains one private file:
 
 ```text
-local_handoff_package/
-├── .env
-├── .gitignore
-└── README.md
+.env
 ```
 
 The database itself is stored in Neon, so authorized computers see the same

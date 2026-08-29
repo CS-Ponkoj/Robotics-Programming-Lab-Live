@@ -2,13 +2,12 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
 
-$packageRoot = Get-RoboticsHandoffPackageRoot -RepositoryRoot $repositoryRoot
-$configPath = Get-RoboticsHandoffPrivateConfigPath -RepositoryRoot $repositoryRoot
+$configPath = Get-RoboticsPrivateConfigPath -RepositoryRoot $repositoryRoot
 $accountsPath = Join-Path $repositoryRoot "backend\data\study_accounts.json"
 
 foreach ($required in @($configPath, $accountsPath)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
-        throw "Required private staging file is missing: $required"
+        throw "Required staging file is missing: $required"
     }
 }
 
@@ -21,10 +20,10 @@ foreach ($line in [System.IO.File]::ReadLines($configPath)) {
     }
 }
 if (-not $neonConfigured) {
-    throw "NEON_DATABASE_URL is missing or invalid in local_handoff_package/.env."
+    throw "NEON_DATABASE_URL is missing or invalid in the repository root .env file."
 }
 
-$trackedPrivateFiles = @(git -C $repositoryRoot ls-files -- "local_handoff_package/.env")
+$trackedPrivateFiles = @(git -C $repositoryRoot ls-files -- ".env")
 if ($trackedPrivateFiles.Count -gt 0) {
     throw "Private staging files must not be tracked by Git."
 }
@@ -53,7 +52,7 @@ $obsoleteNames = @(
     "study_accounts_import_report.json"
 )
 $obsoletePresent = @($obsoleteNames | Where-Object {
-    Test-Path -LiteralPath (Join-Path $packageRoot $_)
+    Test-Path -LiteralPath (Join-Path $repositoryRoot "local_handoff_package\$_")
 })
 if ($obsoletePresent.Count -gt 0) {
     throw "Obsolete local-database artifacts remain: $($obsoletePresent -join ', ')"

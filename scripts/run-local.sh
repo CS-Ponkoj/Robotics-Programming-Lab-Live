@@ -40,14 +40,14 @@ done
 runtime_root="$(robotics_runtime_root)"
 repository_root="$(robotics_repository_root)"
 backend_root="$repository_root/backend"
-private_config="$(robotics_handoff_root)/.env"
+private_config="$(robotics_private_config)"
 process_file="$runtime_root/processes.tsv"
 metadata_file="$runtime_root/managed.env"
 log_root="$runtime_root/logs"
 safe_frontend="$runtime_root/frontend"
 mkdir -p -- "$runtime_root" "$log_root"
 [[ -f "$private_config" ]] || {
-  printf 'Neon configuration is missing: local_handoff_package/.env\n' >&2
+  printf 'Neon configuration is missing: repository root .env\n' >&2
   exit 1
 }
 if robotics_any_managed_process_running; then
@@ -97,7 +97,7 @@ database_url="$(
     'from config import get_settings; print(get_settings().cloud_database_url or "")'
 )"
 [[ -n "$database_url" && "$database_url" == *neon.tech* ]] || {
-  printf 'NEON_DATABASE_URL is missing or invalid in local_handoff_package/.env.\n' >&2
+  printf 'NEON_DATABASE_URL is missing or invalid in the repository root .env.\n' >&2
   exit 1
 }
 printf 'Using the configured Neon staging database.\n'

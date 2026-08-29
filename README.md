@@ -48,8 +48,8 @@ Stop the application:
 ```
 
 The launcher requires `NEON_DATABASE_URL` in the ignored
-`local_handoff_package/.env` and uses the shared `robotics_lab_staging` Neon
-database. It also
+repository-root `.env` and uses the shared `robotics_lab_staging` Neon database.
+It also
 starts the local Python sandbox, FastAPI backend, and Flutter web app. Python
 and Flutter generated files stay in this computer's local user-data
 directories, outside the clone. AI remains off by default.
@@ -158,7 +158,7 @@ manual_sqa_answers/   Maintained instructor answers for manual SQA
 docs/                 Architecture, deployment, research, and SQA documents
   archive/             Superseded reports and deployment snapshots
 scripts/              PowerShell and Bash setup, run, stop, and verification
-local_handoff_package/ Ignored private Neon and optional AI configuration
+.env                  Ignored private Neon and optional AI configuration
 OS user-data folder    Generated Python, Flutter, logs, and runtime state
 ```
 
@@ -169,7 +169,7 @@ security rules are in [AGENTS.md](AGENTS.md).
 
 AI is off by default. Normal grading and built-in hints do not require an API
 key. To intentionally test optional AI feedback, place `OPENAI_API_KEY` in the
-ignored `local_handoff_package/.env` file and start with:
+ignored repository-root `.env` file and start with:
 
 ```powershell
 .\scripts\run-local.ps1 -EnableAi -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
@@ -248,11 +248,11 @@ database remains separate and untouched. Use Neon's dashboard or SQL editor
 for authorized inspection, monitoring, and backup controls. Local PostgreSQL
 and runtime SQLite database modes are no longer supported.
 
-The ignored private folder contains only the Neon/OpenAI environment settings
-and its short instructions. The password-free account roster is tracked in Git.
+The ignored repository-root `.env` contains the Neon/OpenAI environment settings.
+The password-free account roster is tracked in Git.
 
-Copy `backend/.env.example` to ignored `local_handoff_package/.env` only when
-you need optional settings. Production deployment, study-account import, API details, and
+Copy `backend/.env.example` to ignored `.env` only when you need to create the
+private settings file. Production deployment, study-account import, API details, and
 research-data contracts are documented under `docs/` and `backend/README.md`.
 
 Never commit `.env`, databases, credentials, API keys, Python environments,

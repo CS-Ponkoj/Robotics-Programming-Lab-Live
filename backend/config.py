@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 def configured_env_file() -> Path:
     configured = os.getenv("ROBOTICS_ENV_FILE")
-    return Path(configured).expanduser() if configured else BASE_DIR / ".env"
+    return Path(configured).expanduser() if configured else BASE_DIR.parent / ".env"
 
 
 class Settings(BaseSettings):

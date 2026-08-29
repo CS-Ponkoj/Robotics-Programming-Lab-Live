@@ -45,7 +45,7 @@ grading but is excluded from research dashboards and exports.
 
 For storage definitions, standard execution statuses, and event payload rules,
 see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). The ignored
-`local_handoff_package/.env` supplies the Neon connection on authorized
+The repository-root `.env` supplies the Neon connection on authorized
 computers. The password-free account roster is tracked at
 `backend/data/study_accounts.json`; passwords and password hashes never belong
 in Git. Assignment source data is human-readable in

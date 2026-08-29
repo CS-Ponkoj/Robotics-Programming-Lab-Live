@@ -33,22 +33,19 @@ if (-not $resolvedCache.StartsWith($localPrefix, [System.StringComparison]::Ordi
     throw "Python bytecode cache must stay under LocalAppData."
 }
 
-$packageRoot = [System.IO.Path]::GetFullPath(
-    (Get-RoboticsHandoffPackageRoot -RepositoryRoot $repositoryRoot)
-)
 $configPath = [System.IO.Path]::GetFullPath(
-    (Get-RoboticsHandoffPrivateConfigPath -RepositoryRoot $repositoryRoot)
+    (Get-RoboticsPrivateConfigPath -RepositoryRoot $repositoryRoot)
 )
-$expectedConfigPath = Join-Path $packageRoot ".env"
+$expectedConfigPath = Join-Path $repositoryRoot ".env"
 if (-not $configPath.Equals(
     [System.IO.Path]::GetFullPath($expectedConfigPath),
     [System.StringComparison]::OrdinalIgnoreCase
 )) {
-    throw "The package root .env file is not the active private configuration path."
+    throw "The repository root .env file is not the active private configuration path."
 }
 
 Write-Output "PASS: generated Python environment and bytecode cache remain device-local."
-Write-Output "PASS: private Neon configuration remains in the expected ignored package folder."
+Write-Output "PASS: private Neon configuration remains in the expected ignored repository-root file."
 Write-Output "Python environment: $environmentRoot"
 Write-Output "Python cache: $resolvedCache"
 Write-Output "Private config: $configPath"

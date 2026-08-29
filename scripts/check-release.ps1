@@ -49,8 +49,6 @@ try {
         "scripts/check-ros2-local.sh",
         "scripts/linux-local-common.sh",
         "scripts/verify-local.sh",
-        "local_handoff_package/.gitignore",
-        "local_handoff_package/README.md",
         "docs/guides/FIRST_TIME_RUN.md",
         "docs/guides/FIRST_TIME_RUN_WINDOWS.md",
         "docs/guides/FIRST_TIME_RUN_UBUNTU.md"

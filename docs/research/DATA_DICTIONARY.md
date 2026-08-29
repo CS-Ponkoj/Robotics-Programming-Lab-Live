@@ -29,7 +29,7 @@ after an instructor updates the assignment.
 |---|---|---|---|
 | Assignment source definitions | `backend/assignments/assignment_1.json` through `assignment_6.json` | JSON | Yes, open directly in VS Code |
 | Active staging application database | Neon database `robotics_lab_staging` | PostgreSQL | Use the application or authorized Neon SQL Editor |
-| Private local configuration | `local_handoff_package/.env` | Ignored environment settings | Read directly by the launcher and backend |
+| Private local configuration | `.env` in the repository root | Ignored environment settings | Read directly by the launcher and backend |
 | Legacy local source preserved during first migration | `backend/robotics_lab_staging.db` | SQLite | Read-only; not used by the default launcher after migration |
 | Student editor draft | Browser storage, keyed by authenticated user, assignment ID, and assignment version | Local JSON preferences | View through the matching assignment workspace; another login and older versions are isolated |
 | Password-free prototype account roster | `backend/data/study_accounts.json` | JSON | Yes; tracked by Git, with `temporary_password` always `null` |

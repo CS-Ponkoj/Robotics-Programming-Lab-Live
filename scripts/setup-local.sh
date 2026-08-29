@@ -72,6 +72,6 @@ fi
 printf 'Ubuntu local setup is ready.\n'
 printf 'Python: %s\n' "$python"
 "$python" --version
-printf 'Private config: %s/.env\n' "$(robotics_handoff_root)"
+printf 'Private config: %s\n' "$(robotics_private_config)"
 printf 'Database: Neon PostgreSQL (configured in the private .env file)\n'
 printf 'Start with: ./scripts/run-local.sh --frontend-port 8180 --backend-port 5100 --sandbox-port 5101\n'

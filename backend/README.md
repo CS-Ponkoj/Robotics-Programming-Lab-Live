@@ -17,7 +17,7 @@
   participant, assignment, and data-health summaries.
 
 Docker Compose and the supported local launcher load secrets and instructor
-settings directly from ignored `local_handoff_package/.env`. Submission
+settings directly from the ignored repository-root `.env`. Submission
 execution defaults to the Docker sandbox.
 Direct local development can keep `SANDBOX_BACKEND=subprocess`.
 

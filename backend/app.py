@@ -1625,7 +1625,7 @@ def create_app(
             raise HTTPException(
                 503,
                 "Real email delivery is not configured. Add SMTP settings "
-                "to local_handoff_package/.env and restart the backend.",
+                "to the repository root .env and restart the backend.",
             )
         temporary_password = body.temporary_password or generate_temporary_password()
         try:
@@ -1766,7 +1766,7 @@ def create_app(
                 raise HTTPException(
                     503,
                     "Real email delivery is not configured. Add SMTP settings "
-                    "to local_handoff_package/.env and restart the backend.",
+                    "to the repository root .env and restart the backend.",
                 )
             try:
                 email_sent = send_password_email(
@@ -1835,7 +1835,7 @@ def create_app(
             raise HTTPException(
                 503,
                 "Real email delivery is not configured. Add SMTP settings "
-                "to local_handoff_package/.env and restart the backend.",
+                "to the repository root .env and restart the backend.",
             )
         temporary_password = body.temporary_password or generate_temporary_password()
         try:
@@ -1961,7 +1961,7 @@ def create_app(
                 raise HTTPException(
                     503,
                     "Real email delivery is not configured. Add SMTP settings "
-                    "to local_handoff_package/.env and restart the backend.",
+                    "to the repository root .env and restart the backend.",
                 )
             try:
                 email_sent = send_password_email(
@@ -2045,7 +2045,7 @@ def create_app(
             raise HTTPException(
                 503,
                 "Real email delivery is not configured. Add SMTP settings "
-                "to local_handoff_package/.env and restart the backend.",
+                "to the repository root .env and restart the backend.",
             )
         try:
             service.send_test_message(recipient)
@@ -2054,7 +2054,7 @@ def create_app(
             raise HTTPException(
                 502,
                 "The SMTP server rejected the test email. Check backend logs "
-                "and the SMTP settings in local_handoff_package/.env.",
+                "and the SMTP settings in the repository root .env.",
             ) from error
         record_audit(
             session,

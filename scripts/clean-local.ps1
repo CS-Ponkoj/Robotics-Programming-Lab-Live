@@ -14,7 +14,6 @@ $protectedRoots = @(
     (Join-Path $repoRoot 'venv'),
     (Join-Path $repoRoot 'backend\data'),
     (Join-Path $repoRoot 'course_materials'),
-    (Join-Path $repoRoot 'local_handoff_package'),
     (Join-Path $repoRoot 'output')
 )
 
