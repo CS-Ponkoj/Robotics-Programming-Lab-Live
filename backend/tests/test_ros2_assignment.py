@@ -319,8 +319,14 @@ def test_ros2_assignment_submission_uses_injected_executor(tmp_path):
         client.headers.update(
             {"Authorization": f"Bearer {login.json()['token']}"}
         )
+        assignment_response = client.get("/assignments/5")
         response = client.post("/assignments/5/submit", json={"code": solution})
 
+    assert assignment_response.status_code == 200
+    assignment_body = assignment_response.json()
+    assert assignment_body["version"] == 2
+    assert 'src="/images/5"' in assignment_body["assignment_html"]
+    assert "src/robot_motion/robot_motion/controller.py" in assignment_body["assignment_html"]
     assert response.status_code == 200
     body = response.json()
     assert body["pass"] is True
@@ -363,6 +369,9 @@ def test_ros2_obstacle_assignment_submission_uses_behavior_harness(tmp_path):
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
     assert assignment_body["stable_id"] == "ros2-obstacle-stop"
+    assert assignment_body["version"] == 2
+    assert 'src="/images/6"' in assignment_body["assignment_html"]
+    assert "src/reactive_navigation/reactive_navigation/controller.py" in assignment_body["assignment_html"]
     assert assignment_body["editable_file_path"].endswith("controller.py")
     assert sum(item["editable"] for item in assignment_body["project_files"]) == 1
     assert "grader_config" not in assignment_body

@@ -795,6 +795,7 @@ class _InstructionSectionCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             HtmlWidget(
               html,
+              baseUrl: apiBaseUri,
               textStyle: theme.textTheme.bodyMedium?.copyWith(
                 fontFamily: 'roboto-serif',
                 height: 1.55,

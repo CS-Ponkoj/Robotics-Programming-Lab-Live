@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:highlight/languages/python.dart';
+import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/main.dart' as app;
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
@@ -523,6 +525,12 @@ void main() {
     expect(
       find.bySemanticsLabel(RegExp('Scenario instruction section')),
       findsOneWidget,
+    );
+    expect(
+      tester
+          .widgetList<HtmlWidget>(find.byType(HtmlWidget))
+          .every((widget) => widget.baseUrl == apiBaseUri),
+      isTrue,
     );
     expect(
       find.textContaining(

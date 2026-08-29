@@ -72,6 +72,9 @@ def test_assignment_4_exposes_the_complete_deterministic_lidar_model(tmp_path):
     assert "10 + 2 * np.sin(np.radians(angle))" in instructions
     assert "3 through 357" in instructions
     assert "80 through 100" in instructions
+    assert "smallest density, not the smallest distance" in instructions
+    assert assignment["version"] == 5
+    assert 'src="/images/4"' in instructions
     assert "np.sin(np.radians(angle))" in assignment["starter_code"]
 
 
@@ -95,10 +98,12 @@ def test_assignment_2_uses_explicit_hit_and_leave_geometry(tmp_path):
         )
 
     instructions = assignment["assignment_html"]
-    assert "H(4,0)" in instructions
-    assert "L(6,0)" in instructions
+    assert "H = (4, 0)" in instructions
+    assert "L = (6, 0)" in instructions
     assert "H -&gt; A -&gt; B -&gt; L" in instructions
-    assert "Do not use the full rectangle perimeter" in instructions
+    assert "Do not use C, D, the upper boundary, or the full perimeter" in instructions
+    assert assignment["version"] == 5
+    assert 'src="/images/2"' in instructions
     assert old_three_edge_model.status_code == 200
     assert old_three_edge_model.json()["pass"] is False
 
@@ -115,7 +120,9 @@ def test_assignment_3_includes_the_complete_floor_to_floor_route(tmp_path):
     assignment = response.json()
     instructions = assignment["assignment_html"]
     assert "S -&gt; M1 -&gt; M2 -&gt; E_m" in instructions
-    assert "After exiting on floor 10" in instructions
+    assert "floor-10 path / speed" in instructions
+    assert assignment["version"] == 6
+    assert 'src="/images/3"' in instructions
     assert "path_from_E_m_to_goal" in assignment["starter_code"]
     assert "path_from_E_s_to_goal" in assignment["starter_code"]
     assert "total_time_via_E_m" in assignment["starter_code"]
@@ -134,9 +141,12 @@ def test_assignment_1_uses_valid_bug2_m_line_intersections(tmp_path):
     assignment = response.json()
     instructions = assignment["assignment_html"]
     assert "Bug2 <em>m-line</em>" in instructions
-    assert "H(4, 11/3)" in instructions
-    assert "L(23/4, 6)" in instructions
+    assert "H = (4, 11/3)" in instructions
+    assert "L = (23/4, 6)" in instructions
     assert "H and L both lie on the m-line" in instructions
+    assert assignment["version"] == 6
+    assert 'src="/images/1"' in instructions
+    assert "Coordinate diagram showing the cleaning robot route" in instructions
     assert "hit_point = (4.0, 11.0 / 3.0)" in assignment["starter_code"]
     assert "leave_point = (23.0 / 4.0, 6.0)" in assignment["starter_code"]
 
