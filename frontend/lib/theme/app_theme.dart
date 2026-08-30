@@ -6,6 +6,24 @@ abstract final class AppColors {
   static const pageBackground = Color(0xFFF4F7F9);
   static const success = Color(0xFF18794E);
   static const successContainer = Color(0xFFE7F6ED);
+  static const performanceLow = Color(0xFFC62828);
+  static const performanceMid = Color(0xFF9A5A00);
+}
+
+Color performanceColor(num percentage) {
+  final normalized = (percentage.toDouble().clamp(0, 100)) / 100;
+  if (normalized <= 0.5) {
+    return Color.lerp(
+      AppColors.performanceLow,
+      AppColors.performanceMid,
+      normalized * 2,
+    )!;
+  }
+  return Color.lerp(
+    AppColors.performanceMid,
+    AppColors.success,
+    (normalized - 0.5) * 2,
+  )!;
 }
 
 abstract final class AppSpacing {

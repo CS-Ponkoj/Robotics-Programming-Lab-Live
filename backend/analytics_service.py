@@ -730,7 +730,7 @@ def _median_active_gap(attempts: list[Submission]) -> float | None:
     return _median(
         [
             max(0, int(current) - int(previous))
-            for previous, current in zip(snapshots, snapshots[1:], strict=True)
+            for previous, current in zip(snapshots, snapshots[1:])
         ]
     )
 

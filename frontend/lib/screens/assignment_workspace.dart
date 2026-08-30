@@ -253,6 +253,11 @@ class _MyHomePageState extends State<MyHomePage> {
     AssignmentWorkspaceFocus target, {
     required bool useDesktopLayout,
   }) {
+    if (useDesktopLayout &&
+        target == AssignmentWorkspaceFocus.results &&
+        !_submitted) {
+      return;
+    }
     setState(() {
       if (useDesktopLayout) {
         _workspaceFocus = target;
@@ -279,8 +284,9 @@ class _MyHomePageState extends State<MyHomePage> {
             _workspaceFocus == AssignmentWorkspaceFocus.instructions
         : _selectedWorkspaceTab == 1;
     final showResults = useDesktopLayout
-        ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
-            _workspaceFocus == AssignmentWorkspaceFocus.results
+        ? _submitted &&
+            (_workspaceFocus == AssignmentWorkspaceFocus.none ||
+                _workspaceFocus == AssignmentWorkspaceFocus.results)
         : _selectedWorkspaceTab == 2;
     final showResizeHandle =
         useDesktopLayout && _workspaceFocus == AssignmentWorkspaceFocus.none;
@@ -2129,10 +2135,8 @@ class _ResultSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final allPassed = failed == 0 && passed > 0;
-    final statusColor = allPassed ? AppColors.success : theme.colorScheme.error;
-    final statusBackground = allPassed
-        ? AppColors.successContainer
-        : theme.colorScheme.errorContainer;
+    final statusColor = performanceColor(accuracy);
+    final statusBackground = statusColor.withValues(alpha: 0.12);
 
     return Semantics(
       container: true,

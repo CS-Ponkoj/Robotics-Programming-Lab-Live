@@ -353,6 +353,7 @@ class ProgressSummary extends StatelessWidget {
     final progress =
         totalAssignments == 0 ? 0.0 : completedAssignments / totalAssignments;
     final percentage = (progress * 100).round();
+    final progressColor = performanceColor(percentage);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
@@ -394,7 +395,7 @@ class ProgressSummary extends StatelessWidget {
               Text(
                 '$percentage%',
                 style: theme.textTheme.headlineSmall?.copyWith(
-                  color: theme.colorScheme.primary,
+                  color: progressColor,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -405,6 +406,7 @@ class ProgressSummary extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: progress,
+              color: progressColor,
               minHeight: 8,
               backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
             ),
@@ -625,8 +627,8 @@ class ListAssignment extends StatelessWidget {
     final accuracyText = hasAccuracy
         ? '${state.label} • Last score: ${lastAttemptAccuracy[a.id]}%'
         : state.label;
-    final accuracyColor = state == AssignmentProgressState.completed
-        ? AppColors.success
+    final accuracyColor = hasAccuracy
+        ? performanceColor(lastAttemptAccuracy[a.id]!)
         : theme.colorScheme.onSurfaceVariant;
 
     return Card(
@@ -718,6 +720,10 @@ class AssignmentCard extends StatelessWidget {
       starterCode: a.code,
     );
     final hasAccuracy = lastAttemptAccuracy.containsKey(a.id);
+    final score = lastAttemptAccuracy[a.id];
+    final scoreColor = hasAccuracy
+        ? performanceColor(score!)
+        : theme.colorScheme.onSurfaceVariant;
     final solutionRevealed = solutionRevealedAssignments.contains(a.id);
     final statusText = progressState.label;
     final statusColor = progressState == AssignmentProgressState.completed
@@ -845,13 +851,13 @@ class AssignmentCard extends StatelessWidget {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.secondaryContainer,
+                          color: scoreColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           'Last score: ${lastAttemptAccuracy[a.id]}%',
                           style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.onSecondaryContainer,
+                            color: scoreColor,
                             fontWeight: FontWeight.w700,
                           ),
                         ),

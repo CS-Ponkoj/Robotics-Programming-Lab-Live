@@ -26,6 +26,14 @@ const testAuthenticatedUser = AuthenticatedUser(
 Future<void> testLogout() async {}
 
 void main() {
+  test('performance color moves from red through amber to green', () {
+    expect(performanceColor(0), AppColors.performanceLow);
+    expect(performanceColor(50), AppColors.performanceMid);
+    expect(performanceColor(100), AppColors.success);
+    expect(performanceColor(-10), AppColors.performanceLow);
+    expect(performanceColor(110), AppColors.success);
+  });
+
   test('feedback DTO preserves structured tutor guidance', () {
     final feedback = UnittestFeedbackDto.fromJson({
       'id': 1,
@@ -265,8 +273,18 @@ void main() {
         find.byKey(const Key('assignment-instructions-panel')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+      expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
       expect(find.byKey(const Key('workspace-resize-handle')), findsOneWidget);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pump();
+      expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
+      expect(
+        find.byKey(const Key('assignment-instructions-panel')),
+        findsOneWidget,
+      );
 
       final initialEditorWidth = tester
           .getSize(find.byKey(const Key('assignment-editor-panel')))
@@ -297,7 +315,7 @@ void main() {
         find.byKey(const Key('assignment-instructions-panel')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+      expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
@@ -315,7 +333,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pump();
       expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
-      expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+      expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
 
       await tester.pumpWidget(workspaceApp(const Size(390, 844)));
 
@@ -407,13 +425,15 @@ void main() {
       app.learningProgress.attemptCounts.clear();
     });
 
-    expect(find.text('Ready when you are'), findsOneWidget);
+    expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
+    expect(find.text('Ready when you are'), findsNothing);
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
     expect(find.text('Ready when you are'), findsNothing);
   });
 
@@ -852,6 +872,9 @@ void main() {
       find.byType(LinearProgressIndicator),
     );
     expect(progress.value, 0.25);
+    expect(progress.color, performanceColor(25));
+    final percentage = tester.widget<Text>(find.text('25%'));
+    expect(percentage.style?.color, performanceColor(25));
   });
 
   testWidgets('assignment collection switches between grid and list layouts', (
@@ -1010,6 +1033,13 @@ void main() {
 
     expect(find.text('Attempted'), findsOneWidget);
     expect(find.text('Last score: 60%'), findsOneWidget);
+    final badge = tester.widget<Container>(
+      find.byKey(const Key('latest-score-badge')),
+    );
+    final decoration = badge.decoration! as BoxDecoration;
+    expect(decoration.color, performanceColor(60).withValues(alpha: 0.12));
+    final scoreText = tester.widget<Text>(find.text('Last score: 60%'));
+    expect(scoreText.style?.color, performanceColor(60));
   });
 
   testWidgets('feedback uses boolean results for pass and accuracy counts', (
@@ -1042,6 +1072,16 @@ void main() {
     expect(find.byKey(const Key('result-summary')), findsOneWidget);
     expect(find.byKey(const Key('terminal-output')), findsOneWidget);
     expect(find.text('Keep refining your solution'), findsOneWidget);
+    final summary = tester.widget<Container>(
+      find.byKey(const Key('result-summary')),
+    );
+    final summaryDecoration = summary.decoration! as BoxDecoration;
+    expect(
+      summaryDecoration.color,
+      performanceColor(50).withValues(alpha: 0.12),
+    );
+    final score = tester.widget<Text>(find.text('50%'));
+    expect(score.style?.color, performanceColor(50));
     expect(find.text('Passed'), findsOneWidget);
     expect(find.text('Needs attention'), findsOneWidget);
     expect(find.byIcon(Icons.check_rounded), findsNWidgets(2));

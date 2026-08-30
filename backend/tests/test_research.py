@@ -502,6 +502,63 @@ def test_phase1_keeps_versions_separate_and_marks_historical_time_unavailable(
     assert current["completion_time_availability"] == "not_collected"
 
 
+def test_student_analytics_calculates_active_gap_across_multiple_attempts(
+    research_client,
+):
+    student = _login(
+        research_client, "research-student", "Research-Student-4827"
+    )
+    assignment = research_client.get(
+        "/assignments/1", headers=_bearer(student)
+    ).json()
+    user_id = student["user"]["id"]
+    with research_client.app.state.SessionLocal() as session:
+        session.add_all(
+            [
+                Submission(
+                    assignment_id=1,
+                    assignment_version=assignment["version"],
+                    student_id="research-student",
+                    user_id=user_id,
+                    mode="run",
+                    code="student source is not returned",
+                    execution_succeeded=True,
+                    execution_status="completed",
+                    passed=False,
+                    score=25,
+                    active_seconds_at_attempt=30,
+                    evidence={"tests": []},
+                ),
+                Submission(
+                    assignment_id=1,
+                    assignment_version=assignment["version"],
+                    student_id="research-student",
+                    user_id=user_id,
+                    mode="run",
+                    code="student source is not returned",
+                    execution_succeeded=True,
+                    execution_status="completed",
+                    passed=False,
+                    score=50,
+                    active_seconds_at_attempt=90,
+                    evidence={"tests": []},
+                ),
+            ]
+        )
+        session.commit()
+
+    response = research_client.get("/research/me", headers=_bearer(student))
+
+    assert response.status_code == 200
+    row = next(
+        item
+        for item in response.json()["assignment_summaries"]
+        if item["assignment_id"] == 1 and item["is_current_version"]
+    )
+    assert row["attempt_count"] == 2
+    assert row["median_active_seconds_between_attempts"] == 60
+
+
 def test_phase1_records_oversized_attempt_and_instructor_safe_aggregates(
     research_client,
 ):
