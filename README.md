@@ -231,4 +231,6 @@ AI/ML researcher and Ph.D. candidate in Computer Science
 
 ## License
 
-No license file is currently included. Please contact the author before reusing the repository beyond review, education, or fair-use evaluation.
+Copyright 2026 Ponkoj Shill.
+
+Licensed under the [Apache License 2.0](LICENSE).
