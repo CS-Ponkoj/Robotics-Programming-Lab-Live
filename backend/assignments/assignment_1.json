@@ -1,11 +1,11 @@
 {
   "id": 1,
-  "version": 6,
+  "version": 7,
   "data_schema_version": 1,
   "title": "Assignment 1: Obstacle Avoidance: Bug Algorithm Scenario 1",
   "description": "Calculate a true Bug2 m-line route with valid hit and leave points.",
-  "assignment_html": "<p><strong>Scenario</strong></p><p><strong>Purpose:</strong> Practice dividing a valid Bug2 path into approach, boundary-following, and departure distances.</p><p>A cleaning robot starts at <code>S = (2, 1)</code> and travels toward <code>G = (8, 9)</code>. The straight start-to-goal line is the Bug2 <em>m-line</em>. A rectangular obstacle occupies <code>4 &lt;= x &lt;= 7</code> and <code>3 &lt;= y &lt;= 6</code>.</p><ul><li>Hit point: <code>H = (4, 11/3)</code>, where the m-line first reaches the obstacle.</li><li>Clockwise boundary waypoint: <code>T = (4, 6)</code>, the top-left corner.</li><li>Leave point: <code>L = (23/4, 6)</code>, where the boundary meets the m-line again.</li><li>Required route: <code>S -&gt; H -&gt; T -&gt; L -&gt; G</code>.</li></ul><p>H and L both lie on the m-line, and L is closer to G than H. Therefore, the robot may leave the boundary at L.</p><p><img src=\"/images/1\" alt=\"Coordinate diagram showing the cleaning robot route from S to H, clockwise along the obstacle through T to L, and then to goal G.\"></p><p><strong>Task</strong></p><ol><li>Set <code>distance_to_hit</code> to the Euclidean distance from S to H.</li><li>Set <code>distance_along_obstacle</code> to H-to-T plus T-to-L.</li><li>Set <code>distance_leave_to_goal</code> to the Euclidean distance from L to G.</li><li>Set <code>total_distance</code> to the sum of those three traveled components exactly once.</li></ol><p><code>distance = sqrt((x2 - x1)^2 + (y2 - y1)^2)</code></p><p><strong>Hints</strong></p><p><strong>Rules and required outputs</strong></p><ul><li>Treat the fractional coordinates as exact values.</li><li>Follow only <code>H -&gt; T -&gt; L</code>; do not use the full obstacle perimeter.</li><li>Do not change the supplied coordinates or required variable names.</li><li>Required numeric variables: <code>distance_to_hit</code>, <code>distance_along_obstacle</code>, <code>distance_leave_to_goal</code>, and <code>total_distance</code>.</li></ul><p><strong>Before you run the tests</strong></p><ul><li>Confirm that each variable is numeric and defined at module level.</li><li>Confirm that <code>total_distance</code> equals the other three values added once.</li></ul>",
-  "starter_code": "import math\n\nstart_point = (2.0, 1.0)\ngoal_point = (8.0, 9.0)\nhit_point = (4.0, 11.0 / 3.0)\ntop_left = (4.0, 6.0)\nleave_point = (23.0 / 4.0, 6.0)\n\ndef calculate_distance(point_1, point_2):\n    return math.hypot(point_2[0] - point_1[0], point_2[1] - point_1[1])\n\n# TODO: Distance from the start to the m-line hit point.\ndistance_to_hit = 0.0\n\n# TODO: Clockwise boundary distance H -> T -> L.\ndistance_along_obstacle = 0.0\n\n# TODO: Distance from the m-line leave point to the goal.\ndistance_leave_to_goal = 0.0\n\n# TODO: Add the three traveled components exactly once.\ntotal_distance = 0.0\n\nprint(\"Total travel distance:\", total_distance)\n",
+  "assignment_html": "<p><strong>Scenario</strong></p><p><strong>Purpose:</strong> Practice dividing a valid Bug2 path into approach, boundary-following, and departure distances.</p><p>A cleaning robot starts at <code>S = (2, 1)</code> and travels toward <code>G = (8, 9)</code>. The straight start-to-goal line is the Bug2 <em>m-line</em>. A rectangular obstacle occupies <code>4 &lt;= x &lt;= 7</code> and <code>3 &lt;= y &lt;= 6</code>.</p><ul><li>Hit point: <code>H = (4, 11/3)</code>, where the m-line first reaches the obstacle.</li><li>Clockwise boundary waypoint: <code>T = (4, 6)</code>, the top-left corner.</li><li>Leave point: <code>L = (23/4, 6)</code>, where the boundary meets the m-line again.</li><li>Required route: <code>S -&gt; H -&gt; T -&gt; L -&gt; G</code>.</li></ul><p>H and L both lie on the m-line, and L is closer to G than H. Therefore, the robot may leave the boundary at L.</p><p><img src=\"/images/1\" alt=\"Coordinate diagram showing the cleaning robot route from S to H, clockwise along the obstacle through T to L, and then to goal G.\"></p><p><strong>Task</strong></p><p>Complete <code>calculate_bug2_route(start, hit, corner, leave, goal)</code>. It must return four values in this order:</p><ol><li>Euclidean distance from start to hit.</li><li>Boundary distance from hit through corner to leave.</li><li>Euclidean distance from leave to goal.</li><li>Total of the three traveled components.</li></ol><p><code>distance = sqrt((x2 - x1)^2 + (y2 - y1)^2)</code></p><p><strong>Rules</strong></p><ul><li>Use the points passed into the function; do not hard-code the displayed answer.</li><li>Follow only <code>hit -&gt; corner -&gt; leave</code>; do not use the full obstacle perimeter.</li><li>Return exactly four numeric values in the required order.</li><li>The grader checks the displayed scenario and additional coordinate sets.</li></ul><p><strong>Before you run the tests</strong></p><ul><li>Call your function with a second small example of your own.</li><li>Confirm that the total equals the other three values added once.</li></ul>",
+  "starter_code": "import math\n\nstart_point = (2.0, 1.0)\ngoal_point = (8.0, 9.0)\nhit_point = (4.0, 11.0 / 3.0)\ntop_left = (4.0, 6.0)\nleave_point = (23.0 / 4.0, 6.0)\n\ndef calculate_distance(point_1, point_2):\n    return math.hypot(point_2[0] - point_1[0], point_2[1] - point_1[1])\n\ndef calculate_bug2_route(start, hit, corner, leave, goal):\n    # TODO: Calculate the three traveled phases from the supplied points.\n    distance_to_hit = 0.0\n    distance_along_obstacle = 0.0\n    distance_leave_to_goal = 0.0\n    total_distance = 0.0\n    return (\n        distance_to_hit,\n        distance_along_obstacle,\n        distance_leave_to_goal,\n        total_distance,\n    )\n\nresult = calculate_bug2_route(\n    start_point, hit_point, top_left, leave_point, goal_point\n)\nprint(\"Total travel distance:\", result[3])\n",
   "stable_id": "robotics-assignment-1",
   "language": "python",
   "status": "published",
@@ -23,7 +23,10 @@
     "simulation_enabled": false
   },
   "public_tests": [
-    {"id": "public-execution", "label": "Program executes without an error"}
+    {"id": "approach", "label": "Approach distance"},
+    {"id": "boundary", "label": "Boundary-following distance"},
+    {"id": "departure", "label": "Departure distance"},
+    {"id": "total", "label": "Complete route distance"}
   ],
   "rubric": [
     {"criterion": "M-line approach", "description": "Calculate the Euclidean distance from S to the valid hit point H.", "weight": 25},
@@ -47,7 +50,21 @@
   },
   "simulation_config": {"enabled": false, "provider": null, "scenario": null},
   "asset_manifest": [],
-  "grader_type": "python_variables",
+  "grader_type": "python_function",
+  "grader_config": {
+    "function_name": "calculate_bug2_route",
+    "criteria": [
+      {"id": "approach", "label": "Approach distance", "weight": 25, "success_feedback": "The start-to-hit distance works for every tested route.", "failure_feedback": "Use both coordinate differences when calculating the Euclidean distance from start to hit."},
+      {"id": "boundary", "label": "Boundary-following distance", "weight": 25, "success_feedback": "The two boundary segments work for every tested route.", "failure_feedback": "Add hit-to-corner and corner-to-leave; do not use the full obstacle perimeter."},
+      {"id": "departure", "label": "Departure distance", "weight": 25, "success_feedback": "The leave-to-goal distance works for every tested route.", "failure_feedback": "Calculate the Euclidean distance from the supplied leave point to the supplied goal."},
+      {"id": "total", "label": "Complete route distance", "weight": 25, "success_feedback": "The complete Bug2 route total is consistent.", "failure_feedback": "Add the approach, boundary, and departure distances exactly once."}
+    ],
+    "cases": [
+      {"arguments": [[2.0, 1.0], [4.0, 3.6666666666666665], [4.0, 6.0], [5.75, 6.0], [8.0, 9.0]], "expected": [3.3333333333333335, 4.083333333333333, 3.75, 11.166666666666666]},
+      {"arguments": [[0.0, 0.0], [3.0, 4.0], [3.0, 8.0], [7.0, 8.0], [10.0, 12.0]], "expected": [5.0, 8.0, 5.0, 18.0]},
+      {"arguments": [[1.0, 2.0], [1.0, 7.0], [4.0, 7.0], [4.0, 10.0], [8.0, 13.0]], "expected": [5.0, 6.0, 5.0, 16.0]}
+    ]
+  },
   "reference_solution_path": "course_materials/content/Obstacle Avoidance/Assignment_Bug_Algorithm/Scenario_1/math_question_1_solution.py",
   "solution_html": "<p><strong>1. Reach H</strong></p><p>The m-line distance from S to H is <strong>10/3</strong> units.</p><p><strong>2. Follow the clockwise boundary</strong></p><p>H-to-T is 7/3 units and T-to-L is 7/4 units, totaling <strong>49/12</strong> units.</p><p><strong>3. Continue from L to G</strong></p><p>The remaining m-line distance is <strong>15/4</strong> units.</p><p><strong>Total path</strong>: 10/3 + 49/12 + 15/4 = <strong>67/6</strong>, approximately <strong>11.1667 units</strong>.</p>",
   "vals": {

@@ -18,6 +18,45 @@ OFFICIAL_SOLUTIONS = {
     4: MANUAL_ANSWERS / "assignment_4_answer.py",
 }
 
+PARTIAL_SOLUTIONS = {
+    1: (
+        "import math\n"
+        "def calculate_bug2_route(start, hit, corner, leave, goal):\n"
+        "    approach = math.hypot(hit[0] - start[0], hit[1] - start[1])\n"
+        "    return approach, 0, 0, 0\n"
+    ),
+    2: (
+        "import math\n"
+        "def calculate_bug_route(start, hit, corner_a, corner_b, leave, goal):\n"
+        "    approach = math.hypot(hit[0] - start[0], hit[1] - start[1])\n"
+        "    return approach, 0, 0, 0\n"
+    ),
+    3: (
+        "import math\n"
+        "def distance(a, b):\n"
+        "    return math.hypot(b[0] - a[0], b[1] - a[1])\n"
+        "def evaluate_elevator_routes(speed, radius, main_wait, service_wait, "
+        "main_floor, service_floor, floors, start, goal, main, service, waypoints):\n"
+        "    main_entry = sum(distance(a, b) for a, b in "
+        "zip([start, *waypoints], [*waypoints, main]))\n"
+        "    service_entry = distance(start, service) + math.pi * radius\n"
+        "    return (main_entry, service_entry, distance(main, goal), "
+        "distance(service, goal), 0, 0, '', 0)\n"
+    ),
+    4: (
+        "import numpy as np\n"
+        "def analyze_vfh(seed, fill_start, fill_end, goal, half_width, probe):\n"
+        "    readings = dict(seed)\n"
+        "    for angle in range(fill_start, fill_end + 1):\n"
+        "        readings[angle] = 10 + 2 * np.sin(np.radians(angle))\n"
+        "    histogram = {angle: 1 / value**2 for angle, value in readings.items()}\n"
+        "    candidates = list(range(goal - half_width, goal + half_width + 1))\n"
+        "    return len(readings), len(candidates), histogram[probe], 0, 0\n"
+    ),
+}
+
+EXPECTED_PARTIAL_SCORES = {1: 25, 2: 25, 3: 50, 4: 60}
+
 
 def _settings(database_url: str, account_file: Path) -> Settings:
     return Settings(
@@ -58,6 +97,28 @@ def test_classroom_official_solution_passes(assignment_id, tmp_path):
     assert all(response.json()["unittest_pass_results"])
 
 
+@pytest.mark.parametrize("assignment_id", [1, 2, 3, 4])
+def test_classroom_mixed_answers_receive_expected_partial_credit(
+    assignment_id, tmp_path
+):
+    settings = _settings("sqlite://", tmp_path / "partial-accounts.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        response = client.post(
+            f"/assignments/{assignment_id}/submit",
+            headers=_bearer(student["token"]),
+            json={"code": PARTIAL_SOLUTIONS[assignment_id]},
+        )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["pass"] is False
+    assert result["ex_success"] is True
+    assert result["score"] == EXPECTED_PARTIAL_SCORES[assignment_id]
+    assert any(result["unittest_pass_results"])
+    assert any(not item for item in result["unittest_pass_results"])
+
+
 def test_assignment_4_exposes_the_complete_deterministic_lidar_model(tmp_path):
     settings = _settings("sqlite://", tmp_path / "assignment-4-accounts.json")
     with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
@@ -73,9 +134,29 @@ def test_assignment_4_exposes_the_complete_deterministic_lidar_model(tmp_path):
     assert "3 through 357" in instructions
     assert "80 through 100" in instructions
     assert "smallest density, not the smallest distance" in instructions
-    assert assignment["version"] == 5
+    assert assignment["version"] == 6
     assert 'src="/images/4"' in instructions
-    assert "np.sin(np.radians(angle))" in assignment["starter_code"]
+    assert "analyze_vfh" in assignment["starter_code"]
+
+
+def test_assignment_4_rejects_hardcoded_displayed_answers(tmp_path):
+    settings = _settings("sqlite://", tmp_path / "assignment-4-hardcoded.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        response = client.post(
+            "/assignments/4/submit",
+            headers=_bearer(student["token"]),
+            json={
+                "code": (
+                    "def analyze_vfh(*args):\n"
+                    "    return (360, 21, 1/144, 90, 1/144)\n"
+                )
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["pass"] is False
+    assert response.json()["score"] < 100
 
 
 def test_assignment_2_uses_explicit_hit_and_leave_geometry(tmp_path):
@@ -102,10 +183,31 @@ def test_assignment_2_uses_explicit_hit_and_leave_geometry(tmp_path):
     assert "L = (6, 0)" in instructions
     assert "H -&gt; A -&gt; B -&gt; L" in instructions
     assert "Do not use C, D, the upper boundary, or the full perimeter" in instructions
-    assert assignment["version"] == 5
+    assert assignment["version"] == 6
     assert 'src="/images/2"' in instructions
+    assert "calculate_bug_route" in assignment["starter_code"]
     assert old_three_edge_model.status_code == 200
     assert old_three_edge_model.json()["pass"] is False
+
+
+def test_assignment_2_rejects_hardcoded_displayed_answers(tmp_path):
+    settings = _settings("sqlite://", tmp_path / "assignment-2-hardcoded.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        response = client.post(
+            "/assignments/2/submit",
+            headers=_bearer(student["token"]),
+            json={
+                "code": (
+                    "def calculate_bug_route(start, hit, corner_a, corner_b, leave, goal):\n"
+                    "    return (4, 4, 4, 12)\n"
+                )
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["pass"] is False
+    assert response.json()["score"] == 0
 
 
 def test_assignment_3_includes_the_complete_floor_to_floor_route(tmp_path):
@@ -121,12 +223,36 @@ def test_assignment_3_includes_the_complete_floor_to_floor_route(tmp_path):
     instructions = assignment["assignment_html"]
     assert "S -&gt; M1 -&gt; M2 -&gt; E_m" in instructions
     assert "floor-10 path / speed" in instructions
-    assert assignment["version"] == 6
+    assert assignment["version"] == 7
     assert 'src="/images/3"' in instructions
     assert "path_from_E_m_to_goal" in assignment["starter_code"]
     assert "path_from_E_s_to_goal" in assignment["starter_code"]
     assert "total_time_via_E_m" in assignment["starter_code"]
     assert "total_time_via_E_s" in assignment["starter_code"]
+    assert "evaluate_elevator_routes" in assignment["starter_code"]
+
+
+def test_assignment_3_rejects_hardcoded_displayed_answers(tmp_path):
+    settings = _settings("sqlite://", tmp_path / "assignment-3-hardcoded.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        response = client.post(
+            "/assignments/3/submit",
+            headers=_bearer(student["token"]),
+            json={
+                "code": (
+                    "def evaluate_elevator_routes(*args):\n"
+                    "    return (5.130648586880582, 13.191468274710683, "
+                    "29.154759474226502, 24.20743687382041, "
+                    "139.2854080611071, 147.3989051485311, "
+                    "'Main Elevator', 139.2854080611071)\n"
+                )
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["pass"] is False
+    assert response.json()["score"] == 0
 
 
 def test_assignment_1_uses_valid_bug2_m_line_intersections(tmp_path):
@@ -144,17 +270,41 @@ def test_assignment_1_uses_valid_bug2_m_line_intersections(tmp_path):
     assert "H = (4, 11/3)" in instructions
     assert "L = (23/4, 6)" in instructions
     assert "H and L both lie on the m-line" in instructions
-    assert assignment["version"] == 6
+    assert assignment["version"] == 7
     assert 'src="/images/1"' in instructions
     assert "Coordinate diagram showing the cleaning robot route" in instructions
-    assert "hit_point = (4.0, 11.0 / 3.0)" in assignment["starter_code"]
-    assert "leave_point = (23.0 / 4.0, 6.0)" in assignment["starter_code"]
+    assert "calculate_bug2_route" in assignment["starter_code"]
+
+
+def test_assignment_1_rejects_hardcoded_displayed_answers(tmp_path):
+    settings = _settings("sqlite://", tmp_path / "assignment-1-hardcoded.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        response = client.post(
+            "/assignments/1/submit",
+            headers=_bearer(student["token"]),
+            json={
+                "code": (
+                    "def calculate_bug2_route(start, hit, corner, leave, goal):\n"
+                    "    return (10/3, 49/12, 15/4, 67/6)\n"
+                )
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["pass"] is False
+    assert response.json()["score"] == 0
 
 
 @pytest.mark.parametrize(
     ("label", "code", "expected_error"),
     [
-        ("incorrect", "total_path_length = 0", None),
+        (
+            "incorrect",
+            "def calculate_bug_route(start, hit, corner_a, corner_b, leave, goal):\n"
+            "    return (0, 0, 0, 0)\n",
+            None,
+        ),
         ("syntax", "total_path_length =", "SyntaxError"),
         ("runtime", "total_path_length = 1 / 0", "ZeroDivisionError"),
     ],

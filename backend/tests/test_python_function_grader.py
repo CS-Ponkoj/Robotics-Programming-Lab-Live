@@ -1,0 +1,93 @@
+from models import Assignment
+from graders.python_function import PythonFunctionGrader
+from sandbox import SubprocessSandbox
+
+
+def assignment() -> Assignment:
+    return Assignment(
+        id=99,
+        stable_id="function-grader-test",
+        version=1,
+        title="Function grader test",
+        grader_type="python_function",
+        grader_config={
+            "function_name": "calculate_values",
+            "criteria": [
+                {
+                    "id": "sum",
+                    "label": "Sum",
+                    "weight": 40,
+                    "success_feedback": "The sum is correct for every scenario.",
+                    "failure_feedback": "Recheck how the two inputs are added.",
+                },
+                {
+                    "id": "product",
+                    "label": "Product",
+                    "weight": 60,
+                    "success_feedback": "The product is correct for every scenario.",
+                    "failure_feedback": "Recheck how the two inputs are multiplied.",
+                },
+            ],
+            "cases": [
+                {"arguments": [2, 3], "expected": [5, 6]},
+                {"arguments": [-4, 5], "expected": [1, -20]},
+            ],
+        },
+    )
+
+
+def test_function_grader_rejects_hardcoded_original_outputs():
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(
+        assignment(),
+        "def calculate_values(first, second):\n    return 5, 6",
+    )
+
+    assert result.execution_succeeded is True
+    assert result.passed is False
+    assert result.score == 0
+    assert [item.passed for item in result.evidence] == [False, False]
+
+
+def test_function_grader_awards_weighted_partial_credit_and_feedback():
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(
+        assignment(),
+        "def calculate_values(first, second):\n    return first + second, 0",
+    )
+
+    assert result.execution_succeeded is True
+    assert result.passed is False
+    assert result.score == 40
+    assert [item.passed for item in result.evidence] == [True, False]
+    assert result.evidence[1].message == "Recheck how the two inputs are multiplied."
+
+
+def test_function_grader_accepts_general_solution_without_exposing_cases():
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(
+        assignment(),
+        (
+            "def calculate_values(first, second):\n"
+            "    print(first, second)\n"
+            "    return first + second, first * second"
+        ),
+    )
+
+    assert result.execution_succeeded is True
+    assert result.passed is True
+    assert result.score == 100
+    assert result.code_output == ""
+    assert all(item.visibility == "hidden" for item in result.evidence)
+
+
+def test_function_grader_returns_safe_error_when_function_is_missing():
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(
+        assignment(), "answer = 11"
+    )
+
+    assert result.execution_succeeded is False
+    assert result.passed is False
+    assert result.score == 0
+    assert result.execution_error == (
+        "The required function could not complete every grading scenario."
+    )
+    assert "2" not in result.execution_error
+    assert "3" not in result.execution_error

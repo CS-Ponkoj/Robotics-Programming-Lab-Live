@@ -1,7 +1,7 @@
 {
   "id": 6,
   "stable_id": "ros2-obstacle-stop",
-  "version": 2,
+  "version": 3,
   "data_schema_version": 1,
   "title": "Assignment 6: Stop for an Obstacle with ROS 2",
   "description": "Use LaserScan sensor data to move through a clear path, stop for a nearby obstacle, and resume safely.",
@@ -37,9 +37,8 @@
     {"criterion": "Package execution", "description": "The package builds and the node starts.", "weight": 15},
     {"criterion": "ROS interfaces", "description": "Subscribes to /scan and publishes Twist messages on /cmd_vel.", "weight": 20},
     {"criterion": "Clear-path motion", "description": "Moves straight at the required forward speed when the path is clear.", "weight": 20},
-    {"criterion": "Obstacle safety", "description": "Stops for near obstacles and invalid scans.", "weight": 30},
-    {"criterion": "Recovery", "description": "Resumes motion when valid clear-path readings return.", "weight": 10},
-    {"criterion": "Code readability", "description": "Uses clear and maintainable callback logic.", "weight": 5}
+    {"criterion": "Obstacle safety", "description": "Stops for near obstacles and invalid scans.", "weight": 35},
+    {"criterion": "Recovery", "description": "Resumes motion when valid clear-path readings return.", "weight": 10}
   ],
   "common_misconceptions": [
     {"tag": "missing-scan-subscription", "description": "The node publishes velocity but never subscribes to LaserScan data."},

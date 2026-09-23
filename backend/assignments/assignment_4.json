@@ -1,11 +1,11 @@
 {
     "id": 4,
-    "version": 5,
+    "version": 6,
     "data_schema_version": 1,
     "title": "Assignment 4: Calculating Safe Trajectory using Vector Field Histogram (VFH)",
     "description": "Build a deterministic inverse-square polar histogram and select the safest sector near a goal direction.",
-    "assignment_html": "<p><strong>Scenario</strong></p><p><strong>Purpose:</strong> Generate a complete deterministic LIDAR dataset, convert it to inverse-square obstacle density, and select the clearest sector near the goal direction.</p><p>The simplified 360-degree LIDAR contains one distance for each integer sector from 0 through 359 degrees. Each reading affects only its matching one-degree sector.</p><ul><li>Keep the supplied readings for 0, 1, 2, 358, and 359 unchanged.</li><li>Generate every missing integer sector from 3 through 357, inclusive.</li></ul><p><code>distance = 10 + 2 * np.sin(np.radians(angle))</code></p><p><code>density = 1 / distance**2</code></p><p>A smaller density represents a clearer direction because it corresponds to a larger measured distance.</p><p><img src=\"/images/4\" alt=\"LiDAR polar diagram highlighting the inclusive candidate window from 80 through 100 degrees around the 90-degree goal direction, followed by the distance-to-density selection workflow.\"></p><p><strong>Task</strong></p><ol><li>Complete <code>lidar_readings</code> so it contains all 360 integer sectors.</li><li>Build <code>primary_polar_histogram</code> with one inverse-square density for every sector.</li><li>Search every candidate from 80 through 100 degrees, including both endpoints, around the 90-degree goal direction.</li><li>Set <code>optimal_sector_angle</code> to the candidate with the smallest density.</li><li>Set <code>optimal_sector_value</code> to the density stored for that same candidate.</li></ol><p><strong>Assumptions</strong></p><p><strong>Rules and required outputs</strong></p><ul><li>Select the smallest density, not the smallest distance.</li><li>Do not add smoothing, robot-width inflation, dynamic obstacles, or another VFH stage.</li><li>The deterministic data has one unique best candidate; no tie-break rule is needed.</li><li>Required outputs: <code>optimal_sector_angle</code> as an integer and <code>optimal_sector_value</code> as its numeric density.</li></ul><p><strong>Before you run the tests</strong></p><ul><li>Confirm that both dictionaries contain 360 sectors.</li><li>Confirm that <code>optimal_sector_value</code> comes from <code>optimal_sector_angle</code>, not a different sector.</li></ul>",
-    "starter_code": "import numpy as np\n\n# LIDAR readings are given for selected one-degree sectors.\nlidar_readings = {\n    0: 10,\n    1: 8,\n    2: 12,\n    358: 7,\n    359: 9,\n}\n\n# TODO: Complete sectors 3 through 357.\n# Use: 10 + 2 * np.sin(np.radians(angle))\nfor angle in range(3, 358):\n    lidar_readings[angle] = 0.0\n\n# TODO: Calculate inverse-square obstacle density for every sector.\nprimary_polar_histogram = {\n    angle: 0.0 for angle in lidar_readings\n}\n\ngoal_direction = 90\n\n# TODO: Search the inclusive range from 80 through 100 degrees.\nangle_range = list(range(goal_direction - 10, goal_direction + 11))\noptimal_sector = min(\n    angle_range,\n    key=lambda angle: primary_polar_histogram.get(angle, float(\"inf\")),\n)\n\noptimal_sector_angle = optimal_sector\noptimal_sector_value = primary_polar_histogram[optimal_sector]\n\nprint(optimal_sector_angle, optimal_sector_value)",
+    "assignment_html": "<p><strong>Scenario</strong></p><p><strong>Purpose:</strong> Build a reusable simplified VFH analysis that can evaluate different goal directions.</p><p>The displayed 360-degree LIDAR keeps supplied readings for 0, 1, 2, 358, and 359 and generates sectors 3 through 357.</p><p><code>distance = 10 + 2 * np.sin(np.radians(angle))</code></p><p><code>density = 1 / distance**2</code></p><p>A smaller density represents a clearer direction.</p><p><img src=\"/images/4\" alt=\"LiDAR polar diagram highlighting the inclusive candidate window from 80 through 100 degrees around the 90-degree goal direction, followed by the distance-to-density selection workflow.\"></p><p><strong>Task</strong></p><p>Complete <code>analyze_vfh(seed_readings, fill_start, fill_end, goal_direction, search_half_width, probe_angle)</code>. Return these five values in order:</p><ol><li>The total number of LIDAR sectors after filling every integer from <code>fill_start</code> through <code>fill_end</code>, inclusive.</li><li>The number of candidates in the inclusive goal-centered search window.</li><li>The inverse-square density at <code>probe_angle</code>.</li><li>The candidate angle with the smallest density.</li><li>The density stored at that selected angle.</li></ol><p><strong>Rules</strong></p><ul><li>Copy the supplied readings before adding generated sectors.</li><li>Select the smallest density, not the smallest distance.</li><li>Use all function parameters. The grader checks other goal directions and window widths.</li><li>Do not change the function name, parameters, or return order.</li></ul><p><strong>Before you run the tests</strong></p><ul><li>Confirm the displayed call produces 360 sectors and 21 candidates from 80 through 100.</li><li>Confirm the selected value comes from the selected angle.</li></ul>",
+    "starter_code": "import numpy as np\n\ndef analyze_vfh(\n    seed_readings, fill_start, fill_end, goal_direction,\n    search_half_width, probe_angle,\n):\n    lidar_readings = dict(seed_readings)\n\n    # TODO: Complete every integer sector from fill_start through fill_end.\n    for angle in range(fill_start, fill_end + 1):\n        lidar_readings[angle] = 0.0\n\n    # TODO: Calculate inverse-square density for every sector.\n    primary_polar_histogram = {\n        angle: 0.0 for angle in lidar_readings\n    }\n\n    # TODO: Search the inclusive window around goal_direction.\n    angle_range = list(range(\n        goal_direction - search_half_width,\n        goal_direction + search_half_width + 1,\n    ))\n    optimal_sector_angle = 0\n    optimal_sector_value = 0.0\n\n    return (\n        len(lidar_readings),\n        len(angle_range),\n        primary_polar_histogram[probe_angle],\n        optimal_sector_angle,\n        optimal_sector_value,\n    )\n\nseed_readings = {0: 10, 1: 8, 2: 12, 358: 7, 359: 9}\nresults = analyze_vfh(seed_readings, 3, 357, 90, 10, 90)\nprint(*results)",
     "stable_id": "robotics-assignment-4",
     "language": "python",
     "status": "published",
@@ -23,11 +23,18 @@
       "simulation_enabled": false
     },
     "public_tests": [
-      {"id": "public-execution", "label": "Program executes without an error"}
+      {"id": "complete-sectors", "label": "LIDAR dataset contains every required sector"},
+      {"id": "inclusive-window", "label": "Search window includes both endpoints"},
+      {"id": "inverse-square-density", "label": "Histogram uses inverse-square density"},
+      {"id": "optimal-sector-angle", "label": "Minimum-density sector is selected"},
+      {"id": "optimal-sector-value", "label": "Selected sector density is returned"}
     ],
     "rubric": [
-      {"criterion": "Optimal sector", "description": "Select the minimum-density sector in the inclusive 80-to-100-degree search window.", "weight": 50},
-      {"criterion": "Optimal density", "description": "Store the inverse-square density associated with the selected sector.", "weight": 50}
+      {"criterion": "Complete sectors", "description": "Generate every required integer LIDAR sector.", "weight": 20},
+      {"criterion": "Inclusive search window", "description": "Search the complete goal-centered window including both endpoints.", "weight": 20},
+      {"criterion": "Inverse-square density", "description": "Convert distances to inverse-square obstacle densities.", "weight": 20},
+      {"criterion": "Optimal sector", "description": "Select the minimum-density candidate in the search window.", "weight": 20},
+      {"criterion": "Optimal density", "description": "Return the density associated with the selected sector.", "weight": 20}
     ],
     "common_misconceptions": [
       {"tag": "incorrect-optimal-sector-angle", "description": "Searches the wrong interval, omits an endpoint, or selects the largest density instead of the smallest."},
@@ -43,7 +50,22 @@
     },
     "simulation_config": {"enabled": false, "provider": null, "scenario": null},
     "asset_manifest": [],
-    "grader_type": "python_variables",
+    "grader_type": "python_function",
+    "grader_config": {
+      "function_name": "analyze_vfh",
+      "criteria": [
+        {"id": "complete-sectors", "label": "Complete LIDAR sectors", "weight": 20, "failure_feedback": "Generate every integer sector from fill_start through fill_end, including both endpoints."},
+        {"id": "inclusive-window", "label": "Inclusive search window", "weight": 20, "failure_feedback": "The candidate count must include both goal_direction - search_half_width and goal_direction + search_half_width."},
+        {"id": "inverse-square-density", "label": "Inverse-square density", "weight": 20, "failure_feedback": "At the supplied probe angle, calculate 1 / distance**2 after generating the distance."},
+        {"id": "optimal-sector-angle", "label": "Optimal sector angle", "weight": 20, "failure_feedback": "Select the candidate with the smallest density inside the supplied inclusive window."},
+        {"id": "optimal-sector-value", "label": "Optimal sector density", "weight": 20, "failure_feedback": "Return the histogram density stored at the selected optimal sector."}
+      ],
+      "cases": [
+        {"arguments": [[[0, 10], [1, 8], [2, 12], [358, 7], [359, 9]], 3, 357, 90, 10, 90], "expected": [360, 21, 0.006944444444444444, 90, 0.006944444444444444]},
+        {"arguments": [[[0, 10], [1, 8], [2, 12], [358, 7], [359, 9]], 3, 357, 260, 10, 260], "expected": [360, 21, 0.01550698334700962, 250, 0.015164293583650314]},
+        {"arguments": [[[0, 10], [1, 8], [2, 12], [358, 7], [359, 9]], 3, 357, 180, 5, 180], "expected": [360, 11, 0.01, 175, 0.009660285044006971]}
+      ]
+    },
     "reference_solution_path": "course_materials/content/Obstacle Avoidance/Assignment_VFH/question_1_VFH_solution.py",
     "solution_html": "<p><strong>1. Complete the deterministic readings</strong></p><p>For sectors 3 through 357, apply <code>distance = 10 + 2 * sin(angle in degrees)</code>.</p><p><strong>2. Build the polar histogram</strong></p><p>For each sector, compute <code>density = 1 / distance**2</code>.</p><p><strong>3. Search around the goal</strong></p><p>Compare the inclusive range from 80 through 100 degrees. The largest distance in that range produces the lowest inverse-square density.</p><p><strong>Result</strong></p><p>The selected sector is <strong>90 degrees</strong>, with an obstacle-density value of approximately <strong>0.006944</strong>.</p>",
     "vals": {"optimal_sector_angle":90, "optimal_sector_value":0.006944444444444444}

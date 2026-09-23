@@ -15,10 +15,18 @@ from models import (
 
 
 CORRECT_ASSIGNMENT_2 = """
-distance_to_obstacle = 4
-distance_along_obstacle = 4
-distance_from_obstacle_to_goal = 4
-total_path_length = 12
+import math
+
+def calculate_bug_route(start, hit, corner_a, corner_b, leave, goal):
+    distance = lambda a, b: math.hypot(b[0] - a[0], b[1] - a[1])
+    approach = distance(start, hit)
+    boundary = (
+        distance(hit, corner_a)
+        + distance(corner_a, corner_b)
+        + distance(corner_b, leave)
+    )
+    departure = distance(leave, goal)
+    return approach, boundary, departure, approach + boundary + departure
 """
 
 

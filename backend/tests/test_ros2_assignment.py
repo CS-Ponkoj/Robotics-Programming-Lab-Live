@@ -36,6 +36,35 @@ A6_TEST_IDS = [
 ]
 
 
+@pytest.mark.parametrize(
+    ("assignment_id", "rubric_groups"),
+    [
+        (5, [["package-build", "node-start"], ["cmd-vel-topic"],
+             ["forward-motion", "straight-motion"], ["safe-stop", "hold-stop"]]),
+        (6, [["package-build", "node-start"], ["scan-response", "cmd-vel-topic"],
+             ["clear-path-forward", "straight-motion"],
+             ["obstacle-stop", "invalid-scan-stop"], ["resume-motion"]]),
+    ],
+)
+def test_ros2_rubric_weights_match_the_harness_weights(
+    assignment_id, rubric_groups
+):
+    assignment_path = (
+        Path(__file__).resolve().parents[1]
+        / "assignments"
+        / f"assignment_{assignment_id}.json"
+    )
+    source = json.loads(assignment_path.read_text(encoding="utf-8"))
+    harness_weights = source["grader_config"]["test_weights"]
+    grouped_weights = [
+        sum(harness_weights[test_id] for test_id in group)
+        for group in rubric_groups
+    ]
+
+    assert grouped_weights == [item["weight"] for item in source["rubric"]]
+    assert sum(grouped_weights) == 100
+
+
 class FakeRos2Executor:
     def execute(self, code, project_files, config):
         test_ids = list(config.get("test_weights", {})) or TEST_IDS
@@ -324,7 +353,7 @@ def test_ros2_assignment_submission_uses_injected_executor(tmp_path):
 
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
-    assert assignment_body["version"] == 2
+    assert assignment_body["version"] == 3
     assert 'src="/images/5"' in assignment_body["assignment_html"]
     assert "src/robot_motion/robot_motion/controller.py" in assignment_body["assignment_html"]
     assert response.status_code == 200
@@ -369,7 +398,7 @@ def test_ros2_obstacle_assignment_submission_uses_behavior_harness(tmp_path):
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
     assert assignment_body["stable_id"] == "ros2-obstacle-stop"
-    assert assignment_body["version"] == 2
+    assert assignment_body["version"] == 3
     assert 'src="/images/6"' in assignment_body["assignment_html"]
     assert "src/reactive_navigation/reactive_navigation/controller.py" in assignment_body["assignment_html"]
     assert assignment_body["editable_file_path"].endswith("controller.py")

@@ -127,14 +127,17 @@ def test_backend_grades_through_real_remote_sandbox_contract(
             headers={"Authorization": f"Bearer {login.json()['token']}"},
             json={
                 "code": (
-                    "distance_to_obstacle = 4\n"
-                    "distance_along_obstacle = 4\n"
-                    "distance_from_obstacle_to_goal = 4\n"
-                    "total_path_length = 12\n"
+                    "import math\n"
+                    "def calculate_bug_route(start, hit, corner_a, corner_b, leave, goal):\n"
+                    "    distance = lambda a, b: math.hypot(b[0] - a[0], b[1] - a[1])\n"
+                    "    approach = distance(start, hit)\n"
+                    "    boundary = distance(hit, corner_a) + distance(corner_a, corner_b) + distance(corner_b, leave)\n"
+                    "    departure = distance(leave, goal)\n"
+                    "    return approach, boundary, departure, approach + boundary + departure\n"
                 )
             },
         )
 
     assert response.status_code == 200
     assert response.json()["pass"] is True
-    assert response.json()["assignment_version"] == 5
+    assert response.json()["assignment_version"] == 6

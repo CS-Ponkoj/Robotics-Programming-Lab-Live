@@ -47,7 +47,7 @@ from config import Settings, get_settings
 from data_contracts import normalize_event_data
 from database import Base, build_engine
 from email_service import EmailService
-from graders import PythonVariableGrader, Ros2TopicGrader
+from graders import PythonFunctionGrader, PythonVariableGrader, Ros2TopicGrader
 from models import (
     Assignment,
     HintInteraction,
@@ -460,7 +460,7 @@ def create_app(
             return Ros2TopicGrader(
                 request.app.state.ros2_executor_factory(timeout)
             )
-        if assignment.grader_type != "python_variables":
+        if assignment.grader_type not in {"python_function", "python_variables"}:
             raise HTTPException(422, f"Unsupported grader: {assignment.grader_type}.")
         sandbox = build_sandbox(
             settings_value.sandbox_backend,
@@ -472,6 +472,8 @@ def create_app(
                 settings_value.sandbox_http_timeout_seconds
             ),
         )
+        if assignment.grader_type == "python_function":
+            return PythonFunctionGrader(sandbox)
         return PythonVariableGrader(sandbox)
 
     def require_code(request_body: SubmissionRequest, request: Request) -> None:
@@ -1215,7 +1217,7 @@ def create_app(
         grader = grader_for(assignment, request)
         result = execute_with_capacity(
             request,
-            lambda: grader.run(assignment, body.code),
+            lambda: grader.grade(assignment, body.code),
         )
         submission = store_submission(
             request,

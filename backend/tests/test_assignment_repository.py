@@ -30,7 +30,7 @@ def test_newer_seed_versions_upgrade_existing_local_assignments():
         AssignmentRepository(session).sync_seed_assignments()
 
         assignments = AssignmentRepository(session).list_all()
-        assert [item.version for item in assignments] == [6, 5, 6, 5, 2, 2]
+        assert [item.version for item in assignments] == [7, 6, 7, 6, 3, 3]
         for assignment in assignments:
             assert assignment.data_schema_version == 1
             assert assignment.execution_settings["runtime"]
@@ -63,12 +63,7 @@ def test_assignments_1_through_4_use_instructor_authored_learning_metadata():
             objective.startswith("Apply robotics programming concepts")
             for objective in payload["learning_objectives"]
         )
-        assert payload["public_tests"] == [
-            {
-                "id": "public-execution",
-                "label": "Program executes without an error",
-            }
-        ]
+        assert payload["public_tests"]
         assert sum(item["weight"] for item in payload["rubric"]) == pytest.approx(
             100
         )
@@ -82,5 +77,6 @@ def test_assignments_1_through_4_use_instructor_authored_learning_metadata():
         assert payload["tutoring_rules"]["never_reveal_solution"] is True
         assert payload["tutoring_rules"]["never_reveal_hidden_tests"] is True
         assert payload["simulation_config"]["enabled"] is False
-        assert payload["grader_type"] == "python_variables"
+        assert payload["grader_type"] == "python_function"
+        assert payload["grader_config"]["cases"]
         assert payload["reference_solution_path"]

@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from graders.base import AssignmentGrader
@@ -27,6 +28,33 @@ def validate_assignment(
         expected = (assignment.grader_config or {}).get("expected_values", {})
         if not expected:
             errors.append("Hidden expected values are required for this grader.")
+    elif assignment.grader_type == "python_function":
+        config = assignment.grader_config or {}
+        function_name = str(config.get("function_name", ""))
+        criteria = config.get("criteria", [])
+        cases = config.get("cases", [])
+        if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", function_name) is None:
+            errors.append("A valid required function name is required for this grader.")
+        if not isinstance(criteria, list) or not criteria:
+            errors.append("At least one function-grader criterion is required.")
+            criteria = []
+        if not isinstance(cases, list) or not cases:
+            errors.append("At least one hidden function-grader case is required.")
+            cases = []
+        for index, case in enumerate(cases, start=1):
+            if not isinstance(case, dict):
+                errors.append(f"Function-grader case {index} must be an object.")
+                continue
+            if not isinstance(case.get("arguments"), list):
+                errors.append(
+                    f"Function-grader case {index} must provide an argument list."
+                )
+            expected = case.get("expected")
+            if not isinstance(expected, list) or len(expected) != len(criteria):
+                errors.append(
+                    f"Function-grader case {index} must provide one expected value "
+                    "for each criterion."
+                )
     elif assignment.grader_type == "ros2_topic":
         config = assignment.grader_config or {}
         for name in ("package_name", "executable", "topic", "message_type"):
@@ -55,6 +83,8 @@ def validate_assignment(
         return errors
     if not reference.is_file():
         errors.append("Reference solution file does not exist.")
+        return errors
+    if errors:
         return errors
     result = grader.grade(assignment, reference.read_text(encoding="utf-8"))
     if not result.passed:
