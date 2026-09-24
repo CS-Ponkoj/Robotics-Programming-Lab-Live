@@ -87,7 +87,8 @@ instead of deleting an account so its research history remains intact.
 
 - Six configurable, versioned assignments: four Python and two ROS 2 exercises
 - Test-case grading with server-only hidden evidence and maintained answers
-- Student coding workspace, version-scoped local drafts, results, progressive
+- Student coding workspace with cross-device version-scoped drafts, manual
+  Python formatting, completion help, search/replace, results, progressive
   hints, and study progress
 - Instructor assignment, account, analytics, and research-export tools
 - Server-side sessions and role authorization
@@ -134,6 +135,7 @@ flowchart TB
     API --> Research[Study tracking and exports]
     Auth --> DB[(Neon PostgreSQL)]
     Engine --> DB
+    API -->|Versioned student drafts| DB
     Research --> DB
     Engine --> PythonSandbox[Python sandbox service]
     Engine --> ROS[ROS 2 Jazzy Docker grader]
@@ -144,9 +146,11 @@ flowchart TB
 Flutter never grades submissions or stores protected answers. FastAPI loads
 the exact assignment version, sends minimal code to the correct isolated
 grader, stores structured evidence, and supplies only student-visible evidence
-to the tutor. Browser drafts are tied to the assignment version, so code saved
-for an older version is not silently reused after an instructor publishes a
-newer assignment. Test cases remain the scoring authority.
+to the tutor. Persistent student drafts are stored in PostgreSQL and tied to
+the assignment version, with a browser fallback during connectivity problems.
+Code saved for an older version is never silently reused after an instructor
+publishes a newer assignment. Demo drafts remain temporary. Test cases remain
+the scoring authority.
 
 ## Repository map
 

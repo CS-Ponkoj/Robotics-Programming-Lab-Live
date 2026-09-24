@@ -39,9 +39,10 @@ Instructor: instructor / instructor
 
 The signed-in role controls access to instructor assignment and student-account
 management. Session tokens are issued by the backend and restored locally
-between authenticated app refreshes. Student code drafts are saved locally with
-both assignment ID and version; an older-version draft is not loaded into a
-newer assignment.
+between authenticated app refreshes. Persistent student code drafts are saved
+to PostgreSQL with both assignment ID and version and retain a local browser
+fallback; an older-version draft is not loaded into a newer assignment. Demo
+drafts remain session-only.
 
 ## Verify
 

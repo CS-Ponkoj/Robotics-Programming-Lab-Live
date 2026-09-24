@@ -206,6 +206,43 @@ class User(Base):
     assignment_activities: Mapped[list["AssignmentActivity"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    code_drafts: Mapped[list["CodeDraft"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class CodeDraft(Base):
+    __tablename__ = "code_drafts"
+    __table_args__ = (
+        CheckConstraint(
+            "assignment_version >= 1",
+            name="ck_code_drafts_assignment_version_positive",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "assignment_id",
+            "assignment_version",
+            name="uq_code_draft_user_assignment_version",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    assignment_id: Mapped[int] = mapped_column(
+        ForeignKey("assignments.id"), index=True
+    )
+    assignment_version: Mapped[int] = mapped_column(Integer)
+    code: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+    user: Mapped[User] = relationship(back_populates="code_drafts")
 
 
 class StudySession(Base):

@@ -42,6 +42,28 @@ class AssignmentListResponse(BaseModel):
     assignments: list[AssignmentStudent]
 
 
+class CodeDraftUpsert(BaseModel):
+    assignment_version: int = Field(ge=1)
+    code: str = Field(max_length=100_000)
+
+
+class CodeDraftResponse(BaseModel):
+    assignment_id: int
+    assignment_version: int
+    code: str | None = None
+    saved: bool = False
+    updated_at: datetime | None = None
+
+
+class CodeFormatRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=100_000)
+
+
+class CodeFormatResponse(BaseModel):
+    code: str
+    changed: bool
+
+
 class SubmissionRequest(BaseModel):
     code: str = Field(min_length=1)
     student_id: str = Field(default="anonymous", max_length=120)

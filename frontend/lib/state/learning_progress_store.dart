@@ -143,6 +143,20 @@ class LearningProgressStore {
     ]);
   }
 
+  Future<void> clearDraft(int assignmentId) async {
+    codeDrafts.remove(assignmentId);
+    codeDraftVersions.remove(assignmentId);
+    await Future.wait([
+      if (_storage != null)
+        _storage!.setString(_scopedKey(_draftsKey), _encodeMap(codeDrafts)),
+      if (_storage != null)
+        _storage!.setString(
+          _scopedKey(_draftVersionsKey),
+          _encodeMap(codeDraftVersions),
+        ),
+    ]);
+  }
+
   Future<void> recordAttempt(int assignmentId, int score) async {
     latestScores[assignmentId] = score;
     final previousBest = bestScores[assignmentId];

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_highlight/themes/darcula.dart';
+import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:iuse_demo/editor/editor_tools.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
@@ -23,6 +25,8 @@ class MyHomePage extends StatefulWidget {
 
 enum AssignmentWorkspaceFocus { none, editor, instructions, results }
 
+enum DraftSaveState { idle, saving, saved, sessionSaved, failed }
+
 void setAssignmentEditorContent(
   CodeController controller,
   String content,
@@ -36,7 +40,9 @@ class _MyHomePageState extends State<MyHomePage> {
   late Future<AssignmentDto> _assignment;
   late Future<UnittestFeedbackDto> _feedback;
   late CodeController _controller;
+  late FocusNode _editorFocusNode;
   String _code = "";
+  String? _serverDraft;
   int? _assignmentVersion;
   bool _enableFeedback = false;
   bool _submitted = false;
@@ -51,6 +57,12 @@ class _MyHomePageState extends State<MyHomePage> {
   double _editorWidthFraction = 0.5;
   AssignmentWorkspaceFocus _workspaceFocus = AssignmentWorkspaceFocus.none;
   Timer? _draftSaveTimer;
+  Future<void> _draftWriteQueue = Future<void>.value();
+  DraftSaveState _draftSaveState = DraftSaveState.idle;
+  double _editorFontSize = 14;
+  bool _editorDarkMode = true;
+  int? _diagnosticLine;
+  bool _suppressEditorChange = false;
 
   @override
   void initState() {
@@ -59,7 +71,9 @@ class _MyHomePageState extends State<MyHomePage> {
       language: python,
       params: EditorParams(tabSpaces: 4),
     );
-    _assignment = fetchAssignment(widget.id);
+    _editorFocusNode = FocusNode(debugLabel: 'assignment-code-editor');
+    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
+    _assignment = _loadAssignment();
     unawaited(_trackAssignmentOpened());
     _feedback = fetchUnittestFeedback(widget.id, "");
     _submissionId = learningProgress.submissionIds[widget.id] ?? '';
@@ -67,6 +81,23 @@ class _MyHomePageState extends State<MyHomePage> {
         _submissionId.isNotEmpty) {
       unawaited(_loadPreviouslyRevealedSolution());
     }
+  }
+
+  Future<AssignmentDto> _loadAssignment() async {
+    final assignment = await fetchAssignment(widget.id);
+    _controller.autocompleter.setCustomWords(
+      assignmentCompletionWords(assignment),
+    );
+    try {
+      final draft = await fetchCodeDraft(widget.id);
+      if (draft.assignmentVersion == assignment.version && draft.saved) {
+        _serverDraft = draft.code;
+        _draftSaveState = DraftSaveState.saved;
+      }
+    } on Object {
+      // Local drafts remain a reliable fallback while the API is unavailable.
+    }
+    return assignment;
   }
 
   Future<void> _trackAssignmentOpened() async {
@@ -104,12 +135,12 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     _draftSaveTimer?.cancel();
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     researchTracker.clearActiveAssignment(widget.id);
     if (!_init && _assignmentVersion != null) {
-      unawaited(
-        learningProgress.saveDraft(widget.id, _assignmentVersion!, _code),
-      );
+      unawaited(_persistDraft(_code));
     }
+    _editorFocusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -121,20 +152,96 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
     _draftSaveTimer?.cancel();
+    if (mounted) {
+      setState(() => _draftSaveState = DraftSaveState.saving);
+    }
     _draftSaveTimer = Timer(
       const Duration(milliseconds: 350),
-      () => unawaited(
-        learningProgress.saveDraft(widget.id, assignmentVersion, code),
+      () => unawaited(_persistDraft(code)),
+    );
+  }
+
+  Future<DraftSaveState> _persistDraft(String code) async {
+    final assignmentVersion = _assignmentVersion;
+    if (assignmentVersion == null) {
+      return DraftSaveState.failed;
+    }
+    final precedingWrite = _draftWriteQueue;
+    final writeFinished = Completer<void>();
+    _draftWriteQueue = writeFinished.future;
+    await precedingWrite;
+    try {
+      await learningProgress.saveDraft(widget.id, assignmentVersion, code);
+      final result = await saveCodeDraft(widget.id, assignmentVersion, code);
+      final savedState =
+          result.saved ? DraftSaveState.saved : DraftSaveState.sessionSaved;
+      if (mounted && code == _code) {
+        setState(() => _draftSaveState = savedState);
+      }
+      return savedState;
+    } on Object {
+      if (mounted && code == _code) {
+        setState(() => _draftSaveState = DraftSaveState.failed);
+      }
+      return DraftSaveState.failed;
+    } finally {
+      writeFinished.complete();
+    }
+  }
+
+  Future<void> _saveDraftNow() async {
+    if (_init || _assignmentVersion == null || !_selectedProjectFileEditable) {
+      return;
+    }
+    _draftSaveTimer?.cancel();
+    final code = _controller.fullText;
+    _code = code;
+    setState(() => _draftSaveState = DraftSaveState.saving);
+    final saveResult = await _persistDraft(code);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(switch (saveResult) {
+          DraftSaveState.saved => 'Draft saved.',
+          DraftSaveState.sessionSaved =>
+            'Draft saved for this session. It resets on refresh.',
+          _ => 'Cloud save failed. Check your connection and try Ctrl+S again.',
+        }),
       ),
     );
   }
 
+  bool _handleHardwareKey(KeyEvent event) {
+    if (isEditorSaveShortcut(
+      event,
+      editorHasFocus: _editorFocusNode.hasFocus,
+      editable: _selectedProjectFileEditable,
+    )) {
+      unawaited(_saveDraftNow());
+      return true;
+    }
+    final handled = handleEditorKeyEvent(
+      event,
+      _controller,
+      editorHasFocus: _editorFocusNode.hasFocus,
+      editable: _selectedProjectFileEditable,
+    );
+    if (handled) {
+      _handleEditableCodeChanged();
+    }
+    return handled;
+  }
+
   void _handleEditableCodeChanged() {
+    if (_suppressEditorChange) {
+      return;
+    }
     final updatedCode = _controller.fullText;
     if (updatedCode != _code && (_submitted || !_hasUnrunChanges)) {
       setState(() {
         _submitted = false;
         _hasUnrunChanges = true;
+        _diagnosticLine = null;
       });
     }
     _saveDraft(updatedCode);
@@ -165,6 +272,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _submitted = true;
       _isRunning = true;
       _hasUnrunChanges = false;
+      _diagnosticLine = null;
       _feedback = fetchUnittestFeedback(
         widget.id,
         _code,
@@ -182,6 +290,10 @@ class _MyHomePageState extends State<MyHomePage> {
           lastAttemptAccuracy[widget.id] = score;
           _submissionId = feedback.submissionId;
           _isRunning = false;
+          _diagnosticLine = extractPythonErrorLine(
+            '${feedback.codeExecResult}\n${feedback.codeOutput}',
+            _controller.fullText.split('\n').length,
+          );
         });
         unawaited(
           learningProgress.recordSubmission(widget.id, feedback.submissionId),
@@ -193,6 +305,230 @@ class _MyHomePageState extends State<MyHomePage> {
           setState(() => _isRunning = false);
         }
       },
+    );
+  }
+
+  Future<void> _formatCode() async {
+    if (!_selectedProjectFileEditable || _isRunning) {
+      return;
+    }
+    try {
+      final result =
+          await formatAssignmentCode(widget.id, _controller.fullText);
+      if (!mounted) return;
+      if (!result.changed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('The Python code is already formatted.')),
+        );
+        return;
+      }
+      _suppressEditorChange = true;
+      setAssignmentEditorContent(_controller, result.code);
+      _suppressEditorChange = false;
+      setState(() {
+        _submitted = false;
+        _hasUnrunChanges = true;
+        _diagnosticLine = null;
+      });
+      _saveDraft(result.code);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Python formatting applied.')),
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _resetStarterCode() async {
+    final assignment = await _assignment;
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Restore starter code?'),
+            content: const Text(
+              'This replaces the current draft for this assignment version.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Restore'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+    _draftSaveTimer?.cancel();
+    try {
+      await deleteCodeDraft(widget.id, assignment.version);
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+      return;
+    }
+    await learningProgress.clearDraft(widget.id);
+    _suppressEditorChange = true;
+    setAssignmentEditorContent(_controller, assignment.code);
+    _suppressEditorChange = false;
+    setState(() {
+      _code = assignment.code;
+      _submitted = false;
+      _hasUnrunChanges = false;
+      _diagnosticLine = null;
+      _draftSaveState = DraftSaveState.idle;
+    });
+  }
+
+  Future<void> _showReplaceDialog() async {
+    final findController = TextEditingController();
+    final replaceController = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Replace text'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                key: const Key('replace-find-field'),
+                controller: findController,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Find'),
+              ),
+              TextField(
+                key: const Key('replace-with-field'),
+                controller: replaceController,
+                decoration: const InputDecoration(labelText: 'Replace with'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final query = findController.text;
+              if (query.isEmpty) return;
+              final updated = _controller.fullText.replaceAll(
+                query,
+                replaceController.text,
+              );
+              if (updated != _controller.fullText) {
+                setAssignmentEditorContent(_controller, updated);
+                _handleEditableCodeChanged();
+              }
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('Replace all'),
+          ),
+        ],
+      ),
+    );
+    findController.dispose();
+    replaceController.dispose();
+  }
+
+  Future<void> _showFindDialog() async {
+    final findController = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Find in code'),
+        content: TextField(
+          key: const Key('editor-find-field'),
+          controller: findController,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Find'),
+          onSubmitted: (_) => Navigator.pop(dialogContext),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Find next'),
+          ),
+        ],
+      ),
+    );
+    final query = findController.text;
+    findController.dispose();
+    if (!mounted || query.isEmpty) return;
+    final start =
+        _controller.selection.end.clamp(0, _controller.fullText.length);
+    var match = _controller.fullText.indexOf(query, start);
+    if (match < 0 && start > 0) {
+      match = _controller.fullText.indexOf(query);
+    }
+    if (match < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('“$query” was not found.')),
+      );
+      return;
+    }
+    _controller.selection = TextSelection(
+      baseOffset: match,
+      extentOffset: match + query.length,
+    );
+    _editorFocusNode.requestFocus();
+  }
+
+  void _showShortcutHelp() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => const AlertDialog(
+        title: Text('Editor shortcuts'),
+        content: Text(
+          'Ctrl+Enter  Run tests\n'
+          'Ctrl+S  Save draft now\n'
+          'Ctrl+F  Find\n'
+          'Ctrl+Z  Undo\n'
+          'Ctrl+Y or Ctrl+Shift+Z  Redo\n'
+          'Tab / Shift+Tab  Indent or outdent selected lines\n'
+          'Ctrl+/  Toggle comments',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showApiReference() async {
+    final assignment = await _assignment;
+    if (!mounted) return;
+    final items = assignmentApiReference(assignment);
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Available Python names'),
+        content: SizedBox(
+          width: 520,
+          child: SelectableText(
+            items.isEmpty
+                ? 'Use the names provided in the starter code and instructions.'
+                : items.join('\n'),
+          ),
+        ),
+      ),
     );
   }
 
@@ -386,6 +722,29 @@ class _MyHomePageState extends State<MyHomePage> {
                                 AssignmentEditorToolbar(
                                   isRunning: _isRunning,
                                   onRun: _runTests,
+                                  onSave: _selectedProjectFileEditable
+                                      ? () => unawaited(_saveDraftNow())
+                                      : null,
+                                  saveState: _draftSaveState,
+                                  onSearch: _showFindDialog,
+                                  onReplace: _showReplaceDialog,
+                                  onFormat: _formatCode,
+                                  onReset: _resetStarterCode,
+                                  onShowShortcuts: _showShortcutHelp,
+                                  onShowApiReference: _showApiReference,
+                                  editorDarkMode: _editorDarkMode,
+                                  onToggleEditorTheme: () => setState(
+                                    () => _editorDarkMode = !_editorDarkMode,
+                                  ),
+                                  fontSize: _editorFontSize,
+                                  onDecreaseFont: () => setState(
+                                    () => _editorFontSize =
+                                        (_editorFontSize - 1).clamp(12, 22),
+                                  ),
+                                  onIncreaseFont: () => setState(
+                                    () => _editorFontSize =
+                                        (_editorFontSize + 1).clamp(12, 22),
+                                  ),
                                   isFocused: _workspaceFocus ==
                                       AssignmentWorkspaceFocus.editor,
                                   onFocusToggle: useDesktopLayout
@@ -402,7 +761,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                         if (_init) {
                                           _assignmentVersion =
                                               snap.data!.version;
-                                          _code = learningProgress.draftFor(
+                                          _code = _serverDraft ??
+                                              learningProgress.draftFor(
                                                 widget.id,
                                                 snap.data!.version,
                                               ) ??
@@ -423,6 +783,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                           selectedFileEditable:
                                               _selectedProjectFileEditable,
                                           controller: _controller,
+                                          editorDarkMode: _editorDarkMode,
+                                          focusNode: _editorFocusNode,
+                                          fontSize: _editorFontSize,
+                                          diagnosticLine: _diagnosticLine,
                                           onFileSelected: _selectProjectFile,
                                           onChanged: () {
                                             if (_selectedProjectFileEditable) {
@@ -1058,15 +1422,41 @@ class AssignmentPanelHeader extends StatelessWidget {
 class AssignmentEditorToolbar extends StatelessWidget {
   final bool isRunning;
   final VoidCallback onRun;
+  final VoidCallback? onSave;
   final bool isFocused;
   final VoidCallback? onFocusToggle;
+  final DraftSaveState saveState;
+  final VoidCallback? onSearch;
+  final VoidCallback? onReplace;
+  final VoidCallback? onFormat;
+  final VoidCallback? onReset;
+  final VoidCallback? onShowShortcuts;
+  final VoidCallback? onShowApiReference;
+  final bool editorDarkMode;
+  final VoidCallback? onToggleEditorTheme;
+  final double fontSize;
+  final VoidCallback? onDecreaseFont;
+  final VoidCallback? onIncreaseFont;
 
   const AssignmentEditorToolbar({
     super.key,
     required this.isRunning,
     required this.onRun,
+    this.onSave,
     this.isFocused = false,
     this.onFocusToggle,
+    this.saveState = DraftSaveState.idle,
+    this.onSearch,
+    this.onReplace,
+    this.onFormat,
+    this.onReset,
+    this.onShowShortcuts,
+    this.onShowApiReference,
+    this.editorDarkMode = true,
+    this.onToggleEditorTheme,
+    this.fontSize = 14,
+    this.onDecreaseFont,
+    this.onIncreaseFont,
   });
 
   @override
@@ -1123,6 +1513,107 @@ class AssignmentEditorToolbar extends StatelessWidget {
               ],
             ),
           ),
+          if (saveState != DraftSaveState.idle)
+            Tooltip(
+              message: switch (saveState) {
+                DraftSaveState.saving => 'Saving draft',
+                DraftSaveState.saved => 'Draft saved',
+                DraftSaveState.sessionSaved =>
+                  'Draft saved for this session; refresh resets it',
+                DraftSaveState.failed =>
+                  'Cloud save failed. A local fallback remains available.',
+                DraftSaveState.idle => '',
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                child: Icon(
+                  switch (saveState) {
+                    DraftSaveState.saving => Icons.sync_rounded,
+                    DraftSaveState.saved => Icons.cloud_done_outlined,
+                    DraftSaveState.sessionSaved => Icons.save_outlined,
+                    DraftSaveState.failed => Icons.cloud_off_outlined,
+                    DraftSaveState.idle => Icons.cloud_outlined,
+                  },
+                  key: const Key('draft-save-state-icon'),
+                  size: 20,
+                  color: saveState == DraftSaveState.failed
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (onFormat != null || onReset != null)
+            PopupMenuButton<String>(
+              key: const Key('editor-tools-menu'),
+              tooltip: 'Editor tools',
+              onSelected: (value) {
+                switch (value) {
+                  case 'save':
+                    onSave?.call();
+                  case 'search':
+                    onSearch?.call();
+                  case 'replace':
+                    onReplace?.call();
+                  case 'format':
+                    onFormat?.call();
+                  case 'reset':
+                    onReset?.call();
+                  case 'font-down':
+                    onDecreaseFont?.call();
+                  case 'font-up':
+                    onIncreaseFont?.call();
+                  case 'reference':
+                    onShowApiReference?.call();
+                  case 'shortcuts':
+                    onShowShortcuts?.call();
+                  case 'theme':
+                    onToggleEditorTheme?.call();
+                }
+              },
+              itemBuilder: (context) => [
+                if (onSave != null)
+                  const PopupMenuItem(
+                    value: 'save',
+                    child: Text('Save draft (Ctrl+S)'),
+                  ),
+                const PopupMenuItem(value: 'search', child: Text('Find…')),
+                const PopupMenuItem(value: 'replace', child: Text('Replace…')),
+                const PopupMenuItem(
+                  value: 'format',
+                  child: Text('Format Python'),
+                ),
+                const PopupMenuItem(
+                  value: 'reset',
+                  child: Text('Restore starter code'),
+                ),
+                PopupMenuItem(
+                  value: 'font-down',
+                  enabled: fontSize > 12,
+                  child: const Text('Decrease font size'),
+                ),
+                PopupMenuItem(
+                  value: 'font-up',
+                  enabled: fontSize < 22,
+                  child: const Text('Increase font size'),
+                ),
+                const PopupMenuItem(
+                  value: 'reference',
+                  child: Text('Python names and APIs'),
+                ),
+                const PopupMenuItem(
+                  value: 'shortcuts',
+                  child: Text('Keyboard shortcuts'),
+                ),
+                if (onToggleEditorTheme != null)
+                  PopupMenuItem(
+                    value: 'theme',
+                    child: Text(editorDarkMode
+                        ? 'Switch editor to light mode'
+                        : 'Switch editor to dark mode'),
+                  ),
+              ],
+              icon: const Icon(Icons.more_vert_rounded),
+            ),
           if (onFocusToggle != null) ...[
             IconButton(
               key: const Key('focus-editor-button'),
@@ -1172,6 +1663,10 @@ class AssignmentProjectWorkspace extends StatelessWidget {
     required this.selectedPath,
     required this.selectedFileEditable,
     required this.controller,
+    this.editorDarkMode = true,
+    this.focusNode,
+    this.fontSize = 14,
+    this.diagnosticLine,
     required this.onFileSelected,
     required this.onChanged,
   });
@@ -1180,6 +1675,10 @@ class AssignmentProjectWorkspace extends StatelessWidget {
   final String? selectedPath;
   final bool selectedFileEditable;
   final CodeController controller;
+  final bool editorDarkMode;
+  final FocusNode? focusNode;
+  final double fontSize;
+  final int? diagnosticLine;
   final ValueChanged<AssignmentProjectFile> onFileSelected;
   final VoidCallback onChanged;
 
@@ -1191,6 +1690,7 @@ class AssignmentProjectWorkspace extends StatelessWidget {
           ProjectFileStatusBar(
             path: selectedPath ?? files.first.path,
             editable: selectedFileEditable,
+            diagnosticLine: diagnosticLine,
           ),
         Expanded(
           child: Semantics(
@@ -1200,10 +1700,26 @@ class AssignmentProjectWorkspace extends StatelessWidget {
             textField: true,
             readOnly: !selectedFileEditable,
             child: CodeTheme(
-              data: CodeThemeData(styles: darculaTheme),
+              data: CodeThemeData(
+                styles: editorDarkMode ? darculaTheme : githubTheme,
+              ),
               child: CodeField(
                 key: const Key('assignment-code-field'),
                 controller: controller,
+                focusNode: focusNode,
+                textStyle: TextStyle(
+                  fontFamily: 'Courier-New',
+                  fontSize: fontSize,
+                ),
+                lineNumberBuilder: (line, style) => TextSpan(
+                  text: line.toString(),
+                  style: line == diagnosticLine
+                      ? style?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.bold,
+                        )
+                      : style,
+                ),
                 expands: true,
                 minLines: null,
                 readOnly: !selectedFileEditable,
@@ -1370,10 +1886,12 @@ class ProjectFileStatusBar extends StatelessWidget {
     super.key,
     required this.path,
     required this.editable,
+    this.diagnosticLine,
   });
 
   final String path;
   final bool editable;
+  final int? diagnosticLine;
 
   @override
   Widget build(BuildContext context) {
@@ -1399,6 +1917,23 @@ class ProjectFileStatusBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
+          if (diagnosticLine != null) ...[
+            Icon(
+              Icons.error_outline_rounded,
+              size: 15,
+              color: theme.colorScheme.error,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              'Check line $diagnosticLine',
+              key: const Key('editor-diagnostic-line'),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+          ],
           Icon(editable ? Icons.edit_outlined : Icons.lock_outline, size: 15),
           const SizedBox(width: AppSpacing.xs),
           Text(

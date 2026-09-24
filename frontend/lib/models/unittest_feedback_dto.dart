@@ -12,6 +12,7 @@ class UnittestFeedbackDto {
   final bool execSuccess;
   final String hint;
   final String tutorSource;
+  final String executionStatus;
   final Map<String, dynamic> tutorFeedback;
 
   const UnittestFeedbackDto(
@@ -28,6 +29,7 @@ class UnittestFeedbackDto {
       required this.execSuccess,
       required this.hint,
       this.tutorSource = '',
+      this.executionStatus = '',
       this.tutorFeedback = const {}});
 
   factory UnittestFeedbackDto.fromJson(Map<String, dynamic> json) {
@@ -63,6 +65,7 @@ class UnittestFeedbackDto {
           tutorSource: json['tutor_feedback'] is Map
               ? ((json['tutor_feedback'] as Map)['source']?.toString() ?? '')
               : '',
+          executionStatus: json['execution_status']?.toString() ?? '',
           tutorFeedback: json['tutor_feedback'] is Map
               ? Map<String, dynamic>.from(json['tutor_feedback'] as Map)
               : const {},

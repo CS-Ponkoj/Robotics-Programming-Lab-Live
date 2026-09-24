@@ -46,6 +46,7 @@ void main() {
       'unittest_pass_results': <dynamic>[],
       'code_exec_result': '',
       'code_output': '',
+      'execution_status': 'runtime_error',
       'hint': 'Trace the first calculation.',
       'tutor_feedback': {
         'source': 'openai',
@@ -60,6 +61,7 @@ void main() {
       'The first calculation is incomplete.',
     );
     expect(feedback.tutorFeedback['debugging_steps'], ['Trace both inputs.']);
+    expect(feedback.executionStatus, 'runtime_error');
   });
 
   test('assignment DTO parses the ROS project file permissions', () {
@@ -161,6 +163,7 @@ void main() {
               selectedPath: 'src/robot_motion/package.xml',
               selectedFileEditable: false,
               controller: controller,
+              diagnosticLine: 3,
               onFileSelected: (_) {},
               onChanged: () {},
             ),
@@ -174,6 +177,7 @@ void main() {
     );
     expect(codeField.readOnly, isTrue);
     expect(find.text('Read only'), findsOneWidget);
+    expect(find.text('Check line 3'), findsOneWidget);
   });
 
   test('switching project files replaces the complete code model', () {
@@ -473,6 +477,109 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     await tester.tap(find.byKey(const Key('run-tests-button')));
     expect(runCount, 1);
+  });
+
+  testWidgets('editor toolbar exposes save state and essential tools', (
+    WidgetTester tester,
+  ) async {
+    var formatted = false;
+    var saved = false;
+    var themeToggled = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: app.AssignmentEditorToolbar(
+            isRunning: false,
+            onRun: () {},
+            onSave: () => saved = true,
+            saveState: app.DraftSaveState.saved,
+            onToggleEditorTheme: () => themeToggled = true,
+            onSearch: () {},
+            onReplace: () {},
+            onFormat: () => formatted = true,
+            onReset: () {},
+            onShowShortcuts: () {},
+            onShowApiReference: () {},
+            onDecreaseFont: () {},
+            onIncreaseFont: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('draft-save-state-icon')), findsOneWidget);
+    expect(find.byKey(const Key('editor-tools-menu')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('editor-tools-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('Find…'), findsOneWidget);
+    expect(find.text('Save draft (Ctrl+S)'), findsOneWidget);
+    expect(find.text('Switch editor to light mode'), findsOneWidget);
+    expect(find.text('Replace…'), findsOneWidget);
+    expect(find.text('Format Python'), findsOneWidget);
+    expect(find.text('Restore starter code'), findsOneWidget);
+    expect(find.text('Python names and APIs'), findsOneWidget);
+    expect(find.text('Keyboard shortcuts'), findsOneWidget);
+    await tester.tap(find.text('Format Python'));
+    await tester.pumpAndSettle();
+    expect(formatted, isTrue);
+
+    await tester.tap(find.byKey(const Key('editor-tools-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save draft (Ctrl+S)'));
+    await tester.pumpAndSettle();
+    expect(saved, isTrue);
+
+    await tester.tap(find.byKey(const Key('editor-tools-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Switch editor to light mode'));
+    await tester.pumpAndSettle();
+    expect(themeToggled, isTrue);
+  });
+
+  testWidgets('light and dark editor themes preserve code and selection', (
+    WidgetTester tester,
+  ) async {
+    final controller = CodeController(language: python, text: 'print("robot")');
+    addTearDown(controller.dispose);
+    controller.selection = const TextSelection(baseOffset: 0, extentOffset: 5);
+
+    Widget editorWithTheme(bool dark) => MaterialApp(
+          theme: buildAppTheme(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 900,
+              height: 600,
+              child: app.AssignmentProjectWorkspace(
+                files: const [],
+                selectedPath: null,
+                selectedFileEditable: true,
+                controller: controller,
+                editorDarkMode: dark,
+                onFileSelected: (_) {},
+                onChanged: () {},
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(editorWithTheme(true));
+    final darkBackground = tester
+        .widget<CodeTheme>(find.byType(CodeTheme))
+        .data!
+        .styles['root']!
+        .backgroundColor;
+    await tester.pumpWidget(editorWithTheme(false));
+    final lightBackground = tester
+        .widget<CodeTheme>(find.byType(CodeTheme))
+        .data!
+        .styles['root']!
+        .backgroundColor;
+
+    expect(darkBackground, isNot(lightBackground));
+    expect(controller.fullText, 'print("robot")');
+    expect(controller.selection,
+        const TextSelection(baseOffset: 0, extentOffset: 5));
   });
 
   testWidgets('workspace panel header presents consistent panel identity', (

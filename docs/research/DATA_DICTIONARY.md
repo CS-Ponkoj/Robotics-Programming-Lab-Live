@@ -31,7 +31,7 @@ after an instructor updates the assignment.
 | Active staging application database | Neon database `robotics_lab_staging` | PostgreSQL | Use the application or authorized Neon SQL Editor |
 | Private local configuration | `.env` in the repository root | Ignored environment settings | Read directly by the launcher and backend |
 | Legacy local source preserved during first migration | `backend/robotics_lab_staging.db` | SQLite | Read-only; not used by the default launcher after migration |
-| Student editor draft | Browser storage, keyed by authenticated user, assignment ID, and assignment version | Local JSON preferences | View through the matching assignment workspace; another login and older versions are isolated |
+| Student editor draft | Neon PostgreSQL with a browser fallback, keyed by authenticated user, assignment ID, and assignment version | `code_drafts` table plus local JSON preferences | View through the matching assignment workspace; another login and older versions are isolated |
 | Password-free prototype account roster | `backend/data/study_accounts.json` | JSON | Yes; tracked by Git, with `temporary_password` always `null` |
 | Research exports | Downloaded from the instructor Research Dashboard | CSV or Excel | Yes |
 | Data definitions and validation | `backend/data_contracts.py` | Python | Yes; this is the executable contract |
@@ -82,6 +82,23 @@ One row describes the current form of an assignment.
 | `simulation_config` | Optional simulation settings |
 | `asset_manifest` | Project files and which file may be edited |
 | `grader_type`, `grader_config` | Server-side grader selection and protected settings |
+
+### `code_drafts`
+
+One row stores the latest unfinished code for one authenticated student and one
+exact assignment version. Saving a newer draft updates that row. Demo sessions
+never write to this table.
+
+| Field | Meaning |
+|---|---|
+| `id` | Unique draft identifier |
+| `user_id` | Authenticated owner; drafts cannot be read across accounts |
+| `assignment_id`, `assignment_version` | Exact assignment content the draft belongs to |
+| `code` | The student's unfinished source code |
+| `created_at`, `updated_at` | Draft creation and latest-save times |
+
+The browser copy is a fallback for temporary connectivity problems. The
+PostgreSQL row is the authoritative cross-device draft for persistent accounts.
 
 ### `submissions`
 

@@ -61,7 +61,8 @@ simulation are pedagogically correct, secure, reproducible, and versioned.
 - Progress summary and assignment state badges.
 - Responsive desktop workspace with editor, instructions, and results panels.
 - Responsive mobile workspace with Code, Instructions, and Results tabs.
-- Python starter code editor and keyboard test execution.
+- Python editor with safe completion vocabulary, block indentation, search and
+  replace, manual formatting, reset, font controls, and keyboard test execution.
 - Public run and graded submission workflows.
 - Structured score, pass/fail counts, terminal output, and per-test evidence.
 - Optional AI tutoring toggle, disabled by default.
@@ -205,6 +206,7 @@ Use PostgreSQL for:
 - assignment identities and versions;
 - publication state and validation results;
 - student submissions and attempts;
+- version-specific authenticated student code drafts;
 - structured test evidence;
 - hint interactions and tutor feedback;
 - progress and mastery;
@@ -470,7 +472,7 @@ A feature is done when:
 | Hidden solution or test leakage | Academic integrity failure | Server-only packages, response allowlists, automated leak scans |
 | Unsafe code execution | Host or data compromise | Docker isolation, resource limits, no network, read-only packages |
 | AI reveals answers or becomes unavailable | Pedagogical harm or broken workflow | Sanitized evidence, strict tutor policy, evaluation, deterministic fallback |
-| Assignment edits invalidate student work | Incorrect grading and progress | Immutable versions, version recorded on every submission, and browser drafts loaded only for the matching version |
+| Assignment edits invalidate student work | Incorrect grading and progress | Immutable versions, version recorded on every submission, and PostgreSQL/browser drafts loaded only for the matching version |
 | Simulation jobs block API workers | Poor availability | Redis queue, background workers, cancellation, status polling |
 | Shared instructor token is compromised | Unauthorized content changes | Replace with authentication, RBAC, rotation, and audit logging |
 | Local and hosted database behavior diverges | Deployment defects | PostgreSQL by default locally and when hosted, plus migration tests |

@@ -128,6 +128,21 @@ void main() {
     expect(reloadedStore.revealedSolutions, isNot(contains(3)));
   });
 
+  test('clearing a draft removes its code and assignment version', () async {
+    final storage = InMemoryProgressStorage();
+    final store = LearningProgressStore();
+    await store.load(storage: storage);
+    await store.saveDraft(4, 3, 'temporary answer');
+
+    await store.clearDraft(4);
+
+    final reloaded = LearningProgressStore();
+    await reloaded.load(storage: storage);
+    expect(reloaded.draftFor(4, 3), isNull);
+    expect(reloaded.codeDrafts, isNot(contains(4)));
+    expect(reloaded.codeDraftVersions, isNot(contains(4)));
+  });
+
   test('assignment progress resolves every learner state distinctly', () async {
     final storage = InMemoryProgressStorage();
     final store = LearningProgressStore();

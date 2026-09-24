@@ -44,12 +44,14 @@ from auth_service import (
     verify_password,
 )
 from config import Settings, get_settings
+from code_formatting import CodeFormattingError, format_python_code
 from data_contracts import normalize_event_data
 from database import Base, build_engine
 from email_service import EmailService
 from graders import PythonFunctionGrader, PythonVariableGrader, Ros2TopicGrader
 from models import (
     Assignment,
+    CodeDraft,
     HintInteraction,
     StudySession,
     Submission,
@@ -78,6 +80,10 @@ from schemas import (
     AssignmentStudent,
     AuthenticatedUser,
     ChangePasswordRequest,
+    CodeDraftResponse,
+    CodeDraftUpsert,
+    CodeFormatRequest,
+    CodeFormatResponse,
     EmailTestRequest,
     ForgotPasswordRequest,
     HintRequest,
@@ -1193,6 +1199,138 @@ def create_app(
         _user: User = Depends(current_user),
     ):
         return to_student_assignment(get_assignment_or_404(session, assignment_id))
+
+    @application.get(
+        "/assignments/{assignment_id}/draft",
+        response_model=CodeDraftResponse,
+    )
+    def get_code_draft(
+        assignment_id: int,
+        request: Request,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        assignment = get_assignment_or_404(session, assignment_id)
+        if is_ephemeral_demo(request, user):
+            return CodeDraftResponse(
+                assignment_id=assignment.id,
+                assignment_version=assignment.version,
+            )
+        draft = session.scalar(
+            select(CodeDraft).where(
+                CodeDraft.user_id == user.id,
+                CodeDraft.assignment_id == assignment.id,
+                CodeDraft.assignment_version == assignment.version,
+            )
+        )
+        return CodeDraftResponse(
+            assignment_id=assignment.id,
+            assignment_version=assignment.version,
+            code=draft.code if draft is not None else None,
+            saved=draft is not None,
+            updated_at=draft.updated_at if draft is not None else None,
+        )
+
+    @application.put(
+        "/assignments/{assignment_id}/draft",
+        response_model=CodeDraftResponse,
+    )
+    def upsert_code_draft(
+        assignment_id: int,
+        body: CodeDraftUpsert,
+        request: Request,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        assignment = get_assignment_or_404(session, assignment_id)
+        if body.assignment_version != assignment.version:
+            raise HTTPException(
+                409,
+                "The assignment changed. Reload before saving this draft.",
+            )
+        if is_ephemeral_demo(request, user):
+            return CodeDraftResponse(
+                assignment_id=assignment.id,
+                assignment_version=assignment.version,
+                code=body.code,
+            )
+        draft = session.scalar(
+            select(CodeDraft).where(
+                CodeDraft.user_id == user.id,
+                CodeDraft.assignment_id == assignment.id,
+                CodeDraft.assignment_version == assignment.version,
+            )
+        )
+        if draft is None:
+            draft = CodeDraft(
+                user_id=user.id,
+                assignment_id=assignment.id,
+                assignment_version=assignment.version,
+                code=body.code,
+            )
+            session.add(draft)
+        else:
+            draft.code = body.code
+            draft.updated_at = utc_now()
+        session.commit()
+        session.refresh(draft)
+        return CodeDraftResponse(
+            assignment_id=assignment.id,
+            assignment_version=assignment.version,
+            code=draft.code,
+            saved=True,
+            updated_at=draft.updated_at,
+        )
+
+    @application.delete(
+        "/assignments/{assignment_id}/draft",
+        status_code=204,
+    )
+    def delete_code_draft(
+        assignment_id: int,
+        request: Request,
+        assignment_version: int = Query(ge=1),
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        assignment = get_assignment_or_404(session, assignment_id)
+        if assignment_version != assignment.version:
+            raise HTTPException(
+                409,
+                "The assignment changed. Reload before clearing this draft.",
+            )
+        if is_ephemeral_demo(request, user):
+            return Response(status_code=204)
+        draft = session.scalar(
+            select(CodeDraft).where(
+                CodeDraft.user_id == user.id,
+                CodeDraft.assignment_id == assignment.id,
+                CodeDraft.assignment_version == assignment.version,
+            )
+        )
+        if draft is not None:
+            session.delete(draft)
+            session.commit()
+        return Response(status_code=204)
+
+    @application.post(
+        "/assignments/{assignment_id}/format",
+        response_model=CodeFormatResponse,
+    )
+    def format_assignment_code(
+        assignment_id: int,
+        body: CodeFormatRequest,
+        session: Session = Depends(session_dependency),
+        _user: User = Depends(current_user),
+    ):
+        assignment = get_assignment_or_404(session, assignment_id)
+        if not assignment.language.lower().startswith("python"):
+            raise HTTPException(400, "Formatting is available only for Python.")
+        try:
+            formatted = format_python_code(body.code)
+        except CodeFormattingError as error:
+            raise HTTPException(422, str(error)) from error
+        return CodeFormatResponse(code=formatted, changed=formatted != body.code)
 
     @application.post("/assignments/{assignment_id}/run")
     def run_assignment(

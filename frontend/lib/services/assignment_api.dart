@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
+import 'package:iuse_demo/models/code_draft_dto.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
@@ -21,6 +22,81 @@ Future<AssignmentDto> fetchAssignment(int id) async {
     return AssignmentDto.fromJson(jsonDecode(response.body));
   }
   throw Exception('Failed to load assignment $id');
+}
+
+Future<CodeDraftDto> fetchCodeDraft(int assignmentId) async {
+  final response = await http
+      .get(
+        Uri.parse('$apiBaseUrl/assignments/$assignmentId/draft'),
+        headers: AuthApi.authorizedHeaders(),
+      )
+      .timeout(_requestTimeout);
+  if (response.statusCode != 200) {
+    throw Exception(AuthApi.errorMessage(response));
+  }
+  return CodeDraftDto.fromJson(
+    Map<String, dynamic>.from(jsonDecode(response.body) as Map),
+  );
+}
+
+Future<CodeDraftDto> saveCodeDraft(
+  int assignmentId,
+  int assignmentVersion,
+  String code,
+) async {
+  final response = await http
+      .put(
+        Uri.parse('$apiBaseUrl/assignments/$assignmentId/draft'),
+        headers: AuthApi.authorizedHeaders(json: true),
+        body: jsonEncode({
+          'assignment_version': assignmentVersion,
+          'code': code,
+        }),
+      )
+      .timeout(_requestTimeout);
+  if (response.statusCode != 200) {
+    throw Exception(AuthApi.errorMessage(response));
+  }
+  return CodeDraftDto.fromJson(
+    Map<String, dynamic>.from(jsonDecode(response.body) as Map),
+  );
+}
+
+Future<void> deleteCodeDraft(
+  int assignmentId,
+  int assignmentVersion,
+) async {
+  final response = await http
+      .delete(
+        Uri.parse(
+          '$apiBaseUrl/assignments/$assignmentId/draft'
+          '?assignment_version=$assignmentVersion',
+        ),
+        headers: AuthApi.authorizedHeaders(),
+      )
+      .timeout(_requestTimeout);
+  if (response.statusCode != 204) {
+    throw Exception(AuthApi.errorMessage(response));
+  }
+}
+
+Future<CodeFormatDto> formatAssignmentCode(
+  int assignmentId,
+  String code,
+) async {
+  final response = await http
+      .post(
+        Uri.parse('$apiBaseUrl/assignments/$assignmentId/format'),
+        headers: AuthApi.authorizedHeaders(json: true),
+        body: jsonEncode({'code': code}),
+      )
+      .timeout(_requestTimeout);
+  if (response.statusCode != 200) {
+    throw Exception(AuthApi.errorMessage(response));
+  }
+  return CodeFormatDto.fromJson(
+    Map<String, dynamic>.from(jsonDecode(response.body) as Map),
+  );
 }
 
 Future<UnittestFeedbackDto> fetchUnittestFeedback(int id, String code,
