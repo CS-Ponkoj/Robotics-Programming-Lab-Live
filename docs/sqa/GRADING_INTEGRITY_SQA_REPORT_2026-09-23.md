@@ -2,11 +2,13 @@
 
 Date: 2026-09-23
 Branch: fix/grading-integrity
-Release state: Local staging only; not committed or pushed
+Release state: V5.5 baseline is on staging `main`; the follow-up student-facing fixes in this report are local only and have not been committed or pushed
 
 ## Outcome
 
 All confirmed grading issues from the partial-answer QA were repaired. Assignments 1–4 now grade reusable functions across deterministic server-only scenarios. Assignments 5–6 retain their ROS 2 behavior graders, and their displayed rubrics now match the implemented test weights.
+
+The follow-up human-style QA also confirmed that the grader correctly rejects code with a missing helper. The apparent 100% result was stale feedback from the student's previous successful run, not a new score for the edited code. The workspace now hides stale results as soon as code changes and identifies the stored value as a previous score.
 
 ## Repaired issues
 
@@ -19,6 +21,23 @@ All confirmed grading issues from the partial-answer QA were repaired. Assignmen
 | GI-005 | Assignment 3 used 12.5% criteria but displayed integer scores without explanation | Instructions now state that the final total is rounded to the nearest whole percent | Instruction and score tests | Pass |
 | GI-006 | ROS rubrics did not match the behavior-harness weights | Aligned Assignment 5 to 20/20/30/30 and Assignment 6 to 15/20/20/35/10 | Derived rubric-to-harness regression test | Pass |
 | GI-007 | Instructor validation rejected the new function grader | Added configuration validation for function name, criteria, cases, arguments, and expected outputs | Assignment Studio validate/edit/publish tests | Pass |
+| GI-008 | Editing code after a successful run left the old 100% result visible | Hide the Results panel after an edit and label the saved value as `Previous score` until the student runs again | Manual Chrome QA and Flutter widget tests | Pass |
+| GI-009 | The Flutter client recalculated scores as passed checks divided by total checks | Use the backend's authoritative weighted score and show the unweighted check pass rate separately | Weighted-score widget regression test | Pass |
+
+## Student-style mutation checks
+
+Each maintained answer was changed in a realistic student-like way and run through the active local API.
+
+| Assignment | Mutation | Score | Passed | Execution completed | Passed checks | Result |
+|---|---|---:|---|---|---:|---|
+| 1 | Commented out the distance helper | 0% | No | No (`NameError`) | 0/4 | Pass |
+| 2 | Commented out the distance helper | 0% | No | No | 0/4 | Pass |
+| 3 | Commented out the route helper | 0% | No | No | 0/8 | Pass |
+| 4 | Renamed the required function | 0% | No | No | 0/5 | Pass |
+| 5 | Commented out the ROS publisher | 20% | No | Yes | 2/7 | Pass |
+| 6 | Commented out the ROS publisher | 10% | No | Yes | 1/9 | Pass |
+
+Assignments 5 and 6 intentionally award limited weighted credit for valid package/node structure even when driving behavior is incomplete. The client now displays these exact backend scores rather than converting the check counts to 29% and 11%.
 
 ## Assignment scoring checks
 
@@ -40,6 +59,8 @@ All confirmed grading issues from the partial-answer QA were repaired. Assignmen
 | Flutter static analysis | No issues found | Pass |
 | Flutter automated tests | 52 tests passed | Pass |
 | Flutter release web build | Release build completed in the OneDrive-safe build directory | Pass |
+| Manual stale-result scenario | Correct answer produced 100%; editing the code hid the result and labeled 100% as the previous score; rerunning broken code produced 0% | Pass |
+| Weighted-score UI regression | A response with one of two checks passing and a backend score of 35% displayed score 35% and pass rate 50% | Pass |
 | ROS 2 Assignment 5 | Real Docker grader passed 7/7 checks; 78 Twist messages at about 10.0 Hz | Pass |
 | ROS 2 Assignment 6 | Real Docker grader passed 9/9 checks; 44 settled Twist messages at about 9.2 Hz | Pass |
 
@@ -54,4 +75,5 @@ All confirmed grading issues from the partial-answer QA were repaired. Assignmen
 ## Remaining limitations
 
 - Docker Desktop with Linux containers is required to grade Assignments 5 and 6 locally.
-- The code is ready for review, but no commit, push, merge, deployment, or production change was performed.
+- No physical mobile-device test was performed; the narrow-screen Flutter widget test passed.
+- The follow-up changes are ready for review, but no commit, push, merge, deployment, or production change was performed for them.

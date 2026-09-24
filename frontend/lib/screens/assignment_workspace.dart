@@ -41,6 +41,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _enableFeedback = false;
   bool _submitted = false;
   bool _isRunning = false;
+  bool _hasUnrunChanges = false;
   bool _init = true;
   String _submissionId = '';
   String _revealedSolutionHtml = '';
@@ -128,6 +129,17 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void _handleEditableCodeChanged() {
+    final updatedCode = _controller.fullText;
+    if (updatedCode != _code && (_submitted || !_hasUnrunChanges)) {
+      setState(() {
+        _submitted = false;
+        _hasUnrunChanges = true;
+      });
+    }
+    _saveDraft(updatedCode);
+  }
+
   void _selectProjectFile(AssignmentProjectFile file) {
     if (_selectedProjectFileEditable) {
       _saveDraft(_controller.fullText);
@@ -152,6 +164,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _submitted = true;
       _isRunning = true;
+      _hasUnrunChanges = false;
       _feedback = fetchUnittestFeedback(
         widget.id,
         _code,
@@ -161,21 +174,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
     _feedback.then(
       (feedback) {
-        final passed = feedback.unittestFeedback
-            .asMap()
-            .entries
-            .where(
-              (entry) =>
-                  entry.key < feedback.unittestPassResults.length &&
-                  feedback.unittestPassResults[entry.key],
-            )
-            .length;
-        final total = feedback.unittestPassResults.length;
-
         if (!mounted) {
           return;
         }
-        final score = total > 0 ? ((passed / total) * 100).round() : 0;
+        final score = feedback.score.clamp(0, 100).toInt();
         setState(() {
           lastAttemptAccuracy[widget.id] = score;
           _submissionId = feedback.submissionId;
@@ -292,7 +294,9 @@ class _MyHomePageState extends State<MyHomePage> {
         useDesktopLayout && _workspaceFocus == AssignmentWorkspaceFocus.none;
     final progressState = learningProgress.assignmentState(widget.id);
     final submissionStatus = lastAttemptAccuracy.containsKey(widget.id)
-        ? '${progressState.label} • Last score: ${lastAttemptAccuracy[widget.id]}%'
+        ? _hasUnrunChanges
+            ? '${progressState.label} • Code changed • Previous score: ${lastAttemptAccuracy[widget.id]}%'
+            : '${progressState.label} • Last score: ${lastAttemptAccuracy[widget.id]}%'
         : progressState.label;
     final assignmentStatus = solutionRevealedAssignments.contains(widget.id)
         ? '$submissionStatus • Solution viewed'
@@ -422,7 +426,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                           onFileSelected: _selectProjectFile,
                                           onChanged: () {
                                             if (_selectedProjectFileEditable) {
-                                              _saveDraft(_controller.fullText);
+                                              _handleEditableCodeChanged();
                                             }
                                           },
                                         );
@@ -1793,7 +1797,8 @@ class Feedback extends StatelessWidget {
     final passed = data.unittestPassResults.where((result) => result).length;
     final failed = data.unittestPassResults.length - passed;
     final total = passed + failed;
-    final accuracy = total > 0 ? (passed / total) * 100 : 0.0;
+    final passRate = total > 0 ? (passed / total) * 100 : 0.0;
+    final score = data.score.clamp(0, 100).toInt();
     final vars = data.testedVals.map((value) => value.toString()).toList();
     final tutorAvailable = aiTutorEnabled || data.tutorFeedback.isNotEmpty;
 
@@ -1829,7 +1834,12 @@ class Feedback extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ResultSummary(passed: passed, failed: failed, accuracy: accuracy),
+          _ResultSummary(
+            passed: passed,
+            failed: failed,
+            score: score,
+            passRate: passRate,
+          ),
           const SizedBox(height: AppSpacing.md),
           _TerminalOutput(data: data),
           if (data.hint.isNotEmpty ||
@@ -2124,24 +2134,25 @@ class _ResultSummary extends StatelessWidget {
   const _ResultSummary({
     required this.passed,
     required this.failed,
-    required this.accuracy,
+    required this.score,
+    required this.passRate,
   });
 
   final int passed;
   final int failed;
-  final double accuracy;
+  final int score;
+  final double passRate;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final allPassed = failed == 0 && passed > 0;
-    final statusColor = performanceColor(accuracy);
+    final statusColor = performanceColor(score);
     final statusBackground = statusColor.withValues(alpha: 0.12);
 
     return Semantics(
       container: true,
-      label:
-          'Test score ${accuracy.toStringAsFixed(0)} percent. $passed passed and $failed failed.',
+      label: 'Test score $score percent. $passed passed and $failed failed.',
       child: Container(
         key: const Key('result-summary'),
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -2173,7 +2184,7 @@ class _ResultSummary extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${accuracy.toStringAsFixed(0)}%',
+                  '$score%',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     color: statusColor,
                     fontWeight: FontWeight.w900,
@@ -2183,7 +2194,7 @@ class _ResultSummary extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             LinearProgressIndicator(
-              value: accuracy / 100,
+              value: score / 100,
               color: statusColor,
               backgroundColor: theme.colorScheme.surface.withValues(
                 alpha: 0.72,
@@ -2206,7 +2217,7 @@ class _ResultSummary extends StatelessWidget {
                 ),
                 _ResultCount(
                   icon: Icons.analytics_outlined,
-                  label: 'Accuracy: ${accuracy.toStringAsFixed(1)}%',
+                  label: 'Pass rate: ${passRate.toStringAsFixed(1)}%',
                   color: theme.colorScheme.primary,
                 ),
               ],

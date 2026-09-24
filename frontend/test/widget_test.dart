@@ -1042,11 +1042,12 @@ void main() {
     expect(scoreText.style?.color, performanceColor(60));
   });
 
-  testWidgets('feedback uses boolean results for pass and accuracy counts', (
+  testWidgets('feedback separates weighted score from check pass rate', (
     WidgetTester tester,
   ) async {
     const feedback = UnittestFeedbackDto(
       id: 2,
+      score: 35,
       testedVals: ['first', 'second'],
       pass: false,
       unittestFeedback: [
@@ -1068,7 +1069,7 @@ void main() {
 
     expect(find.text('Passed: 1'), findsOneWidget);
     expect(find.text('Failed: 1'), findsOneWidget);
-    expect(find.textContaining('Accuracy: 50.0%'), findsOneWidget);
+    expect(find.textContaining('Pass rate: 50.0%'), findsOneWidget);
     expect(find.byKey(const Key('result-summary')), findsOneWidget);
     expect(find.byKey(const Key('terminal-output')), findsOneWidget);
     expect(find.text('Keep refining your solution'), findsOneWidget);
@@ -1078,10 +1079,10 @@ void main() {
     final summaryDecoration = summary.decoration! as BoxDecoration;
     expect(
       summaryDecoration.color,
-      performanceColor(50).withValues(alpha: 0.12),
+      performanceColor(35).withValues(alpha: 0.12),
     );
-    final score = tester.widget<Text>(find.text('50%'));
-    expect(score.style?.color, performanceColor(50));
+    final score = tester.widget<Text>(find.text('35%'));
+    expect(score.style?.color, performanceColor(35));
     expect(find.text('Passed'), findsOneWidget);
     expect(find.text('Needs attention'), findsOneWidget);
     expect(find.byIcon(Icons.check_rounded), findsNWidgets(2));
