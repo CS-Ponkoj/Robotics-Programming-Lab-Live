@@ -45,7 +45,9 @@ the sandbox, API, and Flutter web application. Python and Flutter generated
 files stay outside the clone. The ignored repository-root `.env` supplies the
 Neon connection and optional AI configuration. Git supplies the password-free
 account roster at `backend/data/study_accounts.json`.
-AI is off. To test AI deliberately, use `-EnableAi`. To use an external staging
+AI tutoring remains off until the student turns on the assignment switch. When
+the ignored `.env` has `OPENAI_API_KEY`, the normal launcher makes that switch
+usable; `-EnableAi` is only an optional startup check for the key.
 The launcher refuses to reuse ports already owned by an older project process;
 stop that process or provide different `-FrontendPort`, `-BackendPort`, and
 `-SandboxPort` values.

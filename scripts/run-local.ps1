@@ -46,6 +46,7 @@ try {
     Push-Location $backendRoot
     try {
         $databaseUrl = (& $python -c "from config import get_settings; print(get_settings().cloud_database_url or '')" 2>$null | Select-Object -Last 1)
+        $aiAvailable = ((& $python -c "from config import get_settings; print('true' if get_settings().openai_api_key else 'false')" 2>$null | Select-Object -Last 1) -eq "true")
     } finally {
         Pop-Location
     }
@@ -60,6 +61,9 @@ try {
     [Environment]::SetEnvironmentVariable("ROBOTICS_ENV_FILE", $previousConfigPath, "Process")
 }
 Write-Output "Using the configured Neon staging database."
+if ($EnableAi -and -not $aiAvailable) {
+    throw "-EnableAi was requested, but OPENAI_API_KEY is not configured in the repository root .env file."
+}
 
 function New-LocalToken {
     $bytes = New-Object byte[] 32
@@ -187,11 +191,7 @@ try {
         SANDBOX_BACKEND = "remote"
         SANDBOX_URL = "http://127.0.0.1:$SandboxPort"
         SANDBOX_API_TOKEN = $token
-        OPENAI_API_KEY = ""
         ROBOTICS_ENV_FILE = $privateConfigPath
-    }
-    if ($EnableAi) {
-        $backendEnvironment.Remove("OPENAI_API_KEY")
     }
     $backend = Start-ProjectProcess -Name "backend" -FilePath $python `
         -ArgumentList @("-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "$BackendPort", "--no-server-header") `
@@ -245,7 +245,8 @@ try {
         sandboxUrl = "http://127.0.0.1:$SandboxPort"
         databaseBackend = "postgresql"
         databaseProvider = "neon"
-        aiEnabled = [bool]$EnableAi
+        aiAvailable = [bool]$aiAvailable
+        aiEnabledByDefault = $false
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8
 
     Write-Output "Robotics Programming Lab is ready."
@@ -253,7 +254,7 @@ try {
     Write-Output "Backend:  http://127.0.0.1:$BackendPort/health"
     Write-Output "Sandbox:  http://127.0.0.1:$SandboxPort/health"
     Write-Output "Database: Neon staging PostgreSQL"
-    Write-Output "AI enabled: $([bool]$EnableAi)"
+    Write-Output "AI available: $([bool]$aiAvailable); off until the assignment switch is turned on."
     Write-Output "Stop with: .\scripts\stop-local.ps1"
 } catch {
     foreach ($process in $processes) {

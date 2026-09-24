@@ -146,11 +146,13 @@ dependencies changed:
 ```
 
 Open `http://127.0.0.1:8180/app` in the browser. The launcher connects to Neon
-and starts the Python sandbox, FastAPI, and Flutter web. AI is off by default.
+and starts the Python sandbox, FastAPI, and Flutter web. The AI tutoring switch
+is off by default. If the ignored repository-root `.env` contains
+`OPENAI_API_KEY`, the normal launcher makes AI available when you turn on the
+switch; it does not call OpenAI merely because the key is present.
 
-To intentionally test optional AI feedback, place `OPENAI_API_KEY` in the
-ignored repository-root `.env` and add `--enable-ai`. Never commit or
-print that file.
+The optional `--enable-ai` flag checks for a configured key at startup; it is
+not required for the assignment switch. Never commit or print the `.env` file.
 
 ## 6. Stop safely
 

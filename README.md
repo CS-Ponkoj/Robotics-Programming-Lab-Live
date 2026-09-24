@@ -172,18 +172,22 @@ security rules are in [AGENTS.md](AGENTS.md).
 ## AI option
 
 AI is off by default. Normal grading and built-in hints do not require an API
-key. To intentionally test optional AI feedback, place `OPENAI_API_KEY` in the
-ignored repository-root `.env` file and start with:
+key. If `OPENAI_API_KEY` is in the ignored repository-root `.env` file, the
+normal local launcher makes AI available without making an API request. Turn on
+**AI tutoring** in an assignment to use it; the switch starts off. The optional
+`-EnableAi` flag now only checks that a key is configured before starting:
 
 ```powershell
 .\scripts\run-local.ps1 -EnableAi -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
 ```
 
+On Ubuntu, `--enable-ai` performs the same optional startup check. Neither
+flag is needed to make the assignment switch work when a key is configured.
 Provider failure or missing credit must not block grading. Hidden tests,
 official solutions, secrets, and unrelated student data are excluded from the
 AI context.
 
-Ubuntu uses the equivalent command:
+Ubuntu's optional startup-check command is:
 
 ```bash
 ./scripts/run-local.sh --enable-ai --frontend-port 8180 --backend-port 5100 --sandbox-port 5101

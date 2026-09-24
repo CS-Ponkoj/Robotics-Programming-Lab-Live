@@ -82,6 +82,7 @@ def test_openai_client_uses_bounded_timeout_and_no_retries(monkeypatch):
     assert request["store"] is False
     assert request["text"]["format"]["type"] == "json_schema"
     assert request["text"]["format"]["strict"] is True
+    assert request["max_output_tokens"] == 1000
 
 
 def test_tutor_falls_back_when_openai_times_out():

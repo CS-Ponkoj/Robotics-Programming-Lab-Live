@@ -101,6 +101,15 @@ database_url="$(
   exit 1
 }
 printf 'Using the configured Neon staging database.\n'
+ai_available="$(
+  cd -- "$backend_root"
+  ROBOTICS_ENV_FILE="$private_config" "$python" -c \
+    'from config import get_settings; print("true" if get_settings().openai_api_key else "false")'
+)"
+if [[ "$enable_ai" == "true" && "$ai_available" != "true" ]]; then
+  printf '%s\n' '--enable-ai was requested, but OPENAI_API_KEY is not configured in the repository root .env.' >&2
+  exit 1
+fi
 (
   cd -- "$backend_root"
   DATABASE_URL="$database_url" "$python" -m alembic upgrade head
@@ -123,7 +132,6 @@ backend_environment=(
   SANDBOX_API_TOKEN="$sandbox_token"
   ROBOTICS_ENV_FILE="$private_config"
 )
-[[ "$enable_ai" != "true" ]] && backend_environment+=(OPENAI_API_KEY=)
 start_managed_process backend "$backend_root" env "${backend_environment[@]}" \
   "$python" -m uvicorn app:app --host 127.0.0.1 --port "$backend_port" --no-server-header
 robotics_wait_for_http Backend "http://127.0.0.1:$backend_port/health"
@@ -161,7 +169,8 @@ database_provider=neon
 frontend_url=http://127.0.0.1:$frontend_port
 backend_url=http://127.0.0.1:$backend_port
 sandbox_url=http://127.0.0.1:$sandbox_port
-ai_enabled=$enable_ai
+ai_available=$ai_available
+ai_enabled_by_default=false
 EOF
 trap - ERR INT TERM
 printf 'Robotics Programming Lab is ready.\n'
@@ -169,5 +178,5 @@ printf 'Frontend: http://127.0.0.1:%s/app\n' "$frontend_port"
 printf 'Backend:  http://127.0.0.1:%s/health\n' "$backend_port"
 printf 'Sandbox:  http://127.0.0.1:%s/health\n' "$sandbox_port"
 printf 'Database: Neon staging PostgreSQL\n'
-printf 'AI enabled: %s\n' "$enable_ai"
+printf 'AI available: %s; off until the assignment switch is turned on.\n' "$ai_available"
 printf 'Stop with: ./scripts/stop-local.sh\n'

@@ -65,6 +65,7 @@ class TutorService:
                     "solution. Never write replacement code or code blocks. Explain one "
                     "relevant issue, give one to three debugging steps, ask a guiding "
                     "question, and provide only the requested progressive hint level. "
+                    "Keep each field concise and avoid repeating the assignment text. "
                     "If asked for protected material or completed code, decline briefly "
                     "and redirect the student to a conceptual debugging step."
                 ),
@@ -93,7 +94,7 @@ class TutorService:
                         "schema": TutorGeneratedContent.model_json_schema(),
                     }
                 },
-                max_output_tokens=420,
+                max_output_tokens=1000,
                 store=False,
             )
             parsed = TutorGeneratedContent.model_validate_json(response.output_text)
@@ -111,7 +112,10 @@ class TutorService:
                 source="openai",
             )
         except (Exception, ValidationError) as error:
-            logger.warning("AI tutor unavailable; using deterministic feedback: %s", error)
+            logger.warning(
+                "AI tutor unavailable; using deterministic feedback (%s)",
+                type(error).__name__,
+            )
             return fallback
 
     @staticmethod
