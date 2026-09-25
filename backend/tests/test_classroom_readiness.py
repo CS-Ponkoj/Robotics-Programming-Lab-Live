@@ -134,9 +134,29 @@ def test_assignment_4_exposes_the_complete_deterministic_lidar_model(tmp_path):
     assert "3 through 357" in instructions
     assert "80 through 100" in instructions
     assert "smallest density, not the smallest distance" in instructions
-    assert assignment["version"] == 6
+    assert assignment["version"] == 7
     assert 'src="/images/4"' in instructions
     assert "analyze_vfh" in assignment["starter_code"]
+
+
+def test_assignment_4_untouched_starter_earns_no_credit(tmp_path):
+    settings = _settings("sqlite://", tmp_path / "assignment-4-starter.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        student = _login(client, "student", "student")
+        headers = _bearer(student["token"])
+        assignment = client.get("/assignments/4", headers=headers).json()
+        response = client.post(
+            "/assignments/4/run",
+            headers=headers,
+            json={"code": assignment["starter_code"]},
+        )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["ex_success"] is True
+    assert result["pass"] is False
+    assert result["score"] == 0
+    assert result["unittest_pass_results"] == [False] * 5
 
 
 def test_assignment_4_rejects_hardcoded_displayed_answers(tmp_path):

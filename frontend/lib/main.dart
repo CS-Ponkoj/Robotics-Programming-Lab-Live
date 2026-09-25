@@ -108,6 +108,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Robotics Programming Lab',
+      debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       builder: (context, child) => Focus(
         canRequestFocus: false,

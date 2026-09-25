@@ -2,7 +2,7 @@
 
 Date: 2026-09-23
 Branch: fix/grading-integrity
-Release state: V5.5 baseline is on staging `main`; the follow-up student-facing fixes in this report are local only and have not been committed or pushed
+Release state: V5.5 baseline and student-facing fixes are on staging `main`; the September 24 Assignment 4 starter correction has been verified locally and is tracked separately in Git history
 
 ## Outcome
 
@@ -76,4 +76,19 @@ Assignments 5 and 6 intentionally award limited weighted credit for valid packag
 
 - Docker Desktop with Linux containers is required to grade Assignments 5 and 6 locally.
 - No physical mobile-device test was performed; the narrow-screen Flutter widget test passed.
-- The follow-up changes are ready for review, but no commit, push, merge, deployment, or production change was performed for them.
+- The September 24 Assignment 4 starter correction has not been deployed to production.
+
+## September 24 follow-up: untouched Assignment 4 starter
+
+Environment: canonical Windows staging checkout and local app, based on staging `main` commit `cb1c565`; Neon staging database; AI disabled.
+
+| Check | Expected | Actual | Result |
+|---|---|---|---|
+| Untouched starter | Runs successfully and earns 0% because no student task is completed | Assignment version 7 returned 0%, execution succeeded, and all five criteria failed | PASS |
+| Student browser flow | Untouched starter shows 0% after Run tests | Clean Chrome student-demo session showed 0%, Passed 0, Failed 5, and output `5 0 0.0 0 0.0` | PASS |
+| Official answer | Still earns 100% | Focused classroom test passed | PASS |
+| Partial answer | Retains rubric-based partial credit | Focused classroom test returned the expected 60% | PASS |
+| Existing assignment upgrade | New seed version loads without changing older attempt versions | Local app served version 7 after restart; assignment repository upgrade test passed | PASS |
+| Backend regression | No backend failures | 201 backend tests passed | PASS |
+
+Confirmed cause: version 6 supplied working code for the complete-sector and inclusive-window criteria, so its untouched starter earned two 20-point criteria. Version 7 leaves those operations for the student while keeping the starter executable. Existing browser drafts are scoped by assignment version, so an old version 6 draft is not loaded as version 7 code.

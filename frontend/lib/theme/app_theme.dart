@@ -48,9 +48,10 @@ ThemeData buildAppTheme() {
     primary: AppColors.brand,
     onPrimary: Colors.white,
     surface: Colors.white,
+    onSurfaceVariant: const Color(0xFF425466),
   );
 
-  return ThemeData(
+  final theme = ThemeData(
     useMaterial3: true,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppColors.pageBackground,
@@ -81,6 +82,13 @@ ThemeData buildAppTheme() {
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: AppColors.brand,
       linearMinHeight: 8,
+    ),
+  );
+
+  return theme.copyWith(
+    textTheme: theme.textTheme.copyWith(
+      bodySmall: theme.textTheme.bodySmall?.copyWith(fontSize: 14),
+      labelSmall: theme.textTheme.labelSmall?.copyWith(fontSize: 13),
     ),
   );
 }

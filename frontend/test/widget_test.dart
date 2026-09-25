@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +16,7 @@ import 'package:iuse_demo/navigation/app_entry_policy.dart';
 import 'package:iuse_demo/screens/assignment_list.dart';
 import 'package:iuse_demo/screens/login_page.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/theme/editor_palette.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const testAuthenticatedUser = AuthenticatedUser(
@@ -226,6 +228,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginPage), findsOneWidget);
+    expect(
+      tester
+          .widget<MaterialApp>(find.byType(MaterialApp))
+          .debugShowCheckedModeBanner,
+      isFalse,
+    );
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getString('auth_session_token'), isNull);
   });
@@ -246,6 +254,8 @@ void main() {
     final theme = Theme.of(context);
     expect(theme.colorScheme.primary, AppColors.brand);
     expect(theme.scaffoldBackgroundColor, AppColors.pageBackground);
+    expect(theme.textTheme.bodySmall?.fontSize, 14);
+    expect(theme.textTheme.labelSmall?.fontSize, 13);
     expect(theme.cardTheme.elevation, 0);
     expect(theme.progressIndicatorTheme.linearMinHeight, 8);
   });
@@ -311,7 +321,10 @@ void main() {
         findsNothing,
       );
       expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
-      expect(find.byTooltip('Restore workspace'), findsOneWidget);
+      expect(
+        find.byTooltip('Restore workspace (Ctrl+Alt+E)'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('focus-editor-button')));
       await tester.pump();
@@ -441,6 +454,64 @@ void main() {
     expect(find.text('Ready when you are'), findsNothing);
   });
 
+  testWidgets('editor keyboard actions open tools and change appearance', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: const MediaQuery(
+          data: MediaQueryData(size: Size(1200, 900)),
+          child: app.MyHomePage(title: 'Assignment 1: Navigation', id: 1),
+        ),
+      ),
+    );
+
+    final bindings = tester
+        .widget<CallbackShortcuts>(
+          find.byType(CallbackShortcuts),
+        )
+        .bindings;
+    for (final shortcut in [
+      const SingleActivator(LogicalKeyboardKey.keyF, control: true),
+      const SingleActivator(LogicalKeyboardKey.keyQ, control: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.keyH, control: true),
+      const SingleActivator(LogicalKeyboardKey.keyW, control: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.keyD, control: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.keyF, shift: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.keyI,
+          control: true, shift: true),
+      const SingleActivator(LogicalKeyboardKey.keyR, control: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.minus, control: true),
+      const SingleActivator(LogicalKeyboardKey.digit1,
+          control: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.equal, control: true),
+      const SingleActivator(LogicalKeyboardKey.digit2,
+          control: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.keyA, control: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.f1),
+      const SingleActivator(LogicalKeyboardKey.keyK, control: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.keyT, control: true, alt: true),
+      const SingleActivator(LogicalKeyboardKey.keyE, control: true, alt: true),
+    ]) {
+      expect(bindings.containsKey(shortcut), isTrue);
+    }
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('Find in code'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.f1);
+    await tester.pumpAndSettle();
+    expect(find.text('Editor shortcuts'), findsOneWidget);
+  });
+
   testWidgets('editor toolbar runs tests once and exposes running state', (
     WidgetTester tester,
   ) async {
@@ -482,6 +553,8 @@ void main() {
   testWidgets('editor toolbar exposes save state and essential tools', (
     WidgetTester tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     var formatted = false;
     var saved = false;
     var themeToggled = false;
@@ -509,31 +582,41 @@ void main() {
     );
 
     expect(find.byKey(const Key('draft-save-state-icon')), findsOneWidget);
-    expect(find.byKey(const Key('editor-tools-menu')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('editor-tools-menu')));
-    await tester.pumpAndSettle();
-    expect(find.text('Find…'), findsOneWidget);
-    expect(find.text('Save draft (Ctrl+S)'), findsOneWidget);
-    expect(find.text('Switch editor to light mode'), findsOneWidget);
-    expect(find.text('Replace…'), findsOneWidget);
-    expect(find.text('Format Python'), findsOneWidget);
-    expect(find.text('Restore starter code'), findsOneWidget);
-    expect(find.text('Python names and APIs'), findsOneWidget);
-    expect(find.text('Keyboard shortcuts'), findsOneWidget);
-    await tester.tap(find.text('Format Python'));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('editor-tools-menu')), findsNothing);
+    expect(find.byKey(const Key('run-tests-button')), findsOneWidget);
+    for (final action in [
+      ('save', 'Save draft (Ctrl+S / Ctrl+Alt+D)'),
+      ('find', 'Find (Ctrl+F / Ctrl+Alt+Q)'),
+      ('replace', 'Replace (Ctrl+H / Ctrl+Alt+W)'),
+      ('format', 'Format Python (Shift+Alt+F / Ctrl+Shift+I)'),
+      ('restore', 'Restore starter code (Ctrl+Alt+R)'),
+      ('font-down', 'Decrease editor font (Ctrl+- / Ctrl+Alt+1)'),
+      ('font-up', 'Increase editor font (Ctrl+= / Ctrl+Alt+2)'),
+      ('reference', 'Python names and APIs (Ctrl+Alt+A)'),
+      ('shortcuts', 'Keyboard shortcuts (F1 / Ctrl+Alt+K)'),
+      ('theme', 'Switch editor to light mode (Ctrl+Alt+T)'),
+    ]) {
+      expect(find.byKey(Key('editor-${action.$1}-button')), findsOneWidget);
+      expect(find.byTooltip(action.$2), findsOneWidget);
+    }
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer();
+    await mouse
+        .moveTo(tester.getCenter(find.byKey(const Key('editor-save-button'))));
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.text('Save draft (Ctrl+S / Ctrl+Alt+D)'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('editor-format-button')));
+    await tester.tap(find.byKey(const Key('editor-format-button')));
     expect(formatted, isTrue);
 
-    await tester.tap(find.byKey(const Key('editor-tools-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Save draft (Ctrl+S)'));
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('editor-save-button')));
+    await tester.tap(find.byKey(const Key('editor-save-button')));
     expect(saved, isTrue);
 
-    await tester.tap(find.byKey(const Key('editor-tools-menu')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Switch editor to light mode'));
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('editor-theme-button')));
+    await tester.tap(find.byKey(const Key('editor-theme-button')));
     expect(themeToggled, isTrue);
   });
 
@@ -569,12 +652,21 @@ void main() {
         .data!
         .styles['root']!
         .backgroundColor;
+    final darkField = tester.widget<CodeField>(find.byType(CodeField));
+    expect(darkField.textStyle?.fontSize, 16);
+    expect(
+        darkField.gutterStyle.textStyle?.color, EditorPalette.dark.lineNumber);
+    expect(darkField.cursorColor, EditorPalette.dark.foreground);
     await tester.pumpWidget(editorWithTheme(false));
     final lightBackground = tester
         .widget<CodeTheme>(find.byType(CodeTheme))
         .data!
         .styles['root']!
         .backgroundColor;
+    final lightField = tester.widget<CodeField>(find.byType(CodeField));
+    expect(lightField.gutterStyle.textStyle?.color,
+        EditorPalette.light.lineNumber);
+    expect(lightField.cursorColor, EditorPalette.light.foreground);
 
     expect(darkBackground, isNot(lightBackground));
     expect(controller.fullText, 'print("robot")');
@@ -808,6 +900,8 @@ void main() {
     );
 
     expect(find.textContaining('Demo mode:'), findsNothing);
+    expect(find.text('student'), findsOneWidget);
+    expect(find.byKey(const Key('account-name-label')), findsOneWidget);
     await tester.tap(find.byTooltip('Account menu'));
     await tester.pumpAndSettle();
     expect(find.text('student (student)'), findsOneWidget);
@@ -833,6 +927,35 @@ void main() {
     );
 
     expect(find.byIcon(Icons.admin_panel_settings_outlined), findsOneWidget);
+    expect(find.text('instructor'), findsOneWidget);
+  });
+
+  testWidgets('long account names fit the narrow header', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          appBar: LandingPageHeader(
+            user: AuthenticatedUser(
+              id: 'long-name-id',
+              loginId: 'a-very-long-student-account-name',
+              role: 'student',
+            ),
+            onLogout: testLogout,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('account-name-label')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip('Account menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign out'), findsOneWidget);
   });
 
   testWidgets('login page asks for study credentials', (
@@ -876,6 +999,7 @@ void main() {
       find.text('Demo mode: all work resets when you refresh'),
       findsOneWidget,
     );
+    expect(find.text('Demo'), findsOneWidget);
     await tester.tap(find.byTooltip('Account menu'));
     await tester.pumpAndSettle();
     expect(find.text('Demo student (temporary)'), findsOneWidget);

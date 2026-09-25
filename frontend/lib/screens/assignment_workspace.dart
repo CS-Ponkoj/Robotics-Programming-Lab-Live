@@ -2,8 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
-import 'package:flutter_highlight/themes/darcula.dart';
-import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:iuse_demo/editor/editor_tools.dart';
 import 'package:iuse_demo/api_config.dart';
@@ -13,6 +11,7 @@ import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/theme/editor_palette.dart';
 import 'package:highlight/languages/python.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -59,7 +58,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _draftSaveTimer;
   Future<void> _draftWriteQueue = Future<void>.value();
   DraftSaveState _draftSaveState = DraftSaveState.idle;
-  double _editorFontSize = 14;
+  double _editorFontSize = 16;
   bool _editorDarkMode = true;
   int? _diagnosticLine;
   bool _suppressEditorChange = false;
@@ -345,6 +344,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _resetStarterCode() async {
+    if (_init || !_selectedProjectFileEditable || _isRunning) return;
     final assignment = await _assignment;
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
@@ -394,8 +394,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _showReplaceDialog() async {
-    final findController = TextEditingController();
-    final replaceController = TextEditingController();
+    var query = '';
+    var replacement = '';
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -407,14 +407,14 @@ class _MyHomePageState extends State<MyHomePage> {
             children: [
               TextField(
                 key: const Key('replace-find-field'),
-                controller: findController,
                 autofocus: true,
                 decoration: const InputDecoration(labelText: 'Find'),
+                onChanged: (value) => query = value,
               ),
               TextField(
                 key: const Key('replace-with-field'),
-                controller: replaceController,
                 decoration: const InputDecoration(labelText: 'Replace with'),
+                onChanged: (value) => replacement = value,
               ),
             ],
           ),
@@ -426,11 +426,10 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           FilledButton(
             onPressed: () {
-              final query = findController.text;
               if (query.isEmpty) return;
               final updated = _controller.fullText.replaceAll(
                 query,
-                replaceController.text,
+                replacement,
               );
               if (updated != _controller.fullText) {
                 setAssignmentEditorContent(_controller, updated);
@@ -443,22 +442,20 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
       ),
     );
-    findController.dispose();
-    replaceController.dispose();
   }
 
   Future<void> _showFindDialog() async {
-    final findController = TextEditingController();
-    await showDialog<void>(
+    var enteredQuery = '';
+    final query = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Find in code'),
         content: TextField(
           key: const Key('editor-find-field'),
-          controller: findController,
           autofocus: true,
           decoration: const InputDecoration(labelText: 'Find'),
-          onSubmitted: (_) => Navigator.pop(dialogContext),
+          onChanged: (value) => enteredQuery = value,
+          onSubmitted: (value) => Navigator.pop(dialogContext, value),
         ),
         actions: [
           TextButton(
@@ -466,15 +463,13 @@ class _MyHomePageState extends State<MyHomePage> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(dialogContext),
+            onPressed: () => Navigator.pop(dialogContext, enteredQuery),
             child: const Text('Find next'),
           ),
         ],
       ),
     );
-    final query = findController.text;
-    findController.dispose();
-    if (!mounted || query.isEmpty) return;
+    if (!mounted || query == null || query.isEmpty) return;
     final start =
         _controller.selection.end.clamp(0, _controller.fullText.length);
     var match = _controller.fullText.indexOf(query, start);
@@ -501,8 +496,16 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text('Editor shortcuts'),
         content: Text(
           'Ctrl+Enter  Run tests\n'
-          'Ctrl+S  Save draft now\n'
-          'Ctrl+F  Find\n'
+          'Ctrl+S  Save draft now (Ctrl+Alt+D browser fallback)\n'
+          'Ctrl+F  Find (Ctrl+Alt+Q browser fallback)\n'
+          'Ctrl+H  Replace (Ctrl+Alt+W browser fallback)\n'
+          'Shift+Alt+F  Format Python (Ctrl+Shift+I on Linux)\n'
+          'Ctrl+Alt+R  Restore starter code\n'
+          'Ctrl+- / Ctrl+=  Editor font (Ctrl+Alt+1 / Ctrl+Alt+2 fallback)\n'
+          'Ctrl+Alt+A  Python names and APIs\n'
+          'F1  Keyboard shortcuts (Ctrl+Alt+K browser fallback)\n'
+          'Ctrl+Alt+T  Switch editor theme\n'
+          'Ctrl+Alt+E  Focus or restore code editor\n'
           'Ctrl+Z  Undo\n'
           'Ctrl+Y or Ctrl+Shift+Z  Redo\n'
           'Tab / Shift+Tab  Indent or outdent selected lines\n'
@@ -510,6 +513,14 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
     );
+  }
+
+  void _changeEditorFontSize(int delta) {
+    setState(() => _editorFontSize = (_editorFontSize + delta).clamp(12, 22));
+  }
+
+  void _toggleEditorTheme() {
+    setState(() => _editorDarkMode = !_editorDarkMode);
   }
 
   Future<void> _showApiReference() async {
@@ -665,6 +676,58 @@ class _MyHomePageState extends State<MyHomePage> {
               _runTests();
             }
           },
+          const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+              _showFindDialog,
+          const SingleActivator(LogicalKeyboardKey.keyQ,
+              control: true, alt: true): _showFindDialog,
+          const SingleActivator(LogicalKeyboardKey.keyH, control: true): () {
+            if (_selectedProjectFileEditable) _showReplaceDialog();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyW,
+              control: true, alt: true): () {
+            if (_selectedProjectFileEditable) _showReplaceDialog();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyD,
+              control: true, alt: true): () {
+            if (_selectedProjectFileEditable) _saveDraftNow();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyF,
+              shift: true, alt: true): () {
+            if (_selectedProjectFileEditable) _formatCode();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyI,
+              control: true, shift: true): () {
+            if (_selectedProjectFileEditable) _formatCode();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyR,
+              control: true, alt: true): () {
+            if (_selectedProjectFileEditable) _resetStarterCode();
+          },
+          const SingleActivator(LogicalKeyboardKey.minus, control: true): () {
+            _changeEditorFontSize(-1);
+          },
+          const SingleActivator(LogicalKeyboardKey.digit1,
+              control: true, alt: true): () {
+            _changeEditorFontSize(-1);
+          },
+          const SingleActivator(LogicalKeyboardKey.equal, control: true): () {
+            _changeEditorFontSize(1);
+          },
+          const SingleActivator(LogicalKeyboardKey.digit2,
+              control: true, alt: true): () {
+            _changeEditorFontSize(1);
+          },
+          const SingleActivator(LogicalKeyboardKey.keyA,
+              control: true, alt: true): _showApiReference,
+          const SingleActivator(LogicalKeyboardKey.f1): _showShortcutHelp,
+          const SingleActivator(LogicalKeyboardKey.keyK,
+              control: true, alt: true): _showShortcutHelp,
+          const SingleActivator(LogicalKeyboardKey.keyT,
+              control: true, alt: true): _toggleEditorTheme,
+          const SingleActivator(LogicalKeyboardKey.keyE, control: true, alt: true):
+              () => _toggleWorkspaceFocus(
+                    AssignmentWorkspaceFocus.editor,
+                  ),
           const SingleActivator(LogicalKeyboardKey.escape): () {
             if (_workspaceFocus != AssignmentWorkspaceFocus.none) {
               setState(() => _workspaceFocus = AssignmentWorkspaceFocus.none);
@@ -727,24 +790,24 @@ class _MyHomePageState extends State<MyHomePage> {
                                       : null,
                                   saveState: _draftSaveState,
                                   onSearch: _showFindDialog,
-                                  onReplace: _showReplaceDialog,
-                                  onFormat: _formatCode,
-                                  onReset: _resetStarterCode,
+                                  onReplace: _selectedProjectFileEditable
+                                      ? _showReplaceDialog
+                                      : null,
+                                  onFormat: _selectedProjectFileEditable
+                                      ? _formatCode
+                                      : null,
+                                  onReset: _selectedProjectFileEditable
+                                      ? _resetStarterCode
+                                      : null,
                                   onShowShortcuts: _showShortcutHelp,
                                   onShowApiReference: _showApiReference,
                                   editorDarkMode: _editorDarkMode,
-                                  onToggleEditorTheme: () => setState(
-                                    () => _editorDarkMode = !_editorDarkMode,
-                                  ),
+                                  onToggleEditorTheme: _toggleEditorTheme,
                                   fontSize: _editorFontSize,
-                                  onDecreaseFont: () => setState(
-                                    () => _editorFontSize =
-                                        (_editorFontSize - 1).clamp(12, 22),
-                                  ),
-                                  onIncreaseFont: () => setState(
-                                    () => _editorFontSize =
-                                        (_editorFontSize + 1).clamp(12, 22),
-                                  ),
+                                  onDecreaseFont: () =>
+                                      _changeEditorFontSize(-1),
+                                  onIncreaseFont: () =>
+                                      _changeEditorFontSize(1),
                                   isFocused: _workspaceFocus ==
                                       AssignmentWorkspaceFocus.editor,
                                   onFocusToggle: useDesktopLayout
@@ -1454,7 +1517,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
     this.onShowApiReference,
     this.editorDarkMode = true,
     this.onToggleEditorTheme,
-    this.fontSize = 14,
+    this.fontSize = 16,
     this.onDecreaseFont,
     this.onIncreaseFont,
   });
@@ -1463,192 +1526,237 @@ class AssignmentEditorToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    Widget toolButton({
+      required String keyName,
+      required IconData icon,
+      required String label,
+      required String shortcut,
+      required VoidCallback? onPressed,
+    }) =>
+        IconButton(
+          key: Key('editor-$keyName-button'),
+          tooltip: '$label ($shortcut)',
+          onPressed: onPressed,
+          icon: Icon(icon, size: 20),
+          visualDensity: VisualDensity.compact,
+        );
+
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      height: 108,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.xs,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
           bottom: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(AppRadii.sm),
-            ),
-            child: Icon(
-              Icons.code_rounded,
-              color: theme.colorScheme.onPrimaryContainer,
-              size: 19,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Python editor',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
                 ),
-                Text(
-                  'Edit the starter code, then run the tests',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (saveState != DraftSaveState.idle)
-            Tooltip(
-              message: switch (saveState) {
-                DraftSaveState.saving => 'Saving draft',
-                DraftSaveState.saved => 'Draft saved',
-                DraftSaveState.sessionSaved =>
-                  'Draft saved for this session; refresh resets it',
-                DraftSaveState.failed =>
-                  'Cloud save failed. A local fallback remains available.',
-                DraftSaveState.idle => '',
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                 child: Icon(
-                  switch (saveState) {
-                    DraftSaveState.saving => Icons.sync_rounded,
-                    DraftSaveState.saved => Icons.cloud_done_outlined,
-                    DraftSaveState.sessionSaved => Icons.save_outlined,
-                    DraftSaveState.failed => Icons.cloud_off_outlined,
-                    DraftSaveState.idle => Icons.cloud_outlined,
+                  Icons.code_rounded,
+                  color: theme.colorScheme.onPrimaryContainer,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Python editor',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'Edit the starter code, then run the tests',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (saveState != DraftSaveState.idle)
+                Tooltip(
+                  message: switch (saveState) {
+                    DraftSaveState.saving => 'Saving draft',
+                    DraftSaveState.saved => 'Draft saved',
+                    DraftSaveState.sessionSaved =>
+                      'Draft saved for this session; refresh resets it',
+                    DraftSaveState.failed =>
+                      'Cloud save failed. A local fallback remains available.',
+                    DraftSaveState.idle => '',
                   },
-                  key: const Key('draft-save-state-icon'),
-                  size: 20,
-                  color: saveState == DraftSaveState.failed
-                      ? theme.colorScheme.error
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          if (onFormat != null || onReset != null)
-            PopupMenuButton<String>(
-              key: const Key('editor-tools-menu'),
-              tooltip: 'Editor tools',
-              onSelected: (value) {
-                switch (value) {
-                  case 'save':
-                    onSave?.call();
-                  case 'search':
-                    onSearch?.call();
-                  case 'replace':
-                    onReplace?.call();
-                  case 'format':
-                    onFormat?.call();
-                  case 'reset':
-                    onReset?.call();
-                  case 'font-down':
-                    onDecreaseFont?.call();
-                  case 'font-up':
-                    onIncreaseFont?.call();
-                  case 'reference':
-                    onShowApiReference?.call();
-                  case 'shortcuts':
-                    onShowShortcuts?.call();
-                  case 'theme':
-                    onToggleEditorTheme?.call();
-                }
-              },
-              itemBuilder: (context) => [
-                if (onSave != null)
-                  const PopupMenuItem(
-                    value: 'save',
-                    child: Text('Save draft (Ctrl+S)'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                    ),
+                    child: Icon(
+                      switch (saveState) {
+                        DraftSaveState.saving => Icons.sync_rounded,
+                        DraftSaveState.saved => Icons.cloud_done_outlined,
+                        DraftSaveState.sessionSaved => Icons.save_outlined,
+                        DraftSaveState.failed => Icons.cloud_off_outlined,
+                        DraftSaveState.idle => Icons.cloud_outlined,
+                      },
+                      key: const Key('draft-save-state-icon'),
+                      size: 20,
+                      color: saveState == DraftSaveState.failed
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                const PopupMenuItem(value: 'search', child: Text('Find…')),
-                const PopupMenuItem(value: 'replace', child: Text('Replace…')),
-                const PopupMenuItem(
-                  value: 'format',
-                  child: Text('Format Python'),
                 ),
-                const PopupMenuItem(
-                  value: 'reset',
-                  child: Text('Restore starter code'),
-                ),
-                PopupMenuItem(
-                  value: 'font-down',
-                  enabled: fontSize > 12,
-                  child: const Text('Decrease font size'),
-                ),
-                PopupMenuItem(
-                  value: 'font-up',
-                  enabled: fontSize < 22,
-                  child: const Text('Increase font size'),
-                ),
-                const PopupMenuItem(
-                  value: 'reference',
-                  child: Text('Python names and APIs'),
-                ),
-                const PopupMenuItem(
-                  value: 'shortcuts',
-                  child: Text('Keyboard shortcuts'),
-                ),
-                if (onToggleEditorTheme != null)
-                  PopupMenuItem(
-                    value: 'theme',
-                    child: Text(editorDarkMode
-                        ? 'Switch editor to light mode'
-                        : 'Switch editor to dark mode'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  key: const Key('editor-actions-scroll'),
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      toolButton(
+                        keyName: 'save',
+                        icon: Icons.save_outlined,
+                        label: 'Save draft',
+                        shortcut: 'Ctrl+S / Ctrl+Alt+D',
+                        onPressed: onSave,
+                      ),
+                      toolButton(
+                        keyName: 'find',
+                        icon: Icons.search_rounded,
+                        label: 'Find',
+                        shortcut: 'Ctrl+F / Ctrl+Alt+Q',
+                        onPressed: onSearch,
+                      ),
+                      toolButton(
+                        keyName: 'replace',
+                        icon: Icons.find_replace_rounded,
+                        label: 'Replace',
+                        shortcut: 'Ctrl+H / Ctrl+Alt+W',
+                        onPressed: onReplace,
+                      ),
+                      toolButton(
+                        keyName: 'format',
+                        icon: Icons.auto_fix_high_rounded,
+                        label: 'Format Python',
+                        shortcut: 'Shift+Alt+F / Ctrl+Shift+I',
+                        onPressed: isRunning ? null : onFormat,
+                      ),
+                      toolButton(
+                        keyName: 'restore',
+                        icon: Icons.restart_alt_rounded,
+                        label: 'Restore starter code',
+                        shortcut: 'Ctrl+Alt+R',
+                        onPressed: isRunning ? null : onReset,
+                      ),
+                      toolButton(
+                        keyName: 'font-down',
+                        icon: Icons.text_decrease_rounded,
+                        label: 'Decrease editor font',
+                        shortcut: 'Ctrl+- / Ctrl+Alt+1',
+                        onPressed: fontSize > 12 ? onDecreaseFont : null,
+                      ),
+                      toolButton(
+                        keyName: 'font-up',
+                        icon: Icons.text_increase_rounded,
+                        label: 'Increase editor font',
+                        shortcut: 'Ctrl+= / Ctrl+Alt+2',
+                        onPressed: fontSize < 22 ? onIncreaseFont : null,
+                      ),
+                      toolButton(
+                        keyName: 'reference',
+                        icon: Icons.integration_instructions_outlined,
+                        label: 'Python names and APIs',
+                        shortcut: 'Ctrl+Alt+A',
+                        onPressed: onShowApiReference,
+                      ),
+                      toolButton(
+                        keyName: 'shortcuts',
+                        icon: Icons.keyboard_outlined,
+                        label: 'Keyboard shortcuts',
+                        shortcut: 'F1 / Ctrl+Alt+K',
+                        onPressed: onShowShortcuts,
+                      ),
+                      toolButton(
+                        keyName: 'theme',
+                        icon: editorDarkMode
+                            ? Icons.light_mode_outlined
+                            : Icons.dark_mode_outlined,
+                        label: editorDarkMode
+                            ? 'Switch editor to light mode'
+                            : 'Switch editor to dark mode',
+                        shortcut: 'Ctrl+Alt+T',
+                        onPressed: onToggleEditorTheme,
+                      ),
+                    ],
                   ),
-              ],
-              icon: const Icon(Icons.more_vert_rounded),
-            ),
-          if (onFocusToggle != null) ...[
-            IconButton(
-              key: const Key('focus-editor-button'),
-              tooltip: isFocused ? 'Restore workspace' : 'Focus code editor',
-              onPressed: onFocusToggle,
-              icon: Icon(
-                isFocused
-                    ? Icons.close_fullscreen_rounded
-                    : Icons.open_in_full_rounded,
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-          ],
-          const SizedBox(width: AppSpacing.md),
-          Semantics(
-            label: isRunning
-                ? 'Assignment tests are running'
-                : 'Run assignment tests. Keyboard shortcut Control Enter',
-            button: true,
-            enabled: !isRunning,
-            child: Tooltip(
-              message: 'Run assignment tests (Ctrl+Enter)',
-              child: FilledButton.icon(
-                key: const Key('run-tests-button'),
-                onPressed: isRunning ? null : onRun,
-                icon: isRunning
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.play_arrow_rounded, size: 20),
-                label: Text(isRunning ? 'Running…' : 'Run tests'),
+              if (onFocusToggle != null)
+                IconButton(
+                  key: const Key('focus-editor-button'),
+                  tooltip: isFocused
+                      ? 'Restore workspace (Ctrl+Alt+E)'
+                      : 'Focus code editor (Ctrl+Alt+E)',
+                  onPressed: onFocusToggle,
+                  icon: Icon(
+                    isFocused
+                        ? Icons.close_fullscreen_rounded
+                        : Icons.open_in_full_rounded,
+                    size: 20,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+              const SizedBox(width: AppSpacing.sm),
+              Semantics(
+                label: isRunning
+                    ? 'Assignment tests are running'
+                    : 'Run assignment tests. Keyboard shortcut Control Enter',
+                button: true,
+                enabled: !isRunning,
+                child: Tooltip(
+                  message: 'Run assignment tests (Ctrl+Enter)',
+                  child: FilledButton.icon(
+                    key: const Key('run-tests-button'),
+                    onPressed: isRunning ? null : onRun,
+                    icon: isRunning
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.play_arrow_rounded, size: 20),
+                    label: Text(isRunning ? 'Running…' : 'Run tests'),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -1665,7 +1773,7 @@ class AssignmentProjectWorkspace extends StatelessWidget {
     required this.controller,
     this.editorDarkMode = true,
     this.focusNode,
-    this.fontSize = 14,
+    this.fontSize = 16,
     this.diagnosticLine,
     required this.onFileSelected,
     required this.onChanged,
@@ -1684,6 +1792,7 @@ class AssignmentProjectWorkspace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = editorDarkMode ? EditorPalette.dark : EditorPalette.light;
     final editor = Column(
       children: [
         if (files.isNotEmpty)
@@ -1701,12 +1810,23 @@ class AssignmentProjectWorkspace extends StatelessWidget {
             readOnly: !selectedFileEditable,
             child: CodeTheme(
               data: CodeThemeData(
-                styles: editorDarkMode ? darculaTheme : githubTheme,
+                styles: palette.styles,
               ),
               child: CodeField(
                 key: const Key('assignment-code-field'),
                 controller: controller,
                 focusNode: focusNode,
+                cursorColor: palette.foreground,
+                gutterStyle: GutterStyle(
+                  width: 64,
+                  background: palette.background,
+                  textStyle: TextStyle(color: palette.lineNumber),
+                ),
+                textSelectionTheme: TextSelectionThemeData(
+                  cursorColor: palette.foreground,
+                  selectionColor: palette.selection,
+                  selectionHandleColor: palette.symbol,
+                ),
                 textStyle: TextStyle(
                   fontFamily: 'Courier-New',
                   fontSize: fontSize,
