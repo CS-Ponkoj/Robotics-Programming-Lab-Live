@@ -59,8 +59,8 @@ simulation are pedagogically correct, secure, reproducible, and versioned.
 - Assignment catalog containing six versioned robotics assignments: four
   Python exercises and two ROS 2 exercises.
 - Progress summary and assignment state badges.
-- Responsive desktop workspace with editor, instructions, and results panels.
-- Responsive mobile workspace with Code, Instructions, and Results tabs.
+- Responsive desktop workspace with editor and full-height instructions; results open in a distinct minimizable drawer.
+- Responsive mobile workspace with Code and Instructions tabs and the same Results drawer.
 - Python editor with safe completion vocabulary, block indentation, search and
   replace, manual formatting, reset, font controls, and keyboard test execution.
 - Public run and graded submission workflows.

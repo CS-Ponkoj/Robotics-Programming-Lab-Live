@@ -85,6 +85,21 @@ def test_openai_client_uses_bounded_timeout_and_no_retries(monkeypatch):
     assert request["max_output_tokens"] == 1000
 
 
+def test_builtin_hint_does_not_call_openai_when_ai_is_off():
+    class UnexpectedResponses:
+        @staticmethod
+        def create(**_kwargs):
+            raise AssertionError("OpenAI must not be called for a built-in hint")
+
+    client = SimpleNamespace(responses=UnexpectedResponses())
+    feedback = TutorService(
+        Settings(openai_api_key="test-key"), client=client
+    ).feedback(_assignment(), _submission(), hint_level=2, use_ai_tutor=False)
+
+    assert feedback.source == "fallback"
+    assert feedback.hint_level == 2
+
+
 def test_tutor_falls_back_when_openai_times_out():
     class TimedOutResponses:
         @staticmethod

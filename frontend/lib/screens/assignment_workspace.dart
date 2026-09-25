@@ -36,6 +36,7 @@ void setAssignmentEditorContent(
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late Future<AssignmentDto> _assignment;
   late Future<UnittestFeedbackDto> _feedback;
   late CodeController _controller;
@@ -278,6 +279,7 @@ class _MyHomePageState extends State<MyHomePage> {
         useAiTutor: _enableFeedback,
       );
     });
+    _openResultsPanel();
 
     _feedback.then(
       (feedback) {
@@ -602,9 +604,8 @@ class _MyHomePageState extends State<MyHomePage> {
     AssignmentWorkspaceFocus target, {
     required bool useDesktopLayout,
   }) {
-    if (useDesktopLayout &&
-        target == AssignmentWorkspaceFocus.results &&
-        !_submitted) {
+    if (target == AssignmentWorkspaceFocus.results) {
+      _openResultsPanel();
       return;
     }
     setState(() {
@@ -614,11 +615,15 @@ class _MyHomePageState extends State<MyHomePage> {
         _selectedWorkspaceTab = switch (target) {
           AssignmentWorkspaceFocus.editor => 0,
           AssignmentWorkspaceFocus.instructions => 1,
-          AssignmentWorkspaceFocus.results => 2,
+          AssignmentWorkspaceFocus.results => _selectedWorkspaceTab,
           AssignmentWorkspaceFocus.none => _selectedWorkspaceTab,
         };
       }
     });
+  }
+
+  void _openResultsPanel() {
+    _scaffoldKey.currentState?.openEndDrawer();
   }
 
   @override
@@ -632,11 +637,6 @@ class _MyHomePageState extends State<MyHomePage> {
         ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
             _workspaceFocus == AssignmentWorkspaceFocus.instructions
         : _selectedWorkspaceTab == 1;
-    final showResults = useDesktopLayout
-        ? _submitted &&
-            (_workspaceFocus == AssignmentWorkspaceFocus.none ||
-                _workspaceFocus == AssignmentWorkspaceFocus.results)
-        : _selectedWorkspaceTab == 2;
     final showResizeHandle =
         useDesktopLayout && _workspaceFocus == AssignmentWorkspaceFocus.none;
     final progressState = learningProgress.assignmentState(widget.id);
@@ -655,6 +655,7 @@ class _MyHomePageState extends State<MyHomePage> {
       feedbackEnabled: _enableFeedback,
       onBack: () => Navigator.pop(context),
       onHome: () => Navigator.of(context).popUntil((route) => route.isFirst),
+      onResultsOpen: _openResultsPanel,
       onFeedbackChanged: (value) {
         setState(() => _enableFeedback = value);
         unawaited(_trackWorkspaceEvent('ai_tutor_toggled', {'enabled': value}));
@@ -751,7 +752,84 @@ class _MyHomePageState extends State<MyHomePage> {
         },
         child: FocusTraversalGroup(
           child: Scaffold(
+            key: _scaffoldKey,
             appBar: appBar,
+            endDrawer: Drawer(
+              width: MediaQuery.sizeOf(context).width >= 600
+                  ? 520
+                  : MediaQuery.sizeOf(context).width * 0.94,
+              backgroundColor: const Color(0xFFE9F2F6),
+              child: SafeArea(
+                child: Column(
+                  key: const Key('assignment-results-panel'),
+                  children: [
+                    Container(
+                      color: const Color(0xFFD5E8F0),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.fact_check_rounded),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Results',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          IconButton(
+                            key: const Key('minimize-results-button'),
+                            tooltip: 'Minimize results',
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(
+                                Icons.keyboard_double_arrow_right_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SwitchListTile(
+                      key: const Key('results-ai-toggle'),
+                      title: const Text('AI tutoring'),
+                      subtitle: const Text(
+                          'Off by default; built-in feedback remains available'),
+                      value: _enableFeedback,
+                      onChanged: (value) {
+                        setState(() => _enableFeedback = value);
+                        unawaited(_trackWorkspaceEvent(
+                          'ai_tutor_toggled',
+                          {'enabled': value},
+                        ));
+                      },
+                    ),
+                    Expanded(
+                      child: _submitted
+                          ? FutureBuilder<UnittestFeedbackDto>(
+                              future: _feedback,
+                              builder: (ctx, snap) {
+                                if (snap.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const SecureGraderLoadingState();
+                                }
+                                if (snap.hasError) {
+                                  return TestRunErrorState(onRetry: _runTests);
+                                }
+                                if (snap.hasData) {
+                                  return Feedback(
+                                    data: snap.data!,
+                                    aiTutorEnabled: _enableFeedback,
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            )
+                          : const _EmptyResultsState(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             body: Column(
               children: [
                 if (!useDesktopLayout)
@@ -880,14 +958,14 @@ class _MyHomePageState extends State<MyHomePage> {
                           editorFraction: _editorWidthFraction,
                           onDragUpdate: _resizeWorkspace,
                         ),
-                      if (showInstructions || showResults)
+                      if (showInstructions)
                         Expanded(
                           flex: showResizeHandle
                               ? ((1 - _editorWidthFraction) * 1000).round()
                               : 1,
                           child: Column(
                             children: [
-                              // scenario half
+                              // Instructions fill the right workspace panel.
                               if (showInstructions)
                                 Expanded(
                                   flex: 1,
@@ -965,59 +1043,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                             },
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                              // feedback half
-                              if (showResults)
-                                Expanded(
-                                  flex: 1,
-                                  child: Column(
-                                    key: const Key('assignment-results-panel'),
-                                    children: [
-                                      AssignmentPanelHeader(
-                                        icon: Icons.fact_check_rounded,
-                                        title: 'Results',
-                                        subtitle:
-                                            'Review test outcomes and feedback',
-                                        isFocused: _workspaceFocus ==
-                                            AssignmentWorkspaceFocus.results,
-                                        onFocusToggle: useDesktopLayout
-                                            ? () => _toggleWorkspaceFocus(
-                                                  AssignmentWorkspaceFocus
-                                                      .results,
-                                                )
-                                            : null,
-                                      ),
-                                      Expanded(
-                                        child: _submitted
-                                            ? FutureBuilder<
-                                                UnittestFeedbackDto>(
-                                                future: _feedback,
-                                                builder: (ctx, snap) {
-                                                  if (snap.connectionState ==
-                                                      ConnectionState.waiting) {
-                                                    return const SecureGraderLoadingState();
-                                                  }
-                                                  if (snap.hasError) {
-                                                    return TestRunErrorState(
-                                                      onRetry: _runTests,
-                                                    );
-                                                  }
-                                                  if (snap.hasData) {
-                                                    return Feedback(
-                                                      data: snap.data!,
-                                                      aiTutorEnabled:
-                                                          _enableFeedback,
-                                                    );
-                                                  }
-                                                  return const SizedBox
-                                                      .shrink();
-                                                },
-                                              )
-                                            : const _EmptyResultsState(),
                                       ),
                                     ],
                                   ),
@@ -2124,6 +2149,7 @@ class AssignmentPageHeader extends StatelessWidget
   final bool feedbackEnabled;
   final VoidCallback onBack;
   final VoidCallback onHome;
+  final VoidCallback onResultsOpen;
   final ValueChanged<bool> onFeedbackChanged;
 
   const AssignmentPageHeader({
@@ -2134,6 +2160,7 @@ class AssignmentPageHeader extends StatelessWidget
     required this.feedbackEnabled,
     required this.onBack,
     required this.onHome,
+    required this.onResultsOpen,
     required this.onFeedbackChanged,
   });
 
@@ -2212,6 +2239,23 @@ class AssignmentPageHeader extends StatelessWidget
       actions: [
         if (showFeedbackLabel)
           TextButton.icon(
+            key: const Key('open-results-button'),
+            onPressed: onResultsOpen,
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.onPrimary,
+            ),
+            icon: const Icon(Icons.fact_check_outlined, size: 20),
+            label: const Text('Results'),
+          )
+        else
+          IconButton(
+            key: const Key('open-results-button'),
+            tooltip: 'Open results',
+            onPressed: onResultsOpen,
+            icon: const Icon(Icons.fact_check_outlined),
+          ),
+        if (showFeedbackLabel)
+          TextButton.icon(
             key: const Key('assignment-home-button'),
             onPressed: onHome,
             style: TextButton.styleFrom(
@@ -2284,10 +2328,6 @@ class AssignmentWorkspaceNavigation extends StatelessWidget {
           icon: Icon(Icons.menu_book_rounded),
           label: 'Instructions',
         ),
-        NavigationDestination(
-          icon: Icon(Icons.fact_check_rounded),
-          label: 'Results',
-        ),
       ],
     );
   }
@@ -2323,7 +2363,7 @@ class _EmptyResultsState extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Run your code to see test results and feedback.',
+                'Run your code to see test results and feedback. Tutor questions become available after the first run.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -2455,7 +2495,9 @@ class Feedback extends StatelessWidget {
     final passRate = total > 0 ? (passed / total) * 100 : 0.0;
     final score = data.score.clamp(0, 100).toInt();
     final vars = data.testedVals.map((value) => value.toString()).toList();
-    final tutorAvailable = aiTutorEnabled || data.tutorFeedback.isNotEmpty;
+    final tutorAvailable = aiTutorEnabled && data.submissionId.isNotEmpty;
+    final showHint = data.hint.isNotEmpty &&
+        (aiTutorEnabled || data.tutorSource != 'openai');
 
     final resultCards = data.unittestFeedback.asMap().entries.map((entry) {
       final feedback = entry.value;
@@ -2497,12 +2539,12 @@ class Feedback extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           _TerminalOutput(data: data),
-          if (data.hint.isNotEmpty ||
-              (tutorAvailable && data.submissionId.isNotEmpty)) ...[
+          if (showHint || tutorAvailable) ...[
             const SizedBox(height: AppSpacing.md),
             _TutorHintPanel(
               data: data,
               allowQuestions: tutorAvailable,
+              useAiTutor: aiTutorEnabled,
               questionRequester: tutorQuestionRequester ?? askTutorQuestion,
             ),
           ],
@@ -3051,11 +3093,13 @@ class _TutorHintPanel extends StatefulWidget {
   const _TutorHintPanel({
     required this.data,
     required this.allowQuestions,
+    required this.useAiTutor,
     required this.questionRequester,
   });
 
   final UnittestFeedbackDto data;
   final bool allowQuestions;
+  final bool useAiTutor;
   final TutorQuestionRequester questionRequester;
 
   @override
@@ -3083,7 +3127,8 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
   @override
   void didUpdateWidget(covariant _TutorHintPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.data.submissionId != widget.data.submissionId) {
+    if (oldWidget.data.submissionId != widget.data.submissionId ||
+        oldWidget.allowQuestions != widget.allowQuestions) {
       _reset();
     }
   }
@@ -3101,7 +3146,7 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
     _hintLevel = 1;
     _loading = false;
     _asking = false;
-    _answer = widget.data.tutorFeedback.isEmpty
+    _answer = !widget.allowQuestions || widget.data.tutorFeedback.isEmpty
         ? null
         : Map<String, dynamic>.from(widget.data.tutorFeedback);
     _error = null;
@@ -3163,6 +3208,7 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
         widget.data.id,
         widget.data.submissionId,
         _hintLevel + 1,
+        useAiTutor: widget.useAiTutor,
       );
       if (!mounted) {
         return;

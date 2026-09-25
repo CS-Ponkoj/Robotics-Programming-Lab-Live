@@ -289,11 +289,22 @@ void main() {
       );
       expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
       expect(find.byKey(const Key('workspace-resize-handle')), findsOneWidget);
+      expect(find.byKey(const Key('open-results-button')), findsOneWidget);
 
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
-      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
-      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
-      await tester.pump();
+      await tester.tap(find.byKey(const Key('open-results-button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+      expect(find.text('Ready when you are'), findsOneWidget);
+      expect(
+          tester
+              .widget<SwitchListTile>(
+                find.byKey(const Key('results-ai-toggle')),
+              )
+              .value,
+          isFalse);
+      await tester.tap(find.byKey(const Key('minimize-results-button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
       expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
       expect(
         find.byKey(const Key('assignment-instructions-panel')),
@@ -374,12 +385,12 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.text('Results'));
-      await tester.pump();
+      await tester.tap(find.byKey(const Key('open-results-button')));
+      await tester.pumpAndSettle();
 
       expect(
         find.byKey(const Key('assignment-instructions-panel')),
-        findsNothing,
+        findsOneWidget,
       );
       expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
     },
@@ -390,6 +401,7 @@ void main() {
   ) async {
     var backCount = 0;
     var homeCount = 0;
+    var resultsCount = 0;
     var feedbackEnabled = false;
 
     await tester.pumpWidget(
@@ -403,6 +415,7 @@ void main() {
             feedbackEnabled: feedbackEnabled,
             onBack: () => backCount += 1,
             onHome: () => homeCount += 1,
+            onResultsOpen: () => resultsCount += 1,
             onFeedbackChanged: (value) => feedbackEnabled = value,
           ),
         ),
@@ -419,6 +432,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('assignment-home-button')));
     expect(homeCount, 1);
+
+    await tester.tap(find.byKey(const Key('open-results-button')));
+    expect(resultsCount, 1);
 
     await tester.tap(find.byType(Switch));
     expect(feedbackEnabled, isTrue);
@@ -1333,7 +1349,7 @@ void main() {
       codeOutput: '',
       execSuccess: false,
       hint: 'Define total_distance before printing it.',
-      tutorSource: 'openai',
+      tutorSource: 'fallback',
     );
 
     await tester.pumpWidget(
@@ -1346,13 +1362,42 @@ void main() {
     expect(find.text('Execution error'), findsOneWidget);
     expect(find.textContaining('NameError'), findsOneWidget);
     expect(find.byKey(const Key('guided-hint')), findsOneWidget);
-    expect(find.text('OpenAI tutor hint'), findsOneWidget);
+    expect(find.text('Built-in tutor hint'), findsOneWidget);
     expect(find.text('Hint level 1 of 4'), findsOneWidget);
     expect(find.byKey(const Key('next-hint-button')), findsOneWidget);
     expect(
       find.text('Define total_distance before printing it.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('AI responses stay hidden while AI tutoring is off', (
+    WidgetTester tester,
+  ) async {
+    const feedback = UnittestFeedbackDto(
+      id: 1,
+      submissionId: 'prior-attempt',
+      testedVals: [],
+      pass: false,
+      unittestFeedback: ['Check the path calculation.'],
+      unittestPassResults: [false],
+      codeExecResult: '',
+      codeOutput: '',
+      execSuccess: true,
+      hint: 'AI-generated hint',
+      tutorSource: 'openai',
+      tutorFeedback: {'source': 'openai', 'answer': 'AI response'},
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: app.Feedback(data: feedback))),
+    );
+
+    expect(find.text('Test details'), findsOneWidget);
+    expect(find.text('Needs attention'), findsOneWidget);
+    expect(find.byKey(const Key('guided-hint')), findsNothing);
+    expect(find.byKey(const Key('tutor-question-field')), findsNothing);
+    expect(find.byKey(const Key('tutor-answer-card')), findsNothing);
   });
 
   testWidgets('AI tutor accepts a question and presents structured guidance', (
@@ -1458,6 +1503,7 @@ void main() {
         home: Scaffold(
           body: app.Feedback(
             data: feedback,
+            aiTutorEnabled: true,
             tutorQuestionRequester:
                 (assignmentId, submissionId, question, hintLevel) async => {},
           ),

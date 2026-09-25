@@ -38,6 +38,7 @@ class TutorService:
         submission: Submission,
         hint_level: int = 1,
         student_question: str = "",
+        use_ai_tutor: bool = True,
     ) -> TutorFeedback:
         normalized_question = student_question.strip()
         fallback = self._fallback(
@@ -46,7 +47,7 @@ class TutorService:
             hint_level,
             student_question=normalized_question,
         )
-        if self.client is None and not self.settings.openai_api_key:
+        if not use_ai_tutor or (self.client is None and not self.settings.openai_api_key):
             return fallback
         try:
             client = self.client or OpenAI(

@@ -187,6 +187,12 @@ Provider failure or missing credit must not block grading. Hidden tests,
 official solutions, secrets, and unrelated student data are excluded from the
 AI context.
 
+Results opens in a separate, minimizable panel. You can open it before the
+first run; running tests opens it automatically. With AI off, results show
+test evidence and available built-in hints without contacting OpenAI. Tutor
+questions require a completed test run because they use that attempt's
+evidence.
+
 Ubuntu's optional startup-check command is:
 
 ```bash

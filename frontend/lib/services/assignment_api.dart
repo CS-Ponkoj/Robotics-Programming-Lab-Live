@@ -158,10 +158,8 @@ Future<String> fetchWorkedSolution(
 }
 
 Future<Map<String, dynamic>> fetchProgressiveHint(
-  int assignmentId,
-  String submissionId,
-  int hintLevel,
-) async {
+    int assignmentId, String submissionId, int hintLevel,
+    {bool useAiTutor = false}) async {
   final response = await http
       .post(
         Uri.parse('$apiBaseUrl/assignments/$assignmentId/hint'),
@@ -169,6 +167,7 @@ Future<Map<String, dynamic>> fetchProgressiveHint(
         body: jsonEncode({
           'submission_id': submissionId,
           'hint_level': hintLevel,
+          'use_ai_tutor': useAiTutor,
         }),
       )
       .timeout(_requestTimeout);

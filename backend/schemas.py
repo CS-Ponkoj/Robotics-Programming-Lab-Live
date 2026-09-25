@@ -127,6 +127,7 @@ class SubmissionResponse(BaseModel):
 class HintRequest(BaseModel):
     submission_id: str
     hint_level: int = Field(default=1, ge=1, le=4)
+    use_ai_tutor: bool = False
 
 
 class TutorQuestionRequest(BaseModel):

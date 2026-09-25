@@ -418,6 +418,7 @@ def test_incorrect_submission_returns_structured_progressive_feedback(client):
     )
     assert next_hint.status_code == 200
     assert next_hint.json()["hint_level"] == 2
+    assert next_hint.json()["source"] == "fallback"
 
 
 @pytest.mark.parametrize("hint_level", [0, 5])

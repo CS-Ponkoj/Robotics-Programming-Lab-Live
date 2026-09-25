@@ -1489,7 +1489,10 @@ def create_app(
         if submission.student_id != user.login_id:
             raise HTTPException(404, "Submission not found.")
         feedback = TutorService(request.app.state.settings).feedback(
-            assignment, submission, hint_level=body.hint_level
+            assignment,
+            submission,
+            hint_level=body.hint_level,
+            use_ai_tutor=body.use_ai_tutor,
         )
         if not is_ephemeral_demo(request, user):
             session.add(
