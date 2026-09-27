@@ -1,6 +1,7 @@
 # Course content library — staging QA
 
 Scope: Windows local staging verification only; hosted deployment was not tested.
+Tested source commit: `6a3992d` (`v6`).
 
 ## Scope
 
