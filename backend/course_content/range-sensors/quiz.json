@@ -1,0 +1,230 @@
+{
+  "id": "quiz",
+  "title": "Quiz",
+  "kind": "quiz",
+  "topic_id": "range-sensors",
+  "html": "",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "What does a range sensor measure?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Distance to an object or surface"
+        },
+        {
+          "id": "B",
+          "text": "The robot's password"
+        },
+        {
+          "id": "C",
+          "text": "Only wheel speed"
+        },
+        {
+          "id": "D",
+          "text": "The number of map vertices"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "prompt": "What physical signal does an ultrasonic range sensor send?",
+      "options": [
+        {
+          "id": "A",
+          "text": "A GPS satellite signal"
+        },
+        {
+          "id": "B",
+          "text": "A wheel rotation"
+        },
+        {
+          "id": "C",
+          "text": "A magnetic map"
+        },
+        {
+          "id": "D",
+          "text": "A high-frequency sound wave"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "prompt": "Why does an ultrasonic sensor measure echo travel time?",
+      "options": [
+        {
+          "id": "A",
+          "text": "To measure motor torque directly"
+        },
+        {
+          "id": "B",
+          "text": "To count nearby cameras"
+        },
+        {
+          "id": "C",
+          "text": "To estimate the distance to a reflecting object"
+        },
+        {
+          "id": "D",
+          "text": "To identify the robot's login ID"
+        }
+      ]
+    },
+    {
+      "id": "q4",
+      "prompt": "Which device is described in the lesson as an ultrasonic range sensor?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Wheel encoder"
+        },
+        {
+          "id": "B",
+          "text": "HC-SR04"
+        },
+        {
+          "id": "C",
+          "text": "PIR motion detector"
+        },
+        {
+          "id": "D",
+          "text": "Compass"
+        }
+      ]
+    },
+    {
+      "id": "q5",
+      "prompt": "What does a laser rangefinder use to measure distance?",
+      "options": [
+        {
+          "id": "A",
+          "text": "A reflected laser beam"
+        },
+        {
+          "id": "B",
+          "text": "Tire pressure"
+        },
+        {
+          "id": "C",
+          "text": "A microphone only"
+        },
+        {
+          "id": "D",
+          "text": "A stored route"
+        }
+      ]
+    },
+    {
+      "id": "q6",
+      "prompt": "In an optical time-of-flight sensor, what is timed?",
+      "options": [
+        {
+          "id": "A",
+          "text": "A wheel's full rotation"
+        },
+        {
+          "id": "B",
+          "text": "A human reaction"
+        },
+        {
+          "id": "C",
+          "text": "A map download"
+        },
+        {
+          "id": "D",
+          "text": "The outward and return travel of emitted light"
+        }
+      ]
+    },
+    {
+      "id": "q7",
+      "prompt": "Which module is used in the lesson as a time-of-flight sensor example?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Mechanical bumper"
+        },
+        {
+          "id": "B",
+          "text": "Magnetic compass"
+        },
+        {
+          "id": "C",
+          "text": "VL53L0X"
+        },
+        {
+          "id": "D",
+          "text": "HC-SR501 PIR"
+        }
+      ]
+    },
+    {
+      "id": "q8",
+      "prompt": "What is the main purpose of a PIR sensor in the lesson?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Reading a GPS position"
+        },
+        {
+          "id": "B",
+          "text": "Detecting motion from changes in infrared radiation"
+        },
+        {
+          "id": "C",
+          "text": "Measuring a reflected laser pulse's travel time"
+        },
+        {
+          "id": "D",
+          "text": "Measuring an ultrasonic echo"
+        }
+      ]
+    },
+    {
+      "id": "q9",
+      "prompt": "Why might a mobile robot use range sensors while navigating?",
+      "options": [
+        {
+          "id": "A",
+          "text": "To detect nearby obstacles and estimate clearance"
+        },
+        {
+          "id": "B",
+          "text": "To change the student's password"
+        },
+        {
+          "id": "C",
+          "text": "To replace all path planning"
+        },
+        {
+          "id": "D",
+          "text": "To increase its physical size"
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "prompt": "Which pair of sensors in the lesson estimates distance using a returning emitted signal?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Compass and wheel encoder"
+        },
+        {
+          "id": "B",
+          "text": "PIR and compass"
+        },
+        {
+          "id": "C",
+          "text": "GPS and keyboard"
+        },
+        {
+          "id": "D",
+          "text": "Ultrasonic and optical time-of-flight"
+        }
+      ]
+    }
+  ],
+  "version": "f9adff2e3444e715"
+}

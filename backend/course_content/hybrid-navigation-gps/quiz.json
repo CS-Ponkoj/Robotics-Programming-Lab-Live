@@ -1,0 +1,230 @@
+{
+  "id": "quiz",
+  "title": "Quiz",
+  "kind": "quiz",
+  "topic_id": "hybrid-navigation-gps",
+  "html": "",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "What are the three core tasks described in the lesson's definition of navigation?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Determine position, plan a route, and follow it"
+        },
+        {
+          "id": "B",
+          "text": "Choose colors, print maps, and charge"
+        },
+        {
+          "id": "C",
+          "text": "Count wheels, resize images, and stop"
+        },
+        {
+          "id": "D",
+          "text": "Train a model, label photos, and grade code"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "prompt": "What does a GPS receiver use to estimate position?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Only wheel color"
+        },
+        {
+          "id": "B",
+          "text": "Only obstacle shape"
+        },
+        {
+          "id": "C",
+          "text": "Only the keyboard"
+        },
+        {
+          "id": "D",
+          "text": "Signals transmitted by satellites"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "prompt": "Why can GPS become unreliable in an urban canyon?",
+      "options": [
+        {
+          "id": "A",
+          "text": "All maps are deleted"
+        },
+        {
+          "id": "B",
+          "text": "The battery always reaches zero"
+        },
+        {
+          "id": "C",
+          "text": "Buildings can obstruct or reflect satellite signals"
+        },
+        {
+          "id": "D",
+          "text": "The robot has too many wheels"
+        }
+      ]
+    },
+    {
+      "id": "q4",
+      "prompt": "Which other setting mentioned in the lesson can limit GPS signal reception?",
+      "options": [
+        {
+          "id": "A",
+          "text": "An unobstructed rooftop"
+        },
+        {
+          "id": "B",
+          "text": "Underwater"
+        },
+        {
+          "id": "C",
+          "text": "Open sky"
+        },
+        {
+          "id": "D",
+          "text": "A clear field"
+        }
+      ]
+    },
+    {
+      "id": "q5",
+      "prompt": "What is a key advantage of GPS for a moving robot outdoors?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Real-time position tracking"
+        },
+        {
+          "id": "B",
+          "text": "Guaranteed obstacle detection at any distance"
+        },
+        {
+          "id": "C",
+          "text": "Perfect operation without satellite signals"
+        },
+        {
+          "id": "D",
+          "text": "Direct measurement of wheel torque"
+        }
+      ]
+    },
+    {
+      "id": "q6",
+      "prompt": "Why combine GPS with another navigation method?",
+      "options": [
+        {
+          "id": "A",
+          "text": "To guarantee that sensors never fail"
+        },
+        {
+          "id": "B",
+          "text": "To remove every source of uncertainty"
+        },
+        {
+          "id": "C",
+          "text": "To eliminate route planning"
+        },
+        {
+          "id": "D",
+          "text": "To continue estimating location when GPS is degraded"
+        }
+      ]
+    },
+    {
+      "id": "q7",
+      "prompt": "What does an inertial navigation system use to estimate motion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Only the robot's paint color"
+        },
+        {
+          "id": "B",
+          "text": "Only a web browser"
+        },
+        {
+          "id": "C",
+          "text": "Measurements from inertial sensors"
+        },
+        {
+          "id": "D",
+          "text": "Only a list of quiz answers"
+        }
+      ]
+    },
+    {
+      "id": "q8",
+      "prompt": "What is sensor fusion in a hybrid navigation system?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Using only a paper map"
+        },
+        {
+          "id": "B",
+          "text": "Combining information from multiple sensors or methods"
+        },
+        {
+          "id": "C",
+          "text": "Discarding all measurements except one"
+        },
+        {
+          "id": "D",
+          "text": "Disabling GPS permanently"
+        }
+      ]
+    },
+    {
+      "id": "q9",
+      "prompt": "Which technique named in the lesson can supplement GPS with correction information?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Differential GPS (DGPS)"
+        },
+        {
+          "id": "B",
+          "text": "A mechanical bumper alone"
+        },
+        {
+          "id": "C",
+          "text": "A display brightness setting"
+        },
+        {
+          "id": "D",
+          "text": "A code editor theme"
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "prompt": "Which technique named in the lesson uses Wi-Fi signals for positioning?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Wheel pressure sensor"
+        },
+        {
+          "id": "B",
+          "text": "Ultrasonic echo timer"
+        },
+        {
+          "id": "C",
+          "text": "Potential field planner"
+        },
+        {
+          "id": "D",
+          "text": "Wi-Fi positioning system (WPS)"
+        }
+      ]
+    }
+  ],
+  "version": "cd6f5fd517c4fd9c"
+}

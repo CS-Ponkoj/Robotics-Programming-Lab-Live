@@ -1,0 +1,27 @@
+{
+  "id": "range-sensors",
+  "title": "Range Sensors",
+  "summary": "Compare distance sensors and interpret obstacle measurements.",
+  "sections": [
+    {
+      "id": "lesson",
+      "title": "Lesson",
+      "kind": "lesson"
+    },
+    {
+      "id": "exercises-question-1",
+      "title": "Exercises · Question 1",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-question-2",
+      "title": "Exercises · Question 2",
+      "kind": "exercise"
+    },
+    {
+      "id": "quiz",
+      "title": "Quiz",
+      "kind": "quiz"
+    }
+  ]
+}

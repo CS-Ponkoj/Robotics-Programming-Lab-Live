@@ -1,0 +1,32 @@
+{
+  "id": "sensor-fusion",
+  "title": "Sensor Fusion",
+  "summary": "Combine readings from multiple sensors to estimate robot state.",
+  "sections": [
+    {
+      "id": "lesson",
+      "title": "Lesson",
+      "kind": "lesson"
+    },
+    {
+      "id": "assignment-1",
+      "title": "1",
+      "kind": "exercise"
+    },
+    {
+      "id": "assignment-2",
+      "title": "2",
+      "kind": "exercise"
+    },
+    {
+      "id": "quiz",
+      "title": "Quiz",
+      "kind": "quiz"
+    },
+    {
+      "id": "math",
+      "title": "math",
+      "kind": "math"
+    }
+  ]
+}

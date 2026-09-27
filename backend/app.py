@@ -14,6 +14,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
+from pydantic import BaseModel
+
+from course_content_repository import CourseContentRepository
 
 from account_sync import (
     active_instructor_count,
@@ -52,6 +55,7 @@ from graders import PythonFunctionGrader, PythonVariableGrader, Ros2TopicGrader
 from models import (
     Assignment,
     CodeDraft,
+    CourseQuizAttempt,
     HintInteraction,
     StudySession,
     Submission,
@@ -118,6 +122,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+COURSE_CONTENT = CourseContentRepository()
+
+
+class QuizSubmission(BaseModel):
+    quiz_version: str
+    choices: dict[str, str]
 
 
 def create_app(
@@ -1631,6 +1641,85 @@ def create_app(
             "assignment_version": assignment.version,
             "solution_html": assignment.solution_html,
         }
+
+    @application.get("/contents")
+    def list_contents(_user: User = Depends(current_user)):
+        return {"topics": COURSE_CONTENT.topics()}
+
+    @application.get("/contents/{topic_id}")
+    def get_content(topic_id: str, _user: User = Depends(current_user)):
+        topic = COURSE_CONTENT.topic(topic_id)
+        if topic is None:
+            raise HTTPException(404, "Content not found.")
+        return topic
+
+    @application.get("/contents/{topic_id}/sections/{section_id}")
+    def get_content_section(
+        topic_id: str, section_id: str, _user: User = Depends(current_user)
+    ):
+        section = COURSE_CONTENT.section(topic_id, section_id)
+        if section is None:
+            raise HTTPException(404, "Section not found.")
+        return section
+
+    @application.post("/contents/{topic_id}/quiz/submit")
+    def submit_content_quiz(
+        topic_id: str,
+        submission: QuizSubmission,
+        request: Request,
+        user: User = Depends(current_user),
+        session: Session = Depends(session_dependency),
+    ):
+        try:
+            result = COURSE_CONTENT.grade_quiz(
+                topic_id, submission.quiz_version, submission.choices
+            )
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from error
+        if result is None:
+            raise HTTPException(404, "Quiz not found.")
+        if user.role == "instructor" or is_ephemeral_demo(request, user):
+            return {**result, "saved": False}
+        attempt = CourseQuizAttempt(user_id=user.id, **result)
+        session.add(attempt)
+        session.commit()
+        return {**result, "saved": True, "attempt_id": attempt.id}
+
+    @application.get("/contents/{topic_id}/quiz/attempts")
+    def content_quiz_attempts(
+        topic_id: str,
+        request: Request,
+        user: User = Depends(current_user),
+        session: Session = Depends(session_dependency),
+    ):
+        if COURSE_CONTENT.section(topic_id, "quiz") is None:
+            raise HTTPException(404, "Quiz not found.")
+        if user.role == "instructor" or is_ephemeral_demo(request, user):
+            return {"attempts": []}
+        rows = session.scalars(
+            select(CourseQuizAttempt)
+            .where(CourseQuizAttempt.user_id == user.id)
+            .where(CourseQuizAttempt.topic_id == topic_id)
+            .order_by(CourseQuizAttempt.submitted_at.desc(), CourseQuizAttempt.id.desc())
+            .limit(20)
+        ).all()
+        return {"attempts": [
+            {
+                "quiz_version": row.quiz_version,
+                "correct_count": row.correct_count,
+                "total_questions": row.total_questions,
+                "score_percent": row.score_percent,
+                "submitted_at": row.submitted_at.isoformat(),
+            }
+            for row in rows
+        ]}
+
+    @application.get("/content-assets/{asset_name}")
+    def serve_content_asset(asset_name: str):
+        asset = COURSE_CONTENT.asset(asset_name)
+        if asset is None:
+            raise HTTPException(404, "Content image not found.")
+        return FileResponse(asset)
 
     @application.get("/images/{image_id}")
     def serve_image(image_id: int):

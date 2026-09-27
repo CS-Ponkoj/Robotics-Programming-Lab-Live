@@ -1,0 +1,70 @@
+{
+  "topics": [
+    {
+      "id": "obstacle-avoidance",
+      "title": "Obstacle Avoidance",
+      "summary": "Detect obstacles and choose safe routes around them.",
+      "section_counts": {
+        "lesson": 1,
+        "exercise": 4,
+        "quiz": 1,
+        "math": 0
+      }
+    },
+    {
+      "id": "path-planning",
+      "title": "Path Planning",
+      "summary": "Explore search algorithms and robot routes through constrained spaces.",
+      "section_counts": {
+        "lesson": 1,
+        "exercise": 3,
+        "quiz": 1,
+        "math": 0
+      }
+    },
+    {
+      "id": "sensor-fusion",
+      "title": "Sensor Fusion",
+      "summary": "Combine readings from multiple sensors to estimate robot state.",
+      "section_counts": {
+        "lesson": 1,
+        "exercise": 2,
+        "quiz": 1,
+        "math": 1
+      }
+    },
+    {
+      "id": "range-sensors",
+      "title": "Range Sensors",
+      "summary": "Compare distance sensors and interpret obstacle measurements.",
+      "section_counts": {
+        "lesson": 1,
+        "exercise": 2,
+        "quiz": 1,
+        "math": 0
+      }
+    },
+    {
+      "id": "locomotion",
+      "title": "Locomotion",
+      "summary": "Study robot mobility, stability, and motion calculations.",
+      "section_counts": {
+        "lesson": 1,
+        "exercise": 4,
+        "quiz": 1,
+        "math": 1
+      }
+    },
+    {
+      "id": "hybrid-navigation-gps",
+      "title": "Hybrid Navigation and GPS",
+      "summary": "Navigate when satellite positioning is unreliable or unavailable.",
+      "section_counts": {
+        "lesson": 1,
+        "exercise": 5,
+        "quiz": 1,
+        "math": 0
+      }
+    }
+  ]
+}

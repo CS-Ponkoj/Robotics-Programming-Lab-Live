@@ -1,0 +1,42 @@
+{
+  "id": "hybrid-navigation-gps",
+  "title": "Hybrid Navigation and GPS",
+  "summary": "Navigate when satellite positioning is unreliable or unavailable.",
+  "sections": [
+    {
+      "id": "lesson",
+      "title": "Lesson",
+      "kind": "lesson"
+    },
+    {
+      "id": "exercises-extra-exercises",
+      "title": "Exercises · Extra Exercises",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-question-1",
+      "title": "Exercises · Question 1",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-question-2",
+      "title": "Exercises · Question 2",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-question-3",
+      "title": "Exercises · Question 3",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-question-4",
+      "title": "Exercises · Question 4",
+      "kind": "exercise"
+    },
+    {
+      "id": "quiz",
+      "title": "Quiz",
+      "kind": "quiz"
+    }
+  ]
+}

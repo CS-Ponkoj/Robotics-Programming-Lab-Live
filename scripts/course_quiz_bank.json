@@ -1,0 +1,50 @@
+{
+  "path-planning": [
+    ["What is the main goal of robot path planning?", ["Choose a safe route from start to goal", "Increase sensor sampling rate", "Replace the robot's motors", "Measure battery voltage"], "A"],
+    ["Which statement best describes global path planning?", ["It needs no map", "It plans using a known environment before movement", "It uses only the latest sensor reading", "It always produces a straight line"], "B"],
+    ["What does local path planning rely on when the environment is partly unknown?", ["Only a fixed route made in advance", "Only satellite images", "Information collected by the robot's sensors", "The color of the robot"], "C"],
+    ["Why are obstacles expanded in configuration space?", ["To model the robot as a point while accounting for its size", "To make every route longer", "To increase the number of sensors", "To remove the goal from the map"], "A"],
+    ["In a planning graph, what connects two neighboring vertices?", ["A coordinate axis", "An edge", "A sensor", "A wheel"], "B"],
+    ["What does an adjacency list store for each graph vertex?", ["Its neighboring vertices", "Its battery level", "Only its x-coordinate", "Every possible robot speed"], "A"],
+    ["For a graph with nonnegative edge costs, what does Dijkstra's algorithm seek?", ["The path with the most edges", "A lowest-cost path from a start vertex", "The brightest obstacle", "A random unexplored path"], "B"],
+    ["What additional estimate does A* use to guide its search toward a goal?", ["A heuristic estimate of remaining cost", "A wheel encoder only", "The robot's paint color", "An exact future sensor measurement"], "A"],
+    ["How does a rapidly-exploring random tree (RRT) grow?", ["By repeatedly sampling configurations and extending a tree", "By sorting all obstacle colors", "By measuring only GPS signals", "By removing all graph edges"], "A"],
+    ["What is the basic idea of a probabilistic roadmap (PRM)?", ["Connect sampled collision-free configurations into a roadmap", "Always follow an obstacle boundary", "Use a single fixed straight line", "Ignore whether connections cross obstacles"], "A"]
+  ],
+  "range-sensors": [
+    ["What does a range sensor measure?", ["Distance to an object or surface", "The robot's password", "Only wheel speed", "The number of map vertices"], "A"],
+    ["What physical signal does an ultrasonic range sensor send?", ["A high-frequency sound wave", "A GPS satellite signal", "A wheel rotation", "A magnetic map"], "A"],
+    ["Why does an ultrasonic sensor measure echo travel time?", ["To estimate the distance to a reflecting object", "To identify the robot's login ID", "To measure motor torque directly", "To count nearby cameras"], "A"],
+    ["Which device is described in the lesson as an ultrasonic range sensor?", ["HC-SR04", "PIR motion detector", "Compass", "Wheel encoder"], "A"],
+    ["What does a laser rangefinder use to measure distance?", ["A reflected laser beam", "Tire pressure", "A microphone only", "A stored route"], "A"],
+    ["In an optical time-of-flight sensor, what is timed?", ["The outward and return travel of emitted light", "A wheel's full rotation", "A human reaction", "A map download"], "A"],
+    ["Which module is used in the lesson as a time-of-flight sensor example?", ["VL53L0X", "HC-SR501 PIR", "Mechanical bumper", "Magnetic compass"], "A"],
+    ["What is the main purpose of a PIR sensor in the lesson?", ["Detecting motion from changes in infrared radiation", "Measuring a reflected laser pulse's travel time", "Measuring an ultrasonic echo", "Reading a GPS position"], "A"],
+    ["Why might a mobile robot use range sensors while navigating?", ["To detect nearby obstacles and estimate clearance", "To change the student's password", "To replace all path planning", "To increase its physical size"], "A"],
+    ["Which pair of sensors in the lesson estimates distance using a returning emitted signal?", ["Ultrasonic and optical time-of-flight", "Compass and wheel encoder", "PIR and compass", "GPS and keyboard"], "A"]
+  ],
+  "locomotion": [
+    ["What does locomotion allow a mobile robot to do?", ["Move from one place to another", "Store only images", "Avoid using actuators", "Remove sensors from its design"], "A"],
+    ["Which design choice generally helps a robot resist tipping?", ["Lowering its center of gravity", "Raising its center of gravity", "Removing all contact points", "Ignoring terrain slope"], "A"],
+    ["What is static stability?", ["Remaining balanced while stationary", "Moving as fast as possible", "Turning without any wheel contact", "Changing the map while moving"], "A"],
+    ["What is dynamic stability concerned with?", ["Maintaining balance while moving", "Only remaining balanced while parked", "The sensor's file format", "The number of quiz questions"], "A"],
+    ["Why does friction matter to locomotion?", ["It helps the robot grip the surface", "It removes the need for contact", "It supplies GPS coordinates", "It guarantees every path is shortest"], "A"],
+    ["Which locomotion method is commonly suited to a relatively flat, structured floor?", ["Wheeled locomotion", "Swimming locomotion", "Flying locomotion", "Snake-like locomotion"], "A"],
+    ["Which locomotion method uses continuous belts around wheels?", ["Tracked locomotion", "Flying locomotion", "Swimming locomotion", "Legged locomotion"], "A"],
+    ["Which environmental property can change a robot's stability on the ground?", ["Terrain inclination", "The lesson title", "The quiz version", "The browser window color"], "A"],
+    ["In differential drive, what produces a turn?", ["Different speeds at the left and right driven wheels", "Moving both driven wheels identically forward", "Disconnecting the power supply", "Changing only the camera exposure"], "A"],
+    ["Why might a designer choose legged rather than simple wheeled locomotion?", ["To negotiate uneven terrain or obstacles", "To remove the need for balance", "To guarantee the lowest energy use everywhere", "To avoid any contact with the ground"], "A"]
+  ],
+  "hybrid-navigation-gps": [
+    ["What are the three core tasks described in the lesson's definition of navigation?", ["Determine position, plan a route, and follow it", "Choose colors, print maps, and charge", "Count wheels, resize images, and stop", "Train a model, label photos, and grade code"], "A"],
+    ["What does a GPS receiver use to estimate position?", ["Signals transmitted by satellites", "Only wheel color", "Only obstacle shape", "Only the keyboard"], "A"],
+    ["Why can GPS become unreliable in an urban canyon?", ["Buildings can obstruct or reflect satellite signals", "The robot has too many wheels", "All maps are deleted", "The battery always reaches zero"], "A"],
+    ["Which other setting mentioned in the lesson can limit GPS signal reception?", ["Underwater", "Open sky", "A clear field", "An unobstructed rooftop"], "A"],
+    ["What is a key advantage of GPS for a moving robot outdoors?", ["Real-time position tracking", "Guaranteed obstacle detection at any distance", "Perfect operation without satellite signals", "Direct measurement of wheel torque"], "A"],
+    ["Why combine GPS with another navigation method?", ["To continue estimating location when GPS is degraded", "To guarantee that sensors never fail", "To remove every source of uncertainty", "To eliminate route planning"], "A"],
+    ["What does an inertial navigation system use to estimate motion?", ["Measurements from inertial sensors", "Only a list of quiz answers", "Only the robot's paint color", "Only a web browser"], "A"],
+    ["What is sensor fusion in a hybrid navigation system?", ["Combining information from multiple sensors or methods", "Discarding all measurements except one", "Disabling GPS permanently", "Using only a paper map"], "A"],
+    ["Which technique named in the lesson can supplement GPS with correction information?", ["Differential GPS (DGPS)", "A mechanical bumper alone", "A display brightness setting", "A code editor theme"], "A"],
+    ["Which technique named in the lesson uses Wi-Fi signals for positioning?", ["Wi-Fi positioning system (WPS)", "Wheel pressure sensor", "Ultrasonic echo timer", "Potential field planner"], "A"]
+  ]
+}

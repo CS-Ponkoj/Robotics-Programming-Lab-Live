@@ -17,6 +17,7 @@ EXPECTED_TABLES = {
     "audit_events",
     "auth_sessions",
     "code_drafts",
+    "course_quiz_attempts",
     "hint_interactions",
     "learning_events",
     "password_reset_tokens",

@@ -85,6 +85,12 @@ instead of deleting an account so its research history remains intact.
 
 ## What is implemented
 
+- Six post-login course topics with browser-readable lessons, diagrams,
+  question-only exercises, math practice, and one 10-question quiz per topic.
+  Open **Contents** from the assignment home page. Students submit a complete
+  quiz to see a score; their quiz attempts are saved in PostgreSQL separately
+  from coding-assignment grades. Demo and instructor previews are not saved.
+  Quiz answer keys stay on the backend.
 - Six configurable, versioned assignments: four Python and two ROS 2 exercises
 - Test-case grading with server-only hidden evidence and maintained answers
 - Student coding workspace with cross-device version-scoped drafts, manual
@@ -100,6 +106,13 @@ instead of deleting an account so its research history remains intact.
 - V5.2 Phase 1 research analytics with assignment-version summaries, active and
   elapsed completion time, paginated attempt history, classroom/participant/
   assignment catalogs, and instructor data-health checks
+
+Course pages are generated from `course_materials/content` and stored in
+`backend/course_content`. The `References` folders and solution files are not
+published as student pages. After reviewing a source-document edit, install
+`scripts/requirements-course-content.txt` in a separate content-authoring
+Python environment and run `python scripts/build_course_content.py` from the
+repository root. The running backend does not need this authoring dependency.
 
 ## Technology stack
 

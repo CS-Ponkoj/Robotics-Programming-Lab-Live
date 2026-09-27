@@ -4,6 +4,7 @@ import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_progress.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/screens/assignment_workspace.dart';
+import 'package:iuse_demo/screens/course_content_page.dart';
 import 'package:iuse_demo/screens/instructor_assignment_admin.dart';
 import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
@@ -67,31 +68,65 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
     return LandingPageFrame(
       user: widget.user,
       onLogout: widget.onLogout,
-      body: FutureBuilder<List<AssignmentDto>>(
-        future: assignments,
-        builder: (context, snap) {
-          if (snap.hasError) {
-            return LandingPageContent(
-              child: AssignmentLoadError(onRetry: _retryAssignments),
-            );
-          }
-          if (!snap.hasData) {
-            return const LandingPageContent(
-              child: AssignmentLoadingState(),
-            );
-          }
-          final list = snap.data!..sort((a, b) => a.id.compareTo(b.id));
-          return LandingPageContent(
-            child: AssignmentCollection(
-              assignments: list,
-              theme: theme,
-              onReturn: () {
-                // Rebuild when coming back so progress and scores refresh.
-                setState(() {});
-              },
+      body: Column(
+        children: [
+          Material(
+            color: theme.colorScheme.surface,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Chip(
+                    avatar: Icon(Icons.code_rounded,
+                        color: theme.colorScheme.onPrimary, size: 18),
+                    label: Text('Assignments',
+                        style: TextStyle(color: theme.colorScheme.onPrimary)),
+                    backgroundColor: theme.colorScheme.primary,
+                    side: BorderSide.none,
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    key: const Key('open-course-contents'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const CourseCatalogPage(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.menu_book_rounded),
+                    label: const Text('Contents'),
+                  ),
+                ],
+              ),
             ),
-          );
-        },
+          ),
+          Expanded(
+              child: FutureBuilder<List<AssignmentDto>>(
+            future: assignments,
+            builder: (context, snap) {
+              if (snap.hasError) {
+                return LandingPageContent(
+                  child: AssignmentLoadError(onRetry: _retryAssignments),
+                );
+              }
+              if (!snap.hasData) {
+                return const LandingPageContent(
+                  child: AssignmentLoadingState(),
+                );
+              }
+              final list = snap.data!..sort((a, b) => a.id.compareTo(b.id));
+              return LandingPageContent(
+                child: AssignmentCollection(
+                  assignments: list,
+                  theme: theme,
+                  onReturn: () {
+                    // Rebuild when coming back so progress and scores refresh.
+                    setState(() {});
+                  },
+                ),
+              );
+            },
+          )),
+        ],
       ),
     );
   }

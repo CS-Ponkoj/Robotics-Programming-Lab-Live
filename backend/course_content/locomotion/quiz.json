@@ -1,0 +1,230 @@
+{
+  "id": "quiz",
+  "title": "Quiz",
+  "kind": "quiz",
+  "topic_id": "locomotion",
+  "html": "",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "What does locomotion allow a mobile robot to do?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Move from one place to another"
+        },
+        {
+          "id": "B",
+          "text": "Store only images"
+        },
+        {
+          "id": "C",
+          "text": "Avoid using actuators"
+        },
+        {
+          "id": "D",
+          "text": "Remove sensors from its design"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "prompt": "Which design choice generally helps a robot resist tipping?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Raising its center of gravity"
+        },
+        {
+          "id": "B",
+          "text": "Removing all contact points"
+        },
+        {
+          "id": "C",
+          "text": "Ignoring terrain slope"
+        },
+        {
+          "id": "D",
+          "text": "Lowering its center of gravity"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "prompt": "What is static stability?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Turning without any wheel contact"
+        },
+        {
+          "id": "B",
+          "text": "Changing the map while moving"
+        },
+        {
+          "id": "C",
+          "text": "Remaining balanced while stationary"
+        },
+        {
+          "id": "D",
+          "text": "Moving as fast as possible"
+        }
+      ]
+    },
+    {
+      "id": "q4",
+      "prompt": "What is dynamic stability concerned with?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The number of quiz questions"
+        },
+        {
+          "id": "B",
+          "text": "Maintaining balance while moving"
+        },
+        {
+          "id": "C",
+          "text": "Only remaining balanced while parked"
+        },
+        {
+          "id": "D",
+          "text": "The sensor's file format"
+        }
+      ]
+    },
+    {
+      "id": "q5",
+      "prompt": "Why does friction matter to locomotion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "It helps the robot grip the surface"
+        },
+        {
+          "id": "B",
+          "text": "It removes the need for contact"
+        },
+        {
+          "id": "C",
+          "text": "It supplies GPS coordinates"
+        },
+        {
+          "id": "D",
+          "text": "It guarantees every path is shortest"
+        }
+      ]
+    },
+    {
+      "id": "q6",
+      "prompt": "Which locomotion method is commonly suited to a relatively flat, structured floor?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Swimming locomotion"
+        },
+        {
+          "id": "B",
+          "text": "Flying locomotion"
+        },
+        {
+          "id": "C",
+          "text": "Snake-like locomotion"
+        },
+        {
+          "id": "D",
+          "text": "Wheeled locomotion"
+        }
+      ]
+    },
+    {
+      "id": "q7",
+      "prompt": "Which locomotion method uses continuous belts around wheels?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Swimming locomotion"
+        },
+        {
+          "id": "B",
+          "text": "Legged locomotion"
+        },
+        {
+          "id": "C",
+          "text": "Tracked locomotion"
+        },
+        {
+          "id": "D",
+          "text": "Flying locomotion"
+        }
+      ]
+    },
+    {
+      "id": "q8",
+      "prompt": "Which environmental property can change a robot's stability on the ground?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The browser window color"
+        },
+        {
+          "id": "B",
+          "text": "Terrain inclination"
+        },
+        {
+          "id": "C",
+          "text": "The lesson title"
+        },
+        {
+          "id": "D",
+          "text": "The quiz version"
+        }
+      ]
+    },
+    {
+      "id": "q9",
+      "prompt": "In differential drive, what produces a turn?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Different speeds at the left and right driven wheels"
+        },
+        {
+          "id": "B",
+          "text": "Moving both driven wheels identically forward"
+        },
+        {
+          "id": "C",
+          "text": "Disconnecting the power supply"
+        },
+        {
+          "id": "D",
+          "text": "Changing only the camera exposure"
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "prompt": "Why might a designer choose legged rather than simple wheeled locomotion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "To remove the need for balance"
+        },
+        {
+          "id": "B",
+          "text": "To guarantee the lowest energy use everywhere"
+        },
+        {
+          "id": "C",
+          "text": "To avoid any contact with the ground"
+        },
+        {
+          "id": "D",
+          "text": "To negotiate uneven terrain or obstacles"
+        }
+      ]
+    }
+  ],
+  "version": "61d2c2fc5c3c3e65"
+}

@@ -1,0 +1,230 @@
+{
+  "id": "quiz",
+  "title": "Quiz",
+  "kind": "quiz",
+  "topic_id": "path-planning",
+  "html": "",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "What is the main goal of robot path planning?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Choose a safe route from start to goal"
+        },
+        {
+          "id": "B",
+          "text": "Increase sensor sampling rate"
+        },
+        {
+          "id": "C",
+          "text": "Replace the robot's motors"
+        },
+        {
+          "id": "D",
+          "text": "Measure battery voltage"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "prompt": "Which statement best describes global path planning?",
+      "options": [
+        {
+          "id": "A",
+          "text": "It plans using a known environment before movement"
+        },
+        {
+          "id": "B",
+          "text": "It uses only the latest sensor reading"
+        },
+        {
+          "id": "C",
+          "text": "It always produces a straight line"
+        },
+        {
+          "id": "D",
+          "text": "It needs no map"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "prompt": "What does local path planning rely on when the environment is partly unknown?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Information collected by the robot's sensors"
+        },
+        {
+          "id": "B",
+          "text": "The color of the robot"
+        },
+        {
+          "id": "C",
+          "text": "Only a fixed route made in advance"
+        },
+        {
+          "id": "D",
+          "text": "Only satellite images"
+        }
+      ]
+    },
+    {
+      "id": "q4",
+      "prompt": "Why are obstacles expanded in configuration space?",
+      "options": [
+        {
+          "id": "A",
+          "text": "To remove the goal from the map"
+        },
+        {
+          "id": "B",
+          "text": "To model the robot as a point while accounting for its size"
+        },
+        {
+          "id": "C",
+          "text": "To make every route longer"
+        },
+        {
+          "id": "D",
+          "text": "To increase the number of sensors"
+        }
+      ]
+    },
+    {
+      "id": "q5",
+      "prompt": "In a planning graph, what connects two neighboring vertices?",
+      "options": [
+        {
+          "id": "A",
+          "text": "A coordinate axis"
+        },
+        {
+          "id": "B",
+          "text": "An edge"
+        },
+        {
+          "id": "C",
+          "text": "A sensor"
+        },
+        {
+          "id": "D",
+          "text": "A wheel"
+        }
+      ]
+    },
+    {
+      "id": "q6",
+      "prompt": "What does an adjacency list store for each graph vertex?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Its battery level"
+        },
+        {
+          "id": "B",
+          "text": "Only its x-coordinate"
+        },
+        {
+          "id": "C",
+          "text": "Every possible robot speed"
+        },
+        {
+          "id": "D",
+          "text": "Its neighboring vertices"
+        }
+      ]
+    },
+    {
+      "id": "q7",
+      "prompt": "For a graph with nonnegative edge costs, what does Dijkstra's algorithm seek?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The brightest obstacle"
+        },
+        {
+          "id": "B",
+          "text": "A random unexplored path"
+        },
+        {
+          "id": "C",
+          "text": "The path with the most edges"
+        },
+        {
+          "id": "D",
+          "text": "A lowest-cost path from a start vertex"
+        }
+      ]
+    },
+    {
+      "id": "q8",
+      "prompt": "What additional estimate does A* use to guide its search toward a goal?",
+      "options": [
+        {
+          "id": "A",
+          "text": "An exact future sensor measurement"
+        },
+        {
+          "id": "B",
+          "text": "A heuristic estimate of remaining cost"
+        },
+        {
+          "id": "C",
+          "text": "A wheel encoder only"
+        },
+        {
+          "id": "D",
+          "text": "The robot's paint color"
+        }
+      ]
+    },
+    {
+      "id": "q9",
+      "prompt": "How does a rapidly-exploring random tree (RRT) grow?",
+      "options": [
+        {
+          "id": "A",
+          "text": "By repeatedly sampling configurations and extending a tree"
+        },
+        {
+          "id": "B",
+          "text": "By sorting all obstacle colors"
+        },
+        {
+          "id": "C",
+          "text": "By measuring only GPS signals"
+        },
+        {
+          "id": "D",
+          "text": "By removing all graph edges"
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "prompt": "What is the basic idea of a probabilistic roadmap (PRM)?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Always follow an obstacle boundary"
+        },
+        {
+          "id": "B",
+          "text": "Use a single fixed straight line"
+        },
+        {
+          "id": "C",
+          "text": "Ignore whether connections cross obstacles"
+        },
+        {
+          "id": "D",
+          "text": "Connect sampled collision-free configurations into a roadmap"
+        }
+      ]
+    }
+  ],
+  "version": "2880601d028f93ab"
+}

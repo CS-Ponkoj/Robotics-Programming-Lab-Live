@@ -1,0 +1,8 @@
+{
+  "id": "assignment-2",
+  "title": "2",
+  "kind": "exercise",
+  "topic_id": "sensor-fusion",
+  "html": "<p>An AUV is on a mission to explore an underwater archaeological maze with treasures and obstacles. The maze is a grid where each cell can be empty, have a treasure, or an obstacle. The AUV must collect as many treasures as possible while avoiding obstacles and minimizing the travel distance.</p>\n<p>Task:</p>\n<p>Write a Python script, that will simulate the AUV&#x27;s path planning through the maze. It will use simple algorithms to demonstrate the concept.</p>",
+  "questions": []
+}

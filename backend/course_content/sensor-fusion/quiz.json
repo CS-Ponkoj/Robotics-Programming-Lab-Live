@@ -1,0 +1,230 @@
+{
+  "id": "quiz",
+  "title": "Quiz",
+  "kind": "quiz",
+  "topic_id": "sensor-fusion",
+  "html": "",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "What is sensor fusion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The process of applying collective information from various sensors."
+        },
+        {
+          "id": "B",
+          "text": "A single sensor data processing technique."
+        },
+        {
+          "id": "C",
+          "text": "A method of filtering noise from one sensor."
+        },
+        {
+          "id": "D",
+          "text": "The use of a single sensor in multiple applications."
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "prompt": "Which area does not typically utilize sensor fusion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Robotics"
+        },
+        {
+          "id": "B",
+          "text": "Self-driving cars"
+        },
+        {
+          "id": "C",
+          "text": "Aircraft"
+        },
+        {
+          "id": "D",
+          "text": "Simple mechanical systems"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "prompt": "What is a key benefit of sensor fusion in autonomous vehicles?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Reduces the need for sensors"
+        },
+        {
+          "id": "B",
+          "text": "Increases data quality and reliability"
+        },
+        {
+          "id": "C",
+          "text": "Decreases system complexity"
+        },
+        {
+          "id": "D",
+          "text": "Reduces data processing requirements"
+        }
+      ]
+    },
+    {
+      "id": "q4",
+      "prompt": "What is an example of data-level fusion in sensor fusion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Combining sensor decisions to make a final decision."
+        },
+        {
+          "id": "B",
+          "text": "Extracting important features from each sensor."
+        },
+        {
+          "id": "C",
+          "text": "Directly adding together raw sensor data."
+        },
+        {
+          "id": "D",
+          "text": "Using a single sensor to make decisions."
+        }
+      ]
+    },
+    {
+      "id": "q5",
+      "prompt": "Which is not a level of sensor fusion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Data-level"
+        },
+        {
+          "id": "B",
+          "text": "Feature-level"
+        },
+        {
+          "id": "C",
+          "text": "Decision-level"
+        },
+        {
+          "id": "D",
+          "text": "Sensor-level"
+        }
+      ]
+    },
+    {
+      "id": "q6",
+      "prompt": "What type of sensors are typically used in autonomous vehicles for sensor fusion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Cameras, lidars, radars, and GPS receivers."
+        },
+        {
+          "id": "B",
+          "text": "Microphones and thermal cameras."
+        },
+        {
+          "id": "C",
+          "text": "Pressure and moisture sensors."
+        },
+        {
+          "id": "D",
+          "text": "Only GPS receivers."
+        }
+      ]
+    },
+    {
+      "id": "q7",
+      "prompt": "What is the role of Kalman Filters in sensor fusion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "To provide a deterministic sampling technique."
+        },
+        {
+          "id": "B",
+          "text": "To filter out noise from single sensors."
+        },
+        {
+          "id": "C",
+          "text": "To predict and correct estimates in a linear system."
+        },
+        {
+          "id": "D",
+          "text": "To process image data exclusively."
+        }
+      ]
+    },
+    {
+      "id": "q8",
+      "prompt": "What is a limitation of the basic Kalman Filter?",
+      "options": [
+        {
+          "id": "A",
+          "text": "It only works with non-linear systems."
+        },
+        {
+          "id": "B",
+          "text": "It assumes the system is linear and the noise is Gaussian."
+        },
+        {
+          "id": "C",
+          "text": "It cannot be used in navigation systems."
+        },
+        {
+          "id": "D",
+          "text": "It is only suitable for robotic applications."
+        }
+      ]
+    },
+    {
+      "id": "q9",
+      "prompt": "What is a Hidden Markov Model (HMM) used for in sensor fusion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "For direct sensor data integration."
+        },
+        {
+          "id": "B",
+          "text": "For sequential data analysis in systems with hidden states."
+        },
+        {
+          "id": "C",
+          "text": "For handling linear systems exclusively."
+        },
+        {
+          "id": "D",
+          "text": "For combining features from multiple sensors."
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "prompt": "Which is not a use case of particle filters in sensor fusion?",
+      "options": [
+        {
+          "id": "A",
+          "text": "SLAM in robotics."
+        },
+        {
+          "id": "B",
+          "text": "Robot localization."
+        },
+        {
+          "id": "C",
+          "text": "Reducing the number of sensors required."
+        },
+        {
+          "id": "D",
+          "text": "Estimating the state of the system considering multiple sources."
+        }
+      ]
+    }
+  ],
+  "version": "3f85be75277c58be"
+}

@@ -1,0 +1,230 @@
+{
+  "id": "quiz",
+  "title": "Quiz",
+  "kind": "quiz",
+  "topic_id": "obstacle-avoidance",
+  "html": "",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "What is the primary goal of obstacle avoidance in mobile robotics?",
+      "options": [
+        {
+          "id": "A",
+          "text": "To increase the speed of the robot"
+        },
+        {
+          "id": "B",
+          "text": "To enable a robot to detect objects in its path and execute appropriate maneuvers to avoid collisions"
+        },
+        {
+          "id": "C",
+          "text": "To enhance the battery life of robots"
+        },
+        {
+          "id": "D",
+          "text": "To improve the aesthetic design of robots"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "prompt": "Which algorithm is considered one of the simplest for obstacle avoidance in mobile robotics?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Vector Field Histogram (VFH)"
+        },
+        {
+          "id": "B",
+          "text": "Simultaneous Localization and Mapping (SLAM)"
+        },
+        {
+          "id": "C",
+          "text": "Bug algorithm"
+        },
+        {
+          "id": "D",
+          "text": "A* Pathfinding"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "prompt": "What does SLAM stand for in the context of autonomous robotics?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Speedy Localization and Mapping"
+        },
+        {
+          "id": "B",
+          "text": "Simultaneous Localization and Mapping"
+        },
+        {
+          "id": "C",
+          "text": "Secure Localization and Mapping"
+        },
+        {
+          "id": "D",
+          "text": "Simplified Localization and Mapping"
+        }
+      ]
+    },
+    {
+      "id": "q4",
+      "prompt": "Which sensor technology is NOT mentioned as commonly used for obstacle detection in mobile robots?",
+      "options": [
+        {
+          "id": "A",
+          "text": "LIDAR"
+        },
+        {
+          "id": "B",
+          "text": "Ultrasonic Sensors"
+        },
+        {
+          "id": "C",
+          "text": "Infrared Sensors"
+        },
+        {
+          "id": "D",
+          "text": "Computer Vision"
+        }
+      ]
+    },
+    {
+      "id": "q5",
+      "prompt": "What challenges do autonomous vehicles face at low speeds in urban environments?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Limited obstacle types"
+        },
+        {
+          "id": "B",
+          "text": "Increased reaction time"
+        },
+        {
+          "id": "C",
+          "text": "High density of obstacles"
+        },
+        {
+          "id": "D",
+          "text": "Reduced need for prediction"
+        }
+      ]
+    },
+    {
+      "id": "q6",
+      "prompt": "How does the Bug2 algorithm differ from Bug1 in its approach to obstacle avoidance?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Bug2 requires manual control while Bug1 is fully autonomous."
+        },
+        {
+          "id": "B",
+          "text": "Bug2 allows the robot to leave the obstacle earlier by using a virtual 'leaving marker'."
+        },
+        {
+          "id": "C",
+          "text": "Bug2 relies on GPS data, whereas Bug1 does not."
+        },
+        {
+          "id": "D",
+          "text": "Bug1 is more computationally intensive than Bug2."
+        }
+      ]
+    },
+    {
+      "id": "q7",
+      "prompt": "What is a key challenge in developing obstacle avoidance systems for autonomous vehicles?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Reducing the size of the vehicles"
+        },
+        {
+          "id": "B",
+          "text": "Enhancing the vehicle's speed"
+        },
+        {
+          "id": "C",
+          "text": "Developing systems that operate reliably in all weather conditions"
+        },
+        {
+          "id": "D",
+          "text": "Decreasing production costs"
+        }
+      ]
+    },
+    {
+      "id": "q8",
+      "prompt": "Which of the following is NOT a listed strength of LIDAR technology?",
+      "options": [
+        {
+          "id": "A",
+          "text": "High accuracy over long ranges"
+        },
+        {
+          "id": "B",
+          "text": "Low cost"
+        },
+        {
+          "id": "C",
+          "text": "Ideal for building intricate environment maps"
+        },
+        {
+          "id": "D",
+          "text": "Relatively unaffected by lighting conditions"
+        }
+      ]
+    },
+    {
+      "id": "q9",
+      "prompt": "In the context of path planning, what is a crucial aspect to consider for the algorithm?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The color of the robot"
+        },
+        {
+          "id": "B",
+          "text": "The robot's kinematic and dynamic constraints"
+        },
+        {
+          "id": "C",
+          "text": "The brand of the robot"
+        },
+        {
+          "id": "D",
+          "text": "The programming language used"
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "prompt": "What does the integration of obstacle avoidance with SLAM and path planning enable in autonomous systems?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Reduced need for sensors"
+        },
+        {
+          "id": "B",
+          "text": "Decreased computational requirements"
+        },
+        {
+          "id": "C",
+          "text": "Operation in complex and dynamic environments"
+        },
+        {
+          "id": "D",
+          "text": "Simplification of robot designs"
+        }
+      ]
+    }
+  ],
+  "version": "47a5ea32496b84c7"
+}

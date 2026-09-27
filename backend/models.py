@@ -209,6 +209,31 @@ class User(Base):
     code_drafts: Mapped[list["CodeDraft"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    course_quiz_attempts: Mapped[list["CourseQuizAttempt"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class CourseQuizAttempt(Base):
+    __tablename__ = "course_quiz_attempts"
+    __table_args__ = (
+        CheckConstraint("correct_count >= 0", name="ck_course_quiz_correct_nonnegative"),
+        CheckConstraint("total_questions >= 10", name="ck_course_quiz_total_minimum"),
+        CheckConstraint("score_percent BETWEEN 0 AND 100", name="ck_course_quiz_score_range"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    topic_id: Mapped[str] = mapped_column(String(120), index=True)
+    quiz_version: Mapped[str] = mapped_column(String(16))
+    correct_count: Mapped[int] = mapped_column(Integer)
+    total_questions: Mapped[int] = mapped_column(Integer)
+    score_percent: Mapped[int] = mapped_column(Integer)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    user: Mapped[User] = relationship(back_populates="course_quiz_attempts")
 
 
 class CodeDraft(Base):

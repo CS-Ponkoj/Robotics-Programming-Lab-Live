@@ -1,0 +1,37 @@
+{
+  "id": "obstacle-avoidance",
+  "title": "Obstacle Avoidance",
+  "summary": "Detect obstacles and choose safe routes around them.",
+  "sections": [
+    {
+      "id": "lesson",
+      "title": "Lesson",
+      "kind": "lesson"
+    },
+    {
+      "id": "assignment-bug-algorithm-scenario-1",
+      "title": "Bug Algorithm · Scenario 1",
+      "kind": "exercise"
+    },
+    {
+      "id": "assignment-bug-algorithm-scenario-2",
+      "title": "Bug Algorithm · Scenario 2",
+      "kind": "exercise"
+    },
+    {
+      "id": "assignment-oa",
+      "title": "OA",
+      "kind": "exercise"
+    },
+    {
+      "id": "assignment-vfh",
+      "title": "VFH",
+      "kind": "exercise"
+    },
+    {
+      "id": "quiz",
+      "title": "Quiz",
+      "kind": "quiz"
+    }
+  ]
+}

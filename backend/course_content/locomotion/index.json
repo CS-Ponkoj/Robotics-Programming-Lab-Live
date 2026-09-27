@@ -1,0 +1,42 @@
+{
+  "id": "locomotion",
+  "title": "Locomotion",
+  "summary": "Study robot mobility, stability, and motion calculations.",
+  "sections": [
+    {
+      "id": "lesson",
+      "title": "Lesson",
+      "kind": "lesson"
+    },
+    {
+      "id": "exercises-question-1",
+      "title": "Exercises · Question 1",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-question-2",
+      "title": "Exercises · Question 2",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-question-3",
+      "title": "Exercises · Question 3",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-question-4",
+      "title": "Exercises · Question 4",
+      "kind": "exercise"
+    },
+    {
+      "id": "quiz",
+      "title": "Quiz",
+      "kind": "quiz"
+    },
+    {
+      "id": "math-exercises-for-locomotion",
+      "title": "Math exercises for locomotion",
+      "kind": "math"
+    }
+  ]
+}

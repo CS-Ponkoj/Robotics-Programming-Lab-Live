@@ -1,0 +1,32 @@
+{
+  "id": "path-planning",
+  "title": "Path Planning",
+  "summary": "Explore search algorithms and robot routes through constrained spaces.",
+  "sections": [
+    {
+      "id": "lesson",
+      "title": "Lesson",
+      "kind": "lesson"
+    },
+    {
+      "id": "a-star-algorithm-exercise",
+      "title": "A star Algorithm Exercise",
+      "kind": "exercise"
+    },
+    {
+      "id": "dijkstra-s-algorithm-exercise",
+      "title": "Dijkstra’s Algorithm Exercise",
+      "kind": "exercise"
+    },
+    {
+      "id": "potential-field-path-planning-exercise",
+      "title": "Potential Field Path Planning Exercise",
+      "kind": "exercise"
+    },
+    {
+      "id": "quiz",
+      "title": "Quiz",
+      "kind": "quiz"
+    }
+  ]
+}

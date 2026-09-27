@@ -110,6 +110,8 @@ backend/                          FastAPI application
   schemas.py                      Pydantic API schemas
   auth_service.py                 Authentication and password/session behavior
   assignment_repository.py       Assignment loading and persistence
+  course_content_repository.py   Student-safe course-page and whole-quiz grading
+  course_content/                Generated lessons and server-only quiz keys
   graders/                        Modular AssignmentGrader implementations
   sandbox.py                      Sandbox client and execution policies
   sandbox_service.py              Dedicated execution service
@@ -123,11 +125,13 @@ backend/                          FastAPI application
   tests/                          Backend regression and security tests
 
 manual_sqa_answers/               Instructor-only manual verification answers
-course_materials/                 Controlled assignment sources and research references
+course_materials/                 Controlled assignment and course source documents
   archive/                        Historical supporting material, not runtime content
 docs/                             Architecture, deployment, research, and SQA records
   archive/                        Superseded evidence retained for traceability
 scripts/                          Local run, verification, and release automation
+  build_course_content.py         Rebuild web pages after reviewed source changes
+  course_quiz_bank.json           Authored questions for topics without a source quiz
 .github/workflows/ci.yml          Continuous-integration release gates
 render.yaml                       API and sandbox hosting configuration
 vercel.json                       Flutter web deployment configuration
