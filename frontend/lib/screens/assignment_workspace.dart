@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:iuse_demo/editor/indent_guides.dart';
 import 'package:iuse_demo/editor/editor_tools.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
@@ -35,6 +36,12 @@ void setAssignmentEditorContent(
   controller.fullText = content;
 }
 
+int editorIndentLevel(String line) {
+  return indentationDepth(line);
+}
+
+bool hasNonWhitespaceCode(String code) => code.trim().isNotEmpty;
+
 class _MyHomePageState extends State<MyHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late Future<AssignmentDto> _assignment;
@@ -46,6 +53,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int? _assignmentVersion;
   bool _enableFeedback = false;
   bool _submitted = false;
+  bool _emptyCodeAttempted = false;
   bool _isRunning = false;
   bool _hasUnrunChanges = false;
   bool _init = true;
@@ -237,9 +245,11 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
     final updatedCode = _controller.fullText;
-    if (updatedCode != _code && (_submitted || !_hasUnrunChanges)) {
+    if (updatedCode != _code &&
+        (_submitted || !_hasUnrunChanges || _emptyCodeAttempted)) {
       setState(() {
         _submitted = false;
+        _emptyCodeAttempted = false;
         _hasUnrunChanges = true;
         _diagnosticLine = null;
       });
@@ -268,8 +278,18 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _runTests() {
+    if (!hasNonWhitespaceCode(_code)) {
+      setState(() {
+        _submitted = false;
+        _emptyCodeAttempted = true;
+        _diagnosticLine = null;
+      });
+      _openResultsPanel();
+      return;
+    }
     setState(() {
       _submitted = true;
+      _emptyCodeAttempted = false;
       _isRunning = true;
       _hasUnrunChanges = false;
       _diagnosticLine = null;
@@ -389,6 +409,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _code = assignment.code;
       _submitted = false;
+      _emptyCodeAttempted = false;
       _hasUnrunChanges = false;
       _diagnosticLine = null;
       _draftSaveState = DraftSaveState.idle;
@@ -804,8 +825,10 @@ class _MyHomePageState extends State<MyHomePage> {
                       },
                     ),
                     Expanded(
-                      child: _submitted
-                          ? FutureBuilder<UnittestFeedbackDto>(
+                      child: _emptyCodeAttempted
+                          ? EmptyCodeTestRunState(onRestore: _resetStarterCode)
+                          : _submitted
+                              ? FutureBuilder<UnittestFeedbackDto>(
                               future: _feedback,
                               builder: (ctx, snap) {
                                 if (snap.connectionState ==
@@ -823,8 +846,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                 }
                                 return const SizedBox.shrink();
                               },
-                            )
-                          : const _EmptyResultsState(),
+                                )
+                              : const _EmptyResultsState(),
                     ),
                   ],
                 ),
@@ -1085,6 +1108,7 @@ class AssignmentInstructions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sections = AssignmentInstructionSections.fromHtml(html);
+    final taskList = InstructionTaskList.fromHtml(sections.task);
     final displayedSolutionHtml =
         solutionHtml.isNotEmpty ? solutionHtml : sections.solution;
 
@@ -1105,7 +1129,9 @@ class AssignmentInstructions extends StatelessWidget {
             icon: Icons.task_alt_rounded,
             title: 'Your task',
             subtitle: 'What your solution needs to calculate',
-            html: sections.task,
+            html: taskList.remainingHtml,
+            introHtml: taskList.introHtml,
+            checklistItems: taskList.items,
           ),
         ],
         if (sections.support.isNotEmpty) ...[
@@ -1198,6 +1224,44 @@ class AssignmentInstructionSections {
   }
 }
 
+class InstructionTaskList {
+  const InstructionTaskList({
+    required this.items,
+    required this.introHtml,
+    required this.remainingHtml,
+  });
+
+  final List<String> items;
+  final String introHtml;
+  final String remainingHtml;
+
+  static final RegExp _orderedList =
+      RegExp(r'<ol(?:\s[^>]*)?>(.*?)</ol>', caseSensitive: false, dotAll: true);
+  static final RegExp _item =
+      RegExp(r'<li(?:\s[^>]*)?>(.*?)</li>', caseSensitive: false, dotAll: true);
+
+  factory InstructionTaskList.fromHtml(String html) {
+    final list = _orderedList.firstMatch(html);
+    if (list == null) {
+      return InstructionTaskList(
+          items: const [], introHtml: '', remainingHtml: html);
+    }
+    final items = _item
+        .allMatches(list.group(1)!)
+        .map((match) => match.group(1)!)
+        .toList();
+    if (items.isEmpty) {
+      return InstructionTaskList(
+          items: const [], introHtml: '', remainingHtml: html);
+    }
+    return InstructionTaskList(
+      items: items,
+      introHtml: html.substring(0, list.start),
+      remainingHtml: html.substring(list.end),
+    );
+  }
+}
+
 class _InstructionSectionCard extends StatelessWidget {
   const _InstructionSectionCard({
     super.key,
@@ -1205,12 +1269,61 @@ class _InstructionSectionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.html,
+    this.introHtml = '',
+    this.checklistItems = const [],
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final String html;
+  final String introHtml;
+  final List<String> checklistItems;
+
+  void _showDiagram(BuildContext context, String source, String? alt) {
+    final imageUri = apiBaseUri.resolve(source);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.all(AppSpacing.md),
+        child: SizedBox(
+          width: MediaQuery.sizeOf(context).width * 0.9,
+          height: MediaQuery.sizeOf(context).height * 0.8,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: Text(alt ?? 'Assignment diagram')),
+                  IconButton(
+                    tooltip: 'Close enlarged diagram',
+                    onPressed: () => Navigator.pop(dialogContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              Flexible(
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: Image.network(
+                    imageUri.toString(),
+                    fit: BoxFit.contain,
+                    semanticLabel: alt ?? 'Assignment diagram',
+                    errorBuilder: (context, error, stackTrace) => const Padding(
+                      padding: EdgeInsets.all(AppSpacing.lg),
+                      child: Text('Diagram unavailable. Try again later.'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1255,14 +1368,68 @@ class _InstructionSectionCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            HtmlWidget(
-              html,
-              baseUrl: apiBaseUri,
-              textStyle: theme.textTheme.bodyMedium?.copyWith(
-                fontFamily: 'roboto-serif',
-                height: 1.55,
+            if (introHtml.trim().isNotEmpty) ...[
+              HtmlWidget(
+                introHtml,
+                baseUrl: apiBaseUri,
+                textStyle: theme.textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'roboto-serif',
+                  height: 1.55,
+                ),
               ),
-            ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            if (checklistItems.isNotEmpty) ...[
+              Text('What to complete',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: AppSpacing.sm),
+              ...checklistItems.asMap().entries.map((entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ExcludeSemantics(
+                          child: CircleAvatar(
+                            radius: 12,
+                            child: Text('${entry.key + 1}',
+                                style: theme.textTheme.labelSmall),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Semantics(
+                            label: 'Task step ${entry.key + 1}',
+                            child: HtmlWidget(entry.value,
+                                baseUrl: apiBaseUri,
+                                textStyle: theme.textTheme.bodyMedium),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            if (html.trim().isNotEmpty)
+              HtmlWidget(
+                html,
+                baseUrl: apiBaseUri,
+                onTapImage: (image) {
+                  if (image.sources.isNotEmpty) {
+                    _showDiagram(context, image.sources.first.url, image.alt);
+                  }
+                },
+                textStyle: theme.textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'roboto-serif',
+                  height: 1.55,
+                ),
+              ),
+            if (html.contains('<img'))
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
+                child: Text('Tap the diagram to enlarge it',
+                    style: theme.textTheme.labelSmall),
+              ),
           ],
         ),
       ),
@@ -1833,45 +2000,58 @@ class AssignmentProjectWorkspace extends StatelessWidget {
                 : 'Read-only project file',
             textField: true,
             readOnly: !selectedFileEditable,
-            child: CodeTheme(
-              data: CodeThemeData(
-                styles: palette.styles,
-              ),
-              child: CodeField(
-                key: const Key('assignment-code-field'),
-                controller: controller,
-                focusNode: focusNode,
-                cursorColor: palette.foreground,
-                gutterStyle: GutterStyle(
-                  width: 64,
-                  background: palette.background,
-                  textStyle: TextStyle(color: palette.lineNumber),
-                ),
-                textSelectionTheme: TextSelectionThemeData(
+            child: EditorIndentGuides(
+              controller: controller,
+              fontSize: fontSize,
+              color: palette.lineNumber,
+              child: CodeTheme(
+                data: CodeThemeData(styles: palette.styles),
+                child: CodeField(
+                  key: const Key('assignment-code-field'),
+                  controller: controller,
+                  focusNode: focusNode,
                   cursorColor: palette.foreground,
-                  selectionColor: palette.selection,
-                  selectionHandleColor: palette.symbol,
+                  gutterStyle: GutterStyle(
+                    width: 64,
+                    background: palette.background,
+                    textStyle: TextStyle(color: palette.lineNumber),
+                  ),
+                  textSelectionTheme: TextSelectionThemeData(
+                    cursorColor: palette.foreground,
+                    selectionColor: palette.selection,
+                    selectionHandleColor: palette.symbol,
+                  ),
+                  textStyle:
+                      TextStyle(fontFamily: 'Courier-New', fontSize: fontSize),
+                  expands: true,
+                  minLines: null,
+                  readOnly: !selectedFileEditable,
+                  onChanged: (_) => onChanged(),
                 ),
-                textStyle: TextStyle(
-                  fontFamily: 'Courier-New',
-                  fontSize: fontSize,
-                ),
-                lineNumberBuilder: (line, style) => TextSpan(
-                  text: line.toString(),
-                  style: line == diagnosticLine
-                      ? style?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                          fontWeight: FontWeight.bold,
-                        )
-                      : style,
-                ),
-                expands: true,
-                minLines: null,
-                readOnly: !selectedFileEditable,
-                onChanged: (_) => onChanged(),
               ),
             ),
           ),
+        ),
+        AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) {
+            final code = controller.text;
+            final caret = controller.selection.baseOffset.clamp(0, code.length);
+            final beforeCaret = code.substring(0, caret);
+            final line = '\n'.allMatches(beforeCaret).length + 1;
+            final column = caret - beforeCaret.lastIndexOf('\n');
+            final lineText = code.split('\n')[line - 1];
+            return Container(
+              key: const Key('editor-position-status'),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              color: palette.background,
+              child: Text(
+                'Ln $line, Col $column  ·  Indent level ${editorIndentLevel(lineText)}',
+                style: TextStyle(color: palette.lineNumber, fontSize: 12),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -2377,6 +2557,50 @@ class _EmptyResultsState extends StatelessWidget {
   }
 }
 
+class EmptyCodeTestRunState extends StatelessWidget {
+  const EmptyCodeTestRunState({super.key, required this.onRestore});
+
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      key: const Key('empty-code-test-run-state'),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.code_off_rounded,
+                size: 40, color: theme.colorScheme.primary),
+            const SizedBox(height: AppSpacing.sm),
+            Text('The code editor is empty',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Enter code or restore the starter code before running tests. '
+              'No attempt was submitted. Tutor questions become available after a test run.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FilledButton.tonalIcon(
+              key: const Key('restore-starter-from-results'),
+              onPressed: onRestore,
+              icon: const Icon(Icons.restart_alt_rounded),
+              label: const Text('Restore starter code'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class TestRunErrorState extends StatelessWidget {
   const TestRunErrorState({super.key, required this.onRetry});
 
@@ -2499,7 +2723,15 @@ class Feedback extends StatelessWidget {
     final showHint = data.hint.isNotEmpty &&
         (aiTutorEnabled || data.tutorSource != 'openai');
 
-    final resultCards = data.unittestFeedback.asMap().entries.map((entry) {
+    final orderedChecks = data.unittestFeedback.asMap().entries.toList()
+      ..sort((a, b) {
+        final aPassed = a.key < data.unittestPassResults.length &&
+            data.unittestPassResults[a.key];
+        final bPassed = b.key < data.unittestPassResults.length &&
+            data.unittestPassResults[b.key];
+        return (aPassed ? 1 : 0).compareTo(bPassed ? 1 : 0);
+      });
+    final resultCards = orderedChecks.map((entry) {
       final feedback = entry.value;
       final didPass = entry.key < data.unittestPassResults.length &&
           data.unittestPassResults[entry.key];
@@ -2518,6 +2750,7 @@ class Feedback extends StatelessWidget {
       }
 
       return _TestResultCard(
+        checkNumber: entry.key + 1,
         passed: didPass,
         first: first,
         highlighted: highlighted,
@@ -2537,7 +2770,11 @@ class Feedback extends StatelessWidget {
             score: score,
             passRate: passRate,
           ),
-          const SizedBox(height: AppSpacing.md),
+          if (failed > 0 || !data.execSuccess) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _ResultNextStep(executionFailed: !data.execSuccess),
+          ],
+          const SizedBox(height: AppSpacing.sm),
           _TerminalOutput(data: data),
           if (showHint || tutorAvailable) ...[
             const SizedBox(height: AppSpacing.md),
@@ -2550,7 +2787,7 @@ class Feedback extends StatelessWidget {
           ],
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Test details',
+            failed > 0 ? 'Test details · failed first' : 'Test details',
             style: Theme.of(
               context,
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -2567,6 +2804,42 @@ class Feedback extends StatelessWidget {
             ...resultCards.expand(
               (card) => [card, const SizedBox(height: AppSpacing.sm)],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultNextStep extends StatelessWidget {
+  const _ResultNextStep({required this.executionFailed});
+
+  final bool executionFailed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const Key('result-next-step'),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.lightbulb_outline_rounded,
+              size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              executionFailed
+                  ? 'Next step: resolve the execution error below, then run the tests again.'
+                  : 'Next step: review the first failed check and compare that part of your code with the task instructions.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
         ],
       ),
     );
@@ -2852,7 +3125,7 @@ class _ResultSummary extends StatelessWidget {
       label: 'Test score $score percent. $passed passed and $failed failed.',
       child: Container(
         key: const Key('result-summary'),
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
           color: statusBackground,
           borderRadius: BorderRadius.circular(AppRadii.md),
@@ -2889,7 +3162,7 @@ class _ResultSummary extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             LinearProgressIndicator(
               value: score / 100,
               color: statusColor,
@@ -3422,12 +3695,14 @@ class _TutorAnswerCard extends StatelessWidget {
 
 class _TestResultCard extends StatelessWidget {
   const _TestResultCard({
+    required this.checkNumber,
     required this.passed,
     required this.first,
     required this.highlighted,
     required this.last,
   });
 
+  final int checkNumber;
   final bool passed;
   final String first;
   final String highlighted;
@@ -3477,6 +3752,7 @@ class _TestResultCard extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
+                  Text('Check $checkNumber', style: theme.textTheme.labelSmall),
                   const SizedBox(height: AppSpacing.xs),
                   RichText(
                     softWrap: true,

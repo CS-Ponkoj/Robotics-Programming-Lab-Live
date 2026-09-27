@@ -836,6 +836,67 @@ void main() {
     expect(revealButton.onPressed, isNull);
   });
 
+  test('editor reports indentation depth without changing code', () {
+    expect(app.editorIndentLevel('def move():'), 0);
+    expect(app.editorIndentLevel('    if clear:'), 1);
+    expect(app.editorIndentLevel('        return True'), 2);
+    expect(app.editorIndentLevel('\treturn True'), 1);
+  });
+
+  testWidgets('assignment task steps are scannable without duplicate list', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: app.AssignmentInstructions(
+            html: '<p><strong>Task</strong></p><p>Complete the route.</p>'
+                '<ol><li>Find the hit point.</li><li>Calculate the distance.</li></ol>',
+          ),
+        ),
+      ),
+    ));
+
+    expect(find.text('What to complete'), findsOneWidget);
+    expect(find.textContaining('Find the hit point.', findRichText: true),
+        findsOneWidget);
+    expect(find.textContaining('Calculate the distance.', findRichText: true),
+        findsOneWidget);
+    expect(find.textContaining('Complete the route.', findRichText: true),
+        findsOneWidget);
+    expect(
+      tester
+          .getTopLeft(
+              find.textContaining('Complete the route.', findRichText: true))
+          .dy,
+      lessThan(tester.getTopLeft(find.text('What to complete')).dy),
+    );
+  });
+
+  testWidgets('instruction diagram opens an enlarged view', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: app.AssignmentInstructions(
+            html: '<p><img src="/images/1" alt="Robot path"></p>',
+          ),
+        ),
+      ),
+    ));
+    final html = tester.widget<HtmlWidget>(find.byType(HtmlWidget).first);
+    html.onTapImage!(ImageMetadata(
+      alt: 'Robot path',
+      sources: const [ImageSource('/images/1')],
+    ));
+    await tester.pump();
+
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    expect(find.text('Robot path'), findsOneWidget);
+    expect(find.byTooltip('Close enlarged diagram'), findsOneWidget);
+  });
+
   test('assignment DTO parses its maintained worked solution', () {
     final assignment = AssignmentDto.fromJson({
       'id': 1,
@@ -1336,6 +1397,31 @@ void main() {
     expect(find.byIcon(Icons.close_rounded), findsNWidgets(2));
   });
 
+  testWidgets('results put failed checks first and give a next step', (
+    WidgetTester tester,
+  ) async {
+    const feedback = UnittestFeedbackDto(
+      id: 1,
+      testedVals: [],
+      pass: false,
+      unittestFeedback: ['first passes', 'second fails'],
+      unittestPassResults: [true, false],
+      codeExecResult: '',
+      codeOutput: '',
+      execSuccess: true,
+      hint: '',
+    );
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(body: app.Feedback(data: feedback)),
+    ));
+
+    expect(find.byKey(const Key('result-next-step')), findsOneWidget);
+    expect(find.text('Test details · failed first'), findsOneWidget);
+    final failedPosition = tester.getTopLeft(find.text('Check 2')).dy;
+    final passedPosition = tester.getTopLeft(find.text('Check 1')).dy;
+    expect(failedPosition, lessThan(passedPosition));
+  });
+
   testWidgets('guided feedback presents terminal output and hint separately', (
     WidgetTester tester,
   ) async {
@@ -1393,7 +1479,7 @@ void main() {
       const MaterialApp(home: Scaffold(body: app.Feedback(data: feedback))),
     );
 
-    expect(find.text('Test details'), findsOneWidget);
+    expect(find.text('Test details · failed first'), findsOneWidget);
     expect(find.text('Needs attention'), findsOneWidget);
     expect(find.byKey(const Key('guided-hint')), findsNothing);
     expect(find.byKey(const Key('tutor-question-field')), findsNothing);
@@ -1652,6 +1738,31 @@ void main() {
 
     await tester.tap(find.byKey(const Key('retry-test-run-button')));
     expect(retryCount, 1);
+  });
+
+  test('empty or whitespace-only code is not a test submission', () {
+    expect(app.hasNonWhitespaceCode(''), isFalse);
+    expect(app.hasNonWhitespaceCode('  \n\t  '), isFalse);
+    expect(app.hasNonWhitespaceCode('pass'), isTrue);
+  });
+
+  testWidgets('empty editor shows a recovery action, not a score', (
+    WidgetTester tester,
+  ) async {
+    var restoreRequested = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: app.EmptyCodeTestRunState(
+          onRestore: () => restoreRequested = true,
+        ),
+      ),
+    ));
+
+    expect(find.text('The code editor is empty'), findsOneWidget);
+    expect(find.textContaining('No attempt was submitted'), findsOneWidget);
+    expect(find.textContaining('0%'), findsNothing);
+    await tester.tap(find.byKey(const Key('restore-starter-from-results')));
+    expect(restoreRequested, isTrue);
   });
 
   testWidgets('secure grader loading state explains free-tier startup delay', (
