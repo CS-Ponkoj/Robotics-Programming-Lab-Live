@@ -78,6 +78,7 @@ def test_alembic_upgrades_an_existing_v4_baseline(tmp_path, monkeypatch):
     }
     assert "study_sessions" not in baseline_tables
     assert "learning_events" not in baseline_tables
+    assert "course_quiz_attempts" not in baseline_tables
     assert "study_session_id" not in baseline_columns
     baseline_engine.dispose()
 

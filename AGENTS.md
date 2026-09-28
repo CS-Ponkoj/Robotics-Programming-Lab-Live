@@ -54,6 +54,9 @@ functionality and must never depend on OpenAI.
   browser session from every other session.
 - Derive student identity from the authenticated server session. Never trust a
   client-supplied student ID for ownership or authorization.
+- Grade complete course quizzes on the server. Store student scores with the
+  exact quiz version, separately from coding-assignment scores. Demo and
+  instructor previews must not create persistent quiz-attempt records.
 - Keep student and instructor capabilities separated and tested.
 - Preserve local development and production deployment from the same source
   code. Environment values may differ; application logic must not be forked.

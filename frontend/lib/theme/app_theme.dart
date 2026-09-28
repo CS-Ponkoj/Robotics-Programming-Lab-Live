@@ -8,6 +8,9 @@ abstract final class AppColors {
   static const successContainer = Color(0xFFE7F6ED);
   static const performanceLow = Color(0xFFC62828);
   static const performanceMid = Color(0xFF9A5A00);
+  static const warningContainer = Color(0xFFFFF3DA);
+  static const resultsSurface = Color(0xFFE9F2F6);
+  static const resultsHeader = Color(0xFFD5E8F0);
 }
 
 Color performanceColor(num percentage) {
@@ -48,7 +51,10 @@ ThemeData buildAppTheme() {
     primary: AppColors.brand,
     onPrimary: Colors.white,
     surface: Colors.white,
+    onSurface: const Color(0xFF1D2935),
     onSurfaceVariant: const Color(0xFF425466),
+    error: AppColors.performanceLow,
+    onError: Colors.white,
   );
 
   final theme = ThemeData(
@@ -83,11 +89,49 @@ ThemeData buildAppTheme() {
       color: AppColors.brand,
       linearMinHeight: 8,
     ),
+    inputDecorationTheme: InputDecorationTheme(
+      // Keep the code editor's own light/dark background intact.
+      filled: false,
+      contentPadding: const EdgeInsets.all(16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        borderSide: const BorderSide(color: AppColors.brand, width: 2),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 44),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+        ),
+      ),
+    ),
+    tooltipTheme: const TooltipThemeData(
+      waitDuration: Duration(milliseconds: 350),
+      textStyle: TextStyle(color: Colors.white, fontSize: 13),
+      decoration: BoxDecoration(
+        color: AppColors.brandDark,
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
+    ),
+    dataTableTheme: DataTableThemeData(
+      headingRowColor: WidgetStatePropertyAll(colorScheme.surfaceContainerLow),
+      headingTextStyle:
+          TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700),
+      horizontalMargin: 16,
+      columnSpacing: 24,
+    ),
   );
 
   return theme.copyWith(
     textTheme: theme.textTheme.copyWith(
-      bodySmall: theme.textTheme.bodySmall?.copyWith(fontSize: 14),
+      bodyLarge: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
+      bodyMedium: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+      bodySmall:
+          theme.textTheme.bodySmall?.copyWith(fontSize: 14, height: 1.45),
       labelSmall: theme.textTheme.labelSmall?.copyWith(fontSize: 13),
     ),
   );

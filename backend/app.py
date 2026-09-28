@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 from pydantic import BaseModel
 
@@ -1643,8 +1643,51 @@ def create_app(
         }
 
     @application.get("/contents")
-    def list_contents(_user: User = Depends(current_user)):
-        return {"topics": COURSE_CONTENT.topics()}
+    def list_contents(
+        request: Request,
+        user: User = Depends(current_user),
+        session: Session = Depends(session_dependency),
+    ):
+        summaries = {}
+        demo = demo_session_record(request)
+        if demo is not None:
+            with request.app.state.demo_session_lock:
+                summaries = dict(demo[1].get("quiz_progress", {}))
+        elif user.role == "student":
+            rows = session.execute(
+                select(
+                    CourseQuizAttempt.topic_id,
+                    CourseQuizAttempt.quiz_version,
+                    func.count(CourseQuizAttempt.id),
+                    func.max(CourseQuizAttempt.score_percent),
+                ).where(CourseQuizAttempt.user_id == user.id)
+                .group_by(CourseQuizAttempt.topic_id, CourseQuizAttempt.quiz_version)
+            ).all()
+            for topic_id, version, count, best in rows:
+                latest = session.scalar(
+                    select(CourseQuizAttempt.score_percent)
+                    .where(CourseQuizAttempt.user_id == user.id,
+                           CourseQuizAttempt.topic_id == topic_id,
+                           CourseQuizAttempt.quiz_version == version)
+                    .order_by(CourseQuizAttempt.submitted_at.desc(), CourseQuizAttempt.id.desc())
+                    .limit(1)
+                )
+                summaries[(topic_id, version)] = {
+                    "attempt_count": count, "best_score": best, "latest_score": latest,
+                }
+        topics = []
+        for topic in COURSE_CONTENT.topics():
+            quiz = COURSE_CONTENT.section(topic["id"], "quiz")
+            version = quiz["version"] if quiz else None
+            progress = summaries.get((topic["id"], version), {})
+            topics.append({**topic, "quiz_progress": {
+                "quiz_version": version,
+                "attempt_count": progress.get("attempt_count", 0),
+                "best_score": progress.get("best_score"),
+                "latest_score": progress.get("latest_score"),
+                "temporary": demo is not None,
+            }})
+        return {"topics": topics}
 
     @application.get("/contents/{topic_id}")
     def get_content(topic_id: str, _user: User = Depends(current_user)):
@@ -1678,7 +1721,19 @@ def create_app(
             raise HTTPException(400, str(error)) from error
         if result is None:
             raise HTTPException(404, "Quiz not found.")
-        if user.role == "instructor" or is_ephemeral_demo(request, user):
+        demo = demo_session_record(request)
+        if demo is not None:
+            with request.app.state.demo_session_lock:
+                progress = demo[1].setdefault("quiz_progress", {})
+                key = (topic_id, result["quiz_version"])
+                previous = progress.get(key, {})
+                progress[key] = {
+                    "attempt_count": previous.get("attempt_count", 0) + 1,
+                    "latest_score": result["score_percent"],
+                    "best_score": max(previous.get("best_score", 0), result["score_percent"]),
+                }
+            return {**result, "saved": False}
+        if user.role == "instructor":
             return {**result, "saved": False}
         attempt = CourseQuizAttempt(user_id=user.id, **result)
         session.add(attempt)

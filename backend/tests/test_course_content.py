@@ -31,8 +31,60 @@ def login(client, login_id="student", password="student"):
     client.headers.update({"Authorization": f"Bearer {response.json()['token']}"})
 
 
+def test_catalog_quiz_progress_is_self_only_and_versioned(client):
+    login(client)
+    quiz = client.get('/contents/path-planning/sections/quiz').json()
+    with client.app.state.SessionLocal() as session:
+        from models import User
+        student = session.scalar(select(User).where(User.login_id == 'student'))
+        other = create_user(session, login_id='quiz-other', password='other-password', role='student')
+        for owner, version, score in [
+            (student.id, quiz['version'], 100),
+            (student.id, quiz['version'], 40),
+            (student.id, 'old-version', 90),
+            (other.id, quiz['version'], 70),
+        ]:
+            session.add(CourseQuizAttempt(
+                user_id=owner, topic_id='path-planning', quiz_version=version,
+                correct_count=score // 10, total_questions=10, score_percent=score,
+            ))
+        session.commit()
+    topics = client.get('/contents').json()['topics']
+    progress = next(t for t in topics if t['id'] == 'path-planning')['quiz_progress']
+    assert progress == {'quiz_version': quiz['version'], 'attempt_count': 2,
+                        'best_score': 100, 'latest_score': 40, 'temporary': False}
+    assert next(t for t in topics if t['id'] == 'locomotion')['quiz_progress']['latest_score'] is None
+    login(client, 'quiz-other', 'other-password')
+    progress = next(t for t in client.get('/contents').json()['topics'] if t['id'] == 'path-planning')['quiz_progress']
+    assert progress['attempt_count'] == 1
+    assert progress['best_score'] == 70
+
+
+def test_demo_catalog_progress_is_temporary_and_session_isolated(client):
+    token = client.post('/auth/demo').json()['token']
+    client.headers.update({'Authorization': f'Bearer {token}'})
+    quiz = client.get('/contents/path-planning/sections/quiz').json()
+    answers = CourseContentRepository()._read(CourseContentRepository().root / 'quiz_answers.json')['path-planning/quiz']
+    assert client.post('/contents/path-planning/quiz/submit', json={
+        'quiz_version': quiz['version'], 'choices': answers,
+    }).json()['saved'] is False
+    progress = next(t for t in client.get('/contents').json()['topics'] if t['id'] == 'path-planning')['quiz_progress']
+    assert progress['latest_score'] == 100
+    assert progress['temporary'] is True
+    with client.app.state.SessionLocal() as session:
+        assert session.scalar(select(CourseQuizAttempt)) is None
+    token = client.post('/auth/demo').json()['token']
+    client.headers.update({'Authorization': f'Bearer {token}'})
+    progress = next(t for t in client.get('/contents').json()['topics'] if t['id'] == 'path-planning')['quiz_progress']
+    assert progress['attempt_count'] == 0
+
+
 def test_course_content_requires_login_and_has_all_six_topics(client):
     assert client.get("/contents").status_code == 401
+    assert client.get("/contents/path-planning/quiz/attempts").status_code == 401
+    assert client.post("/contents/path-planning/quiz/submit", json={
+        "quiz_version": "old", "choices": {},
+    }).status_code == 401
     login(client)
     topics = client.get("/contents").json()["topics"]
     assert len(topics) == 6
@@ -64,6 +116,7 @@ def test_every_topic_has_lesson_and_student_safe_sections(client):
                 assert len(data["version"]) == 16
                 assert all("answer" not in question for question in data["questions"])
             if data["kind"] in {"exercise", "math"}:
+                assert "<pre><code>" not in data["html"]
                 for line in data["html"].splitlines():
                     visible_line = re.sub(r"<[^>]+>", "", line).strip()
                     assert visible_line.lower().rstrip(": ") not in {
@@ -119,6 +172,19 @@ def test_every_quiz_has_exactly_one_correct_choice_and_demo_is_not_saved(client)
             "quiz_version": quiz["version"], "choices": answers,
         })
         assert result.status_code == 200 and result.json()["score_percent"] == 100
+        wrong = {
+            q["id"]: next(o["id"] for o in q["options"] if o["id"] != answers[q["id"]])
+            for q in quiz["questions"]
+        }
+        half = dict(wrong)
+        for question_id in list(answers)[:5]:
+            half[question_id] = answers[question_id]
+        for choices, score in ((wrong, 0), (half, 50)):
+            response = client.post(f"/contents/{topic_id}/quiz/submit", json={
+                "quiz_version": quiz["version"], "choices": choices,
+            })
+            assert response.status_code == 200
+            assert response.json()["score_percent"] == score
     client.headers.clear()
     demo = client.post("/auth/demo")
     assert demo.status_code == 200
@@ -131,7 +197,7 @@ def test_every_quiz_has_exactly_one_correct_choice_and_demo_is_not_saved(client)
     assert response.status_code == 200 and response.json()["saved"] is False
     assert client.get("/contents/path-planning/quiz/attempts").json() == {"attempts": []}
     with client.app.state.SessionLocal() as session:
-        assert len(session.scalars(select(CourseQuizAttempt)).all()) == 6
+        assert len(session.scalars(select(CourseQuizAttempt)).all()) == 18
 
 
 def test_quiz_history_is_student_private_and_scores_survive_restart(tmp_path):
@@ -156,6 +222,13 @@ def test_quiz_history_is_student_private_and_scores_survive_restart(tmp_path):
             "quiz_version": quiz["version"], "choices": wrong,
         })
         assert zero.status_code == 200 and zero.json()["score_percent"] == 0
+        mixed = dict(wrong)
+        for question_id in list(answers)[:5]:
+            mixed[question_id] = answers[question_id]
+        half = first.post("/contents/path-planning/quiz/submit", json={
+            "quiz_version": quiz["version"], "choices": mixed,
+        })
+        assert half.status_code == 200 and half.json()["score_percent"] == 50
         with first.app.state.SessionLocal() as session:
             create_user(session, login_id="second", password="second123", role="student")
         login(first, "second", "second123")
@@ -163,8 +236,9 @@ def test_quiz_history_is_student_private_and_scores_survive_restart(tmp_path):
     with TestClient(create_app(settings=settings, database_url=database_url)) as restarted:
         login(restarted)
         history = restarted.get("/contents/path-planning/quiz/attempts").json()
-        assert len(history["attempts"]) == 1
-        assert history["attempts"][0]["score_percent"] == 0
+        assert len(history["attempts"]) == 2
+        assert history["attempts"][0]["score_percent"] == 50
+        assert history["attempts"][1]["score_percent"] == 0
 
 
 def test_content_asset_is_bounded_and_reachable(client):

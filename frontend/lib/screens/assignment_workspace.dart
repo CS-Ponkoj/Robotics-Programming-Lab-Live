@@ -779,13 +779,13 @@ class _MyHomePageState extends State<MyHomePage> {
               width: MediaQuery.sizeOf(context).width >= 600
                   ? 520
                   : MediaQuery.sizeOf(context).width * 0.94,
-              backgroundColor: const Color(0xFFE9F2F6),
+              backgroundColor: AppColors.resultsSurface,
               child: SafeArea(
                 child: Column(
                   key: const Key('assignment-results-panel'),
                   children: [
                     Container(
-                      color: const Color(0xFFD5E8F0),
+                      color: AppColors.resultsHeader,
                       padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
                       child: Row(
                         children: [
@@ -829,23 +829,24 @@ class _MyHomePageState extends State<MyHomePage> {
                           ? EmptyCodeTestRunState(onRestore: _resetStarterCode)
                           : _submitted
                               ? FutureBuilder<UnittestFeedbackDto>(
-                              future: _feedback,
-                              builder: (ctx, snap) {
-                                if (snap.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const SecureGraderLoadingState();
-                                }
-                                if (snap.hasError) {
-                                  return TestRunErrorState(onRetry: _runTests);
-                                }
-                                if (snap.hasData) {
-                                  return Feedback(
-                                    data: snap.data!,
-                                    aiTutorEnabled: _enableFeedback,
-                                  );
-                                }
-                                return const SizedBox.shrink();
-                              },
+                                  future: _feedback,
+                                  builder: (ctx, snap) {
+                                    if (snap.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const SecureGraderLoadingState();
+                                    }
+                                    if (snap.hasError) {
+                                      return TestRunErrorState(
+                                          onRetry: _runTests);
+                                    }
+                                    if (snap.hasData) {
+                                      return Feedback(
+                                        data: snap.data!,
+                                        aiTutorEnabled: _enableFeedback,
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
                                 )
                               : const _EmptyResultsState(),
                     ),
@@ -1373,8 +1374,7 @@ class _InstructionSectionCard extends StatelessWidget {
                 introHtml,
                 baseUrl: apiBaseUri,
                 textStyle: theme.textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'roboto-serif',
-                  height: 1.55,
+                  height: 1.65,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -1420,8 +1420,7 @@ class _InstructionSectionCard extends StatelessWidget {
                   }
                 },
                 textStyle: theme.textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'roboto-serif',
-                  height: 1.55,
+                  height: 1.65,
                 ),
               ),
             if (html.contains('<img'))

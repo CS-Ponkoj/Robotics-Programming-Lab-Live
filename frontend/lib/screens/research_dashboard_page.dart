@@ -507,7 +507,9 @@ class _MetricGrid extends StatelessWidget {
             ? 4
             : constraints.maxWidth >= 560
                 ? 3
-                : 2;
+                : constraints.maxWidth >= 360
+                    ? 2
+                    : 1;
         final width =
             (constraints.maxWidth - (columns - 1) * AppSpacing.sm) / columns;
         return Wrap(
@@ -875,7 +877,9 @@ class _MetricCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
+          color: Theme.of(context).colorScheme.surface,
+          border:
+              Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(AppRadii.md),
         ),
         child: Column(
@@ -890,7 +894,7 @@ class _MetricCard extends StatelessWidget {
                   .headlineSmall
                   ?.copyWith(fontWeight: FontWeight.w900),
             ),
-            Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(label, style: Theme.of(context).textTheme.bodyMedium),
           ],
         ),
       ),
@@ -1048,7 +1052,7 @@ IconData _statusIcon(String status) => switch (status) {
 Color _statusColor(String status) => status == 'completed'
     ? AppColors.success
     : status == 'partial'
-        ? Colors.orange.shade700
+        ? AppColors.performanceMid
         : AppColors.brand;
 
 String _modeLabel(Object? value) => value == 'submit' ? 'Submit' : 'Run';

@@ -7,6 +7,13 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:iuse_demo/screens/course_content_page.dart';
 import 'package:iuse_demo/services/course_content_api.dart';
+import 'package:iuse_demo/models/authenticated_user.dart';
+import 'package:iuse_demo/screens/assignment_list.dart';
+import 'package:iuse_demo/theme/app_theme.dart';
+
+const _student =
+    AuthenticatedUser(id: 'test-student', loginId: 'student', role: 'student');
+Future<void> _logout() async {}
 
 void main() {
   late MockClient client;
@@ -30,6 +37,17 @@ void main() {
                     'id': name.toLowerCase().replaceAll(' ', '-'),
                     'title': name,
                     'summary': 'Learn $name',
+                    'quiz_progress': name == 'Obstacle Avoidance'
+                        ? {
+                            'attempt_count': 2,
+                            'latest_score': 40,
+                            'best_score': 100
+                          }
+                        : {
+                            'attempt_count': 0,
+                            'latest_score': null,
+                            'best_score': null
+                          },
                   },
               ],
             }),
@@ -119,20 +137,112 @@ void main() {
     client.close();
   });
 
+  for (final width in [390.0, 768.0, 1440.0]) {
+    testWidgets('catalog remains readable at width $width with enlarged text',
+        (tester) async {
+      tester.view.physicalSize = Size(width, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.5)),
+          child: child!,
+        ),
+        home: CourseCatalogPage(user: _student, onLogout: _logout),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Attempted: 0'), findsNWidgets(5));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('contents shares branding and account controls and returns home',
+      (tester) async {
+    var logoutCount = 0;
+    await tester.pumpWidget(MaterialApp(home: Builder(builder: (context) {
+      return Scaffold(
+          body: TextButton(
+        onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => CourseCatalogPage(
+              user: _student,
+              onLogout: () async {
+                logoutCount++;
+              }),
+        )),
+        child: const Text('Open catalog'),
+      ));
+    })));
+    await tester.tap(find.text('Open catalog'));
+    await tester.pumpAndSettle();
+    expect(find.text('Robotics Programming Lab'), findsOneWidget);
+    expect(find.byIcon(Icons.memory_rounded), findsOneWidget);
+    expect(find.text('student'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('course-home-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Open catalog'), findsOneWidget);
+    await tester.tap(find.text('Open catalog'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Account menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('My study progress'), findsOneWidget);
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+    expect(logoutCount, 1);
+    expect(find.text('Open catalog'), findsOneWidget);
+  });
+
+  testWidgets('assignments and contents toggle below the same fixed header',
+      (tester) async {
+    final assignmentsClient =
+        MockClient((_) async => http.Response('{"assignments":[]}', 200));
+    addTearDown(assignmentsClient.close);
+    await http.runWithClient(() async {
+      await tester.pumpWidget(MaterialApp(
+          home: AssignmentListPage(user: _student, onLogout: _logout)));
+      await tester.pumpAndSettle();
+      final header = tester.element(find.byType(LandingPageHeader));
+      await tester.tap(find.byKey(const Key('open-course-contents')));
+      await tester.pumpAndSettle();
+      expect(tester.element(find.byType(LandingPageHeader)), same(header));
+      expect(find.byType(LandingPageHeader), findsOneWidget);
+      expect(find.text('student'), findsOneWidget);
+      expect(find.text('Learn the ideas, then practice them'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('open-assignments')));
+      await tester.pumpAndSettle();
+      expect(tester.element(find.byType(LandingPageHeader)), same(header));
+      expect(find.text('Learn the ideas, then practice them'), findsNothing);
+      await tester.tap(find.byKey(const Key('open-course-contents')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('course-home-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('Learn the ideas, then practice them'), findsNothing);
+      expect(tester.takeException(), isNull);
+    }, () => assignmentsClient);
+  });
+
   testWidgets('all six topics appear at mobile width and open a lesson',
       (tester) async {
     tester.view.physicalSize = const Size(390, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(const MaterialApp(home: CourseCatalogPage()));
+    await tester.pumpWidget(MaterialApp(
+        home: CourseCatalogPage(user: _student, onLogout: _logout)));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('content-topic-obstacle-avoidance')),
         findsOneWidget);
     expect(find.byKey(const Key('content-topic-hybrid-navigation-and-gps')),
         findsOneWidget);
-    await tester.tap(find.byKey(const Key('content-topic-obstacle-avoidance')));
+    await tester.ensureVisible(find.text('Open content →').first);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Open content →').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Robotics Programming Lab'), findsOneWidget);
+    expect(find.byKey(const Key('account-name-label')), findsOneWidget);
+    expect(find.byKey(const Key('course-home-button')), findsOneWidget);
     expect(
         tester
             .widget<HtmlWidget>(find.byKey(const Key('course-section-html')))
@@ -143,10 +253,59 @@ void main() {
   });
 
   testWidgets(
+      'catalog shows latest and best quiz score without treating zero as missing',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+        home: CourseCatalogPage(user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    expect(find.text('Last score: 40%'), findsOneWidget);
+    expect(find.text('Best score: 100%'), findsOneWidget);
+    expect(find.text('Attempted: 2'), findsOneWidget);
+    expect(find.text('Attempted: 0'), findsNWidgets(5));
+    expect(find.text('Best score: —'), findsNWidgets(5));
+    expect(find.text('Last score: —'), findsNWidgets(5));
+    expect(
+        tester
+            .widget<LinearProgressIndicator>(
+                find.byKey(const Key('quiz-progress-obstacle-avoidance')))
+            .value,
+        0.4);
+    expect(find.text('Quiz: Not attempted'), findsWidgets);
+    client = MockClient((_) async => http.Response(
+        jsonEncode({
+          'topics': [
+            {
+              'id': 'zero',
+              'title': 'Zero score',
+              'summary': 'Lesson',
+              'quiz_progress': {
+                'attempt_count': 1,
+                'latest_score': 0,
+                'best_score': 0,
+                'temporary': true
+              }
+            }
+          ]
+        }),
+        200));
+    CourseContentApi.testClient = client;
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpWidget(MaterialApp(
+        home: CourseCatalogPage(user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    expect(find.text('Last score: 0%'), findsOneWidget);
+    expect(find.text('Best score: 0%'), findsOneWidget);
+    expect(find.text('Attempted: 1'), findsOneWidget);
+    expect(find.text('Temporary demo progress'), findsOneWidget);
+    expect(find.text('Quiz: Not attempted'), findsNothing);
+  });
+
+  testWidgets(
       'exercises remain readable and quiz score appears only after submission',
       (tester) async {
-    await tester.pumpWidget(const MaterialApp(
-        home: CourseTopicPage(topicId: 'obstacle-avoidance')));
+    await tester.pumpWidget(MaterialApp(
+        home: CourseTopicPage(
+            topicId: 'obstacle-avoidance', user: _student, onLogout: _logout)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Exercises'));
     await tester.pumpAndSettle();

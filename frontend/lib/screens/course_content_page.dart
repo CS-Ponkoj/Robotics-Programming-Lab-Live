@@ -2,10 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/services/course_content_api.dart';
+import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/models/authenticated_user.dart';
+import 'package:iuse_demo/widgets/landing_page_header.dart';
 
 /// Course reading and quizzes are separate from graded coding assignments.
 class CourseCatalogPage extends StatefulWidget {
-  const CourseCatalogPage({super.key});
+  const CourseCatalogPage(
+      {super.key,
+      required this.user,
+      required this.onLogout,
+      this.embedded = false});
+  final bool embedded;
+  final AuthenticatedUser user;
+  final Future<void> Function() onLogout;
 
   @override
   State<CourseCatalogPage> createState() => _CourseCatalogPageState();
@@ -19,100 +29,193 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Course contents')),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _topics,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _LoadError(onRetry: _retry);
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final topics = snapshot.data!;
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1160),
-              child: ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  Text('Learn the ideas, then practice them',
-                      style: theme.textTheme.headlineMedium),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Six robotics topics with lessons, exercises, and submitted quizzes. '
-                    'Quiz scores are saved separately from coding assignment scores.',
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 24),
-                  LayoutBuilder(builder: (context, constraints) {
-                    final columns = constraints.maxWidth >= 850
-                        ? 3
-                        : constraints.maxWidth >= 520
-                            ? 2
-                            : 1;
-                    final width =
-                        (constraints.maxWidth - (columns - 1) * 16) / columns;
-                    return Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      children: [
-                        for (var i = 0; i < topics.length; i++)
-                          SizedBox(
-                            width: width,
-                            child: Card(
-                              clipBehavior: Clip.antiAlias,
-                              child: InkWell(
-                                key: Key('content-topic-${topics[i]['id']}'),
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => CourseTopicPage(
-                                      topicId: topics[i]['id'] as String,
+    final body = FutureBuilder<List<Map<String, dynamic>>>(
+      future: _topics,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _LoadError(onRetry: _retry);
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final topics = snapshot.data!;
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1160),
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                Text('Learn the ideas, then practice them',
+                    style: theme.textTheme.headlineMedium),
+                const SizedBox(height: 8),
+                Text(
+                  'Six robotics topics with lessons, exercises, and submitted quizzes. '
+                  'Quiz scores are saved separately from coding assignment scores.',
+                  style: theme.textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 24),
+                LayoutBuilder(builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 850
+                      ? 3
+                      : constraints.maxWidth >= 520
+                          ? 2
+                          : 1;
+                  final width =
+                      (constraints.maxWidth - (columns - 1) * 16) / columns;
+                  return Column(children: [
+                    for (var row = 0; row < topics.length; row += columns)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: IntrinsicHeight(
+                            child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (var i = row;
+                                i < row + columns && i < topics.length;
+                                i++) ...[
+                              if (i > row) const SizedBox(width: 16),
+                              SizedBox(
+                                width: width,
+                                child: Card(
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    key:
+                                        Key('content-topic-${topics[i]['id']}'),
+                                    onTap: () async {
+                                      await Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => CourseTopicPage(
+                                            topicId: topics[i]['id'] as String,
+                                            user: widget.user,
+                                            onLogout: widget.onLogout,
+                                          ),
+                                        ),
+                                      );
+                                      if (mounted) _retry();
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(20),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          CircleAvatar(
+                                            child: Text(
+                                                '${i + 1}'.padLeft(2, '0')),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(topics[i]['title'] as String,
+                                              style:
+                                                  theme.textTheme.titleLarge),
+                                          const SizedBox(height: 8),
+                                          Text(topics[i]['summary'] as String),
+                                          const Spacer(),
+                                          const SizedBox(height: 16),
+                                          _QuizProgress(topic: topics[i]),
+                                          const SizedBox(height: 16),
+                                          Text('Open content →',
+                                              style: TextStyle(
+                                                  color:
+                                                      theme.colorScheme.primary,
+                                                  fontWeight: FontWeight.w700)),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      CircleAvatar(
-                                        child: Text('${i + 1}'.padLeft(2, '0')),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(topics[i]['title'] as String,
-                                          style: theme.textTheme.titleLarge),
-                                      const SizedBox(height: 8),
-                                      Text(topics[i]['summary'] as String),
-                                      const SizedBox(height: 16),
-                                      Text('Open content →',
-                                          style: TextStyle(
-                                              color: theme.colorScheme.primary,
-                                              fontWeight: FontWeight.w700)),
-                                    ],
-                                  ),
-                                ),
                               ),
-                            ),
-                          ),
-                      ],
-                    );
-                  }),
-                ],
-              ),
+                            ],
+                          ],
+                        )),
+                      ),
+                  ]);
+                }),
+              ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
+    );
+    if (widget.embedded) return body;
+    return Scaffold(
+      appBar: LandingPageHeader(
+          user: widget.user,
+          onLogout: widget.onLogout,
+          onHome: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst)),
+      body: body,
+    );
+  }
+}
+
+class _QuizProgress extends StatelessWidget {
+  const _QuizProgress({required this.topic});
+  final Map<String, dynamic> topic;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = topic['quiz_progress'] as Map? ?? {};
+    final count = progress['attempt_count'] as int? ?? 0;
+    final latest = progress['latest_score'] as num?;
+    final best = progress['best_score'] as num?;
+    final color = latest == null
+        ? Theme.of(context).colorScheme.outline
+        : performanceColor(latest);
+    final neutral = Theme.of(context).colorScheme.onSurfaceVariant;
+    Widget badge(String label, Color badgeColor, {IconData? icon}) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: badgeColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: badgeColor),
+              const SizedBox(width: 7),
+            ],
+            Flexible(
+                child: Text(label,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: badgeColor, fontWeight: FontWeight.w700))),
+          ]),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(count == 0 ? 'Quiz: Not attempted' : 'Quiz submitted',
+            style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(
+          key: Key('quiz-progress-${topic['id']}'),
+          value: (latest ?? 0).clamp(0, 100) / 100,
+          color: color,
+          semanticsLabel: 'Latest quiz score for ${topic['title']}',
+          semanticsValue: latest == null ? 'Not attempted' : '$latest%',
+        ),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          badge('Attempted: $count', neutral, icon: Icons.science_outlined),
+          badge('Best score: ${best == null ? '—' : '$best%'}',
+              best == null ? neutral : performanceColor(best)),
+          badge('Last score: ${latest == null ? '—' : '$latest%'}',
+              latest == null ? neutral : color),
+        ]),
+        if (progress['temporary'] == true)
+          const Text('Temporary demo progress'),
+      ],
     );
   }
 }
 
 class CourseTopicPage extends StatefulWidget {
-  const CourseTopicPage({super.key, required this.topicId});
+  const CourseTopicPage(
+      {super.key,
+      required this.topicId,
+      required this.user,
+      required this.onLogout});
   final String topicId;
+  final AuthenticatedUser user;
+  final Future<void> Function() onLogout;
 
   @override
   State<CourseTopicPage> createState() => _CourseTopicPageState();
@@ -130,7 +233,11 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Course contents')),
+      appBar: LandingPageHeader(
+          user: widget.user,
+          onLogout: widget.onLogout,
+          onHome: () =>
+              Navigator.of(context).popUntil((route) => route.isFirst)),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _topic,
         builder: (context, snapshot) {
@@ -335,7 +442,23 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
                     ],
                     if (html.isNotEmpty) ...[
                       const SizedBox(height: 18),
-                      HtmlWidget(html, key: const Key('course-section-html')),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 880),
+                          child: HtmlWidget(
+                            html,
+                            key: const Key('course-section-html'),
+                            textStyle: theme.textTheme.bodyLarge,
+                            customStylesBuilder: (element) =>
+                                switch (element.localName) {
+                              'p' || 'li' => {'line-height': '1.65'},
+                              'h1' || 'h2' || 'h3' => {'line-height': '1.3'},
+                              _ => null,
+                            },
+                          ),
+                        ),
+                      ),
                     ],
                     for (final rawQuestion in questions) ...[
                       const SizedBox(height: 18),

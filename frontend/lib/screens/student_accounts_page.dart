@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/feature_flags.dart';
 import 'package:iuse_demo/services/student_admin_api.dart';
 
@@ -711,16 +712,16 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                   const SizedBox(height: 16),
                   Card(
                     color: emailConfigured
-                        ? Colors.green.shade50
-                        : Colors.orange.shade50,
+                        ? AppColors.successContainer
+                        : AppColors.warningContainer,
                     child: ListTile(
                       leading: Icon(
                         emailConfigured
                             ? Icons.mark_email_read_outlined
                             : Icons.mark_email_unread_outlined,
                         color: emailConfigured
-                            ? Colors.green.shade800
-                            : Colors.orange.shade900,
+                            ? AppColors.success
+                            : AppColors.performanceMid,
                       ),
                       title: Text(
                         emailConfigured

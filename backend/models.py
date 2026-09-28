@@ -218,6 +218,7 @@ class CourseQuizAttempt(Base):
     __tablename__ = "course_quiz_attempts"
     __table_args__ = (
         CheckConstraint("correct_count >= 0", name="ck_course_quiz_correct_nonnegative"),
+        CheckConstraint("correct_count <= total_questions", name="ck_course_quiz_correct_bounded"),
         CheckConstraint("total_questions >= 10", name="ck_course_quiz_total_minimum"),
         CheckConstraint("score_percent BETWEEN 0 AND 100", name="ck_course_quiz_score_range"),
     )

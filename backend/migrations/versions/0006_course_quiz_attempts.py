@@ -30,6 +30,7 @@ def upgrade() -> None:
         sa.Column("score_percent", sa.Integer(), nullable=False),
         sa.Column("submitted_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint("correct_count >= 0", name="ck_course_quiz_correct_nonnegative"),
+        sa.CheckConstraint("correct_count <= total_questions", name="ck_course_quiz_correct_bounded"),
         sa.CheckConstraint("total_questions >= 10", name="ck_course_quiz_total_minimum"),
         sa.CheckConstraint("score_percent BETWEEN 0 AND 100", name="ck_course_quiz_score_range"),
     )

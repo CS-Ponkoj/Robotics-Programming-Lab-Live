@@ -5,8 +5,8 @@ import 'package:iuse_demo/models/assignment_progress.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/screens/assignment_workspace.dart';
 import 'package:iuse_demo/screens/course_content_page.dart';
-import 'package:iuse_demo/screens/instructor_assignment_admin.dart';
-import 'package:iuse_demo/screens/research_dashboard_page.dart';
+import 'package:iuse_demo/widgets/landing_page_header.dart';
+export 'package:iuse_demo/widgets/landing_page_header.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
@@ -48,6 +48,7 @@ Future<List<AssignmentDto>> fetchAssignments() async {
 
 class _AssignmentListPageState extends State<AssignmentListPage> {
   late Future<List<AssignmentDto>> assignments;
+  bool _showContents = false;
 
   @override
   void initState() {
@@ -68,6 +69,7 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
     return LandingPageFrame(
       user: widget.user,
       onLogout: widget.onLogout,
+      onHome: () => setState(() => _showContents = false),
       body: Column(
         children: [
           Material(
@@ -75,57 +77,82 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Chip(
+                  ChoiceChip(
+                    key: const Key('open-assignments'),
+                    selected: !_showContents,
+                    showCheckmark: false,
+                    onSelected: (_) => setState(() => _showContents = false),
                     avatar: Icon(Icons.code_rounded,
-                        color: theme.colorScheme.onPrimary, size: 18),
+                        color: !_showContents
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.primary,
+                        size: 18),
                     label: Text('Assignments',
-                        style: TextStyle(color: theme.colorScheme.onPrimary)),
-                    backgroundColor: theme.colorScheme.primary,
+                        style: TextStyle(
+                            color: !_showContents
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.primary)),
+                    selectedColor: theme.colorScheme.primary,
                     side: BorderSide.none,
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton.icon(
+                  ChoiceChip(
                     key: const Key('open-course-contents'),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const CourseCatalogPage(),
-                      ),
-                    ),
-                    icon: const Icon(Icons.menu_book_rounded),
-                    label: const Text('Contents'),
+                    selected: _showContents,
+                    showCheckmark: false,
+                    onSelected: (_) => setState(() => _showContents = true),
+                    avatar: Icon(Icons.menu_book_rounded,
+                        size: 18,
+                        color: _showContents
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.primary),
+                    label: Text('Contents',
+                        style: TextStyle(
+                            color: _showContents
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.primary)),
+                    selectedColor: theme.colorScheme.primary,
                   ),
                 ],
               ),
             ),
           ),
           Expanded(
-              child: FutureBuilder<List<AssignmentDto>>(
-            future: assignments,
-            builder: (context, snap) {
-              if (snap.hasError) {
-                return LandingPageContent(
-                  child: AssignmentLoadError(onRetry: _retryAssignments),
-                );
-              }
-              if (!snap.hasData) {
-                return const LandingPageContent(
-                  child: AssignmentLoadingState(),
-                );
-              }
-              final list = snap.data!..sort((a, b) => a.id.compareTo(b.id));
-              return LandingPageContent(
-                child: AssignmentCollection(
-                  assignments: list,
-                  theme: theme,
-                  onReturn: () {
-                    // Rebuild when coming back so progress and scores refresh.
-                    setState(() {});
-                  },
-                ),
-              );
-            },
-          )),
+              child: _showContents
+                  ? CourseCatalogPage(
+                      user: widget.user,
+                      onLogout: widget.onLogout,
+                      embedded: true)
+                  : FutureBuilder<List<AssignmentDto>>(
+                      future: assignments,
+                      builder: (context, snap) {
+                        if (snap.hasError) {
+                          return LandingPageContent(
+                            child:
+                                AssignmentLoadError(onRetry: _retryAssignments),
+                          );
+                        }
+                        if (!snap.hasData) {
+                          return const LandingPageContent(
+                            child: AssignmentLoadingState(),
+                          );
+                        }
+                        final list = snap.data!
+                          ..sort((a, b) => a.id.compareTo(b.id));
+                        return LandingPageContent(
+                          child: AssignmentCollection(
+                            assignments: list,
+                            theme: theme,
+                            onReturn: () {
+                              // Rebuild when coming back so progress and scores refresh.
+                              setState(() {});
+                            },
+                          ),
+                        );
+                      },
+                    )),
         ],
       ),
     );
@@ -351,19 +378,21 @@ class LandingPageFrame extends StatelessWidget {
   final Widget body;
   final AuthenticatedUser user;
   final Future<void> Function() onLogout;
+  final VoidCallback? onHome;
 
   const LandingPageFrame({
     super.key,
     required this.body,
     required this.user,
     required this.onLogout,
+    this.onHome,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('landing-page-scaffold'),
-      appBar: LandingPageHeader(user: user, onLogout: onLogout),
+      appBar: LandingPageHeader(user: user, onLogout: onLogout, onHome: onHome),
       backgroundColor: landingPageBackgroundColor,
       body: body,
     );
@@ -477,186 +506,6 @@ class LandingPageContent extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
-  const LandingPageHeader({
-    super.key,
-    required this.user,
-    required this.onLogout,
-  });
-
-  final AuthenticatedUser user;
-  final Future<void> Function() onLogout;
-
-  @override
-  Size get preferredSize => const Size.fromHeight(116);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return AppBar(
-      toolbarHeight: preferredSize.height,
-      titleSpacing: 24,
-      elevation: 0,
-      foregroundColor: Colors.white,
-      backgroundColor: Colors.transparent,
-      flexibleSpace: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.brandDark,
-              AppColors.brand,
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-        ),
-      ),
-      title: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.22),
-              ),
-            ),
-            child: const Icon(
-              Icons.memory_rounded,
-              size: 28,
-              semanticLabel: 'Robotics lab',
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Robotics Programming Lab',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  user.isDemo
-                      ? 'Demo mode: all work resets when you refresh'
-                      : 'Practice autonomous navigation through hands-on coding challenges',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.82),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        if (user.isInstructor)
-          IconButton(
-            tooltip: 'Instructor studio',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const InstructorAssignmentAdmin(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.admin_panel_settings_outlined),
-          ),
-        Padding(
-          padding: const EdgeInsets.only(right: AppSpacing.md),
-          child: PopupMenuButton<String>(
-            tooltip: 'Account menu',
-            onSelected: (value) async {
-              if (value == 'study-data' && context.mounted) {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => user.isInstructor
-                        ? const InstructorResearchDashboard()
-                        : const StudentResearchPage(),
-                  ),
-                );
-              }
-              if (value == 'logout') {
-                await Future<void>.delayed(Duration.zero);
-                await onLogout();
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem<String>(
-                enabled: false,
-                child: Text(
-                  user.isDemo
-                      ? 'Demo student (temporary)'
-                      : '${user.loginId} (${user.role})',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-              const PopupMenuDivider(),
-              if (!user.isDemo)
-                PopupMenuItem<String>(
-                  value: 'study-data',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.insights_rounded),
-                    title: Text(
-                      user.isInstructor
-                          ? 'Research dashboard'
-                          : 'My study progress',
-                    ),
-                  ),
-                ),
-              const PopupMenuItem<String>(
-                value: 'logout',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.logout_rounded),
-                  title: Text('Sign out'),
-                ),
-              ),
-            ],
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.account_circle_outlined),
-                  const SizedBox(width: 8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 120),
-                    child: Text(
-                      user.isDemo ? 'Demo' : user.loginId,
-                      key: const Key('account-name-label'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
