@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:iuse_demo/widgets/lesson_reader.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:iuse_demo/screens/course_content_page.dart';
@@ -16,6 +16,20 @@ const _student =
 Future<void> _logout() async {}
 
 void main() {
+  testWidgets('expired session is distinguished from a content outage',
+      (tester) async {
+    CourseContentApi.testClient =
+        MockClient((_) async => http.Response('{}', 401));
+    addTearDown(() => CourseContentApi.testClient = null);
+    await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: CourseCatalogPage(user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    expect(find.text('Please sign in again'), findsOneWidget);
+    expect(find.textContaining('Your saved scores are unchanged.'),
+        findsOneWidget);
+    expect(find.text('Course content is unavailable right now.'), findsNothing);
+  });
   late MockClient client;
 
   setUp(() {
@@ -245,7 +259,7 @@ void main() {
     expect(find.byKey(const Key('course-home-button')), findsOneWidget);
     expect(
         tester
-            .widget<HtmlWidget>(find.byKey(const Key('course-section-html')))
+            .widget<LessonReader>(find.byKey(const Key('course-section-html')))
             .html,
         contains('robot’s turn is π radians'));
     expect(find.text('Exercises'), findsOneWidget);
@@ -311,7 +325,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
         tester
-            .widget<HtmlWidget>(find.byKey(const Key('course-section-html')))
+            .widget<LessonReader>(find.byKey(const Key('course-section-html')))
             .html,
         contains('Try the exercise'));
     expect(find.textContaining('does not affect'), findsOneWidget);

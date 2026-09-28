@@ -11,7 +11,38 @@ abstract final class AppColors {
   static const warningContainer = Color(0xFFFFF3DA);
   static const resultsSurface = Color(0xFFE9F2F6);
   static const resultsHeader = Color(0xFFD5E8F0);
+  static const learningSurface = Color(0xFFF0F8F7);
+  static const practiceSurface = Color(0xFFFFF5E6);
+  static const insightSurface = Color(0xFFF5F2FC);
 }
+
+/// Quiet color around the work, while keeping text and code surfaces readable.
+class LearningBackdrop extends StatelessWidget {
+  const LearningBackdrop({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.learningSurface,
+              AppColors.pageBackground,
+              AppColors.insightSurface
+            ],
+          ),
+        ),
+        child: child,
+      );
+}
+
+Color learningCardSurface(int index) => switch (index % 3) {
+      0 => AppColors.learningSurface,
+      1 => AppColors.practiceSurface,
+      _ => AppColors.insightSurface,
+    };
 
 Color performanceColor(num percentage) {
   final normalized = (percentage.toDouble().clamp(0, 100)) / 100;

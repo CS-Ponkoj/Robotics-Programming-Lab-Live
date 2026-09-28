@@ -5,6 +5,7 @@ import 'package:iuse_demo/screens/student_accounts_page.dart';
 import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
+import 'package:iuse_demo/theme/app_theme.dart';
 
 class InstructorAssignmentAdmin extends StatefulWidget {
   const InstructorAssignmentAdmin({super.key});
@@ -63,6 +64,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.learningSurface,
       appBar: AppBar(
         title: const Text('Instructor assignment studio'),
         actions: [

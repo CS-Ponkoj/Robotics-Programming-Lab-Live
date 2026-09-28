@@ -329,7 +329,8 @@ class AssignmentCollection extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final useGrid = constraints.maxWidth >= 900;
+        final useGrid = constraints.maxWidth >= 900 &&
+            MediaQuery.textScalerOf(context).scale(16) <= 20;
         final assignmentDelegate = SliverChildBuilderDelegate(
           (context, index) => AssignmentCard(
             a: assignments[index],
@@ -355,7 +356,7 @@ class AssignmentCollection extends StatelessWidget {
                   delegate: assignmentDelegate,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisExtent: 290,
+                    mainAxisExtent: 360,
                   ),
                 ),
               )
@@ -394,7 +395,7 @@ class LandingPageFrame extends StatelessWidget {
       key: const Key('landing-page-scaffold'),
       appBar: LandingPageHeader(user: user, onLogout: onLogout, onHome: onHome),
       backgroundColor: landingPageBackgroundColor,
-      body: body,
+      body: LearningBackdrop(child: body),
     );
   }
 }
@@ -646,7 +647,7 @@ class AssignmentCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       elevation: 0,
-      color: theme.colorScheme.surface,
+      color: learningCardSurface(a.id - 1),
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -751,13 +752,43 @@ class AssignmentCard extends StatelessWidget {
                     ),
                     if (hasAccuracy)
                       Container(
+                        key: const Key('best-score-badge'),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                            'Best score: ${learningProgress.bestScores[a.id] ?? score}%',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                                color: performanceColor(
+                                    learningProgress.bestScores[a.id] ??
+                                        score!),
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(999)),
+                      child: Text(
+                          'Attempted: ${learningProgress.attemptCounts[a.id] ?? 0}',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                    if (hasAccuracy)
+                      Container(
                         key: const Key('latest-score-badge'),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: scoreColor.withValues(alpha: 0.12),
+                          color: Color.alphaBlend(
+                              scoreColor.withValues(alpha: 0.12), Colors.white),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -803,7 +834,11 @@ class AssignmentCard extends StatelessWidget {
                 final button = FilledButton.icon(
                   onPressed: () => _openAssignment(context),
                   icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                  label: const Text('Start assignment'),
+                  label: Text(progressState == AssignmentProgressState.completed
+                      ? 'Review assignment'
+                      : progressState == AssignmentProgressState.notStarted
+                          ? 'Start assignment'
+                          : 'Continue assignment'),
                 );
 
                 if (constraints.maxWidth < 520) {
@@ -819,8 +854,8 @@ class AssignmentCard extends StatelessWidget {
 
                 return Row(
                   children: [
-                    status,
-                    const Spacer(),
+                    Expanded(child: status),
+                    const SizedBox(width: 16),
                     button,
                   ],
                 );

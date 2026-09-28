@@ -30,6 +30,8 @@ and verification records.
 
 ## SQA evidence
 
+- [V6.2 learning workbench QA](sqa/V6_2_WORKBENCH_QA.md)
+
 - [Master SQA checklist](sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
 - [Results drawer and account-label SQA report](sqa/RESULTS_DRAWER_ACCOUNT_LABEL_SQA_2026-09-25.md)
 - [Neon-only database architecture SQA report](sqa/NEON_ONLY_DATABASE_SQA_REPORT_2026-08-28.md)

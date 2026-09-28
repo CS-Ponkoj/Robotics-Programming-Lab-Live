@@ -671,6 +671,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
   Widget build(BuildContext context) {
     final emailConfigured = _emailStatus['configured'] == true;
     return Scaffold(
+      backgroundColor: AppColors.practiceSurface,
       appBar: AppBar(
         title: const Text('Account management'),
         actions: [

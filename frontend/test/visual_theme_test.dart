@@ -11,6 +11,19 @@ double contrast(Color a, Color b) {
 }
 
 void main() {
+  test('learning surface tints keep body text readable', () {
+    final scheme = buildAppTheme().colorScheme;
+    for (final background in [
+      AppColors.learningSurface,
+      AppColors.practiceSurface,
+      AppColors.insightSurface
+    ]) {
+      expect(contrast(scheme.onSurface, background), greaterThanOrEqualTo(4.5));
+      expect(contrast(scheme.onSurfaceVariant, background),
+          greaterThanOrEqualTo(4.5));
+      expect(contrast(scheme.primary, background), greaterThanOrEqualTo(4.5));
+    }
+  });
   test('form theme does not paint over the code editor background', () {
     expect(buildAppTheme().inputDecorationTheme.filled, isFalse);
   });

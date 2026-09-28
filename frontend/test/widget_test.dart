@@ -295,6 +295,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
       expect(find.text('Ready when you are'), findsOneWidget);
+      expect(find.byKey(const Key('results-resize-handle')), findsOneWidget);
+      expect(tester.widget<Scaffold>(find.byType(Scaffold).last).endDrawer,
+          isNull);
+      final resultsHeight = tester
+          .getSize(find.byKey(const Key('assignment-results-panel')))
+          .height;
+      await tester.drag(
+          find.byKey(const Key('results-resize-handle')), const Offset(0, -30));
+      await tester.pump();
+      expect(
+          tester
+              .getSize(find.byKey(const Key('assignment-results-panel')))
+              .height,
+          greaterThan(resultsHeight));
+      expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
       expect(
           tester
               .widget<SwitchListTile>(
@@ -1345,7 +1360,13 @@ void main() {
       find.byKey(const Key('latest-score-badge')),
     );
     final decoration = badge.decoration! as BoxDecoration;
-    expect(decoration.color, performanceColor(60).withValues(alpha: 0.12));
+    expect(
+        decoration.color,
+        Color.alphaBlend(
+            performanceColor(60).withValues(alpha: 0.12), Colors.white));
+    expect(find.text('Best score: 60%'), findsOneWidget);
+    expect(find.text('Attempted: 1'), findsOneWidget);
+    expect(find.text('Continue assignment'), findsOneWidget);
     final scoreText = tester.widget<Text>(find.text('Last score: 60%'));
     expect(scoreText.style?.color, performanceColor(60));
   });

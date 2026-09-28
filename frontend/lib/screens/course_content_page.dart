@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/services/course_content_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/widgets/landing_page_header.dart';
+import 'package:iuse_demo/widgets/lesson_reader.dart';
 
 /// Course reading and quizzes are separate from graded coding assignments.
 class CourseCatalogPage extends StatefulWidget {
@@ -33,7 +33,9 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
       future: _topics,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _LoadError(onRetry: _retry);
+          return _LoadError(
+              onRetry: _retry,
+              sessionExpired: snapshot.error is ContentSessionExpired);
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -77,6 +79,7 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
                               SizedBox(
                                 width: width,
                                 child: Card(
+                                  color: learningCardSurface(i),
                                   clipBehavior: Clip.antiAlias,
                                   child: InkWell(
                                     key:
@@ -241,7 +244,11 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
       body: FutureBuilder<Map<String, dynamic>>(
         future: _topic,
         builder: (context, snapshot) {
-          if (snapshot.hasError) return _LoadError(onRetry: _retry);
+          if (snapshot.hasError) {
+            return _LoadError(
+                onRetry: _retry,
+                sessionExpired: snapshot.error is ContentSessionExpired);
+          }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -412,7 +419,11 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
     return FutureBuilder<Map<String, dynamic>>(
       future: _section,
       builder: (context, snapshot) {
-        if (snapshot.hasError) return _LoadError(onRetry: _retry);
+        if (snapshot.hasError) {
+          return _LoadError(
+              onRetry: _retry,
+              sessionExpired: snapshot.error is ContentSessionExpired);
+        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -446,16 +457,9 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
                         alignment: Alignment.centerLeft,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 880),
-                          child: HtmlWidget(
-                            html,
+                          child: LessonReader(
+                            html: html,
                             key: const Key('course-section-html'),
-                            textStyle: theme.textTheme.bodyLarge,
-                            customStylesBuilder: (element) =>
-                                switch (element.localName) {
-                              'p' || 'li' => {'line-height': '1.65'},
-                              'h1' || 'h2' || 'h3' => {'line-height': '1.3'},
-                              _ => null,
-                            },
                           ),
                         ),
                       ),
@@ -572,19 +576,36 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
 }
 
 class _LoadError extends StatelessWidget {
-  const _LoadError({required this.onRetry});
+  const _LoadError({required this.onRetry, this.sessionExpired = false});
   final VoidCallback onRetry;
+  final bool sessionExpired;
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Course content is unavailable right now.'),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
-          ),
-        ]),
+        child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.menu_book_rounded,
+                  size: 40, color: AppColors.brandDark),
+              const SizedBox(height: 16),
+              Text(
+                  sessionExpired
+                      ? 'Please sign in again'
+                      : 'Course content is unavailable right now.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                  sessionExpired
+                      ? 'Your session has expired. Open the account menu, log out, then sign in again. Your saved scores are unchanged.'
+                      : 'Check the backend connection and retry. Your saved quiz scores are unchanged.',
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ])),
       );
 }

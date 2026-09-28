@@ -71,6 +71,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _editorDarkMode = true;
   int? _diagnosticLine;
   bool _suppressEditorChange = false;
+  bool _resultsOpen = false;
+  double _resultsHeightFraction = .48;
 
   @override
   void initState() {
@@ -644,8 +646,84 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _openResultsPanel() {
-    _scaffoldKey.currentState?.openEndDrawer();
+    if (MediaQuery.sizeOf(context).width >= 900) {
+      setState(() {
+        _resultsOpen = true;
+        _workspaceFocus = AssignmentWorkspaceFocus.none;
+      });
+    } else {
+      _scaffoldKey.currentState?.openEndDrawer();
+    }
   }
+
+  Widget _resultsPanel({required bool docked}) => ColoredBox(
+        color: AppColors.resultsSurface,
+        child: SafeArea(
+          top: !docked,
+          child: Column(key: const Key('assignment-results-panel'), children: [
+            Container(
+              color: AppColors.resultsHeader,
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              child: Row(children: [
+                const Icon(Icons.fact_check_rounded),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text('Results',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700))),
+                IconButton(
+                  key: const Key('minimize-results-button'),
+                  tooltip: 'Minimize results',
+                  onPressed: () {
+                    if (docked) {
+                      setState(() => _resultsOpen = false);
+                    } else {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  icon: const Icon(Icons.keyboard_double_arrow_down_rounded),
+                ),
+              ]),
+            ),
+            SwitchListTile(
+              key: const Key('results-ai-toggle'),
+              title: const Text('AI tutoring'),
+              subtitle: const Text(
+                  'Off by default; built-in feedback remains available'),
+              value: _enableFeedback,
+              onChanged: (value) {
+                setState(() => _enableFeedback = value);
+                unawaited(_trackWorkspaceEvent(
+                    'ai_tutor_toggled', {'enabled': value}));
+              },
+            ),
+            Expanded(
+                child: _emptyCodeAttempted
+                    ? EmptyCodeTestRunState(onRestore: _resetStarterCode)
+                    : _submitted
+                        ? FutureBuilder<UnittestFeedbackDto>(
+                            future: _feedback,
+                            builder: (ctx, snap) {
+                              if (snap.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const SecureGraderLoadingState();
+                              }
+                              if (snap.hasError) {
+                                return TestRunErrorState(onRetry: _runTests);
+                              }
+                              if (snap.hasData) {
+                                return Feedback(
+                                    data: snap.data!,
+                                    aiTutorEnabled: _enableFeedback);
+                              }
+                              return const SizedBox.shrink();
+                            })
+                        : const _EmptyResultsState()),
+          ]),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -775,85 +853,15 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Scaffold(
             key: _scaffoldKey,
             appBar: appBar,
-            endDrawer: Drawer(
-              width: MediaQuery.sizeOf(context).width >= 600
-                  ? 520
-                  : MediaQuery.sizeOf(context).width * 0.94,
-              backgroundColor: AppColors.resultsSurface,
-              child: SafeArea(
-                child: Column(
-                  key: const Key('assignment-results-panel'),
-                  children: [
-                    Container(
-                      color: AppColors.resultsHeader,
-                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.fact_check_rounded),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              'Results',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          IconButton(
-                            key: const Key('minimize-results-button'),
-                            tooltip: 'Minimize results',
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(
-                                Icons.keyboard_double_arrow_right_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SwitchListTile(
-                      key: const Key('results-ai-toggle'),
-                      title: const Text('AI tutoring'),
-                      subtitle: const Text(
-                          'Off by default; built-in feedback remains available'),
-                      value: _enableFeedback,
-                      onChanged: (value) {
-                        setState(() => _enableFeedback = value);
-                        unawaited(_trackWorkspaceEvent(
-                          'ai_tutor_toggled',
-                          {'enabled': value},
-                        ));
-                      },
-                    ),
-                    Expanded(
-                      child: _emptyCodeAttempted
-                          ? EmptyCodeTestRunState(onRestore: _resetStarterCode)
-                          : _submitted
-                              ? FutureBuilder<UnittestFeedbackDto>(
-                                  future: _feedback,
-                                  builder: (ctx, snap) {
-                                    if (snap.connectionState ==
-                                        ConnectionState.waiting) {
-                                      return const SecureGraderLoadingState();
-                                    }
-                                    if (snap.hasError) {
-                                      return TestRunErrorState(
-                                          onRetry: _runTests);
-                                    }
-                                    if (snap.hasData) {
-                                      return Feedback(
-                                        data: snap.data!,
-                                        aiTutorEnabled: _enableFeedback,
-                                      );
-                                    }
-                                    return const SizedBox.shrink();
-                                  },
-                                )
-                              : const _EmptyResultsState(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            endDrawer: useDesktopLayout
+                ? null
+                : Drawer(
+                    width: MediaQuery.sizeOf(context).width >= 600
+                        ? 520
+                        : MediaQuery.sizeOf(context).width * 0.94,
+                    backgroundColor: AppColors.resultsSurface,
+                    child: _resultsPanel(docked: false),
+                  ),
             body: Column(
               children: [
                 if (!useDesktopLayout)
@@ -987,92 +995,168 @@ class _MyHomePageState extends State<MyHomePage> {
                           flex: showResizeHandle
                               ? ((1 - _editorWidthFraction) * 1000).round()
                               : 1,
-                          child: Column(
-                            children: [
-                              // Instructions fill the right workspace panel.
-                              if (showInstructions)
-                                Expanded(
-                                  flex: 1,
-                                  child: Column(
+                          child: LayoutBuilder(
+                              builder: (context, rightConstraints) => Column(
                                     children: [
-                                      AssignmentPanelHeader(
-                                        icon: Icons.menu_book_rounded,
-                                        title: 'Instructions',
-                                        subtitle:
-                                            'Review the scenario and task',
-                                        isFocused: _workspaceFocus ==
-                                            AssignmentWorkspaceFocus
-                                                .instructions,
-                                        onFocusToggle: useDesktopLayout
-                                            ? () => _toggleWorkspaceFocus(
-                                                  AssignmentWorkspaceFocus
-                                                      .instructions,
-                                                )
-                                            : null,
-                                      ),
-                                      Expanded(
-                                        child: SingleChildScrollView(
-                                          key: const Key(
-                                            'assignment-instructions-panel',
-                                          ),
-                                          padding: const EdgeInsets.all(
-                                            AppSpacing.md,
-                                          ),
-                                          child: FutureBuilder<AssignmentDto>(
-                                            future: _assignment,
-                                            builder: (ctx, snap) {
-                                              if (snap.hasData) {
-                                                return AssignmentInstructions(
-                                                  assignmentId: widget.id,
-                                                  html: snap.data!.htmlDesc
-                                                      .replaceAll(
-                                                        "http://localhost:5000",
-                                                        apiBaseUrl,
-                                                      )
-                                                      .replaceAll(
-                                                        "http://127.0.0.1:5000",
-                                                        apiBaseUrl,
-                                                      ),
-                                                  solutionHtml:
-                                                      _revealedSolutionHtml
-                                                              .isNotEmpty
-                                                          ? _revealedSolutionHtml
-                                                          : snap.data!
-                                                              .solutionHtml,
-                                                  hasSolution:
-                                                      snap.data!.hasSolution,
-                                                  solutionRevealed:
-                                                      solutionRevealedAssignments
-                                                          .contains(widget.id),
-                                                  canRevealSolution:
-                                                      learningProgress
-                                                          .hasAttempted(
-                                                    widget.id,
+                                      // Instructions fill the right workspace panel.
+                                      if (showInstructions)
+                                        Expanded(
+                                          flex: useDesktopLayout && _resultsOpen
+                                              ? ((1 - _resultsHeightFraction) *
+                                                      1000)
+                                                  .round()
+                                              : 1,
+                                          child: Column(
+                                            children: [
+                                              AssignmentPanelHeader(
+                                                icon: Icons.menu_book_rounded,
+                                                title: 'Instructions',
+                                                subtitle:
+                                                    'Review the scenario and task',
+                                                isFocused: _workspaceFocus ==
+                                                    AssignmentWorkspaceFocus
+                                                        .instructions,
+                                                onFocusToggle: useDesktopLayout
+                                                    ? () =>
+                                                        _toggleWorkspaceFocus(
+                                                          AssignmentWorkspaceFocus
+                                                              .instructions,
+                                                        )
+                                                    : null,
+                                              ),
+                                              Expanded(
+                                                child: SingleChildScrollView(
+                                                  key: const Key(
+                                                    'assignment-instructions-panel',
                                                   ),
-                                                  onSolutionRevealed: () =>
-                                                      unawaited(
-                                                    _revealSolution(),
+                                                  padding: const EdgeInsets.all(
+                                                    AppSpacing.md,
                                                   ),
-                                                );
-                                              }
-                                              if (snap.hasError) {
-                                                return const Text(
-                                                  "Error loading scenario",
-                                                );
-                                              }
-                                              return const Center(
-                                                child:
-                                                    CircularProgressIndicator(),
-                                              );
-                                            },
+                                                  child: FutureBuilder<
+                                                      AssignmentDto>(
+                                                    future: _assignment,
+                                                    builder: (ctx, snap) {
+                                                      if (snap.hasData) {
+                                                        return AssignmentInstructions(
+                                                          assignmentId:
+                                                              widget.id,
+                                                          html: snap
+                                                              .data!.htmlDesc
+                                                              .replaceAll(
+                                                                "http://localhost:5000",
+                                                                apiBaseUrl,
+                                                              )
+                                                              .replaceAll(
+                                                                "http://127.0.0.1:5000",
+                                                                apiBaseUrl,
+                                                              ),
+                                                          solutionHtml:
+                                                              _revealedSolutionHtml
+                                                                      .isNotEmpty
+                                                                  ? _revealedSolutionHtml
+                                                                  : snap.data!
+                                                                      .solutionHtml,
+                                                          hasSolution: snap
+                                                              .data!
+                                                              .hasSolution,
+                                                          solutionRevealed:
+                                                              solutionRevealedAssignments
+                                                                  .contains(
+                                                                      widget
+                                                                          .id),
+                                                          canRevealSolution:
+                                                              learningProgress
+                                                                  .hasAttempted(
+                                                            widget.id,
+                                                          ),
+                                                          onSolutionRevealed:
+                                                              () => unawaited(
+                                                            _revealSolution(),
+                                                          ),
+                                                        );
+                                                      }
+                                                      if (snap.hasError) {
+                                                        return const Text(
+                                                          "Error loading scenario",
+                                                        );
+                                                      }
+                                                      return const Center(
+                                                        child:
+                                                            CircularProgressIndicator(),
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                      ),
+                                      if (useDesktopLayout && _resultsOpen) ...[
+                                        Semantics(
+                                          label: 'Resize results dock',
+                                          child: MouseRegion(
+                                              cursor:
+                                                  SystemMouseCursors.resizeRow,
+                                              child: GestureDetector(
+                                                key: const Key(
+                                                    'results-resize-handle'),
+                                                onVerticalDragUpdate:
+                                                    (details) => setState(() {
+                                                  _resultsHeightFraction =
+                                                      (_resultsHeightFraction -
+                                                              details.delta.dy /
+                                                                  rightConstraints
+                                                                      .maxHeight)
+                                                          .clamp(.3, .7);
+                                                }),
+                                                child: CallbackShortcuts(
+                                                  bindings: {
+                                                    const SingleActivator(
+                                                        LogicalKeyboardKey
+                                                            .arrowUp): () =>
+                                                        setState(() =>
+                                                            _resultsHeightFraction =
+                                                                (_resultsHeightFraction +
+                                                                        .05)
+                                                                    .clamp(.3,
+                                                                        .7)),
+                                                    const SingleActivator(
+                                                        LogicalKeyboardKey
+                                                            .arrowDown): () =>
+                                                        setState(() =>
+                                                            _resultsHeightFraction =
+                                                                (_resultsHeightFraction -
+                                                                        .05)
+                                                                    .clamp(.3,
+                                                                        .7)),
+                                                  },
+                                                  child: const Focus(
+                                                      child: Tooltip(
+                                                          message:
+                                                              'Resize results · drag or use ↑ / ↓',
+                                                          child: SizedBox(
+                                                              height: 20,
+                                                              width: double
+                                                                  .infinity,
+                                                              child: ColoredBox(
+                                                                  color: AppColors
+                                                                      .resultsHeader,
+                                                                  child: Icon(
+                                                                      Icons
+                                                                          .drag_handle_rounded,
+                                                                      size:
+                                                                          18))))),
+                                                ),
+                                              )),
+                                        ),
+                                        Expanded(
+                                            flex:
+                                                (_resultsHeightFraction * 1000)
+                                                    .round(),
+                                            child: _resultsPanel(docked: true)),
+                                      ],
                                     ],
-                                  ),
-                                ),
-                            ],
-                          ),
+                                  )),
                         ),
                     ],
                   ),
@@ -1086,7 +1170,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-class AssignmentInstructions extends StatelessWidget {
+class AssignmentInstructions extends StatefulWidget {
   const AssignmentInstructions({
     super.key,
     required this.html,
@@ -1107,15 +1191,43 @@ class AssignmentInstructions extends StatelessWidget {
   final VoidCallback? onSolutionRevealed;
 
   @override
+  State<AssignmentInstructions> createState() => _AssignmentInstructionsState();
+}
+
+class _AssignmentInstructionsState extends State<AssignmentInstructions> {
+  final _scenario = GlobalKey();
+  final _task = GlobalKey();
+  final _support = GlobalKey();
+
+  Widget _sectionLink(String label, GlobalKey target) => OutlinedButton(
+      onPressed: () {
+        final targetContext = target.currentContext;
+        if (targetContext != null) {
+          Scrollable.ensureVisible(targetContext,
+              duration: const Duration(milliseconds: 250));
+        }
+      },
+      child: Text(label));
+
+  @override
   Widget build(BuildContext context) {
-    final sections = AssignmentInstructionSections.fromHtml(html);
+    final sections = AssignmentInstructionSections.fromHtml(widget.html);
     final taskList = InstructionTaskList.fromHtml(sections.task);
-    final displayedSolutionHtml =
-        solutionHtml.isNotEmpty ? solutionHtml : sections.solution;
+    final displayedSolutionHtml = widget.solutionHtml.isNotEmpty
+        ? widget.solutionHtml
+        : sections.solution;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          _sectionLink('Scenario', _scenario),
+          if (sections.task.isNotEmpty) _sectionLink('Your task', _task),
+          if (sections.support.isNotEmpty)
+            _sectionLink('Data & rules', _support),
+        ]),
+        const SizedBox(height: 12),
+        SizedBox(key: _scenario),
         _InstructionSectionCard(
           key: const Key('instruction-scenario-section'),
           icon: Icons.explore_outlined,
@@ -1125,6 +1237,7 @@ class AssignmentInstructions extends StatelessWidget {
         ),
         if (sections.task.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
+          SizedBox(key: _task),
           _InstructionSectionCard(
             key: const Key('instruction-task-section'),
             icon: Icons.task_alt_rounded,
@@ -1137,6 +1250,7 @@ class AssignmentInstructions extends StatelessWidget {
         ],
         if (sections.support.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
+          SizedBox(key: _support),
           _InstructionSectionCard(
             key: const Key('instruction-support-section'),
             icon: Icons.tips_and_updates_outlined,
@@ -1145,13 +1259,13 @@ class AssignmentInstructions extends StatelessWidget {
             html: sections.support,
           ),
         ],
-        if (hasSolution || displayedSolutionHtml.isNotEmpty) ...[
+        if (widget.hasSolution || displayedSolutionHtml.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           _SolutionSection(
             html: displayedSolutionHtml,
-            revealed: solutionRevealed,
-            canReveal: canRevealSolution,
-            onReveal: onSolutionRevealed,
+            revealed: widget.solutionRevealed,
+            canReveal: widget.canRevealSolution,
+            onReveal: widget.onSolutionRevealed,
           ),
         ],
       ],
@@ -1866,6 +1980,8 @@ class AssignmentEditorToolbar extends StatelessWidget {
                         shortcut: 'Ctrl+Alt+R',
                         onPressed: isRunning ? null : onReset,
                       ),
+                      const SizedBox(
+                          height: 28, child: VerticalDivider(width: 18)),
                       toolButton(
                         keyName: 'font-down',
                         icon: Icons.text_decrease_rounded,
@@ -1880,6 +1996,8 @@ class AssignmentEditorToolbar extends StatelessWidget {
                         shortcut: 'Ctrl+= / Ctrl+Alt+2',
                         onPressed: fontSize < 22 ? onIncreaseFont : null,
                       ),
+                      const SizedBox(
+                          height: 28, child: VerticalDivider(width: 18)),
                       toolButton(
                         keyName: 'reference',
                         icon: Icons.integration_instructions_outlined,
@@ -2523,7 +2641,7 @@ class _EmptyResultsState extends StatelessWidget {
       container: true,
       label: 'No test results yet. Run assignment tests to see feedback.',
       child: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,

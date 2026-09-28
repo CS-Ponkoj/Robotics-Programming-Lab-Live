@@ -7,6 +7,10 @@ import 'package:iuse_demo/services/auth_api.dart';
 
 const _contentTimeout = Duration(seconds: 15);
 
+class ContentSessionExpired implements Exception {
+  const ContentSessionExpired();
+}
+
 class CourseContentApi {
   @visibleForTesting
   static http.Client? testClient;
@@ -18,6 +22,7 @@ class CourseContentApi {
                 http.get(uri, headers: AuthApi.authorizedHeaders()))
             .timeout(_contentTimeout);
     if (response.statusCode != 200) {
+      if (response.statusCode == 401) throw const ContentSessionExpired();
       throw Exception(
           'Could not load course content (${response.statusCode}).');
     }

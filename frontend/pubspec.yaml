@@ -39,6 +39,7 @@ dependencies:
   path: ^1.8.0
   web: ^1.0.0
   http: ^1.2.2
+  html: 0.15.5+1
   flutter_code_editor: ^0.3.2
   flutter_highlight: ^0.7.0
   highlight: 0.7.0

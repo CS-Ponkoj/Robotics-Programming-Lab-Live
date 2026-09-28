@@ -201,10 +201,20 @@ official solutions, secrets, and unrelated student data are excluded from the
 AI context.
 
 Results opens in a separate, minimizable panel. You can open it before the
-first run; running tests opens it automatically. With AI off, results show
+first run; running tests opens it automatically. On desktop it is a non-blocking
+dock beneath the instructions: drag its divider, or focus the divider and use
+the arrow keys, to resize it. Minimize it to give instructions the full height.
+On narrow screens it remains a drawer. With AI off, results show
 test evidence and available built-in hints without contacting OpenAI. Tutor
 questions require a completed test run because they use that attempt's
 evidence.
+
+The learning workbench keeps the shared teal header and uses soft teal, sand,
+and lavender surfaces around readable content. Assignment cards distinguish
+best and last scores, attempts, and Start/Continue/Review actions. Instructions
+have section jump buttons; lessons with multiple headings have an expandable
+**On this page** navigator. These presentation changes do not alter grading,
+quiz persistence, assignment versions, or research calculations.
 
 Ubuntu's optional startup-check command is:
 
