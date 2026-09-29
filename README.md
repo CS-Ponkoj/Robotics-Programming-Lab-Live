@@ -201,10 +201,10 @@ official solutions, secrets, and unrelated student data are excluded from the
 AI context.
 
 Results opens in a separate, minimizable panel. You can open it before the
-first run; running tests opens it automatically. On desktop it is a non-blocking
-dock beneath the instructions: drag its divider, or focus the divider and use
-the arrow keys, to resize it. Minimize it to give instructions the full height.
-On narrow screens it remains a drawer. With AI off, results show
+first run; running tests opens it automatically. Results is an isolated
+right-side overlay panel on desktop and narrow screens, never a bottom dock.
+Opening it does not resize the instruction area. Minimize it and reopen using
+the Results button without losing the current result. With AI off, results show
 test evidence and available built-in hints without contacting OpenAI. Tutor
 questions require a completed test run because they use that attempt's
 evidence.

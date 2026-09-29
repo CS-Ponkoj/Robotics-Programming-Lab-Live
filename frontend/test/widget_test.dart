@@ -278,6 +278,8 @@ void main() {
 
       await tester.pumpWidget(workspaceApp(const Size(1200, 900)));
 
+      await tester.pumpAndSettle();
+
       expect(
         find.byKey(const Key('assignment-workspace-navigation')),
         findsNothing,
@@ -291,24 +293,27 @@ void main() {
       expect(find.byKey(const Key('workspace-resize-handle')), findsOneWidget);
       expect(find.byKey(const Key('open-results-button')), findsOneWidget);
 
+      final instructionsSize = tester.getSize(
+        find.byKey(const Key('assignment-instructions-panel')),
+      );
+
       await tester.tap(find.byKey(const Key('open-results-button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
       expect(find.text('Ready when you are'), findsOneWidget);
-      expect(find.byKey(const Key('results-resize-handle')), findsOneWidget);
+      expect(find.byKey(const Key('results-resize-handle')), findsNothing);
       expect(tester.widget<Scaffold>(find.byType(Scaffold).last).endDrawer,
-          isNull);
-      final resultsHeight = tester
-          .getSize(find.byKey(const Key('assignment-results-panel')))
-          .height;
-      await tester.drag(
-          find.byKey(const Key('results-resize-handle')), const Offset(0, -30));
-      await tester.pump();
+          isA<Drawer>());
+      expect(
+        tester
+            .getSize(find.byKey(const Key('assignment-instructions-panel'))),
+        instructionsSize,
+      );
       expect(
           tester
               .getSize(find.byKey(const Key('assignment-results-panel')))
               .height,
-          greaterThan(resultsHeight));
+          greaterThan(instructionsSize.height));
       expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
       expect(
           tester
@@ -320,6 +325,12 @@ void main() {
       await tester.tap(find.byKey(const Key('minimize-results-button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
+      await tester.tap(find.byKey(const Key('open-results-button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
+      expect(find.text('Ready when you are'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('minimize-results-button')));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
       expect(
         find.byKey(const Key('assignment-instructions-panel')),

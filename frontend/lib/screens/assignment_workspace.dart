@@ -71,8 +71,6 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _editorDarkMode = true;
   int? _diagnosticLine;
   bool _suppressEditorChange = false;
-  bool _resultsOpen = false;
-  double _resultsHeightFraction = .48;
 
   @override
   void initState() {
@@ -646,20 +644,12 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _openResultsPanel() {
-    if (MediaQuery.sizeOf(context).width >= 900) {
-      setState(() {
-        _resultsOpen = true;
-        _workspaceFocus = AssignmentWorkspaceFocus.none;
-      });
-    } else {
-      _scaffoldKey.currentState?.openEndDrawer();
-    }
+    _scaffoldKey.currentState?.openEndDrawer();
   }
 
-  Widget _resultsPanel({required bool docked}) => ColoredBox(
+  Widget _resultsPanel() => ColoredBox(
         color: AppColors.resultsSurface,
         child: SafeArea(
-          top: !docked,
           child: Column(key: const Key('assignment-results-panel'), children: [
             Container(
               color: AppColors.resultsHeader,
@@ -676,14 +666,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 IconButton(
                   key: const Key('minimize-results-button'),
                   tooltip: 'Minimize results',
-                  onPressed: () {
-                    if (docked) {
-                      setState(() => _resultsOpen = false);
-                    } else {
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  icon: const Icon(Icons.keyboard_double_arrow_down_rounded),
+                  onPressed: () => _scaffoldKey.currentState?.closeEndDrawer(),
+                  icon: const Icon(Icons.keyboard_double_arrow_right_rounded),
                 ),
               ]),
             ),
@@ -853,15 +837,13 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Scaffold(
             key: _scaffoldKey,
             appBar: appBar,
-            endDrawer: useDesktopLayout
-                ? null
-                : Drawer(
-                    width: MediaQuery.sizeOf(context).width >= 600
-                        ? 520
-                        : MediaQuery.sizeOf(context).width * 0.94,
-                    backgroundColor: AppColors.resultsSurface,
-                    child: _resultsPanel(docked: false),
-                  ),
+            endDrawer: Drawer(
+              width: MediaQuery.sizeOf(context).width >= 600
+                  ? 520
+                  : MediaQuery.sizeOf(context).width * 0.94,
+              backgroundColor: AppColors.resultsSurface,
+              child: _resultsPanel(),
+            ),
             body: Column(
               children: [
                 if (!useDesktopLayout)
@@ -1001,11 +983,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                       // Instructions fill the right workspace panel.
                                       if (showInstructions)
                                         Expanded(
-                                          flex: useDesktopLayout && _resultsOpen
-                                              ? ((1 - _resultsHeightFraction) *
-                                                      1000)
-                                                  .round()
-                                              : 1,
                                           child: Column(
                                             children: [
                                               AssignmentPanelHeader(
@@ -1091,70 +1068,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                             ],
                                           ),
                                         ),
-                                      if (useDesktopLayout && _resultsOpen) ...[
-                                        Semantics(
-                                          label: 'Resize results dock',
-                                          child: MouseRegion(
-                                              cursor:
-                                                  SystemMouseCursors.resizeRow,
-                                              child: GestureDetector(
-                                                key: const Key(
-                                                    'results-resize-handle'),
-                                                onVerticalDragUpdate:
-                                                    (details) => setState(() {
-                                                  _resultsHeightFraction =
-                                                      (_resultsHeightFraction -
-                                                              details.delta.dy /
-                                                                  rightConstraints
-                                                                      .maxHeight)
-                                                          .clamp(.3, .7);
-                                                }),
-                                                child: CallbackShortcuts(
-                                                  bindings: {
-                                                    const SingleActivator(
-                                                        LogicalKeyboardKey
-                                                            .arrowUp): () =>
-                                                        setState(() =>
-                                                            _resultsHeightFraction =
-                                                                (_resultsHeightFraction +
-                                                                        .05)
-                                                                    .clamp(.3,
-                                                                        .7)),
-                                                    const SingleActivator(
-                                                        LogicalKeyboardKey
-                                                            .arrowDown): () =>
-                                                        setState(() =>
-                                                            _resultsHeightFraction =
-                                                                (_resultsHeightFraction -
-                                                                        .05)
-                                                                    .clamp(.3,
-                                                                        .7)),
-                                                  },
-                                                  child: const Focus(
-                                                      child: Tooltip(
-                                                          message:
-                                                              'Resize results · drag or use ↑ / ↓',
-                                                          child: SizedBox(
-                                                              height: 20,
-                                                              width: double
-                                                                  .infinity,
-                                                              child: ColoredBox(
-                                                                  color: AppColors
-                                                                      .resultsHeader,
-                                                                  child: Icon(
-                                                                      Icons
-                                                                          .drag_handle_rounded,
-                                                                      size:
-                                                                          18))))),
-                                                ),
-                                              )),
-                                        ),
-                                        Expanded(
-                                            flex:
-                                                (_resultsHeightFraction * 1000)
-                                                    .round(),
-                                            child: _resultsPanel(docked: true)),
-                                      ],
                                     ],
                                   )),
                         ),

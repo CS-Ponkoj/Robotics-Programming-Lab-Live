@@ -3,6 +3,11 @@
 Scope: local staging only. Preserve deterministic grading, role privacy,
 quiz persistence, optional AI (off by default), and the existing shared header.
 
+Update 2026-09-29: the desktop bottom dock described in this historical release
+record has been replaced by an isolated right-side overlay at the owner's
+request. See [Results panel correction QA](RESULTS_PANEL_CORRECTION_QA.md) for
+the current behavior and validation.
+
 | Increment | Intended result | Validation | Status |
 |---|---|---|---|
 | Visual foundations and catalogs | Soft teal, sand and lavender surfaces; clear best/latest scores and next actions | Theme contrast >= 4.5:1 on new surfaces; catalog widgets; desktop/narrow layouts | PASS |

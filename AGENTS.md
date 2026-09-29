@@ -486,6 +486,11 @@ Treat every submission as hostile input.
 
 ## Flutter engineering rules
 
+- Keep Results as a separate, minimizable right-side overlay panel. Instructions
+  retain their full workspace height; do not dock Results beneath them without
+  explicit owner approval. Preserve results when minimizing/reopening and keep
+  AI tutoring off by default.
+
 - Keep networking in `lib/services`, shared state in `lib/state`, transport data
   in `lib/models`, and screens focused on presentation and interaction.
 - Use the configured `API_BASE_URL`; do not hardcode localhost or production URLs
