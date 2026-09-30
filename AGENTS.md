@@ -463,6 +463,9 @@ Treat every submission as hostile input.
 - Prompts must prohibit solution disclosure and hidden-test inference.
 - Apply timeouts, quotas, and a deterministic built-in-hint fallback.
 - Clearly label AI-generated feedback in the UI.
+- Ground execution claims in the recorded grader evidence. Successful execution
+  must not be described as a NameError; module-level variables may exist even
+  when using them instead of function parameters fails other input scenarios.
 - AI failure must not leave grading stuck or block submission.
 - Add evaluation cases for correctness, hallucination, prompt injection,
   solution leakage, unsafe advice, and quota/provider failure before expanding

@@ -1,4 +1,8 @@
 from models import Assignment
+import json
+from pathlib import Path
+
+import pytest
 from graders.python_function import PythonFunctionGrader
 from sandbox import SubprocessSandbox
 
@@ -58,7 +62,8 @@ def test_function_grader_awards_weighted_partial_credit_and_feedback():
     assert result.passed is False
     assert result.score == 40
     assert [item.passed for item in result.evidence] == [True, False]
-    assert result.evidence[1].message == "Recheck how the two inputs are multiplied."
+    assert result.evidence[1].message.startswith("Recheck how the two inputs are multiplied.")
+    assert "every input scenario" in result.evidence[1].message
 
 
 def test_function_grader_accepts_general_solution_without_exposing_cases():
@@ -91,3 +96,30 @@ def test_function_grader_returns_safe_error_when_function_is_missing():
     )
     assert "2" not in result.execution_error
     assert "3" not in result.execution_error
+
+
+@pytest.mark.parametrize("use_parameters, expected_score", [(False, 0), (True, 50)])
+def test_assignment_two_screenshot_global_points_and_genuine_partial_credit(use_parameters, expected_score):
+    data = json.loads((Path(__file__).parents[1] / "assignments/assignment_2.json").read_text(encoding="utf-8"))
+    target = Assignment(id=2, stable_id=data["stable_id"], version=data["version"],
+                        title=data["title"], grader_type=data["grader_type"], grader_config=data["grader_config"])
+    code = data["starter_code"].replace(
+        "distance_to_obstacle = 0.0", "distance_to_obstacle = calculate_distance(start_point, hit_point)"
+    ).replace(
+        "distance_along_obstacle = 0.0",
+        "distance_along_obstacle = (calculate_distance(hit_point, corner_a) + "
+        "calculate_distance(corner_a, corner_b) + calculate_distance(corner_b, leave_point))",
+    )
+    if use_parameters:
+        code = code.replace("calculate_distance(start_point, hit_point)", "calculate_distance(start, hit)")
+        code = code.replace("calculate_distance(hit_point, corner_a)", "calculate_distance(hit, corner_a)")
+        code = code.replace("calculate_distance(corner_b, leave_point)", "calculate_distance(corner_b, leave)")
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(target, code)
+    assert result.execution_succeeded is True
+    assert result.code_output.strip() == "4.0 4.0 0.0 0.0"
+    assert result.score == expected_score
+    assert [item.passed for item in result.evidence] == ([True, True, False, False] if use_parameters else [False] * 4)
+    for item in result.evidence:
+        if not item.passed:
+            assert "every input scenario" in item.message
+            assert "printed example alone is not enough" in item.message

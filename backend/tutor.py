@@ -25,6 +25,13 @@ _PROTECTED_OUTPUT_PHRASES = (
 _CODE_LINE_PATTERN = re.compile(
     r"(?im)^\s*(?:def |class |import |from \S+ import |[a-zA-Z_]\w*\s*=)"
 )
+_UNDEFINED_NAME_CLAIM = re.compile(
+    r"\bundefined\s+(?:variables?|names?|functions?)\b|"
+    r"\b(?:variables?|names?|functions?)\b[^.!?\n]{0,100}\b(?:undefined|not defined)\b|"
+    r"\b(?:is|are)\s+(?:undefined|not defined)\b|"
+    r"\bnameerror\b",
+    re.IGNORECASE,
+)
 
 
 class TutorService:
@@ -67,6 +74,15 @@ class TutorService:
                     "relevant issue, give one to three debugging steps, ask a guiding "
                     "question, and provide only the requested progressive hint level. "
                     "Keep each field concise and avoid repeating the assignment text. "
+                    "Read the entire student code, including module-level definitions "
+                    "below a function. Python functions can read globals defined before "
+                    "the function is called; using such a global instead of a parameter "
+                    "can cause wrong results for other inputs, not an undefined-name "
+                    "error. Treat execution_succeeded and execution_error as the source "
+                    "of truth for execution claims. If execution succeeded, do not claim "
+                    "a NameError or undefined variables. A printed example can look "
+                    "correct while a criterion fails because it must work for every "
+                    "input scenario. Do not invent a failed scenario or its values. "
                     "If asked for protected material or completed code, decline briefly "
                     "and redirect the student to a conceptual debugging step."
                 ),
@@ -100,6 +116,7 @@ class TutorService:
             )
             parsed = TutorGeneratedContent.model_validate_json(response.output_text)
             self._enforce_output_policy(parsed)
+            self._enforce_evidence_grounding(parsed, submission.evidence or {})
             return TutorFeedback(
                 diagnosis=parsed.diagnosis,
                 misconception=parsed.misconception,
@@ -118,6 +135,20 @@ class TutorService:
                 type(error).__name__,
             )
             return fallback
+
+    @staticmethod
+    def _enforce_evidence_grounding(
+        content: TutorGeneratedContent, evidence: dict[str, Any]
+    ) -> None:
+        if evidence.get("execution_succeeded") is not True:
+            return
+        fields = [
+            content.diagnosis, content.misconception, content.answer,
+            *content.debugging_steps, content.guiding_question,
+            content.hint, content.next_action,
+        ]
+        if _UNDEFINED_NAME_CLAIM.search("\n".join(fields)):
+            raise ValueError("Tutor name-error claim contradicted successful execution.")
 
     @staticmethod
     def _enforce_output_policy(content: TutorGeneratedContent) -> None:

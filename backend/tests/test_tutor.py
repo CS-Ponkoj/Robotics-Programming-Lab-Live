@@ -1,6 +1,8 @@
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from config import Settings
 from models import Assignment, Submission
 from tutor import TutorService
@@ -83,6 +85,8 @@ def test_openai_client_uses_bounded_timeout_and_no_retries(monkeypatch):
     assert request["text"]["format"]["type"] == "json_schema"
     assert request["text"]["format"]["strict"] is True
     assert request["max_output_tokens"] == 1000
+    assert "module-level definitions" in request["instructions"]
+    assert "source of truth for execution claims" in request["instructions"]
 
 
 def test_builtin_hint_does_not_call_openai_when_ai_is_off():
@@ -247,3 +251,55 @@ def test_tutor_payload_strips_non_allowlisted_grader_evidence():
             "message": "Recheck how answer is calculated.",
         }
     ]
+
+
+@pytest.mark.parametrize("claim", [
+    "The code references undefined variables like start_point and hit_point.",
+    "The variables start_point and hit_point are not defined.",
+    "start_point is not defined in this function.",
+    "The function raises a NameError.",
+])
+@pytest.mark.parametrize("field", ["diagnosis", "answer", "hint", "debugging_steps"])
+def test_successful_execution_rejects_false_undefined_name_claims(claim, field):
+    output = {
+        "diagnosis": "Inspect the function inputs.", "misconception": "",
+        "answer": "Trace one input.", "debugging_steps": ["Compare the inputs."],
+        "guiding_question": "Which parameter is used?",
+        "hint": "Trace the function parameters.", "next_action": "Rerun one calculation.",
+    }
+    output[field] = [claim] if field == "debugging_steps" else claim
+    responses = SimpleNamespace(create=lambda **kwargs: SimpleNamespace(output_text=json.dumps(output)))
+    submission = _submission()
+    submission.code = (
+        "def route(start, hit):\n    return start_point + hit_point\n"
+        "start_point = 0\nhit_point = 4\nprint(route(start_point, hit_point))\n"
+    )
+    feedback = TutorService(Settings(), client=SimpleNamespace(responses=responses)).feedback(
+        _assignment(), submission, student_question="Why did this fail?"
+    )
+    assert feedback.source == "fallback"
+    assert "Your program runs" in feedback.diagnosis
+    assert claim not in feedback.model_dump_json()
+
+
+@pytest.mark.parametrize("execution_succeeded", [True, False])
+def test_grounded_global_input_or_real_name_error_explanation_is_allowed(execution_succeeded):
+    diagnosis = (
+        "The global points exist, but using them ignores the function parameters."
+        if execution_succeeded else "The execution error reports a NameError."
+    )
+    output = {
+        "diagnosis": diagnosis, "misconception": "", "answer": "",
+        "debugging_steps": ["Inspect the names used in this calculation."],
+        "guiding_question": "Which input does this expression use?",
+        "hint": "Trace one expression.", "next_action": "Run the tests again.",
+    }
+    responses = SimpleNamespace(create=lambda **kwargs: SimpleNamespace(output_text=json.dumps(output)))
+    submission = _submission()
+    submission.evidence["execution_succeeded"] = execution_succeeded
+    submission.evidence["execution_error"] = "" if execution_succeeded else "NameError: name 'missing' is not defined"
+    feedback = TutorService(Settings(), client=SimpleNamespace(responses=responses)).feedback(
+        _assignment(), submission
+    )
+    assert feedback.source == "openai"
+    assert feedback.diagnosis == diagnosis

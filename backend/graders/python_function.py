@@ -87,6 +87,11 @@ class PythonFunctionGrader:
                     )
                 )
             )
+            if not passed:
+                message += (
+                    " This check must work for every input scenario. Use the function "
+                    "parameters; correct output for the printed example alone is not enough."
+                )
             evidence.append(
                 TestEvidence(
                     test_id=str(criterion.get("id", f"criterion-{index + 1}")),
