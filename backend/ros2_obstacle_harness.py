@@ -13,6 +13,7 @@ import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
+from ros2_callback_audit import launch_student, exactly_one_per_callback
 
 
 def result(test_id: str, passed: bool, message: str) -> dict:
@@ -50,12 +51,8 @@ def main() -> None:
 
     monitor.create_subscription(Twist, command_topic, receive, 10)
     scan_publisher = monitor.create_publisher(LaserScan, scan_topic, 10)
-    student = subprocess.Popen(
-        ["ros2", "run", package, executable],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        start_new_session=True,
+    student, audit_fd = launch_student(
+        package, executable, "scan", command_topic, scan_topic,
     )
 
     def scan_message(ranges: list[float]) -> LaserScan:
@@ -139,6 +136,7 @@ def main() -> None:
         monitor.destroy_node()
         rclpy.shutdown()
     student_stdout, student_stderr = student.communicate(timeout=1)
+    one_command = exactly_one_per_callback(audit_fd)
 
     settled = [item for item in messages if item[1] >= 0.25]
     by_phase = {
@@ -159,7 +157,7 @@ def main() -> None:
         samples = by_phase[phase]
         return bool(samples) and all(abs(item[2]) <= 0.001 for item in samples)
 
-    responds_to_each_scan_state = all(by_phase.values())
+    responds_to_each_scan_state = all(by_phase.values()) and one_command
     command_topic_ok = bool(settled) and publish_rate >= minimum_rate
     clear_ok = all(forward_ok(phase) for phase in
                    ("clear", "above-threshold", "mixed"))
@@ -190,9 +188,9 @@ def main() -> None:
         result(
             "scan-response",
             responds_to_each_scan_state,
-            "The controller responds to clear, blocked, invalid, and restored scans."
+            "Exactly one command is published per callback for clear, blocked, invalid, and restored scans."
             if responds_to_each_scan_state
-            else "Subscribe to /scan and publish one command for every scan state.",
+            else "Use publisher queue depth 10, subscribe to /scan, and publish exactly one command per scan callback, without duplicates or skipped callbacks.",
         ),
         result(
             "cmd-vel-topic",

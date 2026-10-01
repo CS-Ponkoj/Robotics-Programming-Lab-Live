@@ -288,7 +288,7 @@ def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
     assert response.status_code == 200
     assignments = response.json()["assignments"]
     assert [assignment["id"] for assignment in assignments] == [1, 2, 3, 4, 5, 6]
-    assert [assignment["version"] for assignment in assignments] == [8, 7, 8, 8, 4, 4]
+    assert [assignment["version"] for assignment in assignments] == [9, 9, 10, 9, 5, 5]
     assert all(assignment["stable_id"] for assignment in assignments)
     assert all(assignment["solution_html"] == "" for assignment in assignments)
     assert all(assignment["vals"] == {} for assignment in assignments)
@@ -378,7 +378,7 @@ def test_correct_submission_passes_and_records_assignment_version(client):
     assert body["pass"] is True
     assert body["ex_success"] is True
     assert body["execution_status"] == "completed"
-    assert body["assignment_version"] == 7
+    assert body["assignment_version"] == 9
     assert body["submission_id"]
     assert body["unittest_pass_results"] == [True, True, True, True]
     assert body["hint"] == ""
@@ -573,7 +573,7 @@ def test_solution_reveal_rejects_a_submission_from_an_old_assignment_version(
         json=assignment,
     )
     assert updated.status_code == 200
-    assert updated.json()["version"] == 8
+    assert updated.json()["version"] == assignment["version"] + 1
     validation = client.post(
         "/admin/assignments/2/validate",
         headers=headers,
@@ -663,14 +663,14 @@ def test_admin_content_update_increments_version_and_preserves_stable_id(client)
     assert response.status_code == 200
     updated = response.json()
     assert updated["stable_id"] == original["stable_id"]
-    assert updated["version"] == 9
+    assert updated["version"] == original["version"] + 1
     assert updated["status"] == "draft"
 
     assert client.get("/assignments/1").status_code == 404
     publish = client.post("/admin/assignments/1/publish", headers=headers)
     assert publish.status_code == 200
     student_copy = client.get("/assignments/1").json()
-    assert student_copy["version"] == 9
+    assert student_copy["version"] == original["version"] + 1
     assert "grader_config" not in student_copy
 
 
@@ -686,7 +686,7 @@ def test_admin_update_cannot_bypass_publish_validation_or_force_version(client):
         json=original,
     ).json()
     assert draft["status"] == "draft"
-    assert draft["version"] == 9
+    assert draft["version"] == original["version"] + 1
 
     draft["status"] = "published"
     draft["version"] = 999
@@ -697,7 +697,7 @@ def test_admin_update_cannot_bypass_publish_validation_or_force_version(client):
     )
     assert attempted_bypass.status_code == 200
     assert attempted_bypass.json()["status"] == "draft"
-    assert attempted_bypass.json()["version"] == 9
+    assert attempted_bypass.json()["version"] == original["version"] + 1
 
 
 def test_admin_rejects_duplicate_stable_assignment_id(client):

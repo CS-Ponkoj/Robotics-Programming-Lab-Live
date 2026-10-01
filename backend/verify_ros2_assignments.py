@@ -54,6 +54,23 @@ def verify_assignment(assignment_id: int, image: str) -> None:
         f"{result.get('output', '')}"
     )
 
+    # Protect the exact-one-command contract with a real Docker regression, not
+    # a mock that merely knows the expected score.
+    duplicate = reference.read_text(encoding="utf-8").replace(
+        "self.velocity_publisher.publish(command)",
+        "self.velocity_publisher.publish(command)\n"
+        "        self.velocity_publisher.publish(command)",
+    )
+    rejected = DockerRos2Executor(image, timeout).execute(
+        duplicate, project_files, source.get("grader_config", {}),
+    )
+    criterion = "cmd-vel-topic" if assignment_id == 5 else "scan-response"
+    evidence = {item["id"]: item for item in rejected.get("tests", [])}
+    if (rejected.get("success") is not True or criterion not in evidence
+            or evidence[criterion].get("passed") is not False):
+        raise RuntimeError(f"Assignment {assignment_id}: duplicate commands were not rejected.")
+    print(f"Assignment {assignment_id}: PASS duplicate-command rejection ({criterion}).")
+
 
 def main() -> None:
     image = os.environ.get(

@@ -30,7 +30,7 @@ def test_newer_seed_versions_upgrade_existing_local_assignments():
         AssignmentRepository(session).sync_seed_assignments()
 
         assignments = AssignmentRepository(session).list_all()
-        assert [item.version for item in assignments] == [8, 7, 8, 8, 4, 4]
+        assert [item.version for item in assignments] == [9, 9, 10, 9, 5, 5]
         for assignment in assignments:
             assert assignment.data_schema_version == 1
             assert assignment.execution_settings["runtime"]
@@ -43,6 +43,24 @@ def test_newer_seed_versions_upgrade_existing_local_assignments():
             )
 
     engine.dispose()
+
+
+def test_assignment_2_explains_euclidean_distance_and_only_defined_route_points():
+    payload = json.loads(
+        (Path(__file__).resolve().parents[1] / "assignments/assignment_2.json")
+        .read_text(encoding="utf-8")
+    )
+    instructions = payload["assignment_html"]
+    assert "Euclidean distance (straight-line distance between two points)" in instructions
+    assert "math.sqrt((x2 - x1)**2 + (y2 - y1)**2)" in instructions
+    assert "math.hypot(dx, dy)" in instructions
+    assert "direct hit-to-leave distance" in instructions
+    assert "C, D" not in instructions
+    assert "Do not use the upper boundary or the full obstacle perimeter" in instructions
+    namespace = {}
+    exec(compile(payload["starter_code"], "assignment-2-starter", "exec"), namespace)
+    assert namespace["calculate_distance"]((0, 0), (3, 4)) == pytest.approx(5)
+    assert namespace["results"] == (0.0, 0.0, 0.0, 0.0)
 
 
 def test_assignments_1_through_4_use_instructor_authored_learning_metadata():

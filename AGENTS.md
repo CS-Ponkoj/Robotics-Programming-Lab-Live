@@ -119,6 +119,7 @@ backend/                          FastAPI application
   sandbox.py                      Sandbox client and execution policies
   sandbox_service.py              Dedicated execution service
   ros2_worker.py / ros2_*_harness.py  Isolated ROS package build and behavior checks
+  ros2_callback_audit.py           Container-only callback publication instrumentation
   tutor.py / hinter.py            Deterministic and optional AI tutoring
   research_service.py             Study sessions, events, summaries, and exports
   instructor_dataset.py           Offline instructor AI-evaluation contract and validator
@@ -424,6 +425,12 @@ Each assignment configuration must support:
 Use `AssignmentGrader` implementations for grading differences. Keep result
 evidence structured and normalize non-native scalar values before JSON
 serialization. A feedback string is not a pass/fail boolean.
+
+ROS grading must verify the stated one-command-per-callback contract, not just
+an average publication rate. Keep callback instrumentation inside the isolated
+Docker image; it is assessment evidence, never a substitute for isolation.
+Run `backend/verify_ros2_assignments.py` after rebuilding that image to check
+maintained answers and duplicate-publication rejection.
 
 Before publishing or changing an assignment, verify:
 

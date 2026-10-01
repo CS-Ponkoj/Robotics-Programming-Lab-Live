@@ -12,6 +12,7 @@ import time
 import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
+from ros2_callback_audit import launch_student, exactly_one_per_callback
 
 
 def result(test_id: str, passed: bool, message: str) -> dict:
@@ -97,13 +98,7 @@ def main() -> None:
         rclpy.spin_once(monitor, timeout_sec=0.05)
 
     student_started_at = time.monotonic()
-    student = subprocess.Popen(
-        ["ros2", "run", package, executable],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        start_new_session=True,
-    )
+    student, audit_fd = launch_student(package, executable, "timer", topic)
     started_at = time.monotonic()
     try:
         while time.monotonic() - started_at < observation_seconds:
@@ -121,6 +116,7 @@ def main() -> None:
         monitor.destroy_node()
         rclpy.shutdown()
     student_stdout, student_stderr = student.communicate(timeout=1)
+    one_command = exactly_one_per_callback(audit_fd)
 
     duration = messages[-1][0] - messages[0][0] if len(messages) > 1 else 0.0
     publish_rate = (len(messages) - 1) / duration if duration > 0 else 0.0
@@ -148,8 +144,10 @@ def main() -> None:
         ),
         result(
             "cmd-vel-topic",
-            bool(messages) and publish_rate >= minimum_rate,
-            "Twist messages were published consistently on /cmd_vel." if messages and publish_rate >= minimum_rate else "Publish Twist messages consistently on /cmd_vel.",
+            bool(messages) and publish_rate >= minimum_rate and one_command,
+            "Exactly one Twist command was published per timer callback on /cmd_vel."
+            if messages and publish_rate >= minimum_rate and one_command
+            else "Use queue depth 10 and a 0.1-second timer; publish exactly one Twist command on /cmd_vel in every callback, without duplicates or skipped callbacks.",
         ),
         result(
             "forward-motion",

@@ -222,7 +222,7 @@ def test_drive_forward_harness_uses_process_relative_timing_with_startup_grace()
     )
 
     process_clock = source.index("student_started_at = time.monotonic()")
-    student_launch = source.index("student = subprocess.Popen(")
+    student_launch = source.index("student, audit_fd = launch_student(")
     assert "startup_grace_seconds" in source
     assert "now - student_started_at" in source
     assert "monitor_ready_at = time.monotonic() + 0.5" in source
@@ -355,7 +355,7 @@ def test_ros2_assignment_submission_uses_injected_executor(tmp_path):
 
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
-    assert assignment_body["version"] == 4
+    assert assignment_body["version"] == 5
     assert 'src="/images/5"' in assignment_body["assignment_html"]
     assert "src/robot_motion/robot_motion/controller.py" in assignment_body["assignment_html"]
     assert response.status_code == 200
@@ -400,7 +400,7 @@ def test_ros2_obstacle_assignment_submission_uses_behavior_harness(tmp_path):
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
     assert assignment_body["stable_id"] == "ros2-obstacle-stop"
-    assert assignment_body["version"] == 4
+    assert assignment_body["version"] == 5
     assert 'src="/images/6"' in assignment_body["assignment_html"]
     assert "src/reactive_navigation/reactive_navigation/controller.py" in assignment_body["assignment_html"]
     assert assignment_body["editable_file_path"].endswith("controller.py")

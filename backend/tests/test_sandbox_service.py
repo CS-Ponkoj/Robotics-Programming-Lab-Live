@@ -140,4 +140,4 @@ def test_backend_grades_through_real_remote_sandbox_contract(
 
     assert response.status_code == 200
     assert response.json()["pass"] is True
-    assert response.json()["assignment_version"] == 7
+    assert response.json()["assignment_version"] == 9
