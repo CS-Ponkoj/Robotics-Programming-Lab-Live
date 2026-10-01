@@ -127,7 +127,7 @@ backend/                          FastAPI application
   assignments/                    Controlled assignment configuration
   tests/                          Backend regression and security tests
 
-manual_sqa_answers/               Instructor-only manual verification answers
+assignments_answers/              Instructor-only manual verification answers
 course_materials/                 Controlled assignment and course source documents
   archive/                        Historical supporting material, not runtime content
 docs/                             Architecture, deployment, research, and SQA records
@@ -180,6 +180,11 @@ is not evidence that observable behavior works.
 Clearly separate confirmed bugs, possible risks or improvements, untested
 items, and external limitations or blockers. Mention directly related problems
 encountered during the task, but do not investigate unrelated issues.
+
+When discussing a plan or update, begin each reply with a brief recap of the
+relevant decisions already agreed with the owner. Then explain new options,
+changes, or next steps. Keep the recap short and distinguish agreed decisions
+from proposals; do not ask for approval of an agreed decision again.
 
 Explain technical ideas in simple words and lead with the result or
 recommendation. For architecture, stacks, and workflows, explain what each
@@ -316,7 +321,7 @@ git status --short
 managed application is stopped. Its allow-list may contain rebuildable caches
 and build output only. Never add `.git`, `.env`, `venv`, databases,
 `output`, `course_materials`, or
-`manual_sqa_answers` to that cleanup allow-list.
+`assignments_answers` to that cleanup allow-list.
 
 Use Git maintenance commands for repository object cleanup; never delete files
 inside `.git` manually. Keep the current operating documents and latest SQA
@@ -430,7 +435,7 @@ Before publishing or changing an assignment, verify:
   are bounded; and
 - hidden tests and solutions are absent from student responses.
 
-`manual_sqa_answers/` is controlled instructor material. Do not ship its contents
+`assignments_answers/` is controlled instructor material. Do not ship its contents
 to the frontend, public API, learner export, or AI context.
 
 ## Sandbox and untrusted-code rules
@@ -564,7 +569,7 @@ Before promotion:
 - verify student and instructor end-to-end workflows;
 - verify research capture and export privacy;
 - confirm AI is off by default;
-- update the master SQA workbook/report;
+- update the single master SQA workbook;
 - confirm zero open release blockers;
 - record the tested commit SHA; and
 - obtain explicit approval for production and the release tag.
@@ -606,6 +611,15 @@ SQA evidence must state:
 
 Never convert a blocked or untested item into PASS based on assumption.
 
+Maintain exactly one QA file:
+`docs/sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx`.
+Update its checklist, defect log, dated run evidence, and release sign-off
+instead of creating separate QA Excel, CSV, or Markdown reports. Preserve
+historical evidence and its original statuses. Imported reports are indexed
+in QA Report Index, with complete text in QA Report Archive. Temporary test
+logs may be generated outside tracked files; automated tests and test fixtures
+are not QA reports and must remain in the repository.
+
 ## Review checklist
 
 Before handing off a change, ask:
@@ -619,6 +633,10 @@ Before handing off a change, ask:
 - Can an older browser draft be mistaken for the current assignment version?
 - Are untrusted submissions still isolated and bounded?
 - Does the feature work with AI disabled?
+- Are built-in hints available with AI off, and are misconception labels based
+  on explicit grader evidence rather than model guesses or hint levels?
+- Do route graders check exact return count and order, equivalent safe math
+  methods, valid geometry, and every correct/wrong criterion combination?
 - Are research records reproducible and privacy-preserving?
 - Are desktop, mobile-width, keyboard, and accessibility states covered?
 - Are focused tests and proportional regressions passing?

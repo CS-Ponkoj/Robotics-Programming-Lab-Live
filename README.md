@@ -8,6 +8,9 @@ remain the only grading authority. AI tutoring is optional and off by default.
 This is the **staging repository**. Development and SQA happen here before an
 approved release is promoted to the separate live repository.
 
+All QA checklists, defects, dated results, and historical evidence are maintained
+in the [single master QA workbook](docs/sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx).
+
 ## Quick start
 
 Open a terminal in the repository root. Follow the
@@ -107,6 +110,17 @@ instead of deleting an account so its research history remains intact.
   elapsed completion time, paginated attempt history, classroom/participant/
   assignment catalogs, and instructor data-health checks
 
+Assignment checks cover varied function inputs, not only the printed example.
+Assignment 3 selects the service elevator when complete route times tie.
+Assignment 4 tests variable sector counts, supplied readings, and density ties;
+it does not require angle wrapping. Assignment 5 measures the stop interval
+from the first observed command, excluding node-launch delay, and requires
+continued stop commands throughout the observation period. Assignment 6
+checks the exact stopping threshold, neighboring distances, mixed invalid
+readings, empty scans, and recovery. ROS package/node scaffold checks can earn
+partial credit before movement behavior is implemented; the instructions show
+the individual weights.
+
 Course pages are generated from `course_materials/content` and stored in
 `backend/course_content`. The `References` folders and solution files are not
 published as student pages. After reviewing a source-document edit, install
@@ -171,7 +185,7 @@ the scoring authority.
 backend/              FastAPI app, data models, graders, assignments, and tests
 frontend/             Flutter student and instructor interface
 course_materials/     Controlled course sources plus a labeled history archive
-manual_sqa_answers/   Maintained instructor answers for manual SQA
+assignments_answers/  Maintained instructor answers for manual SQA
 docs/                 Architecture, deployment, research, and SQA documents
   archive/             Superseded reports and deployment snapshots
 scripts/              PowerShell and Bash setup, run, stop, and verification

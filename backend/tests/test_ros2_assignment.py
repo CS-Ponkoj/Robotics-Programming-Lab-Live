@@ -207,11 +207,13 @@ def test_obstacle_harness_waits_for_ros_discovery_before_scoring():
     )
 
     readiness = source.index("controller_ready = wait_for_controller()")
-    clear_phase = source.index('run_phase("clear"')
+    clear_phase = source.index('run_phase(phase, ranges, phase_duration)')
     assert "scan_publisher.get_subscription_count() > 0" in source
     assert "monitor.count_publishers(command_topic) > 0" in source
     assert "messages.clear()" in source
     assert readiness < clear_phase
+    scored_phase_loop = source[source.index('messages.clear()'):clear_phase]
+    assert 'if controller_ready:' in scored_phase_loop
 
 
 def test_drive_forward_harness_uses_process_relative_timing_with_startup_grace():
@@ -329,7 +331,7 @@ def test_ros2_assignment_submission_uses_injected_executor(tmp_path):
     )
     solution = (
         Path(__file__).resolve().parents[2]
-        / "manual_sqa_answers"
+        / "assignments_answers"
         / "assignment_5_ros2_drive_forward"
         / "controller.py"
     ).read_text(encoding="utf-8")
@@ -353,7 +355,7 @@ def test_ros2_assignment_submission_uses_injected_executor(tmp_path):
 
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
-    assert assignment_body["version"] == 3
+    assert assignment_body["version"] == 4
     assert 'src="/images/5"' in assignment_body["assignment_html"]
     assert "src/robot_motion/robot_motion/controller.py" in assignment_body["assignment_html"]
     assert response.status_code == 200
@@ -373,7 +375,7 @@ def test_ros2_obstacle_assignment_submission_uses_behavior_harness(tmp_path):
     )
     solution = (
         Path(__file__).resolve().parents[2]
-        / "manual_sqa_answers"
+        / "assignments_answers"
         / "assignment_6_ros2_obstacle_stop"
         / "controller.py"
     ).read_text(encoding="utf-8")
@@ -398,7 +400,7 @@ def test_ros2_obstacle_assignment_submission_uses_behavior_harness(tmp_path):
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
     assert assignment_body["stable_id"] == "ros2-obstacle-stop"
-    assert assignment_body["version"] == 3
+    assert assignment_body["version"] == 4
     assert 'src="/images/6"' in assignment_body["assignment_html"]
     assert "src/reactive_navigation/reactive_navigation/controller.py" in assignment_body["assignment_html"]
     assert assignment_body["editable_file_path"].endswith("controller.py")

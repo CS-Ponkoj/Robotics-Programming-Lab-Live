@@ -702,6 +702,12 @@ def create_app(
     ) -> dict:
         evidence = submission.evidence
         tests = evidence.get("tests", [])
+        if tutor_feedback is None and not submission.passed:
+            # Offer the first built-in hint without making an AI request or
+            # recording a hint request the student did not initiate.
+            tutor_feedback = TutorService(application.state.settings).feedback(
+                assignment, submission, hint_level=1, use_ai_tutor=False
+            )
         response = SubmissionResponse(
             id=assignment.id,
             submission_id=submission.id,

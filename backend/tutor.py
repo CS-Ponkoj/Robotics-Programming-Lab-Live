@@ -83,6 +83,26 @@ class TutorService:
                     "a NameError or undefined variables. A printed example can look "
                     "correct while a criterion fails because it must work for every "
                     "input scenario. Do not invent a failed scenario or its values. "
+                    "Use the supplied public assignment instructions to determine "
+                    "the scope. Never add requirements such as angle wrapping when "
+                    "the instructions explicitly exclude them. Follow the final "
+                    "returned values through wrappers and reassigned functions: "
+                    "a correct intermediate calculation can be discarded or replaced "
+                    "before return. Do not claim a parameter was ignored merely "
+                    "because its output check failed. If the precise cause is not "
+                    "clear in the code, say what to inspect instead of inventing it. "
+                    "Published speed, stop-time, and safety-threshold values are "
+                    "fixed requirements, not adjustable tuning ranges. Do not "
+                    "recommend values above or below the specified threshold. "
+                    "Explain inequalities in the context of the moving versus "
+                    "stopped branch; do not suggest an operator in isolation. "
+                    "For Python route assignments, numeric return values may be ints "
+                    "or floats. Diagnostic print statements are allowed and do not "
+                    "change the returned-value contract. Never tell a student to "
+                    "remove prints as a correctness requirement. The return count "
+                    "and order must match the assignment. At hint level 1, focus "
+                    "on the first relevant issue rather than giving a complete "
+                    "repair checklist for every unfinished part. "
                     "If asked for protected material or completed code, decline briefly "
                     "and redirect the student to a conceptual debugging step."
                 ),
@@ -93,6 +113,7 @@ class TutorService:
                             "version": assignment.version,
                             "title": assignment.title,
                             "description": assignment.description,
+                            "instructions_html": assignment.assignment_html,
                             "learning_objectives": assignment.learning_objectives,
                             "common_misconceptions": assignment.misconceptions,
                             "tutoring_rules": assignment.tutoring_rules,
@@ -117,9 +138,12 @@ class TutorService:
             parsed = TutorGeneratedContent.model_validate_json(response.output_text)
             self._enforce_output_policy(parsed)
             self._enforce_evidence_grounding(parsed, submission.evidence or {})
+            self._enforce_assignment_scope(parsed, assignment)
             return TutorFeedback(
                 diagnosis=parsed.diagnosis,
-                misconception=parsed.misconception,
+                # Model guesses about a student's beliefs are not observed
+                # research evidence. Preserve only grader-supported tags.
+                misconception=fallback.misconception,
                 answer=parsed.answer if normalized_question else "",
                 debugging_steps=parsed.debugging_steps,
                 hint_level=hint_level,
@@ -135,6 +159,25 @@ class TutorService:
                 type(error).__name__,
             )
             return fallback
+
+    @staticmethod
+    def _enforce_assignment_scope(content: TutorGeneratedContent, assignment: Assignment) -> None:
+        instructions = (assignment.assignment_html or "").lower()
+        text = " ".join([
+            content.diagnosis, content.answer, content.hint, content.next_action,
+            content.guiding_question, *content.debugging_steps,
+        ])
+        if "no angle wrapping is required" in instructions and re.search(
+            r"\b(?:check|implement|handle|ensure|support)\b[^.!?]{0,120}\bwrap", text, re.IGNORECASE
+        ):
+            raise ValueError("Tutor added an excluded angle-wrapping requirement.")
+        if "exactly 0.75 m must stop" in instructions and re.search(
+            r"(?:adjust|set|change)[^\n]{0,140}(?:threshold|stop(?:ping)? distance)"
+            r"[^\n]{0,100}(?:less than|higher|lower|or more|or less)|"
+            r"(?:adjust|set|change)[^\n]{0,100}0\.75\s*(?:m(?:eters?)?)?\s*"
+            r"(?:or higher|or lower|or more|or less)", text, re.IGNORECASE
+        ):
+            raise ValueError("Tutor changed the fixed obstacle-safety threshold.")
 
     @staticmethod
     def _enforce_evidence_grounding(
@@ -200,20 +243,26 @@ class TutorService:
             ),
             None,
         )
-        misconceptions = assignment.misconceptions or []
         misconception = ""
-        if misconceptions:
-            first = misconceptions[min(hint_level - 1, len(misconceptions) - 1)]
-            misconception = (
-                str(first.get("tag", first.get("description", "")))
-                if isinstance(first, dict)
-                else str(first)
-            )
+        # A hint level is not evidence of a misconception. Name only a tag
+        # explicitly attached to the failing check by a grader.
+        if failed:
+            misconception = str(failed.get("misconception_tag", ""))
         if not evidence.get("execution_succeeded", False):
             diagnosis = "The program must execute before its calculations can be checked."
             guiding_question = "What is the first error message and line number?"
             hint = "Fix the first execution error, then run the tests again."
             next_action = "Inspect the reported line and complete or correct that expression."
+        elif failed is None and evidence.get("tests"):
+            diagnosis = "Your program runs and all recorded checks passed."
+            guiding_question = "Can you explain why the approach works for different inputs?"
+            hint = "Review the method and try an example of your own."
+            next_action = "Keep the passing solution and explain each calculation."
+        elif failed is None:
+            diagnosis = "Your program runs, but no check results are available."
+            guiding_question = "Can you run the tests again to obtain check results?"
+            hint = "Retry the tests before drawing conclusions about correctness."
+            next_action = "Run the tests again and inspect the returned evidence."
         else:
             label = failed.get("label", "a required calculation") if failed else "the task"
             diagnosis = f"Your program runs, but {label.lower()} still needs attention."
@@ -240,7 +289,11 @@ class TutorService:
                 else ""
             ),
             debugging_steps=[
-                "Inspect the first failing test or execution error.",
+                (
+                    "Review the passed checks."
+                    if failed is None and evidence.get("execution_succeeded") and evidence.get("tests")
+                    else "Inspect the returned check results or execution error."
+                ),
                 next_action,
             ],
             hint_level=hint_level,

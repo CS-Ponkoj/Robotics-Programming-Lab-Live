@@ -377,7 +377,7 @@ def test_phase1_activity_completion_catalog_and_pagination(research_client):
 
     answer_path = (
         Path(__file__).resolve().parents[2]
-        / "manual_sqa_answers"
+        / "assignments_answers"
         / "assignment_1_answer.py"
     )
     correct = research_client.post(

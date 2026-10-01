@@ -51,17 +51,25 @@ class PythonFunctionGrader:
                 code,
                 "",
                 f"grader_values = {function_name}(*{tuple(arguments)!r})",
+                "grader_return_count = len(grader_values)",
                 *[
                     f"{name} = grader_values[{index}]"
                     for index, name in enumerate(result_names)
                 ],
             ]
-            result = self.sandbox.execute("\n".join(harness_lines), result_names)
+            result = self.sandbox.execute(
+                "\n".join(harness_lines), [*result_names, "grader_return_count"]
+            )
             if result.get("success") is not True:
                 hidden_execution_failed = True
                 criterion_passes = [False] * len(criteria)
                 break
             actual_values = result.get("values", {})
+            if actual_values.get("grader_return_count") != len(criteria):
+                return self._execution_failure(criteria, {
+                    "output": base_result.get("output", ""),
+                    "error": f"Return exactly {len(criteria)} values in the required order.",
+                })
             for index, name in enumerate(result_names):
                 criterion_passes[index] = criterion_passes[index] and self._matches(
                     actual_values.get(name), expected[index]

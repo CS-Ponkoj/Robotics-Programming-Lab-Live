@@ -79,6 +79,7 @@ def test_openai_client_uses_bounded_timeout_and_no_retries(monkeypatch):
     assert feedback.hint == "Trace the calculation."
     assert feedback.source == "openai"
     assert feedback.debugging_steps == ["Inspect the input values."]
+    assert feedback.misconception == ""
 
     request = FakeResponses.last_request
     assert request["store"] is False
@@ -87,6 +88,42 @@ def test_openai_client_uses_bounded_timeout_and_no_retries(monkeypatch):
     assert request["max_output_tokens"] == 1000
     assert "module-level definitions" in request["instructions"]
     assert "source of truth for execution claims" in request["instructions"]
+    assert "Diagnostic print statements are allowed" in request["instructions"]
+    assert "numeric return values may be ints" in request["instructions"]
+    assert "first relevant issue" in request["instructions"]
+    assert "returned values through wrappers" in request["instructions"]
+    assert "instructions_html" in json.loads(request["input"])["assignment"]
+
+
+@pytest.mark.parametrize('advice,expected_source', [
+    ('Check how your code handles wrap-around boundaries.', 'fallback'),
+    ('No angle wrapping is required. Inspect the inclusive endpoints.', 'openai'),
+])
+def test_tutor_respects_explicit_vfh_scope(advice, expected_source):
+    content = dict(diagnosis='Inspect the search window.', misconception='',
+                   answer='', debugging_steps=[advice], guiding_question='Are both endpoints included?',
+                   hint='Trace the candidate angles.', next_action='Run the tests again.')
+    responses = SimpleNamespace(create=lambda **kwargs: SimpleNamespace(output_text=json.dumps(content)))
+    assignment = _assignment()
+    assignment.assignment_html = '<p>No angle wrapping is required.</p>'
+    result = TutorService(Settings(), client=SimpleNamespace(responses=responses)).feedback(assignment, _submission())
+    assert result.source == expected_source
+
+
+@pytest.mark.parametrize('advice,expected_source', [
+    ('Adjust the stop distance parameter to match or be less than the required 0.75 m threshold.', 'fallback'),
+    ('Temporarily set self.stop_distance to 0.75 or higher.', 'fallback'),
+    ('Compare the configured stop distance with the required 0.75 m threshold.', 'openai'),
+])
+def test_tutor_does_not_turn_fixed_safety_threshold_into_a_tuning_range(advice, expected_source):
+    content = dict(diagnosis='Inspect the stop threshold.', misconception='', answer=advice,
+                   debugging_steps=['Trace the stopping branch.'], guiding_question='Does the robot stop at the boundary?',
+                   hint='Compare the requirement.', next_action='Run the tests again.')
+    responses = SimpleNamespace(create=lambda **kwargs: SimpleNamespace(output_text=json.dumps(content)))
+    assignment = _assignment()
+    assignment.assignment_html = '<p>Exactly 0.75 m must stop the robot.</p>'
+    result = TutorService(Settings(), client=SimpleNamespace(responses=responses)).feedback(assignment, _submission())
+    assert result.source == expected_source
 
 
 def test_builtin_hint_does_not_call_openai_when_ai_is_off():
@@ -195,6 +232,7 @@ def test_tutor_sends_student_question_as_untrusted_input_and_returns_answer():
     )
 
     payload = json.loads(captured["input"])
+    assert feedback.misconception == ""
     assert payload["student_question"] == (
         "Why does a diagonal need both coordinates?"
     )

@@ -30,22 +30,15 @@ and verification records.
 
 ## SQA evidence
 
-- [V6.2 learning workbench QA](sqa/V6_2_WORKBENCH_QA.md)
+- [Master QA workbook](sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
 
-- [Master SQA checklist](sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
-- [Results drawer and account-label SQA report](sqa/RESULTS_DRAWER_ACCOUNT_LABEL_SQA_2026-09-25.md)
-- [Neon-only database architecture SQA report](sqa/NEON_ONLY_DATABASE_SQA_REPORT_2026-08-28.md)
-- [Neon and account management SQA report](sqa/NEON_ACCOUNT_MANAGEMENT_SQA_REPORT_2026-08-28.md)
-- [Ubuntu local support SQA report](sqa/UBUNTU_LOCAL_SUPPORT_SQA_REPORT_2026-08-28.md)
-- [Automatic local database backup SQA report (historical; superseded by Neon-only runtime)](sqa/AUTOMATIC_LOCAL_DATABASE_BACKUP_SQA_REPORT_2026-08-26.md)
-- [V5.2 Basic Analytics SQA report](sqa/V5_2_BASIC_ANALYTICS_SQA_REPORT_2026-08-26.md)
-- [Historical PostgreSQL OneDrive handoff SQA report (superseded)](sqa/LOCAL_POSTGRES_ONEDRIVE_HANDOFF_SQA_REPORT_2026-08-24.md)
-- [Historical copyable database handoff package SQA report (superseded)](sqa/COPYABLE_LOCAL_HANDOFF_PACKAGE_SQA_REPORT_2026-08-25.md)
-- [Repository cleanup SQA report](sqa/REPOSITORY_CLEANUP_SQA_REPORT_2026-08-24.md)
-
-Earlier dated reports remain available through the
-[historical documentation archive](archive/README.md). They are evidence from
-their recorded versions, not the current release decision.
+This is the single maintained QA file. Use **Master Checklist** for current
+checks, **Defect Log** for issues, and **Release Sign-off** for release approval.
+**QA Run History** contains checks imported from dated reports. **QA Report
+Index** locates each report; **QA Report Archive** preserves its complete text
+in source-line order. Historical results describe the recorded version and
+are not a current release verdict. Future QA evidence belongs in this workbook,
+not a new Excel or Markdown report.
 
 ## Placement rule
 
@@ -57,6 +50,6 @@ their recorded versions, not the current release decision.
   `docs/deployment/`.
 - Put research schemas, collection guidance, and data definitions in
   `docs/research/`.
-- Keep the current test checklist and latest dated evidence in `docs/sqa/`.
-- Move superseded release evidence and deployment snapshots to `docs/archive/`
-  without rewriting their historical results.
+- Keep all current and historical QA evidence in the single master workbook
+  under `docs/sqa/`; preserve dated results when adding a new run.
+- Move superseded deployment snapshots to `docs/archive/`.

@@ -18,6 +18,44 @@ def result(test_id: str, passed: bool, message: str) -> dict:
     return {"id": test_id, "passed": passed, "message": message}
 
 
+def motion_checks(messages, expected_linear, linear_tolerance,
+                  angular_tolerance, move_seconds, stop_tolerance,
+                  minimum_rate=5.0, observation_end=None):
+    """Separate node-launch latency from the observed command timeline."""
+    origin = messages[0][0] if messages else 0.0
+    samples = [(stamp - origin, linear, angular)
+               for stamp, linear, angular in messages]
+    moving = [item for item in samples if item[0] < move_seconds - stop_tolerance]
+    stopped = [item for item in samples
+               if abs(item[1]) <= 0.001 and abs(item[2]) <= 0.001]
+    first_stop = stopped[0][0] if stopped else None
+    stop_ok = first_stop is not None and (
+        move_seconds - stop_tolerance <= first_stop <= move_seconds + stop_tolerance
+    )
+    stopped_duration = stopped[-1][0] - first_stop if stopped else 0.0
+    stopped_rate = (len(stopped) - 1) / stopped_duration if stopped_duration > 0 else 0.0
+    observed_to_end = (
+        bool(messages) and
+        (observation_end is None or messages[-1][0] >= observation_end - 0.3)
+    )
+    return {
+        "forward-motion": bool(moving) and all(
+            math.isclose(item[1], expected_linear, abs_tol=linear_tolerance)
+            for item in moving
+        ),
+        "straight-motion": bool(samples) and all(
+            abs(item[2]) <= angular_tolerance for item in samples
+        ),
+        "safe-stop": stop_ok,
+        "hold-stop": stop_ok and len(stopped) >= 3
+        and stopped_rate >= minimum_rate and observed_to_end and not any(
+            item[0] > first_stop + 0.1
+            and (abs(item[1]) > 0.001 or abs(item[2]) > 0.001)
+            for item in samples
+        ),
+    }
+
+
 def main() -> None:
     config = json.loads(os.environ.get("ROS_GRADER_CONFIG", "{}"))
     package = str(config.get("package_name", "robot_motion"))
@@ -86,24 +124,13 @@ def main() -> None:
 
     duration = messages[-1][0] - messages[0][0] if len(messages) > 1 else 0.0
     publish_rate = (len(messages) - 1) / duration if duration > 0 else 0.0
-    moving = [item for item in messages if item[0] <= move_seconds - 0.3]
-    stopped = [item for item in messages if abs(item[1]) <= 0.001 and abs(item[2]) <= 0.001]
-    first_stop = stopped[0][0] if stopped else None
-    forward_ok = bool(moving) and all(
-        math.isclose(item[1], expected_linear, abs_tol=linear_tolerance)
-        for item in moving
-    )
-    straight_ok = bool(messages) and all(
-        abs(item[2]) <= angular_tolerance for item in messages
-    )
-    stop_ok = first_stop is not None and (
-        move_seconds - stop_tolerance
-        <= first_stop
-        <= move_seconds + startup_grace + stop_tolerance
-    )
-    held_stop = stop_ok and sum(item[0] >= first_stop for item in stopped) >= 3 and not any(
-        item[0] > first_stop + 0.1 and abs(item[1]) > 0.001 for item in messages
-    )
+    checks = motion_checks(messages, expected_linear, linear_tolerance,
+                           angular_tolerance, move_seconds, stop_tolerance,
+                           minimum_rate, observation_seconds)
+    forward_ok = checks["forward-motion"]
+    straight_ok = checks["straight-motion"]
+    stop_ok = checks["safe-stop"]
+    held_stop = checks["hold-stop"]
     runtime_error = (
         ""
         if alive_at_end

@@ -108,14 +108,26 @@ def main() -> None:
                 break
 
     controller_ready = False
+    # Float32 LaserScan readings cannot represent every decimal exactly.
+    # Use an exactly representable boundary and neighboring values here.
+    phases = [
+        ("clear", [2.0] * 9),
+        ("threshold", [stop_distance]),
+        ("obstacle", [2.0, stop_distance - 0.05, 2.0]),
+        ("above-threshold", [stop_distance + 0.05, 2.0]),
+        ("mixed", [math.nan, math.inf, -1.0, 0.0, 2.0]),
+        ("invalid", [math.inf, math.nan, 0.0, -1.0]),
+        ("empty", []),
+        ("resume", [2.0] * 9),
+    ]
+    phase_duration = 0.8
     try:
         controller_ready = wait_for_controller()
         # Readiness traffic must never count as scored student evidence.
         messages.clear()
-        run_phase("clear", [2.0] * 9, 1.2)
-        run_phase("obstacle", [2.0, 1.5, 0.4, 1.5, 2.0], 1.2)
-        run_phase("invalid", [math.inf, math.nan, 0.0, -1.0], 1.2)
-        run_phase("resume", [2.0] * 9, 1.2)
+        if controller_ready:
+            for phase, ranges in phases:
+                run_phase(phase, ranges, phase_duration)
     finally:
         alive_at_end = student.poll() is None
         if alive_at_end:
@@ -131,9 +143,9 @@ def main() -> None:
     settled = [item for item in messages if item[1] >= 0.25]
     by_phase = {
         phase: [item for item in settled if item[0] == phase]
-        for phase in ("clear", "obstacle", "invalid", "resume")
+        for phase, _ranges in phases
     }
-    observed_duration = 4 * 1.2
+    observed_duration = len(phases) * phase_duration
     publish_rate = len(settled) / observed_duration
 
     def forward_ok(phase: str) -> bool:
@@ -149,9 +161,10 @@ def main() -> None:
 
     responds_to_each_scan_state = all(by_phase.values())
     command_topic_ok = bool(settled) and publish_rate >= minimum_rate
-    clear_ok = forward_ok("clear")
-    obstacle_ok = stopped_ok("obstacle")
-    invalid_ok = stopped_ok("invalid")
+    clear_ok = all(forward_ok(phase) for phase in
+                   ("clear", "above-threshold", "mixed"))
+    obstacle_ok = all(stopped_ok(phase) for phase in ("obstacle", "threshold"))
+    invalid_ok = all(stopped_ok(phase) for phase in ("invalid", "empty"))
     straight_ok = bool(settled) and all(
         abs(item[3]) <= angular_tolerance for item in settled
     )

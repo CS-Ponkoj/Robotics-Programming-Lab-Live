@@ -12,7 +12,7 @@ ALLOWED_IMPORTS = frozenset({"math", "numpy", "scipy"})
 MAX_OUTPUT_CHARS = 20_000
 ALLOWED_MODULE_ATTRIBUTES = {
     "math": {
-        "acos", "asin", "atan", "atan2", "ceil", "cos", "degrees", "e",
+        "acos", "asin", "atan", "atan2", "ceil", "cos", "degrees", "dist", "e",
         "exp", "fabs", "floor", "hypot", "inf", "isclose", "log", "log10",
         "pi", "radians", "sin", "sqrt", "tan", "tau",
     },

@@ -7,7 +7,8 @@ roadmap only and are intentionally absent from the application until their data
 and research rules are ready.
 
 The implementation evidence is recorded in the
-[V5.2 Basic Analytics SQA report](../sqa/V5_2_BASIC_ANALYTICS_SQA_REPORT_2026-08-26.md).
+[master QA workbook](../sqa/Robotics_Programming_Lab_Master_SQA_Checklist.xlsx)
+(find the V5.2 Basic Analytics report in QA Report Index).
 
 | Phase | Scope | Application status |
 | --- | --- | --- |

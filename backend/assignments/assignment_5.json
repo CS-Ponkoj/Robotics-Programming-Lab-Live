@@ -1,11 +1,11 @@
 {
   "id": 5,
   "stable_id": "ros2-drive-forward",
-  "version": 3,
+  "version": 4,
   "data_schema_version": 1,
   "title": "Assignment 5: Drive Forward and Stop with ROS 2",
   "description": "Create a ROS 2 velocity publisher that moves a robot forward and then stops safely.",
-  "assignment_html": "<p><strong>Scenario</strong></p><p><strong>Purpose:</strong> Create a ROS 2 node that moves a robot straight forward for a fixed time and then continuously commands a safe stop.</p><p>You are programming a mobile robot in ROS 2. The robot receives movement commands through the <code>/cmd_vel</code> topic.</p><p><strong>File and editing rule</strong></p><p>Read the complete project tree, but edit only:</p><p><code>src/robot_motion/robot_motion/controller.py</code></p><p>Do not rename the package, node, executable, topic, class, methods, or starter variables.</p><p><img src=\"/images/5\" alt=\"Timeline diagram showing the robot driving forward before five seconds, switching to zero velocity at five seconds, and continuing to publish stop commands afterward.\"></p><p><strong>Task</strong></p><ol><li>Create a <code>geometry_msgs/msg/Twist</code> publisher on <code>/cmd_vel</code> with queue depth 10.</li><li>On each 0.1-second timer callback, create and publish one Twist command.</li><li>While <code>elapsed_time</code> is less than 5.0 seconds, set <code>linear.x</code> to 0.20 m/s and <code>angular.z</code> to 0.0 rad/s.</li><li>At and after 5.0 seconds, publish zero linear and angular velocity.</li><li>Keep the node running and continue publishing zero velocity after stopping.</li></ol><p><strong>Hints</strong></p><p><strong>Safety requirements</strong></p><ul><li>The robot must move forward without turning.</li><li>Ending the program is not a safe stop; the node must explicitly publish zero velocity.</li><li>Every timer callback must publish exactly one command.</li></ul><p><strong>What Run Tests checks</strong></p><ul><li>The package builds and the node starts.</li><li>Twist messages are published on <code>/cmd_vel</code> at a sufficient rate.</li><li>Forward and angular speeds match the required behavior.</li><li>The robot stops after approximately five seconds and remains stopped.</li></ul><p>No robot simulator is used in this assignment.</p>",
+  "assignment_html": "<p><strong>Scenario</strong></p><p><strong>Purpose:</strong> Create a ROS 2 node that moves a robot straight forward for a fixed time and then continuously commands a safe stop.</p><p>You are programming a mobile robot in ROS 2. The robot receives movement commands through the <code>/cmd_vel</code> topic.</p><p><strong>File and editing rule</strong></p><p>Read the complete project tree, but edit only:</p><p><code>src/robot_motion/robot_motion/controller.py</code></p><p>Do not rename the package, node, executable, topic, class, methods, or starter variables.</p><p><img src=\"/images/5\" alt=\"Timeline diagram showing the robot driving forward before five seconds, switching to zero velocity at five seconds, and continuing to publish stop commands afterward.\"></p><p><strong>Task</strong></p><ol><li>Create a <code>geometry_msgs/msg/Twist</code> publisher on <code>/cmd_vel</code> with queue depth 10.</li><li>On each 0.1-second timer callback, create and publish one Twist command.</li><li>While <code>elapsed_time</code> is less than 5.0 seconds, set <code>linear.x</code> to 0.20 m/s and <code>angular.z</code> to 0.0 rad/s.</li><li>At and after 5.0 seconds, publish zero linear and angular velocity.</li><li>Keep the node running and continue publishing zero velocity after stopping.</li></ol><p><strong>Safety requirements</strong></p><ul><li>The robot must move forward without turning.</li><li>Ending the program is not a safe stop; the node must explicitly publish zero velocity.</li><li>Every timer callback must publish exactly one command.</li></ul><p><strong>What Run Tests checks</strong></p><ul><li>The package builds and the node starts.</li><li>Twist messages are published on <code>/cmd_vel</code> at a sufficient rate.</li><li>Forward and angular speeds match the required behavior.</li><li>The robot stops after approximately five seconds and remains stopped.</li></ul><p>No robot simulator is used in this assignment.</p><p><strong>How scoring works</strong></p><p>The supplied package and node scaffold can already earn 20% for building and starting; this does not mean robot behavior is complete. The remaining checks award 20% for publishing, 20% for forward speed, 10% for straight motion, 20% for stopping on time, and 10% for holding the stop. Stop timing is measured from the first observed command with a 0.5-second tolerance; launch time is not extra driving time.</p>",
   "starter_code": "import rclpy\nfrom rclpy.node import Node\nfrom geometry_msgs.msg import Twist\n\n\nclass RobotController(Node):\n\n    def __init__(self):\n        super().__init__('robot_controller')\n\n        # TODO 1: Create a Twist publisher on /cmd_vel with queue depth 10.\n        self.velocity_publisher = None\n\n        self.elapsed_time = 0.0\n        self.timer_period = 0.1\n        self.timer = self.create_timer(self.timer_period, self.control_robot)\n\n    def control_robot(self):\n        command = Twist()\n\n        if self.elapsed_time < 5.0:\n            # TODO 2: Move forward at 0.20 m/s without rotating.\n            pass\n        else:\n            # TODO 3: Stop the robot safely.\n            pass\n\n        # TODO 4: Publish the command.\n        pass\n        self.elapsed_time += self.timer_period\n\n\ndef main(args=None):\n    rclpy.init(args=args)\n    controller = RobotController()\n    try:\n        rclpy.spin(controller)\n    except KeyboardInterrupt:\n        pass\n    finally:\n        controller.destroy_node()\n        rclpy.shutdown()\n\n\nif __name__ == '__main__':\n    main()\n",
   "language": "python-ros2",
   "status": "published",
@@ -23,24 +23,70 @@
     "simulation_enabled": false
   },
   "public_tests": [
-    {"id": "package-build", "label": "ROS 2 package builds successfully"},
-    {"id": "node-start", "label": "robot_controller starts without crashing"},
-    {"id": "cmd-vel-topic", "label": "Publishes Twist messages on /cmd_vel"},
-    {"id": "forward-motion", "label": "Moves forward near 0.20 m/s"},
-    {"id": "straight-motion", "label": "Keeps angular velocity near zero"},
-    {"id": "safe-stop", "label": "Stops after approximately five seconds"},
-    {"id": "hold-stop", "label": "Continues publishing zero velocity"}
+    {
+      "id": "package-build",
+      "label": "ROS 2 package builds successfully"
+    },
+    {
+      "id": "node-start",
+      "label": "robot_controller starts without crashing"
+    },
+    {
+      "id": "cmd-vel-topic",
+      "label": "Publishes Twist messages on /cmd_vel"
+    },
+    {
+      "id": "forward-motion",
+      "label": "Moves forward near 0.20 m/s"
+    },
+    {
+      "id": "straight-motion",
+      "label": "Keeps angular velocity near zero"
+    },
+    {
+      "id": "safe-stop",
+      "label": "Stops after approximately five seconds"
+    },
+    {
+      "id": "hold-stop",
+      "label": "Continues publishing zero velocity"
+    }
   ],
   "rubric": [
-    {"criterion": "Package execution", "description": "The package builds and the node starts.", "weight": 20},
-    {"criterion": "ROS interface", "description": "Publishes Twist messages on /cmd_vel.", "weight": 20},
-    {"criterion": "Forward motion", "description": "Publishes the required forward velocity without rotation.", "weight": 30},
-    {"criterion": "Safe stop", "description": "Stops at the required time and holds zero velocity.", "weight": 30}
+    {
+      "criterion": "Package execution",
+      "description": "The package builds and the node starts.",
+      "weight": 20
+    },
+    {
+      "criterion": "ROS interface",
+      "description": "Publishes Twist messages on /cmd_vel.",
+      "weight": 20
+    },
+    {
+      "criterion": "Forward motion",
+      "description": "Publishes the required forward velocity without rotation.",
+      "weight": 30
+    },
+    {
+      "criterion": "Safe stop",
+      "description": "Stops at the required time and holds zero velocity.",
+      "weight": 30
+    }
   ],
   "common_misconceptions": [
-    {"tag": "missing-publisher", "description": "The publisher was not created or uses the wrong topic."},
-    {"tag": "wrong-twist-field", "description": "Linear or angular velocity was assigned to the wrong Twist field."},
-    {"tag": "missing-safe-stop", "description": "The robot moves correctly but never publishes a stop command."}
+    {
+      "tag": "missing-publisher",
+      "description": "The publisher was not created or uses the wrong topic."
+    },
+    {
+      "tag": "wrong-twist-field",
+      "description": "Linear or angular velocity was assigned to the wrong Twist field."
+    },
+    {
+      "tag": "missing-safe-stop",
+      "description": "The robot moves correctly but never publishes a stop command."
+    }
   ],
   "tutoring_rules": {
     "max_hint_level": 4,
@@ -48,15 +94,54 @@
     "never_reveal_hidden_tests": true,
     "ai_enabled_by_default": false
   },
-  "simulation_config": {"enabled": false, "provider": null, "scenario": null},
+  "simulation_config": {
+    "enabled": false,
+    "provider": null,
+    "scenario": null
+  },
   "asset_manifest": [
-    {"kind": "project_file", "path": "src/robot_motion/package.xml", "editable": false, "content": "<?xml version='1.0'?>\n<package format='3'>\n  <name>robot_motion</name>\n  <version>0.0.1</version>\n  <description>Drive-forward ROS 2 learning package</description>\n  <maintainer email='instructor@example.invalid'>Robotics Programming Lab</maintainer>\n  <license>Apache-2.0</license>\n  <exec_depend>rclpy</exec_depend>\n  <exec_depend>geometry_msgs</exec_depend>\n  <test_depend>ament_pytest</test_depend>\n  <export><build_type>ament_python</build_type></export>\n</package>\n"},
-    {"kind": "project_file", "path": "src/robot_motion/setup.py", "editable": false, "content": "from setuptools import find_packages, setup\n\npackage_name = 'robot_motion'\n\nsetup(\n    name=package_name,\n    version='0.0.1',\n    packages=find_packages(exclude=['test']),\n    data_files=[\n        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),\n        ('share/' + package_name, ['package.xml']),\n        ('share/' + package_name + '/launch', ['launch/controller.launch.py']),\n    ],\n    install_requires=['setuptools'],\n    zip_safe=True,\n    maintainer='Robotics Programming Lab',\n    maintainer_email='instructor@example.invalid',\n    description='Drive-forward ROS 2 learning package',\n    license='Apache-2.0',\n    entry_points={'console_scripts': ['controller = robot_motion.controller:main']},\n)\n"},
-    {"kind": "project_file", "path": "src/robot_motion/setup.cfg", "editable": false, "content": "[develop]\nscript_dir=$base/lib/robot_motion\n[install]\ninstall_scripts=$base/lib/robot_motion\n"},
-    {"kind": "project_file", "path": "src/robot_motion/resource/robot_motion", "editable": false, "content": ""},
-    {"kind": "project_file", "path": "src/robot_motion/robot_motion/__init__.py", "editable": false, "content": ""},
-    {"kind": "project_file", "path": "src/robot_motion/robot_motion/controller.py", "editable": true, "content": ""},
-    {"kind": "project_file", "path": "src/robot_motion/launch/controller.launch.py", "editable": false, "content": "from launch import LaunchDescription\nfrom launch_ros.actions import Node\n\n\ndef generate_launch_description():\n    return LaunchDescription([\n        Node(\n            package='robot_motion',\n            executable='controller',\n            name='robot_controller',\n            output='screen',\n        )\n    ])\n"}
+    {
+      "kind": "project_file",
+      "path": "src/robot_motion/package.xml",
+      "editable": false,
+      "content": "<?xml version='1.0'?>\n<package format='3'>\n  <name>robot_motion</name>\n  <version>0.0.1</version>\n  <description>Drive-forward ROS 2 learning package</description>\n  <maintainer email='instructor@example.invalid'>Robotics Programming Lab</maintainer>\n  <license>Apache-2.0</license>\n  <exec_depend>rclpy</exec_depend>\n  <exec_depend>geometry_msgs</exec_depend>\n  <test_depend>ament_pytest</test_depend>\n  <export><build_type>ament_python</build_type></export>\n</package>\n"
+    },
+    {
+      "kind": "project_file",
+      "path": "src/robot_motion/setup.py",
+      "editable": false,
+      "content": "from setuptools import find_packages, setup\n\npackage_name = 'robot_motion'\n\nsetup(\n    name=package_name,\n    version='0.0.1',\n    packages=find_packages(exclude=['test']),\n    data_files=[\n        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),\n        ('share/' + package_name, ['package.xml']),\n        ('share/' + package_name + '/launch', ['launch/controller.launch.py']),\n    ],\n    install_requires=['setuptools'],\n    zip_safe=True,\n    maintainer='Robotics Programming Lab',\n    maintainer_email='instructor@example.invalid',\n    description='Drive-forward ROS 2 learning package',\n    license='Apache-2.0',\n    entry_points={'console_scripts': ['controller = robot_motion.controller:main']},\n)\n"
+    },
+    {
+      "kind": "project_file",
+      "path": "src/robot_motion/setup.cfg",
+      "editable": false,
+      "content": "[develop]\nscript_dir=$base/lib/robot_motion\n[install]\ninstall_scripts=$base/lib/robot_motion\n"
+    },
+    {
+      "kind": "project_file",
+      "path": "src/robot_motion/resource/robot_motion",
+      "editable": false,
+      "content": ""
+    },
+    {
+      "kind": "project_file",
+      "path": "src/robot_motion/robot_motion/__init__.py",
+      "editable": false,
+      "content": ""
+    },
+    {
+      "kind": "project_file",
+      "path": "src/robot_motion/robot_motion/controller.py",
+      "editable": true,
+      "content": ""
+    },
+    {
+      "kind": "project_file",
+      "path": "src/robot_motion/launch/controller.launch.py",
+      "editable": false,
+      "content": "from launch import LaunchDescription\nfrom launch_ros.actions import Node\n\n\ndef generate_launch_description():\n    return LaunchDescription([\n        Node(\n            package='robot_motion',\n            executable='controller',\n            name='robot_controller',\n            output='screen',\n        )\n    ])\n"
+    }
   ],
   "grader_type": "ros2_topic",
   "grader_config": {
@@ -64,12 +149,12 @@
     "executable": "controller",
     "topic": "/cmd_vel",
     "message_type": "geometry_msgs/msg/Twist",
-    "expected_linear_x": 0.20,
+    "expected_linear_x": 0.2,
     "linear_tolerance": 0.02,
     "angular_tolerance": 0.01,
-    "move_seconds": 5.0,
+    "move_seconds": 5,
     "stop_tolerance_seconds": 0.5,
-    "minimum_publish_rate_hz": 5.0,
+    "minimum_publish_rate_hz": 5,
     "test_weights": {
       "package-build": 10,
       "node-start": 10,
@@ -81,5 +166,5 @@
     }
   },
   "solution_html": "<p><strong>Approach</strong></p><ol><li>Create a <code>Twist</code> publisher for <code>/cmd_vel</code>.</li><li>Publish <code>linear.x = 0.20</code> and <code>angular.z = 0.0</code> during the movement period.</li><li>After five seconds, publish zero for both values and continue publishing the stopped state.</li></ol>",
-  "reference_solution_path": "manual_sqa_answers/assignment_5_ros2_drive_forward/controller.py"
+  "reference_solution_path": "assignments_answers/assignment_5_ros2_drive_forward/controller.py"
 }
