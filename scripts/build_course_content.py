@@ -197,14 +197,6 @@ def text_html(path: Path) -> str:
     )
 
 
-def code_html(path: Path) -> str:
-    text = path.read_text(encoding="utf-8-sig", errors="replace")
-    return (
-        f"<h3>{html.escape(path.name)}</h3>"
-        f"<pre><code>{html.escape(text)}</code></pre>"
-    )
-
-
 def quiz_questions(path: Path) -> tuple[list[dict], dict[str, str]]:
     document = Document(path)
     questions: list[dict] = []
@@ -289,7 +281,6 @@ def build() -> None:
             name = label_for_group(directory, topic_root)
             pieces = []
             ordered = sorted(files, key=lambda path: (
-                path.suffix.lower() == ".py",
                 "instruction" not in path.stem.lower()
                 and "scenario" not in path.stem.lower()
                 and "senario" not in path.stem.lower(),
