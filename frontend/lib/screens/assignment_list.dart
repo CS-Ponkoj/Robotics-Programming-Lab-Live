@@ -74,8 +74,9 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
         children: [
           Material(
             color: theme.colorScheme.surface,
+            shape: const Border(bottom: BorderSide(color: AppColors.border)),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -336,16 +337,51 @@ class AssignmentCollection extends StatelessWidget {
             a: assignments[index],
             theme: theme,
             onReturn: onReturn,
+            fillHeight: useGrid,
           ),
           childCount: assignments.length,
         );
+        final next = nextAssignmentFor(assignments);
+        final pythonCount =
+            assignments.where((a) => !isRos2Assignment(a)).length;
+        final rosCount = assignments.length - pythonCount;
 
         return CustomScrollView(
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.only(top: 32),
+              padding: const EdgeInsets.only(top: 28),
               sliver: SliverToBoxAdapter(
-                child: ProgressSummary(totalAssignments: assignments.length),
+                child: ProgressSummary(
+                  totalAssignments: assignments.length,
+                  nextAssignment: next,
+                  onOpenNext: next == null
+                      ? null
+                      : () => openAssignment(context, next, onReturn),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Coding assignments',
+                        style: theme.textTheme.titleLarge),
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        if (pythonCount > 0)
+                          '$pythonCount Python ${pythonCount == 1 ? 'challenge' : 'challenges'}',
+                        if (rosCount > 0)
+                          '$rosCount ROS 2 ${rosCount == 1 ? 'challenge' : 'challenges'}',
+                      ].join(' · '),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (useGrid)
@@ -356,7 +392,7 @@ class AssignmentCollection extends StatelessWidget {
                   delegate: assignmentDelegate,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisExtent: 360,
+                    mainAxisExtent: 272,
                   ),
                 ),
               )
@@ -400,12 +436,51 @@ class LandingPageFrame extends StatelessWidget {
   }
 }
 
+bool isRos2Assignment(AssignmentDto a) => a.language.contains('ros2');
+
+/// The first unfinished assignment, preferring work already in progress.
+AssignmentDto? nextAssignmentFor(List<AssignmentDto> assignments) {
+  final unfinished = assignments
+      .where((a) => (learningProgress.bestScores[a.id] ?? 0) < 100)
+      .toList();
+  if (unfinished.isEmpty) return null;
+  return unfinished.firstWhere(
+    (a) => learningProgress.hasAttempted(a.id),
+    orElse: () => unfinished.first,
+  );
+}
+
+void openAssignment(
+  BuildContext context,
+  AssignmentDto a,
+  VoidCallback onReturn,
+) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => MyHomePage(title: a.title, id: a.id)),
+  ).then((_) {
+    // Rebuild when the learner returns so the latest score is visible.
+    onReturn();
+  });
+}
+
+String assignmentDisplayTitle(AssignmentDto a) {
+  final prefix = 'Assignment ${a.id}:';
+  return a.title.startsWith(prefix)
+      ? a.title.substring(prefix.length).trim()
+      : a.title;
+}
+
 class ProgressSummary extends StatelessWidget {
   final int totalAssignments;
+  final AssignmentDto? nextAssignment;
+  final VoidCallback? onOpenNext;
 
   const ProgressSummary({
     super.key,
     required this.totalAssignments,
+    this.nextAssignment,
+    this.onOpenNext,
   });
 
   @override
@@ -418,65 +493,150 @@ class ProgressSummary extends StatelessWidget {
     final progress =
         totalAssignments == 0 ? 0.0 : completedAssignments / totalAssignments;
     final percentage = (progress * 100).round();
-    final progressColor = performanceColor(percentage);
+    // Nothing completed yet is a starting point, not a failing grade.
+    final progressColor = completedAssignments == 0
+        ? AppColors.brand
+        : performanceColor(percentage);
+    final allDone =
+        totalAssignments > 0 && completedAssignments == totalAssignments;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.38),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.12),
+    final summary = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'YOUR LEARNING PATH',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: AppColors.brand,
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w700,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(height: 6),
+        Text(
+          allDone
+              ? 'Every assignment complete. Great work!'
+              : completedAssignments == 0
+                  ? 'Start building your robotics skills'
+                  : 'Keep building your robotics skills',
+          style: theme.textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '$percentage%',
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: progressColor,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  '$completedAssignments of $totalAssignments assignments completed',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+          child: LinearProgressIndicator(
+            value: progress,
+            color: progressColor,
+            minHeight: 10,
+            backgroundColor: AppColors.neutralContainer,
+          ),
+        ),
+      ],
+    );
+
+    final next = nextAssignment;
+    final upNext = next == null
+        ? null
+        : Container(
+            key: const Key('up-next-panel'),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.brandTint,
+              borderRadius: BorderRadius.circular(AppRadii.md),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
+                    const Icon(Icons.flag_rounded,
+                        size: 18, color: AppColors.brandDark),
+                    const SizedBox(width: 6),
                     Text(
-                      'Your progress',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$completedAssignments of $totalAssignments assignments completed',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      learningProgress.hasAttempted(next.id)
+                          ? 'Pick up where you left off'
+                          : 'Up next',
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(color: AppColors.brandDark),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                '$percentage%',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: progressColor,
-                  fontWeight: FontWeight.w800,
+                const SizedBox(height: 8),
+                Text(
+                  'Assignment ${next.id} · ${assignmentDisplayTitle(next)}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: AppColors.brandDeep,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              color: progressColor,
-              minHeight: 8,
-              backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.8),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  key: const Key('up-next-button'),
+                  onPressed: onOpenNext,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                  label: Text(learningProgress.hasAttempted(next.id)
+                      ? 'Continue learning'
+                      : 'Begin'),
+                ),
+              ],
             ),
-          ),
-        ],
+          );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: AppColors.border),
+        boxShadow: appCardShadow,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (upNext == null) return summary;
+          if (constraints.maxWidth < 720) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [summary, const SizedBox(height: 20), upNext],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(flex: 3, child: summary),
+              const SizedBox(width: 28),
+              Expanded(flex: 2, child: upNext),
+            ],
+          );
+        },
       ),
     );
   }
@@ -598,26 +758,16 @@ class AssignmentCard extends StatelessWidget {
     required this.a,
     required this.theme,
     required this.onReturn,
+    this.fillHeight = false,
   });
 
-  String get _displayTitle {
-    final prefix = 'Assignment ${a.id}:';
-    return a.title.startsWith(prefix)
-        ? a.title.substring(prefix.length).trim()
-        : a.title;
-  }
+  /// In the fixed-height grid, pin status and actions to the card bottom.
+  final bool fillHeight;
 
-  void _openAssignment(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MyHomePage(title: a.title, id: a.id),
-      ),
-    ).then((_) {
-      // Rebuild when the learner returns so the latest score is visible.
-      onReturn();
-    });
-  }
+  String get _displayTitle => assignmentDisplayTitle(a);
+
+  void _openAssignment(BuildContext context) =>
+      openAssignment(context, a, onReturn);
 
   @override
   Widget build(BuildContext context) {
@@ -644,16 +794,42 @@ class AssignmentCard extends StatelessWidget {
             ? theme.colorScheme.primaryContainer
             : theme.colorScheme.surfaceContainerHighest;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      elevation: 0,
-      color: learningCardSurface(a.id - 1),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
+    final ros2 = isRos2Assignment(a);
+    final completed = progressState == AssignmentProgressState.completed;
+    // On phones the track tag moves into the status row so titles keep the
+    // full card width.
+    final compact = MediaQuery.sizeOf(context).width < 600;
+    final trackTag = Container(
+      key: const Key('assignment-track-tag'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: ros2
+            ? theme.colorScheme.secondaryContainer
+            : AppColors.neutralContainer,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Text(
+        ros2 ? 'ROS 2' : 'Python',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: ros2
+              ? theme.colorScheme.onSecondaryContainer
+              : AppColors.inkMuted,
+          fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(
+          color: completed
+              ? AppColors.success.withValues(alpha: 0.45)
+              : AppColors.border,
+        ),
+        boxShadow: appCardShadow,
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
@@ -668,13 +844,17 @@ class AssignmentCard extends StatelessWidget {
                   height: 44,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
+                    color: completed
+                        ? AppColors.successContainer
+                        : theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(13),
                   ),
                   child: Text(
                     a.id.toString().padLeft(2, '0'),
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.onPrimaryContainer,
+                      color: completed
+                          ? AppColors.success
+                          : theme.colorScheme.onPrimaryContainer,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.4,
                     ),
@@ -687,15 +867,18 @@ class AssignmentCard extends StatelessWidget {
                     children: [
                       Text(
                         _displayTitle,
+                        maxLines: fillHeight ? 2 : null,
+                        overflow: fillHeight ? TextOverflow.ellipsis : null,
                         style: theme.textTheme.titleLarge?.copyWith(
-                          color: theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
+                          fontSize: 19,
+                          height: 1.25,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         a.description,
+                        maxLines: fillHeight ? 3 : null,
+                        overflow: fillHeight ? TextOverflow.ellipsis : null,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                           height: 1.45,
@@ -704,15 +887,23 @@ class AssignmentCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (!compact) ...[
+                  const SizedBox(width: 12),
+                  trackTag,
+                ],
               ],
             ),
-            const SizedBox(height: 22),
+            if (fillHeight) const Spacer() else const SizedBox(height: 22),
+            const Divider(),
+            const SizedBox(height: 16),
             LayoutBuilder(
               builder: (context, constraints) {
                 final status = Wrap(
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
+                    if (compact) trackTag,
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -756,7 +947,7 @@ class AssignmentCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.neutralContainer,
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -771,7 +962,7 @@ class AssignmentCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.neutralContainer,
                           borderRadius: BorderRadius.circular(999)),
                       child: Text(
                           'Attempted: ${learningProgress.attemptCounts[a.id] ?? 0}',
@@ -841,7 +1032,7 @@ class AssignmentCard extends StatelessWidget {
                           : 'Continue assignment'),
                 );
 
-                if (constraints.maxWidth < 520) {
+                if (constraints.maxWidth < 440) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

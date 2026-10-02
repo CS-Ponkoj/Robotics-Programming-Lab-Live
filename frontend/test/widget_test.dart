@@ -308,8 +308,7 @@ void main() {
       expect(tester.widget<Scaffold>(find.byType(Scaffold).last).endDrawer,
           isA<Drawer>());
       expect(
-        tester
-            .getSize(find.byKey(const Key('assignment-instructions-panel'))),
+        tester.getSize(find.byKey(const Key('assignment-instructions-panel'))),
         instructionsSize,
       );
       expect(
@@ -673,8 +672,10 @@ void main() {
     );
     expect(button.onPressed, isNull);
     expect(
-      tester.getSemantics(find.bySemanticsLabel(RegExp('Run assignment tests'))),
-      containsSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+      tester
+          .getSemantics(find.bySemanticsLabel(RegExp('Run assignment tests'))),
+      containsSemantics(
+          isButton: true, hasEnabledState: true, isEnabled: false),
     );
     semantics.dispose();
   });
@@ -1296,6 +1297,79 @@ void main() {
     expect(progress.color, performanceColor(25));
     final percentage = tester.widget<Text>(find.text('25%'));
     expect(percentage.style?.color, performanceColor(25));
+  });
+
+  test('next assignment prefers work in progress and skips completed work', () {
+    const assignments = [
+      AssignmentDto(
+          id: 1,
+          title: 'A1',
+          description: '',
+          htmlDesc: '',
+          code: '',
+          vals: {}),
+      AssignmentDto(
+          id: 2,
+          title: 'A2',
+          description: '',
+          htmlDesc: '',
+          code: '',
+          vals: {}),
+      AssignmentDto(
+          id: 3,
+          title: 'A3',
+          description: '',
+          htmlDesc: '',
+          code: '',
+          vals: {}),
+    ];
+    addTearDown(() {
+      app.learningProgress.attemptCounts.clear();
+      app.learningProgress.bestScores.clear();
+    });
+
+    expect(nextAssignmentFor(assignments)?.id, 1);
+    app.learningProgress.bestScores[1] = 100;
+    expect(nextAssignmentFor(assignments)?.id, 2);
+    app.learningProgress.attemptCounts[3] = 2;
+    app.learningProgress.bestScores[3] = 40;
+    expect(nextAssignmentFor(assignments)?.id, 3);
+    app.learningProgress.bestScores[2] = 100;
+    app.learningProgress.bestScores[3] = 100;
+    expect(nextAssignmentFor(assignments), isNull);
+  });
+
+  testWidgets('progress summary offers the next assignment', (
+    WidgetTester tester,
+  ) async {
+    const next = AssignmentDto(
+      id: 2,
+      title: 'Assignment 2: Planning',
+      description: 'Plan a safe path.',
+      htmlDesc: '',
+      code: '',
+      vals: {},
+    );
+    var opened = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProgressSummary(
+            totalAssignments: 4,
+            nextAssignment: next,
+            onOpenNext: () => opened += 1,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Up next'), findsOneWidget);
+    expect(find.text('Assignment 2 · Planning'), findsOneWidget);
+    expect(find.text('0%'), findsOneWidget);
+    // Nothing completed yet is shown neutrally, not as a failing grade.
+    expect(tester.widget<Text>(find.text('0%')).style?.color, AppColors.brand);
+    await tester.tap(find.byKey(const Key('up-next-button')));
+    expect(opened, 1);
   });
 
   testWidgets('assignment collection switches between grid and list layouts', (
