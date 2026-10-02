@@ -579,71 +579,148 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget section(String title, String detail, List<Widget> fields) => Card(
+          margin: const EdgeInsets.only(bottom: 20),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+                for (final (index, field) in fields.indexed) ...[
+                  if (index > 0) const SizedBox(height: 16),
+                  field,
+                ],
+              ],
+            ),
+          ),
+        );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_saved?['title']?.toString() ?? 'New assignment'),
-        actions: [
-          TextButton(onPressed: _validate, child: const Text('Validate')),
-          const SizedBox(width: 8),
-          FilledButton.tonal(
-            onPressed: _publish,
-            child: const Text('Publish'),
-          ),
-          const SizedBox(width: 16),
-        ],
+        actions: MediaQuery.sizeOf(context).width < 600
+            // Phones keep the title readable with icon-only actions.
+            ? [
+                IconButton(
+                  tooltip: 'Validate',
+                  onPressed: _validate,
+                  icon: const Icon(Icons.fact_check_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Publish',
+                  onPressed: _publish,
+                  icon: const Icon(Icons.publish_rounded),
+                ),
+                const SizedBox(width: 4),
+              ]
+            : [
+                TextButton.icon(
+                  onPressed: _validate,
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  icon: const Icon(Icons.fact_check_outlined, size: 18),
+                  label: const Text('Validate'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _publish,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.brandDark,
+                    minimumSize: const Size(0, 40),
+                  ),
+                  icon: const Icon(Icons.publish_rounded, size: 18),
+                  label: const Text('Publish'),
+                ),
+                const SizedBox(width: 16),
+              ],
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
               children: [
-                _field('stable_id', 'Stable ID', width: 360),
-                _field('version', 'Version', width: 120),
-                _field('language', 'Language', width: 180),
+                section(
+                  'Identity',
+                  'Stable ID, version, and language identify every attempt.',
+                  [
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        _field('stable_id', 'Stable ID', width: 360),
+                        _field('version', 'Version', width: 120),
+                        _field('language', 'Language', width: 180),
+                      ],
+                    ),
+                    _field('title', 'Title'),
+                  ],
+                ),
+                section(
+                  'Student-facing content',
+                  'What students read before they start coding.',
+                  [
+                    _field('description', 'Description', lines: 3),
+                    _field('learning_objectives',
+                        'Learning objectives (one per line)',
+                        lines: 4),
+                    _field('assignment_html', 'Instructions HTML',
+                        lines: 8, monospace: true),
+                  ],
+                ),
+                section(
+                  'Starter code and grading',
+                  'Starter code, public tests, rubric, and grader settings.',
+                  [
+                    _field('starter_code', 'Starter code',
+                        lines: 10, monospace: true),
+                    for (final field in _jsonFields)
+                      _field(
+                        field,
+                        field.replaceAll('_', ' '),
+                        lines: 7,
+                        jsonField: true,
+                      ),
+                  ],
+                ),
+                section(
+                  'Server-only solution',
+                  'Never shown to students before they unlock the worked solution.',
+                  [
+                    _field('solution_html', 'Worked solution HTML',
+                        lines: 6, monospace: true),
+                    _field(
+                      'reference_solution_path',
+                      'Server-side reference solution path',
+                    ),
+                  ],
+                ),
+                if (_message != null) ...[
+                  Text(_message!),
+                  const SizedBox(height: 16),
+                ],
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: const Icon(Icons.save_outlined),
+                    label: Text(_saving ? 'Saving…' : 'Save draft'),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            _field('title', 'Title'),
-            const SizedBox(height: 16),
-            _field('description', 'Description', lines: 3),
-            const SizedBox(height: 16),
-            _field('learning_objectives', 'Learning objectives (one per line)',
-                lines: 4),
-            const SizedBox(height: 16),
-            _field('assignment_html', 'Instructions HTML', lines: 8),
-            const SizedBox(height: 16),
-            _field('starter_code', 'Starter code', lines: 10),
-            const SizedBox(height: 16),
-            for (final field in _jsonFields) ...[
-              _field(
-                field,
-                field.replaceAll('_', ' '),
-                lines: 7,
-                jsonField: true,
-              ),
-              const SizedBox(height: 16),
-            ],
-            _field('solution_html', 'Worked solution HTML', lines: 6),
-            const SizedBox(height: 16),
-            _field(
-              'reference_solution_path',
-              'Server-side reference solution path',
-            ),
-            if (_message != null) ...[
-              const SizedBox(height: 16),
-              Text(_message!),
-            ],
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: const Icon(Icons.save_outlined),
-              label: Text(_saving ? 'Saving…' : 'Save draft'),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -655,11 +732,20 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
     int lines = 1,
     double? width,
     bool jsonField = false,
+    bool monospace = false,
   }) {
     final field = TextFormField(
       controller: _controllers[name],
       minLines: lines,
       maxLines: lines,
+      style: monospace || jsonField
+          ? const TextStyle(
+              fontFamily: 'Courier-New',
+              fontSize: 14,
+              height: 1.45,
+              color: AppColors.ink,
+              fontWeight: FontWeight.w600)
+          : null,
       decoration: InputDecoration(
         labelText: label,
         alignLabelWithHint: lines > 1,
