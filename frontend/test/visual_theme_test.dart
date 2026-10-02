@@ -39,6 +39,20 @@ void main() {
         greaterThanOrEqualTo(4.5));
     expect(contrast(AppColors.success, AppColors.successContainer),
         greaterThanOrEqualTo(4.5));
+    // Brand-tint highlights and AI-feedback labels must stay readable.
+    expect(contrast(scheme.onPrimaryContainer, scheme.primaryContainer),
+        greaterThanOrEqualTo(4.5));
+    expect(contrast(AppColors.brandDark, AppColors.brandTint),
+        greaterThanOrEqualTo(4.5));
+    expect(contrast(AppColors.ai, AppColors.aiContainer),
+        greaterThanOrEqualTo(4.5));
+    expect(contrast(AppColors.ai, scheme.surface), greaterThanOrEqualTo(4.5));
+    expect(contrast(scheme.onTertiaryContainer, scheme.tertiaryContainer),
+        greaterThanOrEqualTo(4.5));
+    expect(contrast(scheme.onSecondaryContainer, scheme.secondaryContainer),
+        greaterThanOrEqualTo(4.5));
+    expect(contrast(AppColors.inkMuted, AppColors.neutralContainer),
+        greaterThanOrEqualTo(4.5));
     for (var score = 0; score <= 100; score++) {
       final foreground = performanceColor(score);
       final badge =
