@@ -3,6 +3,7 @@ param([switch]$Build)
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $image = 'robotics-lab-ros2-grader:jazzy-v1'
+Import-Module (Join-Path $PSScriptRoot 'local-environment.psm1') -Force
 
 $docker = Get-Command docker -ErrorAction SilentlyContinue
 if (-not $docker) {
@@ -16,7 +17,7 @@ if (-not $docker) {
 }
 $dockerExecutable = if ($docker.Source) { $docker.Source } else { $docker.FullName }
 
-& $dockerExecutable info | Out-Null
+Invoke-RoboticsNative $dockerExecutable info | Out-Null
 if ($LASTEXITCODE -ne 0) {
     throw 'Docker Desktop is installed but its Linux engine is not running.'
 }
@@ -24,24 +25,23 @@ if ($LASTEXITCODE -ne 0) {
 if ($Build) {
     Push-Location $repositoryRoot
     try {
-        & $dockerExecutable compose --profile build build ros2-grader-image
+        Invoke-RoboticsNative $dockerExecutable compose --profile build build ros2-grader-image
         if ($LASTEXITCODE -ne 0) { throw 'The ROS 2 grader image build failed.' }
     } finally {
         Pop-Location
     }
 }
 
-& $dockerExecutable image inspect $image | Out-Null
+Invoke-RoboticsNative $dockerExecutable image inspect $image | Out-Null
 if ($LASTEXITCODE -ne 0) {
     throw 'ROS 2 grader image is missing. Run: .\scripts\check-ros2-local.ps1 -Build'
 }
 
 Write-Output ('ROS 2 local grader is ready: ' + $image)
 
-Import-Module (Join-Path $PSScriptRoot 'local-environment.psm1') -Force
 $python = Get-RoboticsPythonExecutable -RepositoryRoot $repositoryRoot -EnsureDependencies
 
-& $python (Join-Path $repositoryRoot 'backend\verify_ros2_assignments.py')
+Invoke-RoboticsNative $python (Join-Path $repositoryRoot 'backend\verify_ros2_assignments.py')
 if ($LASTEXITCODE -ne 0) {
     throw 'One or more maintained ROS 2 answers failed the real Docker grader.'
 }

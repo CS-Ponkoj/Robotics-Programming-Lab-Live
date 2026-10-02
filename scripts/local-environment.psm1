@@ -130,4 +130,19 @@ function Get-RoboticsPythonExecutable {
     return $python
 }
 
-Export-ModuleMember -Function Get-RoboticsRuntimeRoot, Get-RoboticsEnvironmentRoot, Get-RoboticsPrivateConfigPath, Get-RoboticsPythonExecutable
+function Invoke-RoboticsNative {
+    # Windows PowerShell 5.1 turns a native command's stderr into terminating
+    # errors under $ErrorActionPreference = "Stop" whenever the caller redirects
+    # output (for example `*> log.txt`). Tools such as Alembic and Docker write
+    # normal progress to stderr, so pass it through as text; callers still
+    # check $LASTEXITCODE for real failures. Deliberately a simple function:
+    # $args passes tool options such as -m through instead of binding them.
+    $filePath = $args[0]
+    $argumentList = @($args | Select-Object -Skip 1)
+    $ErrorActionPreference = "Continue"
+    & $filePath @argumentList 2>&1 | ForEach-Object {
+        if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { $_ }
+    }
+}
+
+Export-ModuleMember -Function Get-RoboticsRuntimeRoot, Get-RoboticsEnvironmentRoot, Get-RoboticsPrivateConfigPath, Get-RoboticsPythonExecutable, Invoke-RoboticsNative

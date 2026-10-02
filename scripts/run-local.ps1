@@ -168,7 +168,7 @@ try {
     [System.Environment]::SetEnvironmentVariable("DATABASE_URL", $databaseUrl, "Process")
     Push-Location $backendRoot
     try {
-        & $python -m alembic upgrade head
+        Invoke-RoboticsNative $python -m alembic upgrade head
         if ($LASTEXITCODE -ne 0) { throw "Database migration failed." }
     } finally {
         Pop-Location
@@ -218,7 +218,7 @@ try {
     }
     Push-Location $resolvedFrontend
     try {
-        & flutter pub get
+        Invoke-RoboticsNative flutter pub get
         if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed." }
     } finally {
         Pop-Location
@@ -247,7 +247,7 @@ try {
         $webBuild = Join-Path $resolvedFrontend "build\web"
         Push-Location $resolvedFrontend
         try {
-            & flutter build web --release $apiDefine --output $webBuild
+            Invoke-RoboticsNative flutter build web --release $apiDefine --output $webBuild
             if ($LASTEXITCODE -ne 0) { throw "flutter build web failed." }
         } finally {
             Pop-Location

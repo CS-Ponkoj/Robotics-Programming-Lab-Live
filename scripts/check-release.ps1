@@ -38,6 +38,7 @@ try {
         "backend/data/study_accounts.json",
         "scripts/setup-local.ps1",
         "scripts/run-local.ps1",
+        "scripts/serve_web.py",
         "scripts/stop-local.ps1",
         "scripts/local-environment.psm1",
         "scripts/verify-local.ps1",
