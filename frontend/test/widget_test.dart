@@ -1745,6 +1745,14 @@ void main() {
     expect(capturedQuestion, 'Why does the diagonal calculation fail?');
     expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
     expect(find.text('OpenAI tutor response'), findsOneWidget);
+    // AI feedback is always visibly labeled as AI-generated.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('tutor-answer-card')),
+        matching: find.byKey(const Key('ai-generated-badge')),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.text('A diagonal depends on both coordinate changes.'),
       findsOneWidget,

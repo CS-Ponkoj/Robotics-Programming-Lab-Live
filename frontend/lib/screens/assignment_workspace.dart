@@ -940,12 +940,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                           // A local draft the server never
                                           // confirmed is newer than the
                                           // server copy.
-                                          final preferLocal =
-                                              localDraft != null &&
-                                                  learningProgress
-                                                      .hasUnsyncedDraft(
-                                                    widget.id,
-                                                  );
+                                          final preferLocal = localDraft !=
+                                                  null &&
+                                              learningProgress.hasUnsyncedDraft(
+                                                widget.id,
+                                              );
                                           _code = (preferLocal
                                                   ? localDraft
                                                   : _serverDraft) ??
@@ -1925,90 +1924,99 @@ class AssignmentEditorToolbar extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  key: const Key('editor-actions-scroll'),
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      toolButton(
-                        keyName: 'save',
-                        icon: Icons.save_outlined,
-                        label: 'Save draft',
-                        shortcut: 'Ctrl+S / Ctrl+Alt+D',
-                        onPressed: onSave,
-                      ),
-                      toolButton(
-                        keyName: 'find',
-                        icon: Icons.search_rounded,
-                        label: 'Find',
-                        shortcut: 'Ctrl+F / Ctrl+Alt+Q',
-                        onPressed: onSearch,
-                      ),
-                      toolButton(
-                        keyName: 'replace',
-                        icon: Icons.find_replace_rounded,
-                        label: 'Replace',
-                        shortcut: 'Ctrl+H / Ctrl+Alt+W',
-                        onPressed: onReplace,
-                      ),
-                      toolButton(
-                        keyName: 'format',
-                        icon: Icons.auto_fix_high_rounded,
-                        label: 'Format Python',
-                        shortcut: 'Shift+Alt+F / Ctrl+Shift+I',
-                        onPressed: isRunning ? null : onFormat,
-                      ),
-                      toolButton(
-                        keyName: 'restore',
-                        icon: Icons.restart_alt_rounded,
-                        label: 'Restore starter code',
-                        shortcut: 'Ctrl+Alt+R',
-                        onPressed: isRunning ? null : onReset,
-                      ),
-                      const SizedBox(
-                          height: 28, child: VerticalDivider(width: 18)),
-                      toolButton(
-                        keyName: 'font-down',
-                        icon: Icons.text_decrease_rounded,
-                        label: 'Decrease editor font',
-                        shortcut: 'Ctrl+- / Ctrl+Alt+1',
-                        onPressed: fontSize > 12 ? onDecreaseFont : null,
-                      ),
-                      toolButton(
-                        keyName: 'font-up',
-                        icon: Icons.text_increase_rounded,
-                        label: 'Increase editor font',
-                        shortcut: 'Ctrl+= / Ctrl+Alt+2',
-                        onPressed: fontSize < 22 ? onIncreaseFont : null,
-                      ),
-                      const SizedBox(
-                          height: 28, child: VerticalDivider(width: 18)),
-                      toolButton(
-                        keyName: 'reference',
-                        icon: Icons.integration_instructions_outlined,
-                        label: 'Python names and APIs',
-                        shortcut: 'Ctrl+Alt+A',
-                        onPressed: onShowApiReference,
-                      ),
-                      toolButton(
-                        keyName: 'shortcuts',
-                        icon: Icons.keyboard_outlined,
-                        label: 'Keyboard shortcuts',
-                        shortcut: 'F1 / Ctrl+Alt+K',
-                        onPressed: onShowShortcuts,
-                      ),
-                      toolButton(
-                        keyName: 'theme',
-                        icon: editorDarkMode
-                            ? Icons.light_mode_outlined
-                            : Icons.dark_mode_outlined,
-                        label: editorDarkMode
-                            ? 'Switch editor to light mode'
-                            : 'Switch editor to dark mode',
-                        shortcut: 'Ctrl+Alt+T',
-                        onPressed: onToggleEditorTheme,
-                      ),
-                    ],
+                // Fade the trailing edge so a clipped row reads as scrollable.
+                child: ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Colors.white, Colors.white, Colors.transparent],
+                    stops: [0, 0.9, 1],
+                  ).createShader(bounds),
+                  blendMode: BlendMode.dstIn,
+                  child: SingleChildScrollView(
+                    key: const Key('editor-actions-scroll'),
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(right: 24),
+                    child: Row(
+                      children: [
+                        toolButton(
+                          keyName: 'save',
+                          icon: Icons.save_outlined,
+                          label: 'Save draft',
+                          shortcut: 'Ctrl+S / Ctrl+Alt+D',
+                          onPressed: onSave,
+                        ),
+                        toolButton(
+                          keyName: 'find',
+                          icon: Icons.search_rounded,
+                          label: 'Find',
+                          shortcut: 'Ctrl+F / Ctrl+Alt+Q',
+                          onPressed: onSearch,
+                        ),
+                        toolButton(
+                          keyName: 'replace',
+                          icon: Icons.find_replace_rounded,
+                          label: 'Replace',
+                          shortcut: 'Ctrl+H / Ctrl+Alt+W',
+                          onPressed: onReplace,
+                        ),
+                        toolButton(
+                          keyName: 'format',
+                          icon: Icons.auto_fix_high_rounded,
+                          label: 'Format Python',
+                          shortcut: 'Shift+Alt+F / Ctrl+Shift+I',
+                          onPressed: isRunning ? null : onFormat,
+                        ),
+                        toolButton(
+                          keyName: 'restore',
+                          icon: Icons.restart_alt_rounded,
+                          label: 'Restore starter code',
+                          shortcut: 'Ctrl+Alt+R',
+                          onPressed: isRunning ? null : onReset,
+                        ),
+                        const SizedBox(
+                            height: 28, child: VerticalDivider(width: 18)),
+                        toolButton(
+                          keyName: 'font-down',
+                          icon: Icons.text_decrease_rounded,
+                          label: 'Decrease editor font',
+                          shortcut: 'Ctrl+- / Ctrl+Alt+1',
+                          onPressed: fontSize > 12 ? onDecreaseFont : null,
+                        ),
+                        toolButton(
+                          keyName: 'font-up',
+                          icon: Icons.text_increase_rounded,
+                          label: 'Increase editor font',
+                          shortcut: 'Ctrl+= / Ctrl+Alt+2',
+                          onPressed: fontSize < 22 ? onIncreaseFont : null,
+                        ),
+                        const SizedBox(
+                            height: 28, child: VerticalDivider(width: 18)),
+                        toolButton(
+                          keyName: 'reference',
+                          icon: Icons.integration_instructions_outlined,
+                          label: 'Python names and APIs',
+                          shortcut: 'Ctrl+Alt+A',
+                          onPressed: onShowApiReference,
+                        ),
+                        toolButton(
+                          keyName: 'shortcuts',
+                          icon: Icons.keyboard_outlined,
+                          label: 'Keyboard shortcuts',
+                          shortcut: 'F1 / Ctrl+Alt+K',
+                          onPressed: onShowShortcuts,
+                        ),
+                        toolButton(
+                          keyName: 'theme',
+                          icon: editorDarkMode
+                              ? Icons.light_mode_outlined
+                              : Icons.dark_mode_outlined,
+                          label: editorDarkMode
+                              ? 'Switch editor to light mode'
+                              : 'Switch editor to dark mode',
+                          shortcut: 'Ctrl+Alt+T',
+                          onPressed: onToggleEditorTheme,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -2465,7 +2473,7 @@ class AssignmentPageHeader extends StatelessWidget
       toolbarHeight: preferredSize.height,
       automaticallyImplyLeading: false,
       backgroundColor: theme.colorScheme.primary,
-      leadingWidth: 64,
+      leadingWidth: showFeedbackLabel ? 64 : 48,
       leading: IconButton(
         tooltip: 'Back to assignments',
         onPressed: onBack,
@@ -2490,7 +2498,7 @@ class AssignmentPageHeader extends StatelessWidget
               ),
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
+          SizedBox(width: showFeedbackLabel ? AppSpacing.md : AppSpacing.sm),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -2536,6 +2544,8 @@ class AssignmentPageHeader extends StatelessWidget
             onPressed: onResultsOpen,
             icon: const Icon(Icons.fact_check_outlined),
           ),
+        // On phones Back already returns to the assignment list, so the
+        // title keeps the space a duplicate Home icon would take.
         if (showFeedbackLabel)
           TextButton.icon(
             key: const Key('assignment-home-button'),
@@ -2545,13 +2555,6 @@ class AssignmentPageHeader extends StatelessWidget
             ),
             icon: const Icon(Icons.home_rounded, size: 20),
             label: const Text('Home'),
-          )
-        else
-          IconButton(
-            key: const Key('assignment-home-button'),
-            tooltip: 'Home',
-            onPressed: onHome,
-            icon: const Icon(Icons.home_rounded),
           ),
         const SizedBox(width: AppSpacing.xs),
         Semantics(
@@ -3234,10 +3237,11 @@ class _ResultSummary extends StatelessWidget {
       label: 'Test score $score percent. $passed passed and $failed failed.',
       child: Container(
         key: const Key('result-summary'),
-        padding: const EdgeInsets.all(AppSpacing.sm),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: statusBackground,
           borderRadius: BorderRadius.circular(AppRadii.md),
+          border: Border.all(color: statusColor.withValues(alpha: 0.28)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3264,17 +3268,20 @@ class _ResultSummary extends StatelessWidget {
                 ),
                 Text(
                   '$score%',
-                  style: theme.textTheme.headlineSmall?.copyWith(
+                  style: theme.textTheme.headlineMedium?.copyWith(
                     color: statusColor,
                     fontWeight: FontWeight.w900,
+                    height: 1,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             LinearProgressIndicator(
               value: score / 100,
               color: statusColor,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(AppRadii.pill),
               backgroundColor: theme.colorScheme.surface.withValues(
                 alpha: 0.72,
               ),
@@ -3426,40 +3433,59 @@ class _HintCallout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // AI-generated feedback always uses the reserved AI color and badge.
+    final fromAi = source == 'openai';
+    final foreground = fromAi ? AppColors.ai : Colors.brown.shade900;
 
     return Container(
       key: const Key('guided-hint'),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF5D9),
+        color: fromAi ? AppColors.aiContainer : const Color(0xFFFFF5D9),
         borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: const Color(0xFFE7C968)),
+        border: Border.all(
+          color: fromAi
+              ? AppColors.ai.withValues(alpha: 0.35)
+              : const Color(0xFFE7C968),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.lightbulb_outline_rounded, color: Colors.amber.shade900),
+          Icon(
+            fromAi
+                ? Icons.auto_awesome_rounded
+                : Icons.lightbulb_outline_rounded,
+            color: fromAi ? AppColors.ai : Colors.amber.shade900,
+          ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  source == 'openai'
-                      ? 'OpenAI tutor hint'
-                      : source == 'fallback'
-                          ? 'Built-in tutor hint'
-                          : 'Guided hint',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: Colors.brown.shade900,
-                    fontWeight: FontWeight.w800,
-                  ),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      fromAi
+                          ? 'OpenAI tutor hint'
+                          : source == 'fallback'
+                              ? 'Built-in tutor hint'
+                              : 'Guided hint',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: foreground,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (fromAi) const AiGeneratedBadge(),
+                  ],
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   hint,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.brown.shade900,
+                    color: fromAi ? AppColors.ink : Colors.brown.shade900,
                   ),
                 ),
               ],
@@ -3469,6 +3495,28 @@ class _HintCallout extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Marks content produced by the optional AI tutor.
+class AiGeneratedBadge extends StatelessWidget {
+  const AiGeneratedBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        key: const Key('ai-generated-badge'),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.ai,
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+        ),
+        child: Text(
+          'AI-generated',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+      );
 }
 
 class _TutorHintPanel extends StatefulWidget {
@@ -3755,18 +3803,44 @@ class _TutorAnswerCard extends StatelessWidget {
           : 'Built-in tutor response',
       child: Card(
         key: const Key('tutor-answer-card'),
+        color: source == 'openai'
+            ? AppColors.aiContainer
+            : Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          side: BorderSide(
+            color: source == 'openai'
+                ? AppColors.ai.withValues(alpha: 0.35)
+                : AppColors.border,
+          ),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                source == 'openai'
-                    ? 'OpenAI tutor response'
-                    : 'Built-in tutor response',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+              Wrap(
+                spacing: AppSpacing.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Icon(
+                    source == 'openai'
+                        ? Icons.auto_awesome_rounded
+                        : Icons.support_agent_rounded,
+                    size: 18,
+                    color: source == 'openai' ? AppColors.ai : AppColors.brand,
+                  ),
+                  Text(
+                    source == 'openai'
+                        ? 'OpenAI tutor response'
+                        : 'Built-in tutor response',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: source == 'openai' ? AppColors.ai : null,
+                        ),
+                  ),
+                  if (source == 'openai') const AiGeneratedBadge(),
+                ],
               ),
               if (answer.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.sm),

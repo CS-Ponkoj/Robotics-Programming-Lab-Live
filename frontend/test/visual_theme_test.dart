@@ -47,6 +47,10 @@ void main() {
     expect(contrast(AppColors.ai, AppColors.aiContainer),
         greaterThanOrEqualTo(4.5));
     expect(contrast(AppColors.ai, scheme.surface), greaterThanOrEqualTo(4.5));
+    // The AI-generated badge uses white text on the AI color.
+    expect(contrast(Colors.white, AppColors.ai), greaterThanOrEqualTo(4.5));
+    expect(contrast(AppColors.ink, AppColors.aiContainer),
+        greaterThanOrEqualTo(4.5));
     expect(contrast(scheme.onTertiaryContainer, scheme.tertiaryContainer),
         greaterThanOrEqualTo(4.5));
     expect(contrast(scheme.onSecondaryContainer, scheme.secondaryContainer),
