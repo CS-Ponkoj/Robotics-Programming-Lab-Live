@@ -136,6 +136,17 @@ class Settings(BaseSettings):
             problems.append("AUTO_CREATE_SCHEMA must be false")
         if self.allowed_origins.strip() == "*":
             problems.append("ALLOWED_ORIGINS must name the deployed frontend")
+        if self.enable_demo_accounts:
+            # Seeded accounts are real, persistent logins; a guessable default
+            # would expose the instructor studio and research data.
+            for name, password, default in (
+                ("DEMO_STUDENT_PASSWORD", self.demo_student_password, "student"),
+                ("DEMO_INSTRUCTOR_PASSWORD", self.demo_instructor_password, "instructor"),
+            ):
+                if password == default or len(password) < 12:
+                    problems.append(
+                        f"{name} must be a non-default password of at least 12 characters"
+                    )
         if self.sandbox_backend not in {"remote", "docker"}:
             problems.append(
                 "SANDBOX_BACKEND must use remote or docker isolation"

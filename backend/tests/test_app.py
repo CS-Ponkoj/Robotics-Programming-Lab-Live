@@ -121,6 +121,52 @@ def test_production_configuration_accepts_complete_remote_sandbox():
         sandbox_backend="remote",
         sandbox_url="sandbox.internal:10000",
         sandbox_api_token="sandbox-token-with-safe-length",
+        demo_student_password="student-demo-pass-2026",
+        demo_instructor_password="instructor-demo-pass-2026",
+    )
+
+    settings.validate_runtime()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("demo_instructor_password", "instructor"),
+        ("demo_student_password", "student"),
+        ("demo_instructor_password", "short-pass"),
+    ],
+)
+def test_production_configuration_rejects_weak_demo_passwords(field, value):
+    passwords = {
+        "demo_student_password": "student-demo-pass-2026",
+        "demo_instructor_password": "instructor-demo-pass-2026",
+        field: value,
+    }
+    settings = Settings(
+        environment="production",
+        database_url="postgresql+psycopg://user:pass@database.test/study",
+        auto_create_schema=False,
+        allowed_origins="https://study.example.test",
+        sandbox_backend="remote",
+        sandbox_url="sandbox.internal:10000",
+        sandbox_api_token="sandbox-token-with-safe-length",
+        **passwords,
+    )
+
+    with pytest.raises(RuntimeError, match=field.upper()):
+        settings.validate_runtime()
+
+
+def test_production_configuration_allows_default_passwords_without_demo_accounts():
+    settings = Settings(
+        environment="production",
+        database_url="postgresql+psycopg://user:pass@database.test/study",
+        auto_create_schema=False,
+        allowed_origins="https://study.example.test",
+        sandbox_backend="remote",
+        sandbox_url="sandbox.internal:10000",
+        sandbox_api_token="sandbox-token-with-safe-length",
+        enable_demo_accounts=False,
     )
 
     settings.validate_runtime()

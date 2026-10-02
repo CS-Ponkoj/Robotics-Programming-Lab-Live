@@ -104,6 +104,9 @@ Before production promotion:
 - dangerous imports remain blocked;
 - instructor-created student login and student data isolation pass;
 - Neon persistence/restart testing and database-health checks pass;
+- Render's `DEMO_STUDENT_PASSWORD` and `DEMO_INSTRUCTOR_PASSWORD` are strong,
+  non-default values of at least 12 characters (production refuses to start
+  otherwise while `ENABLE_DEMO_ACCOUNTS` is true);
 - the workbook records zero open release blockers;
 - staging `main` is clean and pushed; and
 - the user explicitly approves the production release and release tag.

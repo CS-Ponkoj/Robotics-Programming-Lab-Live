@@ -37,7 +37,10 @@ device-local Python environment, database, sandbox, and API together.
 
 ## Accounts and instructor access
 
-The local prototype seeds `instructor / instructor` and `student / student`.
+A new database is seeded with `instructor` and `student` prototype accounts
+whose passwords come from `DEMO_INSTRUCTOR_PASSWORD` and
+`DEMO_STUDENT_PASSWORD` in the ignored repository-root `.env`. Production
+rejects the built-in defaults and passwords shorter than 12 characters.
 The Flutter application signs in through `/auth/login` and sends an opaque
 Bearer session token. Instructor APIs verify the instructor role. The
 `ADMIN_API_TOKEN` option is retained only for compatibility with older API

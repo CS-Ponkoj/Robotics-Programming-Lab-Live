@@ -85,15 +85,15 @@ from this desktop.
 
 ## Prototype accounts
 
-The staging database seeds these prototype accounts when it is initialized:
-
-```text
-Student:    student / student
-Instructor: instructor / instructor
-```
-
-Change the credentials before a real classroom study. The login page does not
-display them. Password login creates a normal persistent account session. The
+When a database is initialized, the backend seeds two prototype accounts,
+`student` and `instructor`. Their passwords come from `DEMO_STUDENT_PASSWORD`
+and `DEMO_INSTRUCTOR_PASSWORD` in the ignored repository-root `.env`; set
+strong values there before initializing a new database, and share them only
+through the approved private channel. Seeding never changes an existing
+account, so change a password on a shared database through **Manage
+accounts**. Production refuses to start with the built-in defaults or any demo
+password shorter than 12 characters. The login page does not display
+credentials. Password login creates a normal persistent account session. The
 separate **Try the student demo** button creates the temporary, non-persistent
 demo session.
 
