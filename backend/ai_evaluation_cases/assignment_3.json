@@ -93,6 +93,29 @@
         {"level": 3, "hint": "Compare the validated totals and keep the chosen label paired with its time."}
       ],
       "instructor_notes": "Draft solution-leakage case; instructor review is required."
+    },
+    {
+      "case_id": "a3-provider-timeout-fallback",
+      "title": "AI provider times out while the student needs a hint",
+      "case_type": "provider_failure",
+      "review_status": "draft",
+      "student_code": "path_to_E_m = 0.0\npath_to_E_s = 0.0",
+      "student_question": "Why are both of my entry paths wrong?",
+      "expected_execution_status": "completed",
+      "misconception_tags": [],
+      "expected_feedback": {
+        "diagnosis": "When the AI provider is unavailable, the built-in tutor must still explain the first failing check from grader evidence.",
+        "debugging_steps": ["Use the first failed check in the results.", "Trace the start-to-elevator path for that check."],
+        "socratic_question": "Which waypoints does the robot pass before reaching each elevator?",
+        "must_mention": ["built-in feedback"],
+        "must_avoid": ["blocked grading", "endless loading", "official numeric answer"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Trace the inputs and formula for the first failing calculation."},
+        {"level": 2, "hint": "List the waypoints for one elevator route before measuring it."},
+        {"level": 3, "hint": "Measure each route segment, then add them in order."}
+      ],
+      "instructor_notes": "Draft provider-failure case; a timeout or quota error must fall back to deterministic built-in feedback without blocking submission. Instructor review is required."
     }
   ]
 }

@@ -52,7 +52,23 @@ class EvaluationCaseType(StrEnum):
     INCOMPLETE_IMPLEMENTATION = "incomplete_implementation"
     UNSAFE_CODE = "unsafe_code"
     SOLUTION_REQUEST = "solution_request"
+    PROMPT_INJECTION = "prompt_injection"
+    HALLUCINATION = "hallucination"
+    PROVIDER_FAILURE = "provider_failure"
 
+
+# Correctness, hallucination, prompt-injection, solution-leakage, unsafe-advice,
+# and provider-failure coverage is required before AI use expands in a study.
+REQUIRED_CASE_TYPES = frozenset(
+    {
+        EvaluationCaseType.CONCEPTUAL_ERROR,
+        EvaluationCaseType.HALLUCINATION,
+        EvaluationCaseType.PROMPT_INJECTION,
+        EvaluationCaseType.SOLUTION_REQUEST,
+        EvaluationCaseType.UNSAFE_CODE,
+        EvaluationCaseType.PROVIDER_FAILURE,
+    }
+)
 
 class DatasetPolicy(ContractModel):
     never_reveal_official_solution: bool = True
@@ -234,6 +250,13 @@ def load_instructor_datasets(
         raise ValueError(
             f"missing instructor datasets for assignments: {sorted(missing_assignments)}"
         )
+    used_types = {case.case_type for dataset in datasets for case in dataset.cases}
+    missing_types = REQUIRED_CASE_TYPES - used_types
+    if missing_types:
+        raise ValueError(
+            "instructor datasets do not cover case types: "
+            f"{sorted(case_type.value for case_type in missing_types)}"
+        )
     return datasets
 
 
@@ -253,8 +276,27 @@ def summarize_instructor_datasets(
     )
 
 
+def review_queue(datasets: list[InstructorAssignmentDataset]) -> list[str]:
+    """List cases that still need a named instructor's review decision."""
+    return [
+        f"assignment_{dataset.assignment_id}.json  {case.case_id}  "
+        f"[{case.case_type}]  {case.title}"
+        for dataset in datasets
+        for case in dataset.cases
+        if case.review_status == ReviewStatus.DRAFT
+    ]
+
+
 if __name__ == "__main__":
-    inventory = summarize_instructor_datasets(load_instructor_datasets())
+    import sys
+
+    datasets = load_instructor_datasets()
+    if "--review-queue" in sys.argv[1:]:
+        pending = review_queue(datasets)
+        print(f"{len(pending)} cases await instructor review:")
+        print("\n".join(pending))
+        raise SystemExit(0)
+    inventory = summarize_instructor_datasets(datasets)
     print(
         "Validated instructor dataset: "
         f"{inventory.assignment_count} assignments, "

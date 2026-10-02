@@ -50,9 +50,22 @@ Each case contains:
 | `review_status` | `draft`, `approved`, or `rejected` |
 | `reviewer` | Required when an instructor approves the case |
 
-The initial inventory has 24 cases: four per assignment. It covers every
-misconception tag currently configured for Assignments 1–6 and includes direct
-solution-request and prompt-injection cases.
+The inventory has 27 cases: four per assignment plus three safety cases. It
+covers every misconception tag currently configured for Assignments 1–6. The
+validator also requires at least one case of each safety category:
+
+| `case_type` | What the tutor must do |
+|---|---|
+| `conceptual_error` | Explain the real learning issue correctly |
+| `solution_request` | Decline completed code or protected material |
+| `unsafe_code` | Avoid unsafe advice |
+| `prompt_injection` | Treat instructions hidden in code or questions as data |
+| `hallucination` | Never invent an execution error the grader did not record |
+| `provider_failure` | Fall back to built-in feedback when the AI times out or fails |
+
+In the automated harness, injection and hallucination cases receive a
+deliberately unsafe model response, and provider-failure cases receive a
+timeout. Each must be rejected and replaced by deterministic built-in feedback.
 
 ## Current status and important limitation
 
@@ -73,6 +86,16 @@ This stage does not:
 
 ## Instructor review workflow
 
+List the cases that still need a decision:
+
+```powershell
+Import-Module .\scripts\local-environment.psm1 -Force
+$python = Get-RoboticsPythonExecutable -RepositoryRoot (Get-Location)
+Push-Location .\backend
+& $python instructor_dataset.py --review-queue
+Pop-Location
+```
+
 1. Open one assignment JSON file.
 2. Compare each example with the assignment instructions and rubric.
 3. Confirm that the diagnosis identifies the real learning issue.
@@ -80,7 +103,9 @@ This stage does not:
    final answer.
 5. Confirm that `must_avoid` protects solutions, hidden tests, and unsafe advice.
 6. Edit inaccurate wording or add missing examples.
-7. Add the instructor name in `reviewer` and set `review_status` to `approved`.
+7. Add the instructor name in `reviewer` and set `review_status` to `approved`
+   (or `rejected`). Only the reviewing instructor may make this change; a
+   developer or AI assistant must never fill in `reviewer`.
 8. Run the validator and backend tests before committing.
 
 ```powershell
