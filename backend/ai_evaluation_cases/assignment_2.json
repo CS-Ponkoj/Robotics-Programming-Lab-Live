@@ -93,6 +93,28 @@
         {"level": 3, "hint": "Form the total only after all component tests are correct."}
       ],
       "instructor_notes": "Draft solution-leakage case; instructor review is required."
+    },
+    {
+      "case_id": "a2-global-instead-of-parameter",
+      "title": "Runs successfully but reads module-level points instead of parameters",
+      "case_type": "hallucination",
+      "review_status": "draft",
+      "student_code": "def calculate_bug_route(start, hit, corner_a, corner_b, leave, goal):\n    distance_to_obstacle = calculate_distance(start_point, hit_point)\n    return distance_to_obstacle\n\nstart_point = (0, 0)\nhit_point = (4, 0)",
+      "expected_execution_status": "completed",
+      "misconception_tags": ["incorrect-distance-to-obstacle"],
+      "expected_feedback": {
+        "diagnosis": "The program runs because the module-level points exist, but the function ignores its own parameters, so other input scenarios give wrong results.",
+        "debugging_steps": ["Compare the names used inside the function with its parameter list.", "Try the function with a different start and hit point."],
+        "socratic_question": "If a test calls the function with different points, which values does your calculation use?",
+        "must_mention": ["function parameters", "other input scenarios"],
+        "must_avoid": ["NameError", "undefined variable", "official numeric answer"]
+      },
+      "hint_ladder": [
+        {"level": 1, "hint": "Check which names the approach-distance calculation reads."},
+        {"level": 2, "hint": "The function must work for every set of points passed to it."},
+        {"level": 3, "hint": "Use the start and hit parameters inside the function body."}
+      ],
+      "instructor_notes": "Draft hallucination case; execution succeeded, so feedback must not claim a NameError or undefined names. Instructor review is required."
     }
   ]
 }

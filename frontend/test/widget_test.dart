@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:highlight/languages/python.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/main.dart' as app;
 import 'package:iuse_demo/models/assignment_dto.dart';
@@ -466,34 +469,93 @@ void main() {
     expect(feedbackEnabled, isTrue);
   });
 
-  testWidgets('control enter runs assignment tests from the keyboard', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildAppTheme(),
-        home: const MediaQuery(
-          data: MediaQueryData(size: Size(1200, 900)),
-          child: app.MyHomePage(title: 'Assignment 1: Navigation', id: 1),
-        ),
-      ),
-    );
-    addTearDown(() {
-      app.learningProgress.latestScores.clear();
-      app.learningProgress.bestScores.clear();
-      app.learningProgress.attemptCounts.clear();
-    });
-
-    expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
-    expect(find.text('Ready when you are'), findsNothing);
+  Future<void> pressControlEnter(WidgetTester tester) async {
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pumpAndSettle();
+  }
+
+  Widget assignmentWorkspaceApp() {
+    return MaterialApp(
+      theme: buildAppTheme(),
+      home: const MediaQuery(
+        data: MediaQueryData(size: Size(1200, 900)),
+        child: app.MyHomePage(title: 'Assignment 1: Navigation', id: 1),
+      ),
+    );
+  }
+
+  void clearLearningProgress() {
+    // A loaded workspace also records drafts and submission IDs; later
+    // assignment-card tests expect a clean, not-started state.
+    final progress = app.learningProgress;
+    progress.latestScores.clear();
+    progress.bestScores.clear();
+    progress.attemptCounts.clear();
+    progress.codeDrafts.clear();
+    progress.codeDraftVersions.clear();
+    progress.submissionIds.clear();
+    progress.unsyncedDrafts.clear();
+    progress.revealedSolutions.clear();
+  }
+
+  testWidgets('control enter waits until the assignment code has loaded', (
+    WidgetTester tester,
+  ) async {
+    // The test binding rejects HTTP requests, so the assignment never loads.
+    await tester.pumpWidget(assignmentWorkspaceApp());
+    addTearDown(clearLearningProgress);
+
+    await pressControlEnter(tester);
+
+    // Running now would wrongly report the displayed code as empty.
+    expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
+    expect(find.text('The code editor is empty'), findsNothing);
+  });
+
+  testWidgets('control enter runs assignment tests from the keyboard', (
+    WidgetTester tester,
+  ) async {
+    final submitted = <String>[];
+    final client = MockClient((request) async {
+      if (request.method == 'GET' && request.url.path == '/assignments/1') {
+        return http.Response(
+          jsonEncode({
+            'id': 1,
+            'title': 'Assignment 1: Navigation',
+            'description': 'Route distances.',
+            'assignment_html': '<p>Route distances.</p>',
+            'starter_code': 'print(1)',
+            'vals': <String, dynamic>{},
+          }),
+          200,
+        );
+      }
+      if (request.url.path == '/assignments/1/submit') {
+        submitted.add(request.body);
+      }
+      return http.Response('{}', 404);
+    });
+    addTearDown(client.close);
+    addTearDown(clearLearningProgress);
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(assignmentWorkspaceApp());
+      await tester.pumpAndSettle();
+      final runButton = tester.widget<FilledButton>(
+        find.byKey(const Key('run-tests-button')),
+      );
+      expect(runButton.onPressed, isNotNull);
+
+      await pressControlEnter(tester);
+    }, () => client);
 
     expect(find.byKey(const Key('assignment-results-panel')), findsOneWidget);
-    expect(find.text('Ready when you are'), findsNothing);
+    expect(find.text('The code editor is empty'), findsNothing);
+    expect(submitted, hasLength(1));
+    expect(submitted.single, contains('print(1)'));
   });
 
   testWidgets('editor keyboard actions open tools and change appearance', (
@@ -590,6 +652,31 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     await tester.tap(find.byKey(const Key('run-tests-button')));
     expect(runCount, 1);
+  });
+
+  testWidgets('run tests stays disabled while the assignment code loads', (
+    WidgetTester tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: const Scaffold(
+          body: app.AssignmentEditorToolbar(isRunning: false, onRun: null),
+        ),
+      ),
+    );
+
+    expect(find.text('Run tests'), findsOneWidget);
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('run-tests-button')),
+    );
+    expect(button.onPressed, isNull);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel(RegExp('Run assignment tests'))),
+      containsSemantics(isButton: true, hasEnabledState: true, isEnabled: false),
+    );
+    semantics.dispose();
   });
 
   testWidgets('editor toolbar exposes save state and essential tools', (

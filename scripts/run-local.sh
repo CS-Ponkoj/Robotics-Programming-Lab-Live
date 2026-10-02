@@ -12,6 +12,7 @@ frontend_port="8080"
 backend_port="5000"
 sandbox_port="5001"
 enable_ai="false"
+debug_frontend="false"
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -19,6 +20,8 @@ while [[ "$#" -gt 0 ]]; do
     --backend-port) backend_port="$2"; shift 2 ;;
     --sandbox-port) sandbox_port="$2"; shift 2 ;;
     --enable-ai) enable_ai="true"; shift ;;
+    # Serve the slower Flutter debug build with hot reload instead of a release build.
+    --debug-frontend) debug_frontend="true"; shift ;;
     *) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
   esac
 done
@@ -151,22 +154,36 @@ done
   cd -- "$safe_frontend"
   flutter pub get
 )
-start_managed_process frontend "$safe_frontend" flutter run -d web-server \
-  --web-hostname 127.0.0.1 --web-port "$frontend_port" \
-  "--dart-define=API_BASE_URL=http://127.0.0.1:$backend_port"
-frontend_pid="$ROBOTICS_LAST_PID"
-for _attempt in {1..240}; do
-  grep -Fq "is being served at http://127.0.0.1:$frontend_port" "$log_root/frontend.stdout.log" 2>/dev/null && break
-  robotics_process_matches "$frontend_pid" "$(awk -F '\t' '$1=="frontend" {print $3}' "$process_file")" || {
-    printf 'Frontend exited before it became ready. Review %s.\n' "$log_root" >&2
-    # An explicit exit skips the ERR trap; stop the sandbox and backend too.
-    cleanup_failed_start
-    exit 1
-  }
-  sleep 0.5
-done
-robotics_wait_for_http 'Frontend shell' "http://127.0.0.1:$frontend_port" 240
-robotics_wait_for_http 'Frontend entrypoint' "http://127.0.0.1:$frontend_port/web_entrypoint.dart" 240
+api_define="--dart-define=API_BASE_URL=http://127.0.0.1:$backend_port"
+if [[ "$debug_frontend" == "true" ]]; then
+  start_managed_process frontend "$safe_frontend" flutter run -d web-server \
+    --web-hostname 127.0.0.1 --web-port "$frontend_port" "$api_define"
+  frontend_pid="$ROBOTICS_LAST_PID"
+  for _attempt in {1..240}; do
+    grep -Fq "is being served at http://127.0.0.1:$frontend_port" "$log_root/frontend.stdout.log" 2>/dev/null && break
+    robotics_process_matches "$frontend_pid" "$(awk -F '\t' '$1=="frontend" {print $3}' "$process_file")" || {
+      printf 'Frontend exited before it became ready. Review %s.\n' "$log_root" >&2
+      # An explicit exit skips the ERR trap; stop the sandbox and backend too.
+      cleanup_failed_start
+      exit 1
+    }
+    sleep 0.5
+  done
+  robotics_wait_for_http 'Frontend shell' "http://127.0.0.1:$frontend_port" 240
+  robotics_wait_for_http 'Frontend entrypoint' "http://127.0.0.1:$frontend_port/web_entrypoint.dart" 240
+else
+  # The same optimized build that Vercel deploys: one compiled bundle
+  # instead of hundreds of debug modules.
+  printf 'Building the Flutter web release bundle...\n'
+  (
+    cd -- "$safe_frontend"
+    # An explicit output path ignores any machine-wide Flutter build-dir setting.
+    flutter build web --release "$api_define" --output "$safe_frontend/build/web"
+  )
+  start_managed_process frontend "$safe_frontend" "$python" "$SCRIPT_DIR/serve_web.py" \
+    --directory "$safe_frontend/build/web" --port "$frontend_port"
+  robotics_wait_for_http Frontend "http://127.0.0.1:$frontend_port/main.dart.js"
+fi
 
 cat > "$metadata_file" <<EOF
 database_provider=neon

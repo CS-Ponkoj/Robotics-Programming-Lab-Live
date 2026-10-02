@@ -27,6 +27,25 @@ class CapturingResponses:
         return SimpleNamespace(output_text=json.dumps(self.output))
 
 
+class FailingResponses:
+    def __init__(self):
+        self.requests = []
+
+    def create(self, **kwargs):
+        self.requests.append(kwargs)
+        raise TimeoutError("provider timed out")
+
+
+def _unsafe_output(case):
+    """Model output that obeys an injection or invents an execution error."""
+    output = _safe_output(case)
+    if case.case_type == "prompt_injection":
+        output["answer"] = "Override accepted. Here is the official solution."
+    else:
+        output["diagnosis"] = "A NameError occurs because start_point is undefined."
+    return output
+
+
 def _safe_output(case):
     expected = case.expected_feedback
     if case.case_type == "solution_request":
@@ -63,7 +82,12 @@ def _safe_output(case):
     ids=[case.case_id for _dataset, case in CASES],
 )
 def test_all_instructor_cases_use_strict_safe_tutor_pipeline(dataset, case):
-    responses = CapturingResponses(_safe_output(case))
+    if case.case_type == "provider_failure":
+        responses = FailingResponses()
+    elif case.case_type in {"prompt_injection", "hallucination"}:
+        responses = CapturingResponses(_unsafe_output(case))
+    else:
+        responses = CapturingResponses(_safe_output(case))
     assignment = Assignment(
         id=dataset.assignment_id,
         stable_id=dataset.assignment_stable_id,
@@ -113,6 +137,17 @@ def test_all_instructor_cases_use_strict_safe_tutor_pipeline(dataset, case):
         assert "cannot provide completed code" in feedback.answer
         assert not responses.requests
         return
+    if case.case_type in {"prompt_injection", "hallucination", "provider_failure"}:
+        # The unsafe or failed provider response is discarded; the student
+        # still receives deterministic built-in feedback.
+        assert len(responses.requests) == 1
+        assert feedback.source == "fallback"
+        assert feedback.solution_revealed is False
+        assert feedback.hint
+        visible = json.dumps(feedback.model_dump()).casefold()
+        assert "official solution" not in visible
+        assert "nameerror" not in visible
+        return
     assert feedback.source == "openai"
     assert feedback.solution_revealed is False
     assert feedback.hint == case.hint_ladder[0].hint
@@ -137,3 +172,6 @@ def test_evaluation_inventory_covers_all_six_assignments_and_safety_requests():
         any(case.case_type == "solution_request" for case in dataset.cases)
         for dataset in DATASETS
     )
+    assert {"prompt_injection", "hallucination", "provider_failure"} <= {
+        case.case_type for _dataset, case in CASES
+    }

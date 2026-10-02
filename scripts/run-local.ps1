@@ -1,5 +1,7 @@
 param(
     [switch]$EnableAi,
+    # Serve the slower Flutter debug build with hot reload instead of a release build.
+    [switch]$DebugFrontend,
     [int]$FrontendPort = 8080,
     [int]$BackendPort = 5000,
     [int]$SandboxPort = 5001
@@ -221,20 +223,44 @@ try {
     } finally {
         Pop-Location
     }
-    $flutterCommand = (Get-Command flutter).Source
-    $frontend = Start-ProjectProcess -Name "frontend" -FilePath $flutterCommand `
-        -ArgumentList @("run", "-d", "web-server", "--web-hostname", "127.0.0.1", "--web-port", "$FrontendPort", "--dart-define=API_BASE_URL=http://127.0.0.1:$BackendPort") `
-        -WorkingDirectory $resolvedFrontend
-    $processes += [pscustomobject]@{ name = "frontend"; id = $frontend.Id }
-    Wait-ForLogMessage -Name "Frontend compiler" `
-        -Path (Join-Path $logRoot "frontend.stdout.log") `
-        -Text "is being served at http://127.0.0.1:$FrontendPort" `
-        -ProcessId $frontend.Id
-    Wait-ForEndpoint -Name "Frontend shell" -Url "http://127.0.0.1:$FrontendPort" -Attempts 240 -AcceptAnySuccess
-    # Flutter's web server can return index.html before the generated Dart
-    # entrypoint is available. Wait for that module so the first browser load
-    # cannot race the compiler and render a blank page.
-    Wait-ForEndpoint -Name "Frontend entrypoint" -Url "http://127.0.0.1:$FrontendPort/web_entrypoint.dart" -Attempts 240 -AcceptAnySuccess
+    $apiDefine = "--dart-define=API_BASE_URL=http://127.0.0.1:$BackendPort"
+    if ($DebugFrontend) {
+        $flutterCommand = (Get-Command flutter).Source
+        $frontend = Start-ProjectProcess -Name "frontend" -FilePath $flutterCommand `
+            -ArgumentList @("run", "-d", "web-server", "--web-hostname", "127.0.0.1", "--web-port", "$FrontendPort", $apiDefine) `
+            -WorkingDirectory $resolvedFrontend
+        $processes += [pscustomobject]@{ name = "frontend"; id = $frontend.Id }
+        Wait-ForLogMessage -Name "Frontend compiler" `
+            -Path (Join-Path $logRoot "frontend.stdout.log") `
+            -Text "is being served at http://127.0.0.1:$FrontendPort" `
+            -ProcessId $frontend.Id
+        Wait-ForEndpoint -Name "Frontend shell" -Url "http://127.0.0.1:$FrontendPort" -Attempts 240 -AcceptAnySuccess
+        # Flutter's web server can return index.html before the generated Dart
+        # entrypoint is available. Wait for that module so the first browser load
+        # cannot race the compiler and render a blank page.
+        Wait-ForEndpoint -Name "Frontend entrypoint" -Url "http://127.0.0.1:$FrontendPort/web_entrypoint.dart" -Attempts 240 -AcceptAnySuccess
+    } else {
+        # The same optimized build that Vercel deploys: one compiled bundle
+        # instead of hundreds of debug modules.
+        Write-Output "Building the Flutter web release bundle..."
+        # An explicit output path ignores any machine-wide Flutter build-dir setting.
+        $webBuild = Join-Path $resolvedFrontend "build\web"
+        Push-Location $resolvedFrontend
+        try {
+            & flutter build web --release $apiDefine --output $webBuild
+            if ($LASTEXITCODE -ne 0) { throw "flutter build web failed." }
+        } finally {
+            Pop-Location
+        }
+        # Start-Process joins arguments without quoting; the checkout path has spaces.
+        $serverScript = '"' + (Join-Path $PSScriptRoot "serve_web.py") + '"'
+        $webRoot = '"' + $webBuild + '"'
+        $frontend = Start-ProjectProcess -Name "frontend" -FilePath $python `
+            -ArgumentList @($serverScript, "--directory", $webRoot, "--port", "$FrontendPort") `
+            -WorkingDirectory $resolvedFrontend
+        $processes += [pscustomobject]@{ name = "frontend"; id = $frontend.Id }
+        Wait-ForEndpoint -Name "Frontend" -Url "http://127.0.0.1:$FrontendPort/main.dart.js" -AcceptAnySuccess
+    }
 
     [pscustomobject]@{
         repository = $repositoryRoot

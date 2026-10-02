@@ -36,6 +36,11 @@ Start the application:
 Open the frontend URL printed by the script, normally
 `http://127.0.0.1:8180/app`. Keep the PowerShell window open.
 
+The launcher builds and serves the same optimized Flutter release bundle that
+Vercel deploys, so pages load quickly. Frontend developers who need hot reload
+can add `-DebugFrontend` (Ubuntu: `--debug-frontend`) to serve the slower debug
+build instead.
+
 Stop the application:
 
 ```powershell
@@ -267,6 +272,28 @@ It checks source completeness, private Neon configuration, backend tests,
 dependency integrity, Python compilation, Flutter analysis and tests, a release
 web build from LocalAppData, Git whitespace, and the safe cleanup allow-list.
 It also checks managed service health when the stack is running.
+
+### Browser tests
+
+With the stack running, drive the student and instructor flows in a real
+browser:
+
+```powershell
+.\scripts\run-browser-tests.ps1 -InstructorLogin <instructor-login>
+```
+
+On Ubuntu: `./scripts/run-browser-tests.sh --instructor-login <instructor-login>`.
+
+The student test uses the memory-only demo: it runs Assignment 1's starter
+code, checks the failing result and built-in hint, submits the maintained
+answer, expects every test to pass, and confirms that a refresh resets the
+demo. The instructor test signs in, checks the studio and research dashboard,
+and signs out without changing course or research data (sign-in and sign-out
+still record the normal session and audit rows). The script asks for the instructor
+password (or reads `E2E_INSTRUCTOR_PASSWORD`); without `-InstructorLogin` the
+instructor test is skipped. Playwright runs in its own environment under the OS
+user-data folder; Windows uses the installed Google Chrome and Ubuntu downloads
+Playwright's Chromium.
 
 Check the three local services manually when using the example ports:
 
