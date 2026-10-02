@@ -275,3 +275,46 @@ def test_subprocess_worker_environment_excludes_application_secrets(
     assert "OPENAI_API_KEY" not in captured["env"]
     assert "DATABASE_URL" not in captured["env"]
     assert "SANDBOX_API_TOKEN" not in captured["env"]
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "value = '{0.__globals__}'.format(len)",
+        "value = '{0.__class__}'.format(1)",
+        "value = ''.format_map({})",
+        "value = '1'.zfill(3)",
+        "value = (1).to_bytes(4, 'big')",
+        "value = str(1).zfill(3)",
+    ],
+)
+def test_subprocess_sandbox_applies_method_allowlist_to_every_receiver(code):
+    result = SubprocessSandbox().execute(code, ["value"])
+
+    assert result["success"] is False
+    assert "is not allowed" in result["error"]
+
+
+def test_subprocess_sandbox_keeps_allowed_methods_on_literals_and_calls():
+    result = SubprocessSandbox().execute(
+        "value = ', '.join(sorted(['b', 'a'])).upper() + f'{3.14159:.2f}'",
+        ["value"],
+    )
+
+    assert result["success"] is True
+    assert result["values"]["value"] == "A, B3.14"
+
+
+def test_subprocess_sandbox_does_not_return_oversized_values():
+    result = SubprocessSandbox().execute(
+        "text = 'x' * 5_000_000\nitems = list(range(100_000))\nsmall = 'ok'",
+        ["text", "items", "small"],
+    )
+
+    assert result["success"] is True
+    assert result["values"]["text"] == {
+        "unsupported_type": "str",
+        "repr": "[value too large]",
+    }
+    assert result["values"]["items"]["repr"] == "[value too large]"
+    assert result["values"]["small"] == "ok"

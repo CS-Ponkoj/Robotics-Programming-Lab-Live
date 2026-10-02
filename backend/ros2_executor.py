@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import secrets
 import shutil
 import subprocess
 from typing import Protocol
+
+
+logger = logging.getLogger(__name__)
 
 
 class Ros2Executor(Protocol):
@@ -155,7 +159,13 @@ def _container_failure_message(stderr: str) -> str:
             "The local ROS 2 grader cannot reach Docker Desktop. Start Docker "
             "Desktop with Linux containers, wait until it is ready, and run the tests again."
         )
-    return message[-2000:] or "The ROS 2 grader container failed."
+    # Raw container output can reveal grader internals; keep it server-side.
+    if message:
+        logger.warning("ROS 2 grader container failed: %s", message[-2000:])
+    return (
+        "The ROS 2 grader stopped unexpectedly. Run the tests again; if this "
+        "keeps happening, ask your instructor."
+    )
 
 
 def _executor_error(message: str) -> dict:

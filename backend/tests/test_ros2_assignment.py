@@ -241,6 +241,7 @@ def test_docker_executor_returns_actionable_error_when_docker_is_missing(monkeyp
 
 
 def test_docker_executor_hides_daemon_pipe_details_when_desktop_is_stopped(monkeypatch):
+    monkeypatch.setattr("ros2_executor.shutil.which", lambda _name: "docker")
     def unavailable(*_args, **_kwargs):
         return SimpleNamespace(
             returncode=1,
@@ -266,6 +267,7 @@ def test_ros2_controller_validation_rejects_syntax_errors():
 
 
 def test_docker_executor_isolated_flags_and_config_allowlist(monkeypatch):
+    monkeypatch.setattr('ros2_executor.shutil.which', lambda _name: 'docker')
     captured = {}
 
     def complete(command, **kwargs):
@@ -443,3 +445,49 @@ def test_ros2_obstacle_assignment_rejects_oversized_submission(tmp_path):
 
     assert response.status_code == 413
     assert response.json()["error"] == "Submitted code is too large."
+
+
+def test_docker_executor_hides_raw_container_failure_output(monkeypatch):
+    monkeypatch.setattr("ros2_executor.shutil.which", lambda _name: "docker")
+
+    def crashed(*_args, **_kwargs):
+        return SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr=(
+                'Traceback (most recent call last):\n'
+                '  File "/grader/ros2_obstacle_harness.py", line 42, in <module>\n'
+                '    assert stop_time < HIDDEN_LIMIT\n'
+                'AssertionError'
+            ),
+        )
+
+    monkeypatch.setattr("ros2_executor.subprocess.run", crashed)
+    result = DockerRos2Executor("grader:test").execute("pass", [], {})
+
+    assert result["success"] is False
+    assert "/grader/" not in result["error"]
+    assert "HIDDEN_LIMIT" not in result["error"]
+    assert "stopped unexpectedly" in result["error"]
+
+
+def test_ros2_worker_redacts_hidden_harness_frames_but_keeps_student_frames():
+    from ros2_worker import redact_grader_frames
+
+    stderr = (
+        "Traceback (most recent call last):\n"
+        '  File "/grader/ros2_topic_harness.py", line 88, in run\n'
+        "    expected = SECRET_EXPECTED_SPEED\n"
+        "               ^^^^^^^^^^^^^^^^^^^^^\n"
+        '  File "/workspace/src/robot_motion/robot_motion/controller.py", line 7, in tick\n'
+        "    self.publisher.publish(mesage)\n"
+        "NameError: name 'mesage' is not defined"
+    )
+
+    redacted = redact_grader_frames(stderr)
+
+    assert "/grader/" not in redacted
+    assert "SECRET_EXPECTED_SPEED" not in redacted
+    assert "controller.py" in redacted
+    assert "self.publisher.publish(mesage)" in redacted
+    assert redacted.endswith("NameError: name 'mesage' is not defined")

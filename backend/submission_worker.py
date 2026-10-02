@@ -10,6 +10,7 @@ import traceback
 
 ALLOWED_IMPORTS = frozenset({"math", "numpy", "scipy"})
 MAX_OUTPUT_CHARS = 20_000
+MAX_VALUE_CHARS = 20_000
 ALLOWED_MODULE_ATTRIBUTES = {
     "math": {
         "acos", "asin", "atan", "atan2", "ceil", "cos", "degrees", "dist", "e",
@@ -67,16 +68,17 @@ class SubmissionSyntaxValidator(ast.NodeVisitor):
         if node.attr.startswith("_"):
             raise ValueError(f"Attribute '{node.attr}' is not allowed")
         path = self._attribute_path(node)
-        if path:
-            imported = self.module_aliases.get(path[0])
-            if imported:
-                canonical = ".".join([imported, *path[1:-1]])
-                if node.attr not in ALLOWED_MODULE_ATTRIBUTES.get(canonical, set()):
-                    raise ValueError(
-                        f"Use of '{'.'.join(path)}' is not allowed"
-                    )
-            elif node.attr not in ALLOWED_VALUE_METHODS:
-                raise ValueError(f"Attribute '{node.attr}' is not allowed")
+        imported = self.module_aliases.get(path[0]) if path else None
+        if imported:
+            canonical = ".".join([imported, *path[1:-1]])
+            if node.attr not in ALLOWED_MODULE_ATTRIBUTES.get(canonical, set()):
+                raise ValueError(
+                    f"Use of '{'.'.join(path)}' is not allowed"
+                )
+        elif node.attr not in ALLOWED_VALUE_METHODS:
+            # Applies to every receiver, including literals and call results,
+            # so "'{0.__globals__}'.format(f)" cannot bypass the allowlist.
+            raise ValueError(f"Attribute '{node.attr}' is not allowed")
         self.generic_visit(node)
 
     @staticmethod
@@ -163,14 +165,30 @@ def safe_builtins():
 
 
 def json_safe_value(value):
-    if type(value) in (bool, float, int, str) or value is None:
+    if type(value) in (bool, float, int) or value is None:
         return value
+    if type(value) is str:
+        return _bounded_text(value, "str")
     item = getattr(value, "item", None)
     if callable(item):
         converted = item()
-        if type(converted) in (bool, float, int, str) or converted is None:
+        if type(converted) in (bool, float, int) or converted is None:
             return converted
-    return {"unsupported_type": type(value).__name__, "repr": repr(value)}
+        if type(converted) is str:
+            return _bounded_text(converted, "str")
+    text = repr(value)
+    if len(text) > MAX_VALUE_CHARS:
+        return _too_large(type(value).__name__)
+    return {"unsupported_type": type(value).__name__, "repr": text}
+
+
+def _bounded_text(value, type_name):
+    return value if len(value) <= MAX_VALUE_CHARS else _too_large(type_name)
+
+
+def _too_large(type_name):
+    # Oversized results are never accepted as answers and are not copied back.
+    return {"unsupported_type": type_name, "repr": "[value too large]"}
 
 
 def format_error(error):

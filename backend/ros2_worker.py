@@ -149,7 +149,8 @@ def evaluate(request: dict) -> dict:
         return failure("The ROS 2 node exceeded the execution time limit.")
     if harness.returncode != 0:
         return failure(
-            harness.stderr.strip()[-2000:] or "The ROS 2 node test failed."
+            redact_grader_frames(harness.stderr.strip())[-2000:]
+            or "The ROS 2 node test failed."
         )
     try:
         runtime = json.loads(harness.stdout)
@@ -167,6 +168,23 @@ def evaluate(request: dict) -> dict:
         "output": runtime.get("output", ""),
         "tests": tests,
     }
+
+
+def redact_grader_frames(text: str) -> str:
+    """Remove hidden-harness traceback frames, keeping the student's frames."""
+    kept = []
+    skipping = False
+    for line in text.splitlines():
+        if line.startswith('  File "'):
+            skipping = '"/grader/' in line
+            if skipping:
+                continue
+        elif skipping and line.startswith("    "):
+            continue
+        else:
+            skipping = False
+        kept.append(line.replace("/grader/", "<grader>/"))
+    return "\n".join(kept)
 
 
 def test_result(test_id: str, passed: bool, message: str) -> dict:
