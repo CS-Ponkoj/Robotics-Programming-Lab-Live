@@ -27,6 +27,9 @@ backend/study_exports/
 /outputs/
 /tmp/
 
+# Personal task notes and dashboards from desktop productivity tools.
+/productivity/
+
 # Obsolete pre-handoff-package backup location; ignored if an old copy reappears.
 /local_database_backups/
 
