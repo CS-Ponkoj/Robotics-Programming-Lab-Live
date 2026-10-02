@@ -69,18 +69,32 @@ class EmailService:
         token: str,
         purpose: str,
     ) -> bool:
-        action = "set" if purpose == "account_activation" else "reset"
         link = f"{self.settings.public_app_url}/?password_token={token}"
-        subject = (
-            "Set your Robotics Programming Lab password"
-            if action == "set"
-            else "Reset your Robotics Programming Lab password"
-        )
-        body = (
-            f"Your login ID is {login_id}.\n\n"
-            f"Use this one-time link to {action} your password:\n{link}\n\n"
-            "If you did not request this message, you can ignore it."
-        )
+        if purpose == "account_activation":
+            hours = self.settings.invitation_link_hours
+            subject = "Your Robotics Programming Lab account is ready"
+            body = (
+                "Hello,\n\n"
+                "Your instructor has created a Robotics Programming Lab "
+                "account for you.\n\n"
+                f"Login ID: {login_id}\n\n"
+                "Set your password with this one-time link:\n"
+                f"{link}\n\n"
+                f"The link works once and expires in {hours} hours. After "
+                "setting your password, sign in with your login ID and the "
+                "password you chose. If the link has expired, ask your "
+                "instructor to send a new one.\n\n"
+                "Your password is never sent by email.\n\n"
+                "Robotics Programming Lab\n"
+                "Robotics Research Lab, University of Nevada, Reno"
+            )
+        else:
+            subject = "Reset your Robotics Programming Lab password"
+            body = (
+                f"Your login ID is {login_id}.\n\n"
+                f"Use this one-time link to reset your password:\n{link}\n\n"
+                "If you did not request this message, you can ignore it."
+            )
         message_record = {
             "to": email,
             "subject": subject,

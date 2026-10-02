@@ -567,10 +567,15 @@ def create_app(
     ) -> bool:
         if not user.email:
             return False
+        settings = request.app.state.settings
         raw_token = create_password_reset_token(
             session,
             user,
-            duration_minutes=request.app.state.settings.password_reset_minutes,
+            duration_minutes=(
+                settings.invitation_link_hours * 60
+                if purpose == "account_activation"
+                else settings.password_reset_minutes
+            ),
             purpose=purpose,
         )
         return EmailService(
@@ -1059,17 +1064,26 @@ def create_app(
         request: Request,
         session: Session = Depends(session_dependency),
     ):
-        if not request.app.state.settings.enable_password_reset:
+        settings = request.app.state.settings
+        # Instructor invitations work with email features alone; ordinary
+        # self-service reset links still require the password-reset flag.
+        if not (settings.enable_password_reset or settings.enable_email_features):
             raise HTTPException(404, "Not found.")
         enforce_client_rate_limit(
             request,
             bucket="auth",
-            requests_per_minute=request.app.state.settings.auth_requests_per_minute,
+            requests_per_minute=settings.auth_requests_per_minute,
         )
         consumed = consume_password_reset_token(session, body.token)
         if consumed is None:
             raise HTTPException(400, "The password reset link is invalid or expired.")
-        _, user = consumed
+        reset_token, user = consumed
+        activation = reset_token.purpose == "account_activation"
+        if not (
+            (activation and settings.enable_email_features)
+            or (not activation and settings.enable_password_reset)
+        ):
+            raise HTTPException(400, "The password reset link is invalid or expired.")
         change_password(session, user, body.new_password)
         record_audit(
             session,
@@ -1077,6 +1091,7 @@ def create_app(
             resource_type="user",
             resource_id=user.id,
             actor_user_id=user.id,
+            details={"purpose": reset_token.purpose},
         )
         return {"password_reset": True, "login_required": True}
 

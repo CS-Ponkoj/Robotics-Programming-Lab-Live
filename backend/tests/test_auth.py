@@ -9,7 +9,8 @@ import account_sync
 from account_sync import seed_demo_accounts
 from app import create_app
 from config import Settings
-from models import AuditEvent, Submission, User
+from auth_service import aware_utc
+from models import AuditEvent, PasswordResetToken, Submission, User, utc_now
 
 
 @pytest.fixture()
@@ -654,6 +655,118 @@ def test_tracked_account_roster_rejects_plaintext_passwords(tmp_path, monkeypatc
         ).status_code == 401
 
     assert json.loads(account_file.read_text(encoding="utf-8")) == payload
+
+
+@pytest.fixture()
+def invitation_client(tmp_path, monkeypatch):
+    """Email invitations on, public self-service reset off, fake SMTP."""
+    sent = []
+
+    class FakeSmtp:
+        def __init__(self, host, port, timeout):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def starttls(self):
+            pass
+
+        def login(self, username, password):
+            pass
+
+        def send_message(self, message):
+            sent.append(message)
+
+    monkeypatch.setattr("email_service.smtplib.SMTP", FakeSmtp)
+    settings = Settings(
+        database_url="sqlite://",
+        study_accounts_file=tmp_path / "study_accounts.json",
+        public_app_url="http://study.test",
+        smtp_host="smtp.office365.test",
+        smtp_username="mailer@unr.test",
+        smtp_password="test-only-password",
+        smtp_from="Robotics Programming Lab <mailer@unr.test>",
+        enable_email_features=True,
+        enable_password_reset=False,
+    )
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        client.sent_messages = sent
+        yield client
+
+
+def test_invitation_email_lets_a_new_student_set_a_password(invitation_client):
+    client = invitation_client
+    instructor = login(client, "instructor", "instructor")
+    created = client.post(
+        "/admin/students",
+        headers=bearer(instructor["token"]),
+        json={
+            "login_id": "new-student",
+            "email": "new.student@unr.test",
+            "participant_code": "P-101",
+            "send_invitation_email": True,
+        },
+    )
+    assert created.status_code == 201
+    assert created.json()["email_sent"] is True
+    # The password is never returned to the instructor or sent by email.
+    assert created.json()["temporary_password"] is None
+
+    assert len(client.sent_messages) == 1
+    message = client.sent_messages[0]
+    body = message.get_content()
+    assert message["To"] == "new.student@unr.test"
+    assert message["Subject"] == "Your Robotics Programming Lab account is ready"
+    assert "Login ID: new-student" in body
+    assert "expires in 72 hours" in body
+    assert "temporary password" not in body.lower()
+    token = re.search(r"password_token=([^\s]+)", body).group(1)
+
+    with client.app.state.SessionLocal() as session:
+        user = session.scalar(select(User).where(User.login_id == "new-student"))
+        stored = session.scalar(
+            select(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+        )
+        assert stored.purpose == "account_activation"
+        lifetime = aware_utc(stored.expires_at) - utc_now()
+        assert 71.9 <= lifetime.total_seconds() / 3600 <= 72.1
+
+    activated = client.post(
+        "/auth/reset-password",
+        json={"token": token, "new_password": "Student-Chosen-5827"},
+    )
+    assert activated.status_code == 200
+    login(client, "new-student", "Student-Chosen-5827")
+    # The one-time link cannot be reused.
+    assert client.post(
+        "/auth/reset-password",
+        json={"token": token, "new_password": "Second-Use-5827"},
+    ).status_code == 400
+
+
+def test_invitations_do_not_enable_public_password_reset(invitation_client):
+    client = invitation_client
+    assert client.post(
+        "/auth/forgot-password", json={"identifier": "instructor"}
+    ).status_code == 404
+
+    from auth_service import create_password_reset_token
+
+    with client.app.state.SessionLocal() as session:
+        instructor = session.scalar(select(User).where(User.login_id == "instructor"))
+        reset_token = create_password_reset_token(
+            session, instructor, duration_minutes=30, purpose="password_reset"
+        )
+    # A self-service reset link stays unusable while that feature is off.
+    assert client.post(
+        "/auth/reset-password",
+        json={"token": reset_token, "new_password": "Attacker-Chosen-5827"},
+    ).status_code == 400
+    login(client, "instructor", "instructor")
 
 
 def _custom_client(tmp_path, client_address=("testclient", 50000), **overrides):

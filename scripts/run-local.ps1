@@ -49,6 +49,8 @@ try {
     try {
         $databaseUrl = (& $python -c "from config import get_settings; print(get_settings().cloud_database_url or '')" 2>$null | Select-Object -Last 1)
         $aiAvailable = ((& $python -c "from config import get_settings; print('true' if get_settings().openai_api_key else 'false')" 2>$null | Select-Object -Last 1) -eq "true")
+        # One .env flag enables email invitations in both the API and the web UI.
+        $emailToolsEnabled = ((& $python -c "from config import get_settings; print('true' if get_settings().enable_email_features else 'false')" 2>$null | Select-Object -Last 1) -eq "true")
     } finally {
         Pop-Location
     }
@@ -224,10 +226,11 @@ try {
         Pop-Location
     }
     $apiDefine = "--dart-define=API_BASE_URL=http://127.0.0.1:$BackendPort"
+    $emailDefine = "--dart-define=ENABLE_INSTRUCTOR_EMAIL_TOOLS=$($emailToolsEnabled.ToString().ToLowerInvariant())"
     if ($DebugFrontend) {
         $flutterCommand = (Get-Command flutter).Source
         $frontend = Start-ProjectProcess -Name "frontend" -FilePath $flutterCommand `
-            -ArgumentList @("run", "-d", "web-server", "--web-hostname", "127.0.0.1", "--web-port", "$FrontendPort", $apiDefine) `
+            -ArgumentList @("run", "-d", "web-server", "--web-hostname", "127.0.0.1", "--web-port", "$FrontendPort", $apiDefine, $emailDefine) `
             -WorkingDirectory $resolvedFrontend
         $processes += [pscustomobject]@{ name = "frontend"; id = $frontend.Id }
         Wait-ForLogMessage -Name "Frontend compiler" `
@@ -247,7 +250,7 @@ try {
         $webBuild = Join-Path $resolvedFrontend "build\web"
         Push-Location $resolvedFrontend
         try {
-            Invoke-RoboticsNative flutter build web --release $apiDefine --output $webBuild
+            Invoke-RoboticsNative flutter build web --release $apiDefine $emailDefine --output $webBuild
             if ($LASTEXITCODE -ne 0) { throw "flutter build web failed." }
         } finally {
             Pop-Location

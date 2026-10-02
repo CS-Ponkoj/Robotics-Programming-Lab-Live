@@ -111,6 +111,11 @@ ai_available="$(
   ROBOTICS_ENV_FILE="$private_config" "$python" -c \
     'from config import get_settings; print("true" if get_settings().openai_api_key else "false")'
 )"
+# One .env flag enables email invitations in both the API and the web UI.
+email_tools_enabled="$(
+  cd -- "$backend_root"
+  ROBOTICS_ENV_FILE="$private_config" "$python" -c     'from config import get_settings; print("true" if get_settings().enable_email_features else "false")'
+)"
 if [[ "$enable_ai" == "true" && "$ai_available" != "true" ]]; then
   printf '%s\n' '--enable-ai was requested, but OPENAI_API_KEY is not configured in the repository root .env.' >&2
   exit 1
@@ -155,9 +160,10 @@ done
   flutter pub get
 )
 api_define="--dart-define=API_BASE_URL=http://127.0.0.1:$backend_port"
+email_define="--dart-define=ENABLE_INSTRUCTOR_EMAIL_TOOLS=$email_tools_enabled"
 if [[ "$debug_frontend" == "true" ]]; then
   start_managed_process frontend "$safe_frontend" flutter run -d web-server \
-    --web-hostname 127.0.0.1 --web-port "$frontend_port" "$api_define"
+    --web-hostname 127.0.0.1 --web-port "$frontend_port" "$api_define" "$email_define"
   frontend_pid="$ROBOTICS_LAST_PID"
   for _attempt in {1..240}; do
     grep -Fq "is being served at http://127.0.0.1:$frontend_port" "$log_root/frontend.stdout.log" 2>/dev/null && break
@@ -178,7 +184,7 @@ else
   (
     cd -- "$safe_frontend"
     # An explicit output path ignores any machine-wide Flutter build-dir setting.
-    flutter build web --release "$api_define" --output "$safe_frontend/build/web"
+    flutter build web --release "$api_define" "$email_define" --output "$safe_frontend/build/web"
   )
   start_managed_process frontend "$safe_frontend" "$python" "$SCRIPT_DIR/serve_web.py" \
     --directory "$safe_frontend/build/web" --port "$frontend_port"

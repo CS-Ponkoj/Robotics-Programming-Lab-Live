@@ -55,9 +55,10 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    bool sendEmail = false;
-    String role = 'student';
     final emailConfigured = _emailStatus['configured'] == true;
+    // Invite by email by default whenever real delivery is available.
+    bool sendEmail = instructorEmailToolsEnabled && emailConfigured;
+    String role = 'student';
     bool saving = false;
     String? dialogError;
 
@@ -150,6 +151,11 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                             enabled: !saving,
                             decoration: const InputDecoration(
                               labelText: 'Participant code (optional)',
+                              helperText:
+                                  'Anonymous study ID, such as P-042. Research '
+                                  'views and exports show it instead of the '
+                                  'login ID.',
+                              helperMaxLines: 3,
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -283,8 +289,10 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                   'shown again.',
                 ),
               ] else if (emailSent)
-                const Text(
-                  'A one-time password setup link was sent to the account owner.',
+                Text(
+                  'An invitation was sent to ${user['email'] ?? 'the account owner'}. '
+                  'It contains the login ID and a one-time link to set a '
+                  'password, valid for 72 hours.',
                 ),
             ],
           ),

@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     public_app_url: str = "http://127.0.0.1:8080"
     auth_session_hours: int = 12
     password_reset_minutes: int = 30
+    # New-account invitations may be opened the next day, unlike resets.
+    invitation_link_hours: int = 72
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_username: str | None = None
