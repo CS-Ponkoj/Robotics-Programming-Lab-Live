@@ -241,9 +241,13 @@ test evidence and available built-in hints without contacting OpenAI. Tutor
 questions require a completed test run because they use that attempt's
 evidence.
 
-The learning workbench keeps the shared teal header and uses soft teal, sand,
-and lavender surfaces around readable content. Assignment cards distinguish
-best and last scores, attempts, and Start/Continue/Review actions. Instructions
+One design system in `frontend/lib/theme/app_theme.dart` styles every screen:
+a teal brand, slate neutrals, white cards with soft shadows, and a reserved
+violet that always marks AI-generated feedback with an **AI-generated** badge.
+The sign-in page explains the Learn, Code, Evaluate, Improve loop. The student
+home opens with a learning-path summary and an **Up next** action for the
+first unfinished assignment; assignment cards show a Python or ROS 2 tag, best
+and last scores, attempts, and Start/Continue/Review actions. Instructions
 have section jump buttons; lessons with multiple headings have an expandable
 **On this page** navigator. These presentation changes do not alter grading,
 quiz persistence, assignment versions, or research calculations.
