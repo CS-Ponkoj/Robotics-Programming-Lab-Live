@@ -1,4 +1,6 @@
 import json
+import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,7 +11,7 @@ from app import create_app
 from config import Settings
 from models import Assignment
 from graders.ros2_topic import Ros2TopicGrader
-from ros2_executor import DockerRos2Executor
+from ros2_executor import DockerRos2Executor, _run_bounded
 from ros2_worker import select_harness, validate_controller
 
 
@@ -233,7 +235,7 @@ def test_docker_executor_returns_actionable_error_when_docker_is_missing(monkeyp
     def missing(*_args, **_kwargs):
         raise FileNotFoundError
 
-    monkeypatch.setattr("ros2_executor.subprocess.run", missing)
+    monkeypatch.setattr("ros2_executor._run_bounded", missing)
     result = DockerRos2Executor("grader:test").execute("pass", [], {})
 
     assert result["success"] is False
@@ -250,15 +252,118 @@ def test_docker_executor_hides_daemon_pipe_details_when_desktop_is_stopped(monke
                 "failed to connect to the docker API at "
                 "npipe:////./pipe/dockerDesktopLinuxEngine"
             ),
+            timed_out=False,
+            overflowed=False,
         )
 
-    monkeypatch.setattr("ros2_executor.subprocess.run", unavailable)
+    monkeypatch.setattr("ros2_executor._run_bounded", unavailable)
     result = DockerRos2Executor("grader:test").execute("pass", [], {})
 
     assert result["success"] is False
     assert result["tests"] == []
     assert "Start Docker Desktop" in result["error"]
     assert "npipe" not in result["error"]
+
+
+@pytest.mark.parametrize(
+    ("outcome", "message"),
+    [("timed_out", "exceeded"), ("overflowed", "too much output")],
+)
+def test_docker_executor_removes_container_after_timeout_or_overflow(
+    monkeypatch, outcome, message
+):
+    monkeypatch.setattr("ros2_executor.shutil.which", lambda _name: "docker")
+    started = {}
+    removed = []
+
+    def stopped(command, input_data, **kwargs):
+        started["name"] = command[command.index("--name") + 1]
+        return SimpleNamespace(
+            returncode=-9,
+            stdout="",
+            stderr="",
+            timed_out=outcome == "timed_out",
+            overflowed=outcome == "overflowed",
+        )
+
+    monkeypatch.setattr("ros2_executor._run_bounded", stopped)
+    monkeypatch.setattr(
+        "ros2_executor.subprocess.run",
+        lambda command, **kwargs: removed.append(command),
+    )
+    result = DockerRos2Executor("grader:test").execute("pass", [], {})
+
+    assert result["success"] is False
+    assert message in result["error"]
+    assert started["name"].startswith("rpl-ros2-")
+    assert removed == [["docker", "rm", "--force", started["name"]]]
+
+
+def test_docker_executor_does_not_remove_container_after_normal_exit(monkeypatch):
+    monkeypatch.setattr("ros2_executor.shutil.which", lambda _name: "docker")
+    removed = []
+    monkeypatch.setattr(
+        "ros2_executor._run_bounded",
+        lambda command, input_data, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps({"success": True, "error": "", "output": "", "tests": []}),
+            stderr="",
+            timed_out=False,
+            overflowed=False,
+        ),
+    )
+    monkeypatch.setattr(
+        "ros2_executor.subprocess.run",
+        lambda command, **kwargs: removed.append(command),
+    )
+
+    assert DockerRos2Executor("grader:test").execute("pass", [], {})["success"] is True
+    assert removed == []
+
+
+def test_bounded_runner_stops_a_process_that_never_exits():
+    started = time.monotonic()
+    result = _run_bounded(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        b"",
+        timeout_seconds=0.5,
+        output_limit=1_000,
+    )
+
+    assert result.timed_out is True
+    assert result.overflowed is False
+    assert time.monotonic() - started < 10
+
+
+def test_bounded_runner_caps_retained_output_and_stops_early():
+    started = time.monotonic()
+    result = _run_bounded(
+        [
+            sys.executable,
+            "-c",
+            "import sys\nwhile True: sys.stdout.write('x' * 65536)",
+        ],
+        b"",
+        timeout_seconds=30,
+        output_limit=100_000,
+    )
+
+    assert result.overflowed is True
+    assert result.timed_out is False
+    assert len(result.stdout) <= 100_000
+    assert time.monotonic() - started < 10
+
+
+def test_bounded_runner_passes_input_and_returns_output():
+    result = _run_bounded(
+        [sys.executable, "-c", "import sys; sys.stdout.write(sys.stdin.read().upper())"],
+        b"ros2",
+        timeout_seconds=10,
+        output_limit=1_000,
+    )
+
+    assert (result.returncode, result.stdout) == (0, "ROS2")
+    assert not (result.timed_out or result.overflowed)
 
 
 def test_ros2_controller_validation_rejects_syntax_errors():
@@ -270,18 +375,20 @@ def test_docker_executor_isolated_flags_and_config_allowlist(monkeypatch):
     monkeypatch.setattr('ros2_executor.shutil.which', lambda _name: 'docker')
     captured = {}
 
-    def complete(command, **kwargs):
+    def complete(command, input_data, **kwargs):
         captured['command'] = command
-        captured['request'] = json.loads(kwargs['input'])
+        captured['request'] = json.loads(input_data)
         return SimpleNamespace(
             returncode=0,
             stdout=json.dumps(
                 {'success': True, 'error': '', 'output': '', 'tests': []}
             ),
             stderr='',
+            timed_out=False,
+            overflowed=False,
         )
 
-    monkeypatch.setattr('ros2_executor.subprocess.run', complete)
+    monkeypatch.setattr('ros2_executor._run_bounded', complete)
     result = DockerRos2Executor('grader:test').execute(
         'pass',
         [],
@@ -460,9 +567,11 @@ def test_docker_executor_hides_raw_container_failure_output(monkeypatch):
                 '    assert stop_time < HIDDEN_LIMIT\n'
                 'AssertionError'
             ),
+            timed_out=False,
+            overflowed=False,
         )
 
-    monkeypatch.setattr("ros2_executor.subprocess.run", crashed)
+    monkeypatch.setattr("ros2_executor._run_bounded", crashed)
     result = DockerRos2Executor("grader:test").execute("pass", [], {})
 
     assert result["success"] is False
