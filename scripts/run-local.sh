@@ -159,6 +159,8 @@ for _attempt in {1..240}; do
   grep -Fq "is being served at http://127.0.0.1:$frontend_port" "$log_root/frontend.stdout.log" 2>/dev/null && break
   robotics_process_matches "$frontend_pid" "$(awk -F '\t' '$1=="frontend" {print $3}' "$process_file")" || {
     printf 'Frontend exited before it became ready. Review %s.\n' "$log_root" >&2
+    # An explicit exit skips the ERR trap; stop the sandbox and backend too.
+    cleanup_failed_start
     exit 1
   }
   sleep 0.5
