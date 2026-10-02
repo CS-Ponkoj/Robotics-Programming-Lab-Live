@@ -1167,6 +1167,34 @@ void main() {
     expect(find.text('Forgot password?'), findsNothing);
   });
 
+  testWidgets('login page credits the developer and lab with links', (
+    WidgetTester tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(home: LoginPage(onAuthenticated: (_) async {})),
+    );
+
+    expect(find.byKey(const Key('login-credits')), findsOneWidget);
+    // The credits sit below the fold in the default test window.
+    await tester.ensureVisible(find.byKey(const Key('login-credits')));
+    await tester.pumpAndSettle();
+    expect(find.text('Developed by'), findsOneWidget);
+    expect(find.text('· ponkoj.com'), findsOneWidget);
+    expect(find.text('· rrl.cse.unr.edu'), findsOneWidget);
+    expect(find.text('University of Nevada, Reno'), findsOneWidget);
+    for (final label in [
+      'Ponkoj Shill, ponkoj.com, opens in a new tab',
+      'Robotics Research Lab, rrl.cse.unr.edu, opens in a new tab',
+    ]) {
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(label)),
+        containsSemantics(isButton: true, hasTapAction: true),
+      );
+    }
+    semantics.dispose();
+  });
+
   testWidgets('demo header is labeled temporary and hides saved study data', (
     WidgetTester tester,
   ) async {

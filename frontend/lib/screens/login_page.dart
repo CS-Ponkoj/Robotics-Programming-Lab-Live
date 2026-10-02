@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iuse_demo/feature_flags.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/services/auth_api.dart';
+import 'package:iuse_demo/services/external_link.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
@@ -196,7 +197,14 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: AppColors.pageBackground,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final form = _buildFormCard(context, resetMode);
+          final form = Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildFormCard(context, resetMode),
+              const SizedBox(height: 24),
+              const LoginCredits(),
+            ],
+          );
           if (constraints.maxWidth >= 960) {
             return Row(
               children: [
@@ -431,6 +439,103 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ],
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Project credits shown below the sign-in card.
+class LoginCredits extends StatelessWidget {
+  const LoginCredits({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    Widget line(List<Widget> children) => Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 4,
+          children: children,
+        );
+    return ConstrainedBox(
+      key: const Key('login-credits'),
+      constraints: const BoxConstraints(maxWidth: 440),
+      child: Column(
+        children: [
+          line([
+            Text('Developed by', style: muted),
+            const _CreditLink(
+              label: 'Ponkoj Shill',
+              url: 'https://ponkoj.com',
+              semanticsLabel: 'Ponkoj Shill, ponkoj.com',
+            ),
+            Text('· ponkoj.com', style: muted),
+          ]),
+          const SizedBox(height: 6),
+          line([
+            const _CreditLink(
+              label: 'Robotics Research Lab',
+              url: 'https://rrl.cse.unr.edu/en/',
+              semanticsLabel: 'Robotics Research Lab, rrl.cse.unr.edu',
+            ),
+            Text('· rrl.cse.unr.edu', style: muted),
+          ]),
+          const SizedBox(height: 2),
+          Text(
+            'University of Nevada, Reno',
+            textAlign: TextAlign.center,
+            style: muted,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CreditLink extends StatelessWidget {
+  const _CreditLink({
+    required this.label,
+    required this.url,
+    required this.semanticsLabel,
+  });
+
+  final String label;
+  final String url;
+  final String semanticsLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // A semantics href would also navigate the app's own tab away, ending the
+    // session, so this is an explicitly labeled new-tab button instead.
+    return Semantics(
+      button: true,
+      label: '$semanticsLabel, opens in a new tab',
+      // excludeSemantics hides the InkWell, so assistive technology needs
+      // the activation action here.
+      onTap: () => openExternalLink(url),
+      excludeSemantics: true,
+      child: Tooltip(
+        message: url,
+        child: InkWell(
+          onTap: () => openExternalLink(url),
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.brandDark,
+                fontWeight: FontWeight.w700,
+                decoration: TextDecoration.underline,
+                decorationColor: AppColors.brandDark.withValues(alpha: 0.4),
+              ),
             ),
           ),
         ),
