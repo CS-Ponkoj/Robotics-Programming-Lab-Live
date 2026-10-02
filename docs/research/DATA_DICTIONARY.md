@@ -17,6 +17,7 @@ Study session = one period when a student uses the application
 Assignment activity = version-specific active time for one student
 Learning event = an important action inside that session
 Hint interaction = feedback requested for one submission
+Quiz attempt = one complete course-quiz submission, graded by the server
 ```
 
 These records are connected by IDs. For example, a submission contains the
@@ -181,6 +182,35 @@ question, next action, source, and solution-protection flag. For student
 questions, the stored response also records `interaction_type` but does not
 store the raw question. Demo sessions do not create persistent hint rows.
 
+### `course_quiz_attempts`
+
+One row stores the score for one complete course-quiz submission by a
+persistent student account. The server grades every quiz against the
+server-only answer key in `backend/course_content/quiz_answers.json`; the
+browser never receives the correct answers. Quiz scores are kept separate from
+coding-assignment `submissions`.
+
+| Field | Meaning |
+|---|---|
+| `id` | Unique quiz-attempt identifier |
+| `user_id` | Authenticated student who submitted the quiz |
+| `topic_id` | Course topic whose quiz was taken, such as `locomotion` |
+| `quiz_version` | Exact quiz version answered; the server rejects submissions for an outdated version |
+| `correct_count` | Number of questions answered correctly (at least `0`, at most `total_questions`) |
+| `total_questions` | Questions in that quiz version (at least `10`) |
+| `score_percent` | `correct_count / total_questions` as a rounded whole percentage, `0`–`100` |
+| `submitted_at` | UTC submission time |
+
+Only scores are stored. The chosen answers for each question are not written
+to the database. Every question must be answered before the server grades the
+quiz.
+
+Demo sessions and instructor previews are graded but return `saved: false` and
+never create rows; demo quiz progress lives only in the server's in-memory demo
+session. Students can read their own 20 most recent attempts per topic through
+`GET /contents/{topic_id}/quiz/attempts`. Quiz attempts are not currently part
+of the research exports or the Phase 1 analytics metrics.
+
 ## Assignment JSON fields
 
 Every assignment is normalized into the same fields before database storage.
@@ -202,6 +232,8 @@ configuration explicitly. All assignment files declare
   standardized columns without deleting existing research rows.
 - Alembic migration `0004_basic_research_analytics` adds assignment activity
   tracking and nullable active-time snapshots without changing old attempts.
+- Alembic migration `0006_course_quiz_attempts` adds the separate quiz-score
+  table without changing coding-assignment submissions.
 
 ## Phase 1 analytics interfaces
 
