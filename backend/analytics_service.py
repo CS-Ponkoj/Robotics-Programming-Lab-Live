@@ -652,6 +652,7 @@ def _get_or_create_activity(
             data_schema_version=CURRENT_DATA_SCHEMA_VERSION,
             first_active_at=timestamp,
             last_active_at=timestamp,
+            active_seconds=0,
         )
         session.add(activity)
     else:

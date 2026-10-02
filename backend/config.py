@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     max_concurrent_executions: int = 2
     execution_requests_per_minute: int = 30
     tutor_requests_per_minute: int = 10
+    # Generous because a whole classroom often shares one public address.
+    auth_requests_per_minute: int = 120
+    admin_requests_per_minute: int = 300
+    general_requests_per_minute: int = 60
+    max_demo_sessions: int = 500
     allowed_origins: str = "*"
 
     @property

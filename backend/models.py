@@ -6,6 +6,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     JSON,
     String,
@@ -90,6 +91,13 @@ class Submission(Base):
             "'rejected', 'grader_unavailable', 'internal_error', 'execution_error'"
             ")",
             name="ck_submissions_execution_status_known",
+        ),
+        # Created by migration 0004; declared here so autogenerate keeps it.
+        Index(
+            "ix_submissions_assignment_version_created",
+            "assignment_id",
+            "assignment_version",
+            "created_at",
         ),
     )
 

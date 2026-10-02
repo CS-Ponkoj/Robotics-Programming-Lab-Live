@@ -5,9 +5,11 @@ from sqlalchemy import func, select
 from app import create_app
 from config import Settings
 from models import (
+    AssignmentActivity,
     AuditEvent,
     AuthSession,
     HintInteraction,
+    LearningEvent,
     StudySession,
     Submission,
     User,
@@ -188,3 +190,86 @@ def test_demo_endpoint_is_hidden_when_demo_accounts_are_disabled(tmp_path):
     with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
         response = client.post("/auth/demo")
     assert response.status_code == 404
+
+
+def test_demo_token_cannot_write_to_a_real_student_study_session(demo_client):
+    login = demo_client.post(
+        "/auth/login",
+        json={"login_id": "student", "password": "student"},
+    )
+    assert login.status_code == 200
+    student_headers = bearer(login.json()["token"])
+    started = demo_client.post(
+        "/research/sessions",
+        headers=student_headers,
+        json={"client_session_id": "real-classroom-session"},
+    )
+    assert started.status_code == 201
+    session_id = started.json()["id"]
+
+    demo_headers = bearer(demo_client.post("/auth/demo").json()["token"])
+    version = demo_client.get("/assignments/1", headers=demo_headers).json()[
+        "version"
+    ]
+    before = persistent_counts(demo_client)
+    with demo_client.app.state.SessionLocal() as session:
+        events_before = session.scalar(select(func.count()).select_from(LearningEvent))
+        activities_before = session.scalar(
+            select(func.count()).select_from(AssignmentActivity)
+        )
+
+    attempts = [
+        demo_client.post(
+            f"/research/sessions/{session_id}/heartbeat",
+            headers=demo_headers,
+            json={
+                "active_seconds": 30,
+                "assignment_id": 1,
+                "assignment_version": version,
+            },
+        ),
+        demo_client.post(
+            f"/research/sessions/{session_id}/events",
+            headers=demo_headers,
+            json={
+                "event_type": "assignment_opened",
+                "assignment_id": 1,
+                "assignment_version": version,
+                "event_data": {"source": "assignment_catalog"},
+            },
+        ),
+        demo_client.post(
+            f"/research/sessions/{session_id}/end", headers=demo_headers
+        ),
+    ]
+    assert [response.status_code for response in attempts] == [409, 409, 409]
+
+    assert persistent_counts(demo_client) == before
+    with demo_client.app.state.SessionLocal() as session:
+        assert (
+            session.scalar(select(func.count()).select_from(LearningEvent))
+            == events_before
+        )
+        assert (
+            session.scalar(select(func.count()).select_from(AssignmentActivity))
+            == activities_before
+        )
+        study_session = session.get(StudySession, session_id)
+        assert study_session.ended_at is None
+        assert study_session.active_seconds == 0
+
+
+def test_demo_payload_hides_the_shared_student_account_identity(demo_client):
+    with demo_client.app.state.SessionLocal() as session:
+        real_id = session.scalar(select(User.id).where(User.login_id == "student"))
+    login = demo_client.post("/auth/demo")
+    assert login.status_code == 200
+    restored = demo_client.get(
+        "/auth/me", headers=bearer(login.json()["token"])
+    )
+    assert restored.status_code == 200
+    for user in (login.json()["user"], restored.json()):
+        assert user["is_demo"] is True
+        assert user["id"] != real_id
+        assert user["participant_code"] is None
+        assert user["email"] is None

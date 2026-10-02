@@ -118,3 +118,23 @@ def test_disposable_database_rollback_and_recovery_rehearsal(tmp_path, monkeypat
     assert EXPECTED_TABLES.issubset(set(inspect(recovered_engine).get_table_names()))
     recovered_engine.dispose()
     get_settings.cache_clear()
+
+
+def test_models_match_migrated_schema(tmp_path, monkeypatch):
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+
+    database_path = tmp_path / "drift.db"
+    _upgrade(database_path, monkeypatch)
+    engine = build_engine(f"sqlite:///{database_path.as_posix()}")
+    with engine.connect() as connection:
+        differences = compare_metadata(
+            MigrationContext.configure(connection), Base.metadata
+        )
+    engine.dispose()
+    index_differences = [
+        item
+        for item in differences
+        if isinstance(item, tuple) and item[0] in {"add_index", "remove_index"}
+    ]
+    assert index_differences == []

@@ -654,3 +654,258 @@ def test_tracked_account_roster_rejects_plaintext_passwords(tmp_path, monkeypatc
         ).status_code == 401
 
     assert json.loads(account_file.read_text(encoding="utf-8")) == payload
+
+
+def _custom_client(tmp_path, client_address=("testclient", 50000), **overrides):
+    settings = Settings(
+        database_url="sqlite://",
+        admin_api_token="legacy-admin",
+        openai_api_key=None,
+        enable_password_reset=True,
+        enable_email_features=True,
+        study_accounts_file=tmp_path / "study_accounts.json",
+        public_app_url="http://study.test",
+        **overrides,
+    )
+    return create_app(settings=settings, database_url="sqlite://")
+
+
+def _email_student_reset_link(client, login_id, email):
+    instructor = login(client, "instructor", "instructor")
+    created = client.post(
+        "/admin/students",
+        headers=bearer(instructor["token"]),
+        json={
+            "login_id": login_id,
+            "temporary_password": "Original-Password-4827",
+            "email": email,
+        },
+    )
+    assert created.status_code == 201
+
+    def request_link():
+        assert client.post(
+            "/auth/forgot-password", json={"identifier": email}
+        ).status_code == 202
+        body = client.app.state.email_outbox[-1]["body"]
+        return re.search(r"password_token=([^\s]+)", body).group(1)
+
+    return request_link
+
+
+def test_password_change_cancels_outstanding_reset_links(auth_client):
+    request_link = _email_student_reset_link(
+        auth_client, "stu-change", "stu-change@example.com"
+    )
+    old_link = request_link()
+    session = login(auth_client, "stu-change", "Original-Password-4827")
+    changed = auth_client.post(
+        "/auth/change-password",
+        headers=bearer(session["token"]),
+        json={
+            "current_password": "Original-Password-4827",
+            "new_password": "Owner-Chosen-5827",
+        },
+    )
+    assert changed.status_code == 200
+    assert auth_client.post(
+        "/auth/reset-password",
+        json={"token": old_link, "new_password": "Attacker-Chosen-5827"},
+    ).status_code == 400
+    login(auth_client, "stu-change", "Owner-Chosen-5827")
+
+
+def test_completed_reset_cancels_other_reset_links(auth_client):
+    request_link = _email_student_reset_link(
+        auth_client, "stu-two-links", "stu-two-links@example.com"
+    )
+    first, second = request_link(), request_link()
+    assert auth_client.post(
+        "/auth/reset-password",
+        json={"token": second, "new_password": "Second-Link-5827"},
+    ).status_code == 200
+    assert auth_client.post(
+        "/auth/reset-password",
+        json={"token": first, "new_password": "First-Link-5827"},
+    ).status_code == 400
+
+
+def test_failed_logins_from_one_address_do_not_lock_out_the_owner(tmp_path):
+    app = _custom_client(tmp_path)
+    with TestClient(app, client=("203.0.113.9", 40000)) as attacker:
+        for _ in range(5):
+            assert attacker.post(
+                "/auth/login",
+                json={"login_id": "instructor", "password": "wrong"},
+            ).status_code == 401
+        assert attacker.post(
+            "/auth/login",
+            json={"login_id": "instructor", "password": "instructor"},
+        ).status_code == 429
+        with TestClient(app, client=("198.51.100.7", 40000)) as owner:
+            assert owner.post(
+                "/auth/login",
+                json={"login_id": "instructor", "password": "instructor"},
+            ).status_code == 200
+
+
+def test_login_failure_tracking_is_bounded(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.MAX_TRACKED_LOGIN_KEYS", 10)
+    with TestClient(_custom_client(tmp_path, auth_requests_per_minute=0)) as client:
+        for index in range(25):
+            client.post(
+                "/auth/login",
+                json={"login_id": f"missing-{index}", "password": "wrong"},
+            )
+        assert len(client.app.state.login_failures) <= 10
+
+
+def test_unauthenticated_auth_endpoints_are_rate_limited(tmp_path):
+    with TestClient(_custom_client(tmp_path, auth_requests_per_minute=3)) as client:
+        statuses = [client.post("/auth/demo").status_code for _ in range(4)]
+        assert statuses == [200, 200, 200, 429]
+        assert client.post(
+            "/auth/forgot-password", json={"identifier": "nobody@example.com"}
+        ).status_code == 429
+        assert client.post(
+            "/auth/login", json={"login_id": "student", "password": "student"}
+        ).status_code == 429
+
+
+def test_demo_sessions_are_capped(tmp_path):
+    with TestClient(
+        _custom_client(tmp_path, max_demo_sessions=2, auth_requests_per_minute=0)
+    ) as client:
+        statuses = [client.post("/auth/demo").status_code for _ in range(3)]
+        assert statuses == [200, 200, 503]
+
+
+def test_admin_routes_are_rate_limited_for_sessions_and_token(tmp_path):
+    with TestClient(_custom_client(tmp_path, admin_requests_per_minute=2)) as client:
+        instructor = login(client, "instructor", "instructor")
+        statuses = [
+            client.get(
+                "/admin/students", headers=bearer(instructor["token"])
+            ).status_code
+            for _ in range(3)
+        ]
+        assert statuses == [200, 200, 429]
+        token_statuses = [
+            client.get(
+                "/admin/students", headers={"X-Admin-Token": "legacy-admin"}
+            ).status_code
+            for _ in range(3)
+        ]
+        assert token_statuses == [200, 200, 429]
+        assert client.get(
+            "/admin/students", headers={"X-Admin-Token": "wrong-token"}
+        ).status_code == 401
+
+
+def test_format_and_quiz_submission_are_rate_limited(tmp_path):
+    with TestClient(_custom_client(tmp_path, general_requests_per_minute=1)) as client:
+        headers = bearer(login(client, "student", "student")["token"])
+        format_statuses = [
+            client.post(
+                "/assignments/1/format", headers=headers, json={"code": "x=1"}
+            ).status_code
+            for _ in range(2)
+        ]
+        assert format_statuses == [200, 429]
+        quiz_statuses = [
+            client.post(
+                "/contents/unknown-topic/quiz/submit",
+                headers=headers,
+                json={"quiz_version": "1", "choices": {}},
+            ).status_code
+            for _ in range(2)
+        ]
+        assert quiz_statuses[1] == 429
+
+
+def test_chunked_request_body_cannot_exceed_size_limit(tmp_path):
+    with TestClient(_custom_client(tmp_path, max_request_bytes=1_000)) as client:
+        def chunks():
+            yield b'{"login_id": "student", "password": "'
+            for _ in range(20):
+                yield b"x" * 1_000
+            yield b'"}'
+
+        response = client.post(
+            "/auth/login",
+            content=chunks(),
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code == 413
+        assert response.json()["error"] == "Request body is too large."
+
+
+def test_development_email_outbox_is_bounded(auth_client):
+    from email_service import MAX_OUTBOX_MESSAGES, EmailService
+
+    service = EmailService(
+        auth_client.app.state.settings, auth_client.app.state.email_outbox
+    )
+    for index in range(MAX_OUTBOX_MESSAGES + 10):
+        service.send_password_link(
+            email=f"user{index}@example.com",
+            login_id=f"user{index}",
+            token=f"token-{index}",
+            purpose="password_reset",
+        )
+    outbox = auth_client.app.state.email_outbox
+    assert len(outbox) == MAX_OUTBOX_MESSAGES
+    assert "token-59" in outbox[-1]["body"]
+
+
+def test_failed_roster_account_keeps_its_temporary_password(tmp_path):
+    account_file = tmp_path / "study_accounts.json"
+    account_file.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "accounts": [
+                    {
+                        "login_id": "first-student",
+                        "temporary_password": "First-Password-4827",
+                        "role": "student",
+                        "email": "shared@example.com",
+                    },
+                    {
+                        "login_id": "second-student",
+                        "temporary_password": "Second-Password-4827",
+                        "role": "student",
+                        "email": "shared@example.com",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(database_url="sqlite://", study_accounts_file=account_file)
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as client:
+        report = client.app.state.account_import_report
+        assert report["created"] == ["first-student"]
+        assert any("second-student" in error for error in report["errors"])
+    rewritten = json.loads(account_file.read_text(encoding="utf-8"))["accounts"]
+    assert rewritten[0]["temporary_password"] is None
+    assert rewritten[1]["temporary_password"] == "Second-Password-4827"
+
+
+def test_admin_research_detail_hides_demo_students(auth_client):
+    instructor = login(auth_client, "instructor", "instructor")
+    created = auth_client.post(
+        "/admin/students",
+        headers=bearer(instructor["token"]),
+        json={"login_id": "marked-demo", "temporary_password": "Demo-Marked-4827"},
+    )
+    assert created.status_code == 201
+    with auth_client.app.state.SessionLocal() as session:
+        user = session.scalar(select(User).where(User.login_id == "marked-demo"))
+        user.is_demo = True
+        session.commit()
+        student_id = user.id
+    assert auth_client.get(
+        f"/admin/research/students/{student_id}",
+        headers=bearer(instructor["token"]),
+    ).status_code == 404

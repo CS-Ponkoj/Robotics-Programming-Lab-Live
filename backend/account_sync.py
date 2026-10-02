@@ -157,11 +157,14 @@ def sync_accounts_from_json(session: Session, path: Path) -> dict:
         sanitized_accounts.append(_safe_account_payload(account))
         if not login_id:
             report["errors"].append(f"Account {index} has no login_id.")
+            # Keep the original entry, password included, so it can be fixed.
+            sanitized_accounts[-1] = account
             continue
         if role not in VALID_ROLES:
             report["errors"].append(
                 f"{login_id}: role must be student or instructor."
             )
+            sanitized_accounts[-1] = account
             continue
 
         user = session.scalar(select(User).where(User.login_id == login_id))
@@ -251,9 +254,11 @@ def sync_accounts_from_json(session: Session, path: Path) -> dict:
         except (ValueError, TypeError) as error:
             session.rollback()
             report["errors"].append(f"{login_id}: {error}")
+            sanitized_accounts[-1] = account
         except Exception as error:
             session.rollback()
             report["errors"].append(f"{login_id}: account update failed: {error}")
+            sanitized_accounts[-1] = account
 
     sanitized_payload = {
         "version": payload.get("version", 1),

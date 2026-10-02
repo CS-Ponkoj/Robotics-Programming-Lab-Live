@@ -6,6 +6,9 @@ from email.message import EmailMessage
 from config import Settings
 
 
+MAX_OUTBOX_MESSAGES = 50
+
+
 class EmailService:
     def __init__(self, settings: Settings, outbox: list[dict]):
         self.settings = settings
@@ -86,6 +89,8 @@ class EmailService:
         }
         if not self.configured:
             self.outbox.append(message_record)
+            # Development outbox only; keep the newest messages.
+            del self.outbox[:-MAX_OUTBOX_MESSAGES]
             return False
 
         message = EmailMessage()

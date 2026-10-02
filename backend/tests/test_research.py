@@ -604,3 +604,60 @@ def test_phase1_records_oversized_attempt_and_instructor_safe_aggregates(
     assert assignment_data.status_code == 200
     assert len(assignment_data.json()["assignments"]) == 1
     assert "hidden-test" not in assignment_data.text.lower()
+
+
+def test_heartbeat_before_assignment_open_is_recorded(research_client):
+    student = _login(
+        research_client, "research-student", "Research-Student-4827"
+    )
+    session_id = _start(research_client, student, "browser-session-first-beat").json()[
+        "id"
+    ]
+    version = research_client.get(
+        "/assignments/1", headers=_bearer(student)
+    ).json()["version"]
+    for _ in range(2):
+        heartbeat = research_client.post(
+            f"/research/sessions/{session_id}/heartbeat",
+            headers=_bearer(student),
+            json={
+                "active_seconds": 20,
+                "assignment_id": 1,
+                "assignment_version": version,
+            },
+        )
+        assert heartbeat.status_code == 200
+    assert heartbeat.json()["active_seconds"] == 40
+
+
+def test_rapid_heartbeats_cannot_exceed_session_wall_clock(research_client):
+    student = _login(
+        research_client, "research-student", "Research-Student-4827"
+    )
+    session_id = _start(research_client, student, "browser-session-flood").json()[
+        "id"
+    ]
+    version = research_client.get(
+        "/assignments/1", headers=_bearer(student)
+    ).json()["version"]
+    for _ in range(20):
+        heartbeat = research_client.post(
+            f"/research/sessions/{session_id}/heartbeat",
+            headers=_bearer(student),
+            json={
+                "active_seconds": 60,
+                "assignment_id": 1,
+                "assignment_version": version,
+            },
+        )
+        assert heartbeat.status_code == 200
+    # Twenty 60-second claims within a few seconds of wall-clock time are
+    # capped at the session age plus one heartbeat of grace.
+    assert heartbeat.json()["active_seconds"] <= 70
+    summary = research_client.get("/research/me", headers=_bearer(student)).json()
+    row = next(
+        item
+        for item in summary["assignment_summaries"]
+        if item["assignment_id"] == 1 and item["is_current_version"]
+    )
+    assert row["total_active_seconds"] <= 70

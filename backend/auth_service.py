@@ -12,6 +12,8 @@ from models import AuthSession, AuditEvent, PasswordResetToken, User, utc_now
 
 
 password_hasher = PasswordHash.recommended()
+# Verified for unknown accounts so login takes the same time either way.
+_TIMING_DUMMY_HASH = password_hasher.hash(secrets.token_urlsafe(16))
 VALID_ROLES = {"student", "instructor"}
 
 
@@ -112,6 +114,7 @@ def authenticate_user(session: Session, login_id: str, password: str) -> User | 
         select(User).where(User.login_id == normalize_login_id(login_id))
     )
     if user is None or not user.is_active:
+        verify_password(password, _TIMING_DUMMY_HASH)
         return None
     if not verify_password(password, user.password_hash):
         return None
@@ -178,6 +181,15 @@ def change_password(session: Session, user: User, password: str) -> None:
     user.password_hash = hash_password(password)
     user.must_change_password = False
     user.password_changed_at = utc_now()
+    # Any outstanding reset or activation link must stop working.
+    session.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+        .values(used_at=utc_now())
+    )
     session.commit()
     revoke_user_sessions(session, user.id)
 

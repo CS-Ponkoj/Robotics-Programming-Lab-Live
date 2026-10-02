@@ -4,7 +4,7 @@ import secrets
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -121,8 +121,47 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent
+# Extra seconds a study session may report beyond its wall-clock age, so one
+# normal heartbeat is never lost to clock or network jitter.
+HEARTBEAT_GRACE_SECONDS = 60
+# Upper bounds for in-memory security state so it cannot grow without limit.
+MAX_TRACKED_LOGIN_KEYS = 10_000
+MAX_RATE_LIMIT_KEYS = 50_000
 STATIC_DIR = BASE_DIR / "static"
 COURSE_CONTENT = CourseContentRepository()
+
+
+class RequestBodyTooLarge(HTTPException):
+    def __init__(self):
+        super().__init__(413, "Request body is too large.")
+
+
+class BodySizeLimitMiddleware:
+    """Enforce the body limit on the bytes actually received.
+
+    A Content-Length check alone is bypassed by chunked uploads.
+    """
+
+    def __init__(self, app, max_bytes: int):
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        received = 0
+
+        async def limited_receive():
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    raise RequestBodyTooLarge()
+            return message
+
+        await self.app(scope, limited_receive, send)
 
 
 class QuizSubmission(BaseModel):
@@ -175,6 +214,7 @@ def create_app(
     application.state.SessionLocal = local_session
     application.state.email_outbox = []
     application.state.login_failures = {}
+    application.state.login_failure_lock = threading.Lock()
     application.state.demo_sessions = {}
     application.state.demo_submissions = {}
     application.state.demo_session_lock = threading.Lock()
@@ -195,6 +235,9 @@ def create_app(
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+    application.add_middleware(
+        BodySizeLimitMiddleware, max_bytes=configured.max_request_bytes
     )
 
     @application.middleware("http")
@@ -299,6 +342,15 @@ def create_app(
         record = demo_session_record(request)
         return bool(record is not None and record[1]["user_id"] == user.id)
 
+    def reject_demo_research_write(request: Request, user: User) -> None:
+        # Demo sessions share the seeded student row, so they must never
+        # touch that account's persistent study sessions.
+        if is_ephemeral_demo(request, user):
+            raise HTTPException(
+                409,
+                "Demo progress is kept only in this browser session.",
+            )
+
     def create_demo_session(request: Request, user: User):
         raw_token = secrets.token_urlsafe(32)
         token_hash = hash_token(raw_token)
@@ -306,6 +358,15 @@ def create_app(
             hours=max(1, request.app.state.settings.auth_session_hours)
         )
         with request.app.state.demo_session_lock:
+            if (
+                len(request.app.state.demo_sessions)
+                >= request.app.state.settings.max_demo_sessions
+            ):
+                raise HTTPException(
+                    503,
+                    "The demo is busy. Please try again later.",
+                    headers={"Retry-After": "60"},
+                )
             request.app.state.demo_sessions[token_hash] = {
                 "user_id": user.id,
                 "expires_at": expires_at,
@@ -359,10 +420,43 @@ def create_app(
         # headers must not allow a student to bypass the execution limit.
         demo_record = demo_session_record(request)
         identity = demo_record[0] if demo_record is not None else user.id
-        key = f"{bucket}:{identity}"
+        consume_rate_limit(
+            request,
+            key=f"{bucket}:{identity}",
+            requests_per_minute=requests_per_minute,
+        )
+
+    def client_address(request: Request) -> str:
+        return request.client.host if request.client else "unknown"
+
+    def enforce_client_rate_limit(
+        request: Request, *, bucket: str, requests_per_minute: int
+    ) -> None:
+        """Throttle unauthenticated endpoints by the connecting address."""
+        if requests_per_minute <= 0:
+            return
+        consume_rate_limit(
+            request,
+            key=f"{bucket}:ip:{client_address(request)}",
+            requests_per_minute=requests_per_minute,
+        )
+
+    def consume_rate_limit(
+        request: Request, *, key: str, requests_per_minute: int
+    ) -> None:
+        if requests_per_minute <= 0:
+            return
         now = time.monotonic()
         cutoff = now - 60.0
         with request.app.state.rate_limit_lock:
+            limits = request.app.state.rate_limits
+            if len(limits) >= MAX_RATE_LIMIT_KEYS:
+                for stale in [
+                    name
+                    for name, stamps in limits.items()
+                    if not stamps or stamps[-1] < cutoff
+                ]:
+                    limits.pop(stale, None)
             recent = [
                 timestamp
                 for timestamp in request.app.state.rate_limits.get(key, [])
@@ -397,15 +491,39 @@ def create_app(
         x_admin_token: str | None = Header(default=None),
         session: Session = Depends(session_dependency),
     ) -> User | None:
-        token = request.app.state.settings.admin_api_token
-        if token and x_admin_token == token:
+        settings = request.app.state.settings
+        token = settings.admin_api_token
+        if (
+            token
+            and x_admin_token
+            and secrets.compare_digest(
+                x_admin_token.encode("utf-8"), token.encode("utf-8")
+            )
+        ):
+            consume_rate_limit(
+                request,
+                key="admin:token",
+                requests_per_minute=settings.admin_requests_per_minute,
+            )
             return None
+        if x_admin_token:
+            enforce_client_rate_limit(
+                request,
+                bucket="admin-token-failure",
+                requests_per_minute=settings.auth_requests_per_minute,
+            )
         bearer = bearer_token(request)
         user = demo_user_for_token(request, session, bearer)
         if user is None:
             user = user_for_session_token(session, bearer)
         if user is not None:
             if user.role == "instructor":
+                enforce_rate_limit(
+                    request,
+                    user,
+                    bucket="admin",
+                    requests_per_minute=settings.admin_requests_per_minute,
+                )
                 return user
             raise HTTPException(403, "Instructor access required.")
         if x_admin_token:
@@ -421,6 +539,15 @@ def create_app(
             participant_code=user.participant_code,
             is_demo=user.is_demo if is_demo is None else is_demo,
             must_change_password=user.must_change_password,
+        ).model_dump()
+
+    def demo_user_payload(user: User) -> dict:
+        # Never expose the shared seeded account's identifiers to demo users.
+        return AuthenticatedUser(
+            id="demo",
+            login_id=user.login_id,
+            role=user.role,
+            is_demo=True,
         ).model_dump()
 
     def admin_user_payload(user: User) -> dict:
@@ -758,21 +885,40 @@ def create_app(
         request: Request,
         session: Session = Depends(session_dependency),
     ):
+        enforce_client_rate_limit(
+            request,
+            bucket="auth",
+            requests_per_minute=request.app.state.settings.auth_requests_per_minute,
+        )
         login_id = normalize_login_id(body.login_id)
+        # Lock out an account only for the address that keeps failing, so a
+        # stranger cannot lock the real owner out of their account.
+        failure_key = f"{login_id}|{client_address(request)}"
+        failures = request.app.state.login_failures
         cutoff = utc_now() - timedelta(minutes=15)
-        recent_failures = [
-            value
-            for value in request.app.state.login_failures.get(login_id, [])
-            if value >= cutoff
-        ]
+        with request.app.state.login_failure_lock:
+            recent_failures = [
+                value for value in failures.get(failure_key, []) if value >= cutoff
+            ]
         if len(recent_failures) >= 5:
             raise HTTPException(429, "Too many login attempts. Try again later.")
         user = authenticate_user(session, login_id, body.password)
+        with request.app.state.login_failure_lock:
+            if user is None:
+                if len(failures) >= MAX_TRACKED_LOGIN_KEYS:
+                    for stale in [
+                        key
+                        for key, stamps in failures.items()
+                        if not stamps or stamps[-1] < cutoff
+                    ]:
+                        failures.pop(stale, None)
+                    while len(failures) >= MAX_TRACKED_LOGIN_KEYS:
+                        failures.pop(next(iter(failures)))
+                failures[failure_key] = [*recent_failures, utc_now()]
+            else:
+                failures.pop(failure_key, None)
         if user is None:
-            recent_failures.append(utc_now())
-            request.app.state.login_failures[login_id] = recent_failures
             raise HTTPException(401, "Invalid login ID or password.")
-        request.app.state.login_failures.pop(login_id, None)
         raw_token, auth_session = create_session(
             session,
             user,
@@ -798,6 +944,11 @@ def create_app(
     ):
         if not request.app.state.settings.enable_demo_accounts:
             raise HTTPException(404, "Demo access is not available.")
+        enforce_client_rate_limit(
+            request,
+            bucket="auth",
+            requests_per_minute=request.app.state.settings.auth_requests_per_minute,
+        )
         user = session.scalar(
             select(User)
             .where(
@@ -812,12 +963,14 @@ def create_app(
         return {
             "token": raw_token,
             "expires_at": expires_at,
-            "user": user_payload(user, is_demo=True),
+            "user": demo_user_payload(user),
         }
 
     @application.get("/auth/me", response_model=AuthenticatedUser)
     def auth_me(request: Request, user: User = Depends(current_user)):
-        return user_payload(user, is_demo=is_ephemeral_demo(request, user))
+        if is_ephemeral_demo(request, user):
+            return demo_user_payload(user)
+        return user_payload(user, is_demo=False)
 
     @application.post("/auth/logout")
     def logout(
@@ -867,6 +1020,11 @@ def create_app(
     ):
         if not request.app.state.settings.enable_password_reset:
             raise HTTPException(404, "Not found.")
+        enforce_client_rate_limit(
+            request,
+            bucket="auth",
+            requests_per_minute=request.app.state.settings.auth_requests_per_minute,
+        )
         identifier = body.identifier.strip().lower()
         user = session.scalar(
             select(User).where(
@@ -903,6 +1061,11 @@ def create_app(
     ):
         if not request.app.state.settings.enable_password_reset:
             raise HTTPException(404, "Not found.")
+        enforce_client_rate_limit(
+            request,
+            bucket="auth",
+            requests_per_minute=request.app.state.settings.auth_requests_per_minute,
+        )
         consumed = consume_password_reset_token(session, body.token)
         if consumed is None:
             raise HTTPException(400, "The password reset link is invalid or expired.")
@@ -961,9 +1124,11 @@ def create_app(
     def study_heartbeat(
         study_session_id: str,
         body: StudyHeartbeatRequest,
+        request: Request,
         session: Session = Depends(session_dependency),
         user: User = Depends(current_user),
     ):
+        reject_demo_research_write(request, user)
         study_session = get_user_study_session(session, study_session_id, user)
         if study_session is None:
             raise HTTPException(404, "Study session not found.")
@@ -976,15 +1141,26 @@ def create_app(
                 and body.assignment_version != assignment.version
             ):
                 raise HTTPException(409, "Assignment version is no longer current.")
-        study_session.active_seconds += body.active_seconds
-        study_session.last_active_at = utc_now()
+        now = utc_now()
+        started_at = study_session.started_at
+        if started_at.tzinfo is None:
+            started_at = started_at.replace(tzinfo=timezone.utc)
+        # Total reported activity can never exceed the session's real age.
+        budget = (
+            int((now - started_at).total_seconds())
+            + HEARTBEAT_GRACE_SECONDS
+            - (study_session.active_seconds or 0)
+        )
+        credited = max(0, min(body.active_seconds, budget))
+        study_session.active_seconds = (study_session.active_seconds or 0) + credited
+        study_session.last_active_at = now
         if body.assignment_id is not None and body.assignment_version is not None:
             add_assignment_active_time(
                 session,
                 user=user,
                 assignment_id=body.assignment_id,
                 assignment_version=body.assignment_version,
-                active_seconds=body.active_seconds,
+                active_seconds=credited,
                 occurred_at=study_session.last_active_at,
             )
         session.commit()
@@ -998,11 +1174,13 @@ def create_app(
     def create_learning_event(
         study_session_id: str,
         body: LearningEventRequest,
+        request: Request,
         session: Session = Depends(session_dependency),
         user: User = Depends(current_user),
     ):
         import json
 
+        reject_demo_research_write(request, user)
         study_session = get_user_study_session(session, study_session_id, user)
         if study_session is None:
             raise HTTPException(404, "Study session not found.")
@@ -1036,9 +1214,11 @@ def create_app(
     )
     def end_study_session(
         study_session_id: str,
+        request: Request,
         session: Session = Depends(session_dependency),
         user: User = Depends(current_user),
     ):
+        reject_demo_research_write(request, user)
         study_session = get_user_study_session(session, study_session_id, user)
         if study_session is None:
             raise HTTPException(404, "Study session not found.")
@@ -1128,7 +1308,7 @@ def create_app(
         _actor: User | None = Depends(admin_dependency),
     ):
         student = session.get(User, student_id)
-        if student is None or student.role != "student":
+        if student is None or student.role != "student" or student.is_demo:
             raise HTTPException(404, "Student account not found.")
         return student_research_payload(session, student)
 
@@ -1336,9 +1516,16 @@ def create_app(
     def format_assignment_code(
         assignment_id: int,
         body: CodeFormatRequest,
+        request: Request,
         session: Session = Depends(session_dependency),
-        _user: User = Depends(current_user),
+        user: User = Depends(current_user),
     ):
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="format",
+            requests_per_minute=request.app.state.settings.general_requests_per_minute,
+        )
         assignment = get_assignment_or_404(session, assignment_id)
         if not assignment.language.lower().startswith("python"):
             raise HTTPException(400, "Formatting is available only for Python.")
@@ -1719,6 +1906,12 @@ def create_app(
         user: User = Depends(current_user),
         session: Session = Depends(session_dependency),
     ):
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="quiz",
+            requests_per_minute=request.app.state.settings.general_requests_per_minute,
+        )
         try:
             result = COURSE_CONTENT.grade_quiz(
                 topic_id, submission.quiz_version, submission.choices
