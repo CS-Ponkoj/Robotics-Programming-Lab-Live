@@ -310,6 +310,14 @@ Set-Location ..
 For OneDrive checkouts, prefer `scripts/verify_frontend_onedrive.ps1` or the
 complete `scripts/verify-local.ps1` gate.
 
+### Browser flows
+
+With the local stack running, `scripts/run-browser-tests.ps1` (Ubuntu:
+`scripts/run-browser-tests.sh`) drives the student demo and an instructor
+session that changes no course or research data in a real browser. Keep Playwright in its separate
+browser-test environment; never add it to the application requirements. Run it
+after UI, authentication, grading, or launcher changes.
+
 ### Repository hygiene
 
 ```powershell
