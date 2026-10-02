@@ -189,10 +189,13 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final resetMode = selfServicePasswordResetEnabled &&
-        _resetToken != null &&
-        _resetToken!.isNotEmpty &&
-        !_resetComplete;
+    // Invitation links from instructor email tools also open this form; the
+    // backend decides which kinds of links are accepted.
+    final resetMode =
+        (selfServicePasswordResetEnabled || instructorEmailToolsEnabled) &&
+            _resetToken != null &&
+            _resetToken!.isNotEmpty &&
+            !_resetComplete;
     return Scaffold(
       backgroundColor: AppColors.pageBackground,
       body: LayoutBuilder(
@@ -457,6 +460,10 @@ class LoginCredits extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
+    final name = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurface,
+      fontWeight: FontWeight.w700,
+    );
     Widget line(List<Widget> children) => Wrap(
           alignment: WrapAlignment.center,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -470,21 +477,23 @@ class LoginCredits extends StatelessWidget {
         children: [
           line([
             Text('Developed by', style: muted),
+            Text('Ponkoj Shill', style: name),
+            Text('·', style: muted),
             const _CreditLink(
-              label: 'Ponkoj Shill',
+              label: 'ponkoj.com',
               url: 'https://ponkoj.com',
               semanticsLabel: 'Ponkoj Shill, ponkoj.com',
             ),
-            Text('· ponkoj.com', style: muted),
           ]),
           const SizedBox(height: 6),
           line([
+            Text('Robotics Research Lab', style: name),
+            Text('·', style: muted),
             const _CreditLink(
-              label: 'Robotics Research Lab',
+              label: 'rrl.cse.unr.edu',
               url: 'https://rrl.cse.unr.edu/en/',
               semanticsLabel: 'Robotics Research Lab, rrl.cse.unr.edu',
             ),
-            Text('· rrl.cse.unr.edu', style: muted),
           ]),
           const SizedBox(height: 2),
           Text(
@@ -528,14 +537,26 @@ class _CreditLink extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-            child: Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.brandDark,
-                fontWeight: FontWeight.w700,
-                decoration: TextDecoration.underline,
-                decorationColor: AppColors.brandDark.withValues(alpha: 0.4),
-              ),
+            // Styled as a web address: brand color, underline, new-tab arrow.
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.brand,
+                    fontWeight: FontWeight.w600,
+                    decoration: TextDecoration.underline,
+                    decorationColor: AppColors.brand,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(
+                  Icons.open_in_new_rounded,
+                  size: 13,
+                  color: AppColors.brand,
+                ),
+              ],
             ),
           ),
         ),
@@ -572,14 +593,18 @@ class _BrandPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final onBrand = Colors.white.withValues(alpha: 0.86);
     final logo = Container(
-      width: compact ? 40 : 48,
-      height: compact ? 40 : 48,
+      width: compact ? 40 : 60,
+      height: compact ? 40 : 60,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(compact ? 14 : 17),
         border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
       ),
-      child: const Icon(Icons.memory_rounded, color: Colors.white, size: 26),
+      child: Icon(
+        Icons.memory_rounded,
+        color: Colors.white,
+        size: compact ? 26 : 34,
+      ),
     );
     return Container(
       width: double.infinity,
@@ -633,12 +658,15 @@ class _BrandPanel extends StatelessWidget {
                         Row(
                           children: [
                             logo,
-                            const SizedBox(width: 14),
-                            Text(
-                              'Robotics Programming Lab',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                                letterSpacing: 0.4,
+                            const SizedBox(width: 18),
+                            Flexible(
+                              child: Text(
+                                'Robotics Programming Lab',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],

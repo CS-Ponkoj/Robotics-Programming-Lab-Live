@@ -1180,8 +1180,8 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('login-credits')));
     await tester.pumpAndSettle();
     expect(find.text('Developed by'), findsOneWidget);
-    expect(find.text('· ponkoj.com'), findsOneWidget);
-    expect(find.text('· rrl.cse.unr.edu'), findsOneWidget);
+    expect(find.text('Ponkoj Shill'), findsOneWidget);
+    expect(find.text('Robotics Research Lab'), findsOneWidget);
     expect(find.text('University of Nevada, Reno'), findsOneWidget);
     for (final label in [
       'Ponkoj Shill, ponkoj.com, opens in a new tab',
