@@ -28,6 +28,7 @@ EXPECTED_TABLES = {
 
 
 def _upgrade(database_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "testing")
     database_url = f"sqlite:///{database_path.as_posix()}"
     monkeypatch.setenv("DATABASE_URL", database_url)
     get_settings.cache_clear()
@@ -63,6 +64,7 @@ def test_alembic_creates_a_fresh_schema(tmp_path, monkeypatch):
 
 
 def test_alembic_upgrades_an_existing_v4_baseline(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "testing")
     database_path = tmp_path / "existing.sqlite"
     database_url = f"sqlite:///{database_path.as_posix()}"
     monkeypatch.setenv("DATABASE_URL", database_url)
@@ -94,6 +96,7 @@ def test_alembic_upgrades_an_existing_v4_baseline(tmp_path, monkeypatch):
 
 
 def test_disposable_database_rollback_and_recovery_rehearsal(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "testing")
     database_path = tmp_path / "rollback-rehearsal.sqlite"
     database_url = f"sqlite:///{database_path.as_posix()}"
     monkeypatch.setenv("DATABASE_URL", database_url)

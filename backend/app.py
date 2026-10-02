@@ -137,7 +137,7 @@ def create_app(
 ) -> FastAPI:
     configured = settings or get_settings()
     configured.validate_runtime()
-    selected_database_url = database_url or configured.database_url
+    selected_database_url = database_url or configured.application_database_url
     engine = build_engine(selected_database_url)
     local_session = sessionmaker(bind=engine, expire_on_commit=False)
 

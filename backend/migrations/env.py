@@ -14,7 +14,7 @@ if config.config_file_name is not None:
 
 config.set_main_option(
     "sqlalchemy.url",
-    normalize_database_url(get_settings().database_url).replace("%", "%%"),
+    normalize_database_url(get_settings().application_database_url).replace("%", "%%"),
 )
 target_metadata = Base.metadata
 

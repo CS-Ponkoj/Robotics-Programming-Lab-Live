@@ -65,6 +65,19 @@ distribute database or OpenAI credentials. A future hosted staging backend
 removes that per-device secret requirement because local Flutter clients need
 only its public HTTPS URL.
 
+Internet access is required for saved data. A missing or unavailable Neon
+connection stops database-dependent operations; the app never switches to a
+local database. Direct backend starts and Alembic migrations use the same Neon
+configuration as the launchers. Do not add a local `DATABASE_URL` override.
+
+The Neon-only migration follows four steps: inventory old databases, reconcile
+their record IDs and history, disable local fallback, and verify shared access
+before publication. The desktop audit found both legacy PostgreSQL databases
+and six archived dumps already represented in Neon, so no duplicate import was
+needed. Newer Neon account and assignment settings were preserved. Evidence is
+in the master QA workbook. Unavailable files on other devices cannot be checked
+from this desktop.
+
 ## Prototype accounts
 
 The staging database seeds these prototype accounts when it is initialized:

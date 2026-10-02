@@ -96,8 +96,8 @@ simulation are pedagogically correct, secure, reproducible, and versioned.
 ### Backend and grading
 
 - FastAPI application with OpenAPI documentation.
-- SQLAlchemy persistence with PostgreSQL locally and when hosted, plus an
-  explicit disposable SQLite troubleshooting fallback.
+- SQLAlchemy persistence with shared Neon PostgreSQL for local and hosted app
+  runs. Disposable tests may use SQLite or local PostgreSQL; no app fallback.
 - Argon2id password hashing, opaque hashed session tokens, expiry, and logout.
 - Login throttling and generic forgot-password responses.
 - One-time expiring password-reset tokens that revoke existing sessions.

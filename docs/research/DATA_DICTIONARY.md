@@ -5,7 +5,7 @@
 This document explains what the platform stores, where it is stored, and how to
 inspect it safely. Data contract version `1` is implemented in
 `backend/data_contracts.py`. The application validates structured JSON before
-writing it to SQLite or PostgreSQL.
+writing it to Neon PostgreSQL. Disposable automated tests may use SQLite.
 
 ## Simple mental model
 
@@ -30,7 +30,7 @@ after an instructor updates the assignment.
 | Assignment source definitions | `backend/assignments/assignment_1.json` through `assignment_6.json` | JSON | Yes, open directly in VS Code |
 | Active staging application database | Neon database `robotics_lab_staging` | PostgreSQL | Use the application or authorized Neon SQL Editor |
 | Private local configuration | `.env` in the repository root | Ignored environment settings | Read directly by the launcher and backend |
-| Legacy local source preserved during first migration | `backend/robotics_lab_staging.db` | SQLite | Read-only; not used by the default launcher after migration |
+| Historical local databases and dumps | Archived outside the active checkout | SQLite or PostgreSQL dump | Recovery evidence only; never used by the application |
 | Student editor draft | Neon PostgreSQL with a browser fallback, keyed by authenticated user, assignment ID, and assignment version | `code_drafts` table plus local JSON preferences | View through the matching assignment workspace; another login and older versions are isolated |
 | Password-free prototype account roster | `backend/data/study_accounts.json` | JSON | Yes; tracked by Git, with `temporary_password` always `null` |
 | Research exports | Downloaded from the instructor Research Dashboard | CSV or Excel | Yes |

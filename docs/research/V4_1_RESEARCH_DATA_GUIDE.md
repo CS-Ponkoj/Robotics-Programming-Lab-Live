@@ -5,8 +5,8 @@
 V4.1 adds classroom-study evidence without changing assignment grading,
 solution protection, authentication, or the optional AI tutor. The dedicated
 Neon PostgreSQL database `robotics_lab_staging` is the staging source of truth
-on every authorized computer. Local Docker PostgreSQL remains an explicit
-offline fallback, and SQLite remains a disposable troubleshooting fallback.
+on every authorized computer. There is no local database or offline grading-data
+fallback. SQLite and local PostgreSQL are reserved for disposable automated tests.
 
 ## Data flow
 
@@ -45,7 +45,7 @@ grading but is excluded from research dashboards and exports.
 
 For storage definitions, standard execution statuses, and event payload rules,
 see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). The ignored
-The repository-root `.env` supplies the Neon connection on authorized
+repository-root `.env` supplies the Neon connection on authorized
 computers. The password-free account roster is tracked at
 `backend/data/study_accounts.json`; passwords and password hashes never belong
 in Git. Assignment source data is human-readable in

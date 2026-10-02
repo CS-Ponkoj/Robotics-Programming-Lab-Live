@@ -76,8 +76,9 @@ Run the full automated SQA gate:
 ./scripts/verify-local.sh
 ```
 
-The Windows and Ubuntu workflows use the same source and handoff-package
-contract. A physical Ubuntu 22.04 or 24.04 lab-computer smoke test is required
+The Windows and Ubuntu workflows use the same source and private root `.env`
+format. No database handoff package or restore command is needed. A physical
+Ubuntu 22.04 or 24.04 lab-computer smoke test is required
 before an Ubuntu classroom release is declared hardware-compatible.
 
 ## Change workflow

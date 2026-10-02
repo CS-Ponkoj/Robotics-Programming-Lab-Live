@@ -276,8 +276,8 @@ On Ubuntu:
 ```
 
 Use `-EnableAi` on Windows or `--enable-ai` on Ubuntu only for an intentional AI
-test. External database and SQLite troubleshooting flags also follow each
-script's native PowerShell or GNU-style spelling.
+test. Normal application runs require Neon; there are no local-database
+troubleshooting flags.
 
 OneDrive can lock Flutter build artifacts. Use the supplied run and verification
 scripts, which build from a safe generated copy outside the clone. Do not solve
@@ -369,8 +369,14 @@ A change is complete only when:
 
 ## Database and migration rules
 
-- PostgreSQL is authoritative for production mutable data.
-- SQLite is a local-development convenience, not a production fallback.
+- Neon PostgreSQL is authoritative for all persistent application data.
+- Normal staging launchers, direct backend starts, and Alembic commands must
+  resolve the same dedicated Neon database. Missing configuration or connection
+  failure must never silently create or switch to a local database.
+- SQLite and local PostgreSQL are allowed only as explicitly configured,
+  disposable automated-test databases (`ENVIRONMENT=testing`), not app modes.
+- Reconcile legacy records before importing them. Preserve newer Neon accounts,
+  assignments, and session state; never restore an old dump over the shared DB.
 - Every production schema change requires an Alembic migration.
 - Test migrations against a fresh PostgreSQL database and the supported previous
   schema state.

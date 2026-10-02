@@ -106,6 +106,9 @@ The database itself is stored in Neon, so authorized computers see the same
 accounts, attempts, and analytics. The password-free roster arrives through Git
 at `backend/data/study_accounts.json`; use Instructor Studio to create or reset
 passwords. Local PostgreSQL and SQLite application modes are not supported.
+Internet access and the same `NEON_DATABASE_NAME=robotics_lab_staging` are
+required on every device. No database copy or restore command is needed. If
+Neon is unavailable, fix the connection; do not switch to an old local dump.
 
 ## Optional verification
 

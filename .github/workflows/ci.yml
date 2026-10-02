@@ -38,12 +38,12 @@ jobs:
           shellcheck -x scripts/*.sh
       - name: Prepare managed Python 3.14 environment
         run: ./scripts/setup-local.sh
-      - name: Verify portable PostgreSQL backup and restore
-        if: matrix.os == 'ubuntu-24.04'
-        run: ./scripts/verify-linux-database-handoff.sh
 
   backend:
     runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: testing
+      DATABASE_URL: sqlite://
     services:
       postgres:
         image: postgres:16

@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     )
 
     environment: str = "development"
-    database_url: str = f"sqlite:///{(BASE_DIR / 'robotics_lab.db').as_posix()}"
+    database_url: str = ""
     neon_database_url: str | None = None
     neon_database_name: str = "robotics_lab_staging"
     auto_create_schema: bool = True
@@ -80,6 +80,46 @@ class Settings(BaseSettings):
         return urlunsplit(
             parsed._replace(path=f"/{self.neon_database_name}")
         )
+
+    @property
+    def application_database_url(self) -> str:
+        """Normal application runs use Neon; isolated tests opt in explicitly."""
+        if self.environment.lower() == "testing":
+            if not self.database_url:
+                raise RuntimeError(
+                    "Testing requires an explicit disposable DATABASE_URL."
+                )
+            return self.database_url
+        selected = (
+            self.database_url
+            if self.environment.lower() == "production"
+            else self.cloud_database_url
+        )
+        if not selected:
+            raise RuntimeError(
+                "Neon configuration is missing. Configure NEON_DATABASE_URL in the root .env."
+            )
+        parsed = urlsplit(selected)
+        if parsed.scheme not in {
+            "postgresql",
+            "postgresql+psycopg",
+            "postgres",
+        } or not (parsed.hostname or "").endswith(".neon.tech"):
+            raise RuntimeError(
+                "Application data must use Neon PostgreSQL; local database fallback is disabled."
+            )
+        if self.environment.lower() != "production" and self.database_url:
+
+            def normalize(value: str) -> str:
+                return value.replace(
+                    "postgresql+psycopg://", "postgresql://", 1
+                ).replace("postgres://", "postgresql://", 1)
+
+            if normalize(self.database_url) != normalize(selected):
+                raise RuntimeError(
+                    "DATABASE_URL conflicts with Neon staging. Remove the local override from the root .env."
+                )
+        return selected
 
     def validate_runtime(self) -> None:
         if self.environment.lower() != "production":

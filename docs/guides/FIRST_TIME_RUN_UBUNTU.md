@@ -181,6 +181,9 @@ Clone the source and provision its private Neon configuration through the
 approved secret-delivery method. Do not copy Python environments, Flutter
 builds, Docker volumes, or log folders. Local database fallbacks are not
 supported.
+Internet access and the same `NEON_DATABASE_NAME=robotics_lab_staging` are
+required on every device. No database copy or restore command is needed. If
+Neon is unavailable, fix the connection; do not switch to an old local dump.
 
 ## 9. Update the project later
 
