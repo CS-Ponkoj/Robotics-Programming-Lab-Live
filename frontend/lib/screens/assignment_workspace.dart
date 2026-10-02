@@ -285,6 +285,9 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _runTests() {
+    // Until the assignment loads, _code is not the code shown in the editor;
+    // running now would wrongly report an empty editor.
+    if (_init) return;
     if (!hasNonWhitespaceCode(_code)) {
       setState(() {
         _submitted = false;
@@ -889,7 +892,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               children: [
                                 AssignmentEditorToolbar(
                                   isRunning: _isRunning,
-                                  onRun: _runTests,
+                                  onRun: _init ? null : _runTests,
                                   onSave: _selectedProjectFileEditable
                                       ? () => unawaited(_saveDraftNow())
                                       : null,
@@ -966,6 +969,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                             _code,
                                           );
                                           _init = false;
+                                          // The toolbar was built earlier in
+                                          // this frame; rebuild it so Run
+                                          // tests becomes enabled.
+                                          WidgetsBinding.instance
+                                              .addPostFrameCallback((_) {
+                                            if (mounted) setState(() {});
+                                          });
                                         }
                                         return AssignmentProjectWorkspace(
                                           files: snap.data!.projectFiles,
@@ -1763,7 +1773,8 @@ class AssignmentPanelHeader extends StatelessWidget {
 
 class AssignmentEditorToolbar extends StatelessWidget {
   final bool isRunning;
-  final VoidCallback onRun;
+  // Null while the assignment code is still loading.
+  final VoidCallback? onRun;
   final VoidCallback? onSave;
   final bool isFocused;
   final VoidCallback? onFocusToggle;
@@ -2022,7 +2033,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
                     ? 'Assignment tests are running'
                     : 'Run assignment tests. Keyboard shortcut Control Enter',
                 button: true,
-                enabled: !isRunning,
+                enabled: !isRunning && onRun != null,
                 child: Tooltip(
                   message: 'Run assignment tests (Ctrl+Enter)',
                   child: FilledButton.icon(

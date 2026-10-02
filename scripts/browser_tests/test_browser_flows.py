@@ -91,11 +91,9 @@ def test_student_demo_runs_and_submits_an_assignment(page: Page):
     expect(page.get_by_role("button", name="Instructor studio")).to_have_count(0)
     starts.first.click()
 
-    # The editor receives its code in the same frame the instructions render.
-    expect(page.get_by_role("button", name="Scenario", exact=True)).to_be_visible(
-        timeout=60_000
-    )
+    # Run tests stays disabled until the assignment code is in the editor.
     run_tests = page.get_by_role("button", name="Run tests")
+    expect(run_tests).to_be_enabled(timeout=60_000)
     run_tests.click()
     wait_for_text(page, "Keep refining your solution", GRADING_TIMEOUT_MS)
     wait_for_text(page, "Built-in tutor hint")
