@@ -187,4 +187,30 @@ void main() {
       AssignmentProgressState.completed,
     );
   });
+
+  test('an unsynced draft is remembered until the server confirms it',
+      () async {
+    final storage = InMemoryProgressStorage();
+    final store = LearningProgressStore();
+    await store.load(storage: storage);
+
+    await store.saveDraft(3, 2, 'offline edit');
+    await store.setDraftSynced(3, false);
+
+    final reloaded = LearningProgressStore();
+    await reloaded.load(storage: storage);
+    expect(reloaded.hasUnsyncedDraft(3), isTrue);
+    expect(reloaded.draftFor(3, 2), 'offline edit');
+
+    await reloaded.setDraftSynced(3, true);
+    final synced = LearningProgressStore();
+    await synced.load(storage: storage);
+    expect(synced.hasUnsyncedDraft(3), isFalse);
+
+    await synced.setDraftSynced(3, false);
+    await synced.clearDraft(3);
+    final cleared = LearningProgressStore();
+    await cleared.load(storage: storage);
+    expect(cleared.hasUnsyncedDraft(3), isFalse);
+  });
 }

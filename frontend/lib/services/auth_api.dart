@@ -90,6 +90,7 @@ class AuthApi {
     }
 
     _token = storedToken;
+    var sessionRejected = false;
     try {
       final response = await http
           .get(
@@ -107,10 +108,17 @@ class AuthApi {
         }
         return user;
       }
+      sessionRejected =
+          response.statusCode == 401 || response.statusCode == 403;
     } on Object {
-      // A stale or unreachable session is cleared so the user can sign in.
+      // A timeout or network error keeps the stored session for next time.
     }
-    await clearLocalSession();
+    if (sessionRejected) {
+      await clearLocalSession();
+    } else {
+      // Show sign-in now, but a brief outage must not log the user out.
+      _token = null;
+    }
     return null;
   }
 

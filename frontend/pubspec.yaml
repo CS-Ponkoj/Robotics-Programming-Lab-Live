@@ -33,10 +33,6 @@ dependencies:
 
   
   flutter_widget_from_html: 0.16.0
-  just_audio_web: 0.4.15
-  english_words: ^4.0.0
-  provider: ^6.0.0
-  path: ^1.8.0
   web: ^1.0.0
   http: ^1.2.2
   html: 0.15.5+1

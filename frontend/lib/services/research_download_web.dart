@@ -13,6 +13,10 @@ bool saveResearchDownload(Uint8List bytes, String filename, String mimeType) {
     ..href = url
     ..download = filename;
   anchor.click();
-  web.URL.revokeObjectURL(url);
+  // Revoking at once can cancel the download in Firefox and Safari.
+  Future<void>.delayed(
+    const Duration(seconds: 30),
+    () => web.URL.revokeObjectURL(url),
+  );
   return true;
 }

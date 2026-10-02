@@ -12,6 +12,7 @@ class LearningProgressStore {
   static const _attemptCountsKey = 'learning.attempt_counts.v1';
   static const _revealedSolutionsKey = 'learning.revealed_solutions.v1';
   static const _submissionIdsKey = 'learning.submission_ids.v1';
+  static const _unsyncedDraftsKey = 'learning.unsynced_drafts.v1';
 
   final Map<int, int> latestScores = {};
   final Map<int, int> bestScores = {};
@@ -20,6 +21,7 @@ class LearningProgressStore {
   final Map<int, int> attemptCounts = {};
   final Set<int> revealedSolutions = {};
   final Map<int, String> submissionIds = {};
+  final Set<int> unsyncedDrafts = {};
 
   ProgressStorage? _storage;
   String? _userScope;
@@ -46,6 +48,26 @@ class LearningProgressStore {
           ? null
           : draftFor(assignmentId, assignmentVersion),
       starterCode: starterCode,
+    );
+  }
+
+  /// True when this device holds draft code the server has not confirmed.
+  bool hasUnsyncedDraft(int assignmentId) =>
+      unsyncedDrafts.contains(assignmentId);
+
+  Future<void> setDraftSynced(int assignmentId, bool synced) async {
+    final changed = synced
+        ? unsyncedDrafts.remove(assignmentId)
+        : unsyncedDrafts.add(assignmentId);
+    if (changed) {
+      await _storeUnsyncedDrafts();
+    }
+  }
+
+  Future<void> _storeUnsyncedDrafts() async {
+    await _storage?.setString(
+      _scopedKey(_unsyncedDraftsKey),
+      jsonEncode(unsyncedDrafts.toList()..sort()),
     );
   }
 
@@ -96,6 +118,11 @@ class LearningProgressStore {
     submissionIds.addAll(
       _decodeStringMap(_getStringSafely(_submissionIdsKey)),
     );
+    unsyncedDrafts.addAll(
+      _decodeIntList(_getStringSafely(_unsyncedDraftsKey))
+          .map(int.tryParse)
+          .whereType<int>(),
+    );
   }
 
   Future<void> _copyLegacyProgress() async {
@@ -123,6 +150,7 @@ class LearningProgressStore {
     attemptCounts.clear();
     revealedSolutions.clear();
     submissionIds.clear();
+    unsyncedDrafts.clear();
   }
 
   Future<void> saveDraft(
@@ -146,6 +174,9 @@ class LearningProgressStore {
   Future<void> clearDraft(int assignmentId) async {
     codeDrafts.remove(assignmentId);
     codeDraftVersions.remove(assignmentId);
+    if (unsyncedDrafts.remove(assignmentId)) {
+      await _storeUnsyncedDrafts();
+    }
     await Future.wait([
       if (_storage != null)
         _storage!.setString(_scopedKey(_draftsKey), _encodeMap(codeDrafts)),

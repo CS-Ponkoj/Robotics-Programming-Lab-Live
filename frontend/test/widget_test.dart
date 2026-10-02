@@ -1873,4 +1873,26 @@ void main() {
     expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
     semantics.dispose();
   });
+
+  testWidgets('test run error shows the server explanation when rejected', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: app.TestRunErrorState(
+            onRetry: () {},
+            message: 'Too many requests. Please wait and try again.',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Your code was not graded'), findsOneWidget);
+    expect(
+      find.text('Too many requests. Please wait and try again.'),
+      findsOneWidget,
+    );
+    expect(find.text('Grading service unavailable'), findsNothing);
+  });
 }

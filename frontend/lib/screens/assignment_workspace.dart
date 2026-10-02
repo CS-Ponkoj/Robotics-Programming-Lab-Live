@@ -160,6 +160,10 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
     _draftSaveTimer?.cancel();
+    // Keep the newest code on this device at once, so logout or a lost
+    // connection cannot drop it; the server copy follows after a short pause.
+    unawaited(learningProgress.saveDraft(widget.id, assignmentVersion, code));
+    unawaited(learningProgress.setDraftSynced(widget.id, false));
     if (mounted) {
       setState(() => _draftSaveState = DraftSaveState.saving);
     }
@@ -181,6 +185,9 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       await learningProgress.saveDraft(widget.id, assignmentVersion, code);
       final result = await saveCodeDraft(widget.id, assignmentVersion, code);
+      if (code == _code) {
+        await learningProgress.setDraftSynced(widget.id, true);
+      }
       final savedState =
           result.saved ? DraftSaveState.saved : DraftSaveState.sessionSaved;
       if (mounted && code == _code) {
@@ -695,7 +702,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                 return const SecureGraderLoadingState();
                               }
                               if (snap.hasError) {
-                                return TestRunErrorState(onRetry: _runTests);
+                                final error = snap.error;
+                                return TestRunErrorState(
+                                  onRetry: _runTests,
+                                  message: error is ApiRequestException
+                                      ? error.message
+                                      : null,
+                                );
                               }
                               if (snap.hasData) {
                                 return Feedback(
@@ -916,12 +929,35 @@ class _MyHomePageState extends State<MyHomePage> {
                                         if (_init) {
                                           _assignmentVersion =
                                               snap.data!.version;
-                                          _code = _serverDraft ??
+                                          final localDraft =
                                               learningProgress.draftFor(
-                                                widget.id,
-                                                snap.data!.version,
-                                              ) ??
+                                            widget.id,
+                                            snap.data!.version,
+                                          );
+                                          // A local draft the server never
+                                          // confirmed is newer than the
+                                          // server copy.
+                                          final preferLocal =
+                                              localDraft != null &&
+                                                  learningProgress
+                                                      .hasUnsyncedDraft(
+                                                    widget.id,
+                                                  );
+                                          _code = (preferLocal
+                                                  ? localDraft
+                                                  : _serverDraft) ??
+                                              localDraft ??
                                               snap.data!.code;
+                                          if (preferLocal) {
+                                            WidgetsBinding.instance
+                                                .addPostFrameCallback((_) {
+                                              if (mounted) {
+                                                unawaited(
+                                                  _persistDraft(_code),
+                                                );
+                                              }
+                                            });
+                                          }
                                           _selectedProjectFilePath =
                                               snap.data!.editableFilePath;
                                           _selectedProjectFileEditable = true;
@@ -2657,9 +2693,13 @@ class EmptyCodeTestRunState extends StatelessWidget {
 }
 
 class TestRunErrorState extends StatelessWidget {
-  const TestRunErrorState({super.key, required this.onRetry});
+  const TestRunErrorState({super.key, required this.onRetry, this.message});
 
   final VoidCallback onRetry;
+
+  /// The server's explanation when it rejected the run (for example a rate
+  /// limit); null when the grading service could not be reached.
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
@@ -2681,7 +2721,9 @@ class TestRunErrorState extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Grading service unavailable',
+                message == null
+                    ? 'Grading service unavailable'
+                    : 'Your code was not graded',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -2689,8 +2731,9 @@ class TestRunErrorState extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Your code was not graded. Confirm that the backend is running '
-                'at $apiBaseUrl, then try again.',
+                message ??
+                    'Your code was not graded. Confirm that the backend is '
+                        'running at $apiBaseUrl, then try again.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
