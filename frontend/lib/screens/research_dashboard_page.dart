@@ -507,7 +507,7 @@ class _MetricGrid extends StatelessWidget {
             ? 4
             : constraints.maxWidth >= 560
                 ? 3
-                : constraints.maxWidth >= 360
+                : constraints.maxWidth >= 300
                     ? 2
                     : 1;
         final width =
@@ -882,9 +882,9 @@ class _MetricCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadii.md),
           boxShadow: appCardShadow,
         ),
-        child: Row(
-          children: [
-            Container(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final iconTile = Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
@@ -892,29 +892,40 @@ class _MetricCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, size: 20, color: AppColors.brandDark),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
+            );
+            final text = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800, height: 1.15),
+                ),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            );
+            // Narrow two-column tiles stack the icon above the value.
+            if (constraints.maxWidth < 200) {
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w800, height: 1.15),
-                  ),
-                  Text(
-                    label,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+                children: [iconTile, const SizedBox(height: 10), text],
+              );
+            }
+            return Row(
+              children: [
+                iconTile,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(child: text),
+              ],
+            );
+          },
         ),
       ),
     );
