@@ -124,7 +124,7 @@ def test_instructor_signs_in_reviews_studio_and_signs_out(page: Page):
 
     page.get_by_role("button", name="Instructor studio").click()
     expect(page.get_by_role("button", name="Create assignment")).to_be_visible()
-    expect(page.get_by_role("button", name="Manage accounts").first).to_be_visible()
+    expect(page.get_by_role("button", name="Manage accounts")).to_be_visible()
     for assignment_number in range(1, 5):
         expect(
             page.get_by_role("button", name=f"Assignment {assignment_number}:")

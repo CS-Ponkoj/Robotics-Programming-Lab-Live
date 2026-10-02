@@ -670,34 +670,49 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
   @override
   Widget build(BuildContext context) {
     final emailConfigured = _emailStatus['configured'] == true;
+    final theme = Theme.of(context);
+    final actions = Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        OutlinedButton.icon(
+          key: const Key('import-accounts-button'),
+          onPressed: _loading ? null : _importAccounts,
+          icon: const Icon(Icons.sync_rounded),
+          label: const Text('Import study_accounts.json'),
+        ),
+        FilledButton.icon(
+          key: const Key('create-account-button'),
+          onPressed: _loading ? null : _createAccount,
+          icon: const Icon(Icons.person_add_alt_1_rounded),
+          label: const Text('New account'),
+        ),
+      ],
+    );
     return Scaffold(
-      backgroundColor: AppColors.practiceSurface,
       appBar: AppBar(
         title: const Text('Account management'),
-        actions: [
-          IconButton(
-            tooltip: 'Import study_accounts.json',
-            onPressed: _loading ? null : _importAccounts,
-            icon: const Icon(Icons.sync_rounded),
-          ),
-          IconButton(
-            tooltip: 'Create account',
-            onPressed: _loading ? null : _createAccount,
-            icon: const Icon(Icons.person_add_alt_1_rounded),
-          ),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1050),
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
+                  'ACCOUNTS',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: AppColors.brand,
+                    letterSpacing: 1.1,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
                   'Student and instructor access',
-                  style: Theme.of(context).textTheme.headlineSmall,
+                  style: theme.textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -708,7 +723,11 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                       : 'Create login credentials, connect optional participant '
                           'codes, reset access, or deactivate an account while '
                           'preserving its study data.',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
+                const SizedBox(height: 16),
+                actions,
                 if (instructorEmailToolsEnabled) ...[
                   const SizedBox(height: 16),
                   Card(
@@ -772,40 +791,117 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                   final student = _accounts[index];
                                   final active =
                                       student['is_active'] as bool? ?? false;
+                                  final loginId = student['login_id'] as String;
+                                  final instructor =
+                                      student['role'] == 'instructor';
+                                  Widget chip(String label, Color background,
+                                          Color foreground) =>
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 9, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: background,
+                                          borderRadius: BorderRadius.circular(
+                                              AppRadii.pill),
+                                        ),
+                                        child: Text(
+                                          label,
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                            color: foreground,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      );
                                   return Card(
                                     child: ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundColor: active
-                                            ? Theme.of(context)
-                                                .colorScheme
-                                                .primaryContainer
-                                            : Theme.of(context)
-                                                .colorScheme
-                                                .surfaceContainerHighest,
-                                        child: Icon(
-                                          active
-                                              ? Icons.person_rounded
-                                              : Icons.person_off_outlined,
+                                      contentPadding: const EdgeInsets.fromLTRB(
+                                          16, 8, 8, 8),
+                                      leading: Container(
+                                        width: 42,
+                                        height: 42,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: active
+                                              ? AppColors.brandTint
+                                              : AppColors.neutralContainer,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: active
+                                            ? Text(
+                                                loginId
+                                                    .substring(
+                                                        0,
+                                                        loginId.length < 2
+                                                            ? loginId.length
+                                                            : 2)
+                                                    .toUpperCase(),
+                                                style: theme
+                                                    .textTheme.labelLarge
+                                                    ?.copyWith(
+                                                  color: AppColors.brandDark,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              )
+                                            : const Icon(
+                                                Icons.person_off_outlined,
+                                                color: AppColors.inkMuted,
+                                              ),
+                                      ),
+                                      title: Text(loginId),
+                                      subtitle: Padding(
+                                        padding: const EdgeInsets.only(top: 6),
+                                        child: Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          children: [
+                                            chip(
+                                              instructor
+                                                  ? 'Instructor'
+                                                  : 'Student',
+                                              instructor
+                                                  ? theme.colorScheme
+                                                      .secondaryContainer
+                                                  : AppColors.neutralContainer,
+                                              instructor
+                                                  ? theme.colorScheme
+                                                      .onSecondaryContainer
+                                                  : AppColors.inkMuted,
+                                            ),
+                                            chip(
+                                              active ? 'Active' : 'Inactive',
+                                              active
+                                                  ? AppColors.successContainer
+                                                  : AppColors.neutralContainer,
+                                              active
+                                                  ? AppColors.success
+                                                  : AppColors.inkMuted,
+                                            ),
+                                            if (student['participant_code'] !=
+                                                    null &&
+                                                '${student['participant_code']}'
+                                                    .isNotEmpty)
+                                              Text(
+                                                'Participant ${student['participant_code']}',
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                  color: theme.colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                              ),
+                                            if (instructorEmailToolsEnabled &&
+                                                student['email'] != null)
+                                              Text('${student['email']}',
+                                                  style: theme
+                                                      .textTheme.bodySmall),
+                                          ],
                                         ),
                                       ),
-                                      title:
-                                          Text(student['login_id'] as String),
-                                      subtitle: Text(
-                                        [
-                                          student['role'],
-                                          student['participant_code'],
-                                          if (instructorEmailToolsEnabled)
-                                            student['email'],
-                                          active ? 'Active' : 'Inactive',
-                                        ]
-                                            .where(
-                                              (value) =>
-                                                  value != null &&
-                                                  value.toString().isNotEmpty,
-                                            )
-                                            .join(' • '),
-                                      ),
                                       trailing: PopupMenuButton<String>(
+                                        tooltip: 'Account actions',
                                         onSelected: (value) {
                                           switch (value) {
                                             case 'edit':
@@ -845,11 +941,6 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
             ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _loading ? null : _createAccount,
-        icon: const Icon(Icons.person_add_alt_1_rounded),
-        label: const Text('New account'),
       ),
     );
   }

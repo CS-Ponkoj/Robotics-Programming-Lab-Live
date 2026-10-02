@@ -63,144 +63,309 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final published =
+        _assignments.where((a) => a['status'] == 'published').length;
+    void open(Widget page) => Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => page));
+
+    final createButton = FilledButton.icon(
+      key: const Key('create-assignment-button'),
+      onPressed: _loading ? null : () => _edit(),
+      icon: const Icon(Icons.add_rounded),
+      label: const Text('Create assignment'),
+    );
+    final intro = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'INSTRUCTOR STUDIO',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: AppColors.brand,
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text('Manage versioned assignments',
+            style: theme.textTheme.headlineSmall),
+        const SizedBox(height: 6),
+        Text(
+          'Your instructor login authorizes assignment and account '
+          'management. '
+          'Publishing is blocked until the reference solution passes '
+          'the hidden grader.',
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+      ],
+    );
+
     return Scaffold(
-      backgroundColor: AppColors.learningSurface,
       appBar: AppBar(
         title: const Text('Instructor assignment studio'),
-        actions: [
-          IconButton(
-            tooltip: 'Research study dashboard',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const InstructorResearchDashboard(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.insights_rounded),
-          ),
-          IconButton(
-            tooltip: 'Manage accounts',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const StudentAccountsPage(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.manage_accounts_outlined),
-          ),
-          IconButton(
-            tooltip: 'Create assignment',
-            onPressed: _loading ? null : () => _edit(),
-            icon: const Icon(Icons.add_rounded),
-          ),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Manage versioned assignments',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Your instructor login authorizes assignment and account '
-                  'management. '
-                  'Publishing is blocked until the reference solution passes '
-                  'the hidden grader.',
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) => constraints.maxWidth >= 720
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: intro),
+                          const SizedBox(width: 24),
+                          createButton,
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          intro,
+                          const SizedBox(height: 16),
+                          createButton
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 24),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final cards = [
+                    _StudioLinkCard(
+                      icon: Icons.manage_accounts_outlined,
+                      title: 'Manage accounts',
+                      detail:
+                          'Create student logins, reset access, and link participant codes.',
+                      onTap: () => open(const StudentAccountsPage()),
+                    ),
+                    _StudioLinkCard(
+                      icon: Icons.insights_rounded,
+                      title: 'Research study dashboard',
+                      detail:
+                          'Participation, attempts, and privacy-safe research exports.',
+                      onTap: () => open(const InstructorResearchDashboard()),
+                    ),
+                  ];
+                  if (constraints.maxWidth < 640) {
+                    return Column(children: [
+                      cards[0],
+                      const SizedBox(height: 12),
+                      cards[1],
+                    ]);
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      FilledButton.tonalIcon(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const StudentAccountsPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.manage_accounts_outlined),
-                        label: const Text('Manage accounts'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  const InstructorResearchDashboard(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.insights_rounded),
-                        label: const Text('View research dashboard'),
-                      ),
+                      Expanded(child: cards[0]),
+                      const SizedBox(width: 16),
+                      Expanded(child: cards[1]),
                     ],
-                  ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_error!,
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error)),
-                ],
-                const SizedBox(height: 20),
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _assignments.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No assignments are available yet.',
-                              ),
-                            )
-                          : ListView.separated(
-                              itemCount: _assignments.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 10),
-                              itemBuilder: (context, index) {
-                                final assignment = _assignments[index];
-                                return Card(
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      child: Text('${assignment['id']}'),
-                                    ),
-                                    title: Text(
-                                      assignment['title']?.toString() ??
-                                          'Untitled assignment',
-                                    ),
-                                    subtitle: Text(
-                                      '${assignment['stable_id']} • '
-                                      'v${assignment['version']} • '
-                                      '${assignment['status']}',
-                                    ),
-                                    trailing: const Icon(Icons.edit_outlined),
-                                    onTap: () => _edit(assignment),
-                                  ),
-                                );
-                              },
-                            ),
-                ),
+                  );
+                },
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
               ],
-            ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Text('Assignments', style: theme.textTheme.titleLarge),
+                  const SizedBox(width: 12),
+                  if (!_loading)
+                    Text(
+                      '${_assignments.length} total · $published published',
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_assignments.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(
+                    child: Text('No assignments are available yet.'),
+                  ),
+                )
+              else
+                for (final assignment in _assignments)
+                  _StudioAssignmentRow(
+                    assignment: assignment,
+                    onTap: () => _edit(assignment),
+                  ),
+            ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _loading ? null : () => _edit(),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('New assignment'),
+    );
+  }
+}
+
+class _StudioLinkCard extends StatelessWidget {
+  const _StudioLinkCard({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.brandTint,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, color: AppColors.brandDark),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 2),
+                    Text(
+                      detail,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.inkMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StudioAssignmentRow extends StatelessWidget {
+  const _StudioAssignmentRow({required this.assignment, required this.onTap});
+
+  final Map<String, dynamic> assignment;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final published = assignment['status'] == 'published';
+    final ros2 = '${assignment['language']}'.contains('ros2');
+    Widget chip(String label, Color background, Color foreground) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+          ),
+          child: Text(
+            label,
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: foreground, fontWeight: FontWeight.w700),
+          ),
+        );
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.brandTint,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${assignment['id']}',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: AppColors.brandDark,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      assignment['title']?.toString() ?? 'Untitled assignment',
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        chip(
+                          published ? 'Published' : '${assignment['status']}',
+                          published
+                              ? AppColors.successContainer
+                              : AppColors.neutralContainer,
+                          published ? AppColors.success : AppColors.inkMuted,
+                        ),
+                        chip(
+                          ros2 ? 'ROS 2' : 'Python',
+                          ros2
+                              ? theme.colorScheme.secondaryContainer
+                              : AppColors.neutralContainer,
+                          ros2
+                              ? theme.colorScheme.onSecondaryContainer
+                              : AppColors.inkMuted,
+                        ),
+                        Text(
+                          '${assignment['stable_id']} • '
+                          'v${assignment['version']}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Tooltip(
+                message: 'Edit assignment',
+                child: Icon(Icons.edit_outlined,
+                    color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
