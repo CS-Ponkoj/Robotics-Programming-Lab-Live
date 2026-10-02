@@ -1017,6 +1017,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                                         return AssignmentInstructions(
                                                           assignmentId:
                                                               widget.id,
+                                                          assignmentVersion:
+                                                              snap.data!
+                                                                  .version,
                                                           html: snap
                                                               .data!.htmlDesc
                                                               .replaceAll(
@@ -1088,6 +1091,7 @@ class AssignmentInstructions extends StatefulWidget {
     super.key,
     required this.html,
     this.assignmentId = 1,
+    this.assignmentVersion = 1,
     this.solutionHtml = '',
     this.hasSolution = false,
     this.solutionRevealed = false,
@@ -1097,6 +1101,7 @@ class AssignmentInstructions extends StatefulWidget {
 
   final String html;
   final int assignmentId;
+  final int assignmentVersion;
   final String solutionHtml;
   final bool hasSolution;
   final bool solutionRevealed;
@@ -1124,7 +1129,8 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
 
   @override
   Widget build(BuildContext context) {
-    final sections = AssignmentInstructionSections.fromHtml(widget.html);
+    final sections = AssignmentInstructionSections.fromHtml(
+        versionAssignmentImages(widget.html, widget.assignmentVersion));
     final taskList = InstructionTaskList.fromHtml(sections.task);
     final displayedSolutionHtml = widget.solutionHtml.isNotEmpty
         ? widget.solutionHtml
@@ -1184,6 +1190,25 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
       ],
     );
   }
+}
+
+// A new assignment version must not reuse Flutter/browser's old image URL.
+String versionAssignmentImages(String html, int version) {
+  return html.replaceAllMapped(
+    RegExp(r'''(<img\b[^>]*\bsrc\s*=\s*)(["'])([^"']+)\2''',
+        caseSensitive: false),
+    (match) {
+      final uri = Uri.tryParse(match[3]!);
+      if (uri == null || !RegExp(r'^/images/\d+$').hasMatch(uri.path)) {
+        return match[0]!;
+      }
+      final updated = uri.replace(queryParameters: {
+        ...uri.queryParameters,
+        'assignment_version': '$version',
+      });
+      return '${match[1]}${match[2]}$updated${match[2]}';
+    },
+  );
 }
 
 class AssignmentInstructionSections {

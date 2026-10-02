@@ -330,7 +330,10 @@ def test_serves_assignment_image(client, image_id):
     response = client.get(f"/images/{image_id}")
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
+    assert response.headers["cache-control"] == "no-cache"
     assert response.content.startswith(b"\x89PNG")
+    versioned = client.get(f"/images/{image_id}?assignment_version=99")
+    assert versioned.content == response.content
 
 
 def test_missing_assignment_and_image_return_json_404(client):

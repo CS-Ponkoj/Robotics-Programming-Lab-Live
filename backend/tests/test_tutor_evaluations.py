@@ -50,7 +50,7 @@ def _safe_output(case):
         if case.misconception_tags
         else "",
         "answer": "" if not case.student_question else "Let us inspect one step.",
-        "debugging_steps": expected.debugging_steps[:3],
+        "debugging_steps": expected.debugging_steps[:2],
         "guiding_question": expected.socratic_question,
         "hint": case.hint_ladder[0].hint,
         "next_action": expected.debugging_steps[0],
@@ -108,10 +108,15 @@ def test_all_instructor_cases_use_strict_safe_tutor_pipeline(dataset, case):
         student_question=case.student_question or "",
     )
 
+    if case.case_type == "solution_request":
+        assert feedback.source == "fallback"
+        assert "cannot provide completed code" in feedback.answer
+        assert not responses.requests
+        return
     assert feedback.source == "openai"
     assert feedback.solution_revealed is False
     assert feedback.hint == case.hint_ladder[0].hint
-    assert 1 <= len(feedback.debugging_steps) <= 3
+    assert 1 <= len(feedback.debugging_steps) <= 2
 
     request = responses.requests[0]
     payload = json.loads(request["input"])

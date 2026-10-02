@@ -244,7 +244,7 @@ def test_assignment_3_includes_the_complete_floor_to_floor_route(tmp_path):
     instructions = assignment["assignment_html"]
     assert "S -&gt; M1 -&gt; M2 -&gt; E_m" in instructions
     assert "floor-10 path / speed" in instructions
-    assert assignment["version"] == 9
+    assert assignment["version"] == 10
     assert 'src="/images/3"' in instructions
     assert "path_from_E_m_to_goal" in assignment["starter_code"]
     assert "path_from_E_s_to_goal" in assignment["starter_code"]

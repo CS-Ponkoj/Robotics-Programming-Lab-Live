@@ -638,6 +638,8 @@ Before handing off a change, ask:
 - Are local and deployed paths driven by configuration from the same code?
 - Does the database change have a tested migration and rollback path?
 - Can an older browser draft be mistaken for the current assignment version?
+- Do assignment diagrams use version-specific image URLs, and have the actual
+  displayed diagrams been checked rather than only the source image files?
 - Are untrusted submissions still isolated and bounded?
 - Does the feature work with AI disabled?
 - Are built-in hints available with AI off, and are misconception labels based

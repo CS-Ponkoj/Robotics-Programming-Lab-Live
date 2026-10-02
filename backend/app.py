@@ -1787,7 +1787,7 @@ def create_app(
         image = STATIC_DIR / f"image{image_id}.png"
         if not image.is_file():
             raise HTTPException(404, "Image not found.")
-        return FileResponse(image, media_type="image/png")
+        return FileResponse(image, media_type="image/png", headers={"Cache-Control": "no-cache"})
 
     @application.get(
         "/admin/assignments",

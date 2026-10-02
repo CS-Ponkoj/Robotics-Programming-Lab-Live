@@ -1,3 +1,4 @@
+import ast
 import json
 import logging
 import re
@@ -34,6 +35,15 @@ _UNDEFINED_NAME_CLAIM = re.compile(
 )
 
 
+_PROTECTED_REQUEST = re.compile(
+    r"\b(?:give|show|write|provide)\b[^.!?]{0,100}\b(?:complete|completed|full|finished|working|exact|correct)\b"
+    r"[^.!?]{0,80}\b(?:code|solution|controller|calculations)\b|"
+    r"\bwrite\s+controller\.py\s+for\s+me\b|"
+    r"\bignore\b[^.!?]{0,60}\b(?:instructions|rules?)\b|"
+    r"\b(?:protected|hidden)\s+test\s+(?:answers|values|code)\b", re.IGNORECASE,
+)
+
+
 class TutorService:
     def __init__(self, settings: Settings, client: OpenAI | None = None):
         self.settings = settings
@@ -56,6 +66,11 @@ class TutorService:
         )
         if not use_ai_tutor or (self.client is None and not self.settings.openai_api_key):
             return fallback
+        if _PROTECTED_REQUEST.search(normalized_question):
+            return fallback.model_copy(update={
+                "answer": "I cannot provide completed code or private assessment material. "
+                          "I can help you understand the task and debug one step at a time.",
+            })
         try:
             client = self.client or OpenAI(
                 api_key=self.settings.openai_api_key,
@@ -103,6 +118,20 @@ class TutorService:
                     "and order must match the assignment. At hint level 1, focus "
                     "on the first relevant issue rather than giving a complete "
                     "repair checklist for every unfinished part. "
+                    "Across ALL fields, level 1 must discuss only one issue and give "
+                    "one or two inspection steps, not the expressions that solve it. "
+                    "For an execution error, discuss only that error until it is fixed. "
+                    "Do not write inline replacement expressions, assignments, or "
+                    "helper calls with the required arguments. A conceptual explanation "
+                    "is allowed; a complete algorithm checklist is not a gradual hint. "
+                    "Code observations are syntax-derived facts, not grading claims. "
+                    "When literal_return_overrides is present, the returned placeholders "
+                    "are the first issue. Do not blame already calculated inputs or "
+                    "intermediate values: inspect the final returned values instead. "
+                    "Example: if a wrapper calculates values then returns some fields "
+                    "as -999, say 'Some final returned fields are replaced by placeholders; "
+                    "trace the last return.' Do not say the underlying route formula "
+                    "or search window is wrong without direct evidence. "
                     "If asked for protected material or completed code, decline briefly "
                     "and redirect the student to a conceptual debugging step."
                 ),
@@ -119,6 +148,7 @@ class TutorService:
                             "tutoring_rules": assignment.tutoring_rules,
                         },
                         "student_code": submission.code,
+                        "code_observations": self._code_observations(submission.code),
                         "visible_evidence": self._visible_evidence(submission.evidence),
                         "hint_level": hint_level,
                         "student_question": normalized_question,
@@ -139,6 +169,13 @@ class TutorService:
             self._enforce_output_policy(parsed)
             self._enforce_evidence_grounding(parsed, submission.evidence or {})
             self._enforce_assignment_scope(parsed, assignment)
+            if hint_level == 1 and len(parsed.debugging_steps) > 2:
+                raise ValueError("First hint gave too many debugging steps.")
+            if self._code_observations(submission.code) and not re.search(
+                r"return|placeholder|replace|override|literal|discard", parsed.diagnosis,
+                re.IGNORECASE,
+            ):
+                raise ValueError("Tutor overlooked literal replacements in the final return.")
             return TutorFeedback(
                 diagnosis=parsed.diagnosis,
                 # Model guesses about a student's beliefs are not observed
@@ -190,8 +227,38 @@ class TutorService:
             *content.debugging_steps, content.guiding_question,
             content.hint, content.next_action,
         ]
-        if _UNDEFINED_NAME_CLAIM.search("\n".join(fields)):
+        text = "\n".join(fields)
+        text = re.sub(
+            r"\b(?:no NameError(?: occurred)?|(?:does|did) not (?:raise|cause) "
+            r"(?:a )?NameError|(?:are|is) not undefined)\b", "", text,
+            flags=re.IGNORECASE,
+        )
+        if _UNDEFINED_NAME_CLAIM.search(text):
             raise ValueError("Tutor name-error claim contradicted successful execution.")
+
+    @staticmethod
+    def _code_observations(code: str) -> dict[str, Any]:
+        """Inspect syntax only. Never execute code or infer a student's beliefs."""
+        try:
+            tree = ast.parse(code)
+        except (SyntaxError, ValueError, RecursionError):
+            return {}
+        overrides = []
+        for node in tree.body:
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            for statement in node.body:
+                if not isinstance(statement, ast.Return) or not isinstance(statement.value, ast.Tuple):
+                    continue
+                parts = statement.value.elts
+                if not any(isinstance(part, ast.Subscript) for part in parts):
+                    continue
+                positions = [index + 1 for index, part in enumerate(parts)
+                             if isinstance(part, ast.Constant) or
+                             (isinstance(part, ast.UnaryOp) and isinstance(part.operand, ast.Constant))]
+                if positions:
+                    overrides.append({"function": node.name, "positions": positions})
+        return {"literal_return_overrides": overrides} if overrides else {}
 
     @staticmethod
     def _enforce_output_policy(content: TutorGeneratedContent) -> None:
@@ -278,12 +345,27 @@ class TutorService:
             }
             hint = level_hints[hint_level]
             next_action = "Change one calculation, rerun the tests, and use the new evidence."
+            if assignment.language == "python-ros2" or (assignment.grader_type or "").startswith("ros2"):
+                diagnosis = f"The ROS 2 assessment completed, but {label.lower()} still needs attention."
+                guiding_question = "What does the first failed behavior require, and where does your node implement it?"
+                hint = {
+                    1: "Trace the callback or node setup named by the first failed check.",
+                    2: "Inspect one received message and the command published for it.",
+                    3: "Compare the failing behavior with the assignment's topic, timing, and safety requirements.",
+                    4: "Trace one callback from input to exactly one published command, then rerun the checks.",
+                }[hint_level]
+                next_action = "Change one ROS 2 behavior, rerun the tests, and inspect the new evidence."
+        if failed is not None and evidence.get("execution_succeeded") and TutorService._code_observations(submission.code):
+            diagnosis = "Some final returned fields are replaced by literal values after earlier calculations."
+            guiding_question = "Does the last return preserve the calculated value for the failing field?"
+            hint = "Trace the final returned field, not just the earlier calculation or printed example."
+            next_action = "Inspect one failing returned field and rerun the tests."
         return TutorFeedback(
             diagnosis=diagnosis,
             misconception=misconception,
             answer=(
                 "Use the current test evidence to narrow the question to the first "
-                "failing calculation; the built-in tutor cannot interpret free-form "
+                "failing behavior; the built-in tutor cannot interpret free-form "
                 "questions while AI is unavailable."
                 if student_question
                 else ""

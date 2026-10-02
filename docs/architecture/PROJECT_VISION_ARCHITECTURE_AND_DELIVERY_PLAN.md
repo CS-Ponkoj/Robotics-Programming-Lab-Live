@@ -281,6 +281,16 @@ The current tutor:
    suspicious output before display.
 8. Record privacy-safe interaction metadata without storing raw questions in
    general learning events.
+9. Decline explicit requests for completed code before calling the provider.
+   Keep first-level hints to one issue and at most two debugging steps. Use
+   execution evidence and syntax-only observations of final returned values to
+   reject contradictory explanations and fall back to built-in feedback.
+   Built-in ROS hints describe node setup and callback behavior rather than
+   route calculations. A completed assessment does not imply the node started.
+
+Assignment diagram URLs include the exact assignment version, and the image
+endpoint requires cache revalidation. Verify the rendered diagrams after image
+changes so a cached illustration is not mistaken for the current one.
 
 ### Later AI phases
 

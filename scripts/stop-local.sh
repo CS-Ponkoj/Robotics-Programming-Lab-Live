@@ -28,7 +28,9 @@ stop_named_process() {
         robotics_process_matches "$pid" "$start_time" || break
         sleep 0.1
       done
-      robotics_process_matches "$pid" "$start_time" && kill -KILL -- "-$pid" 2>/dev/null || true
+      if robotics_process_matches "$pid" "$start_time"; then
+        kill -KILL -- "-$pid" 2>/dev/null || true
+      fi
       printf 'Stopped %s process %s.\n' "$name" "$pid"
     fi
   done < "$process_file"

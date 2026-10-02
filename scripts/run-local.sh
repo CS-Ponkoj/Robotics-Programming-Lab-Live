@@ -60,7 +60,9 @@ cleanup_failed_start() {
   local _name pid start_time
   if [[ -f "$process_file" ]]; then
     while IFS=$'\t' read -r _name pid start_time; do
-      robotics_process_matches "$pid" "$start_time" && kill -- "-$pid" 2>/dev/null || true
+      if robotics_process_matches "$pid" "$start_time"; then
+        kill -- "-$pid" 2>/dev/null || true
+      fi
     done < "$process_file"
   fi
   rm -f -- "$process_file" "$metadata_file"
