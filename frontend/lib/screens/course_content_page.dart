@@ -47,13 +47,23 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
+                Text(
+                  'COURSE CONTENTS',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: AppColors.brand,
+                    letterSpacing: 1.1,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
                 Text('Learn the ideas, then practice them',
                     style: theme.textTheme.headlineMedium),
                 const SizedBox(height: 8),
                 Text(
                   'Six robotics topics with lessons, exercises, and submitted quizzes. '
                   'Quiz scores are saved separately from coding assignment scores.',
-                  style: theme.textTheme.bodyLarge,
+                  style: theme.textTheme.bodyLarge
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 24),
                 LayoutBuilder(builder: (context, constraints) {
@@ -78,50 +88,100 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
                               if (i > row) const SizedBox(width: 16),
                               SizedBox(
                                 width: width,
-                                child: Card(
-                                  color: learningCardSurface(i),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: InkWell(
-                                    key:
-                                        Key('content-topic-${topics[i]['id']}'),
-                                    onTap: () async {
-                                      await Navigator.of(context).push(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) => CourseTopicPage(
-                                            topicId: topics[i]['id'] as String,
-                                            user: widget.user,
-                                            onLogout: widget.onLogout,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.lg),
+                                    boxShadow: appCardShadow,
+                                  ),
+                                  child: Material(
+                                    color: theme.colorScheme.surface,
+                                    clipBehavior: Clip.antiAlias,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadii.lg),
+                                      side: const BorderSide(
+                                          color: AppColors.border),
+                                    ),
+                                    child: InkWell(
+                                      key: Key(
+                                          'content-topic-${topics[i]['id']}'),
+                                      onTap: () async {
+                                        await Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) => CourseTopicPage(
+                                              topicId:
+                                                  topics[i]['id'] as String,
+                                              user: widget.user,
+                                              onLogout: widget.onLogout,
+                                            ),
                                           ),
+                                        );
+                                        if (mounted) _retry();
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(22),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  width: 44,
+                                                  height: 44,
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.brandTint,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            13),
+                                                  ),
+                                                  child: Icon(
+                                                    topicIcon(topics[i]['id']
+                                                        as String),
+                                                    color: AppColors.brandDark,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Text(
+                                                  'TOPIC ${'${i + 1}'.padLeft(2, '0')}',
+                                                  style: theme
+                                                      .textTheme.labelMedium
+                                                      ?.copyWith(
+                                                    color: theme.colorScheme
+                                                        .onSurfaceVariant,
+                                                    letterSpacing: 1,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 16),
+                                            Text(topics[i]['title'] as String,
+                                                style:
+                                                    theme.textTheme.titleLarge),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              topics[i]['summary'] as String,
+                                              style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                color: theme.colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            const SizedBox(height: 18),
+                                            const Divider(),
+                                            const SizedBox(height: 16),
+                                            _QuizProgress(topic: topics[i]),
+                                            const SizedBox(height: 16),
+                                            Text('Open content →',
+                                                style: TextStyle(
+                                                    color: theme
+                                                        .colorScheme.primary,
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                          ],
                                         ),
-                                      );
-                                      if (mounted) _retry();
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(20),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          CircleAvatar(
-                                            child: Text(
-                                                '${i + 1}'.padLeft(2, '0')),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Text(topics[i]['title'] as String,
-                                              style:
-                                                  theme.textTheme.titleLarge),
-                                          const SizedBox(height: 8),
-                                          Text(topics[i]['summary'] as String),
-                                          const Spacer(),
-                                          const SizedBox(height: 16),
-                                          _QuizProgress(topic: topics[i]),
-                                          const SizedBox(height: 16),
-                                          Text('Open content →',
-                                              style: TextStyle(
-                                                  color:
-                                                      theme.colorScheme.primary,
-                                                  fontWeight: FontWeight.w700)),
-                                        ],
                                       ),
                                     ),
                                   ),
@@ -150,6 +210,19 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
     );
   }
 }
+
+/// A recognizable icon for each course topic.
+IconData topicIcon(String topicId) => switch (topicId) {
+      'obstacle-avoidance' => Icons.alt_route_rounded,
+      'path-planning' => Icons.route_rounded,
+      'sensor-fusion' => Icons.hub_rounded,
+      'range-sensors' => Icons.sensors_rounded,
+      'locomotion' => Icons.precision_manufacturing_rounded,
+      'hybrid-navigation-gps' ||
+      'hybrid-navigation-and-gps' =>
+        Icons.satellite_alt_rounded,
+      _ => Icons.menu_book_rounded,
+    };
 
 class _QuizProgress extends StatelessWidget {
   const _QuizProgress({required this.topic});
@@ -192,6 +265,9 @@ class _QuizProgress extends StatelessWidget {
           key: Key('quiz-progress-${topic['id']}'),
           value: (latest ?? 0).clamp(0, 100) / 100,
           color: color,
+          minHeight: 8,
+          backgroundColor: AppColors.neutralContainer,
+          borderRadius: BorderRadius.circular(AppRadii.pill),
           semanticsLabel: 'Latest quiz score for ${topic['title']}',
           semanticsValue: latest == null ? 'Not attempted' : '$latest%',
         ),
@@ -203,8 +279,15 @@ class _QuizProgress extends StatelessWidget {
           badge('Last score: ${latest == null ? '—' : '$latest%'}',
               latest == null ? neutral : color),
         ]),
-        if (progress['temporary'] == true)
-          const Text('Temporary demo progress'),
+        if (progress['temporary'] == true) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Temporary demo progress',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
       ],
     );
   }
@@ -272,13 +355,38 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 6),
+                    child: Row(
+                      children: [
+                        Icon(topicIcon(widget.topicId),
+                            size: 18, color: AppColors.brand),
+                        const SizedBox(width: 8),
+                        Text(
+                          'COURSE TOPIC',
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AppColors.brand,
+                                    letterSpacing: 1.1,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
                     child: Text(topic['title'] as String,
                         style: Theme.of(context).textTheme.headlineMedium),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(topic['summary'] as String),
+                    child: Text(
+                      topic['summary'] as String,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
                   ),
                   const SizedBox(height: 14),
                   SingleChildScrollView(
