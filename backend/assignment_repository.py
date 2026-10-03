@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from sqlalchemy import select
@@ -294,7 +295,16 @@ def to_student_assignment(assignment: Assignment) -> AssignmentStudent:
         has_solution=bool(assignment.solution_html),
         solution_html="",
         vals={},
+        playground_function=_playground_function(assignment),
     )
+
+
+def _playground_function(assignment: Assignment) -> str | None:
+    """Name the required function only when the ungraded playground applies."""
+    if assignment.grader_type != "python_function":
+        return None
+    name = str((assignment.grader_config or {}).get("function_name", ""))
+    return name if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name) else None
 
 
 def to_admin_payload(assignment: Assignment) -> AdminAssignmentPayload:

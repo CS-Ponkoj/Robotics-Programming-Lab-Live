@@ -13,6 +13,7 @@ import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/theme/editor_palette.dart';
+import 'package:iuse_demo/widgets/playground_dialog.dart';
 import 'package:highlight/languages/python.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -71,6 +72,9 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _editorDarkMode = true;
   int? _diagnosticLine;
   bool _suppressEditorChange = false;
+  String? _playgroundFunction;
+  // Kept in memory only so reopening the playground restores the last inputs.
+  String _playgroundArguments = '';
 
   @override
   void initState() {
@@ -336,6 +340,27 @@ class _MyHomePageState extends State<MyHomePage> {
           setState(() => _isRunning = false);
         }
       },
+    );
+  }
+
+  Future<void> _openPlayground() async {
+    final functionName = _playgroundFunction;
+    if (_init || functionName == null) return;
+    if (!hasNonWhitespaceCode(_code)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Write some code before trying inputs.')),
+      );
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) => PlaygroundDialog(
+        assignmentId: widget.id,
+        functionName: functionName,
+        code: _code,
+        initialArguments: _playgroundArguments,
+        onArgumentsChanged: (value) => _playgroundArguments = value,
+      ),
     );
   }
 
@@ -893,6 +918,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                 AssignmentEditorToolbar(
                                   isRunning: _isRunning,
                                   onRun: _init ? null : _runTests,
+                                  onTryInputs:
+                                      _init || _playgroundFunction == null
+                                          ? null
+                                          : () => unawaited(_openPlayground()),
                                   onSave: _selectedProjectFileEditable
                                       ? () => unawaited(_saveDraftNow())
                                       : null,
@@ -963,6 +992,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                           _selectedProjectFilePath =
                                               snap.data!.editableFilePath;
                                           _selectedProjectFileEditable = true;
+                                          _playgroundFunction =
+                                              snap.data!.playgroundFunction;
                                           setAssignmentEditorContent(
                                             _controller,
                                             _code,
@@ -1774,6 +1805,8 @@ class AssignmentEditorToolbar extends StatelessWidget {
   final bool isRunning;
   // Null while the assignment code is still loading.
   final VoidCallback? onRun;
+  // Null when the assignment has no ungraded input playground.
+  final VoidCallback? onTryInputs;
   final VoidCallback? onSave;
   final bool isFocused;
   final VoidCallback? onFocusToggle;
@@ -1794,6 +1827,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
     super.key,
     required this.isRunning,
     required this.onRun,
+    this.onTryInputs,
     this.onSave,
     this.isFocused = false,
     this.onFocusToggle,
@@ -2035,6 +2069,28 @@ class AssignmentEditorToolbar extends StatelessWidget {
                   ),
                   visualDensity: VisualDensity.compact,
                 ),
+              if (onTryInputs != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                // Phones keep room for the editor tools with an icon-only button.
+                if (MediaQuery.sizeOf(context).width < 480)
+                  IconButton.outlined(
+                    key: const Key('try-inputs-button'),
+                    tooltip: 'Try inputs: call your function. Not graded or saved.',
+                    onPressed: isRunning ? null : onTryInputs,
+                    icon: const Icon(Icons.science_outlined, size: 20),
+                  )
+                else
+                  Tooltip(
+                    message: 'Call your function with your own inputs. '
+                        'Not graded or saved.',
+                    child: OutlinedButton.icon(
+                      key: const Key('try-inputs-button'),
+                      onPressed: isRunning ? null : onTryInputs,
+                      icon: const Icon(Icons.science_outlined, size: 18),
+                      label: const Text('Try inputs'),
+                    ),
+                  ),
+              ],
               const SizedBox(width: AppSpacing.sm),
               Semantics(
                 label: isRunning
@@ -2861,12 +2917,17 @@ class Feedback extends StatelessWidget {
         }
       }
 
+      final detail =
+          entry.key < data.evidence.length ? data.evidence[entry.key] : null;
       return _TestResultCard(
         checkNumber: entry.key + 1,
         passed: didPass,
         first: first,
         highlighted: highlighted,
         last: last,
+        label: detail?.label,
+        reason: detail?.reason,
+        weight: detail?.weight,
       );
     }).toList();
 
@@ -3876,6 +3937,34 @@ class _TutorAnswerCard extends StatelessWidget {
   }
 }
 
+/// Plain-language guidance for a grader failure reason, or null when the
+/// check passed or the grader did not classify it.
+String? failureReasonExplanation(String? reason) {
+  return switch (reason) {
+    'wrong_all_inputs' =>
+      'Wrong for every grading scenario. Recheck the formula and make sure '
+          'this value is returned in the right position.',
+    'wrong_some_inputs' =>
+      'Right for some scenarios but not all. Use the function parameters '
+          'instead of fixed numbers, and check edge cases. Try inputs lets '
+          'you test other values.',
+    'error_on_some_inputs' =>
+      'Your function stopped with an error on at least one scenario. Look '
+          'for division by zero, empty lists, missing keys, or a missing '
+          'function.',
+    'unsupported_type' =>
+      'This value has a type the grader cannot compare. Return plain numbers, '
+          'text, or lists; for example, convert NumPy values with float().',
+    'not_checked' =>
+      'Not checked because the code did not finish running. Fix the error '
+          'shown above first.',
+    _ => null,
+  };
+}
+
+String _formatPoints(double value) =>
+    value == value.roundToDouble() ? value.toStringAsFixed(0) : '$value';
+
 class _TestResultCard extends StatelessWidget {
   const _TestResultCard({
     required this.checkNumber,
@@ -3883,6 +3972,9 @@ class _TestResultCard extends StatelessWidget {
     required this.first,
     required this.highlighted,
     required this.last,
+    this.label,
+    this.reason,
+    this.weight,
   });
 
   final int checkNumber;
@@ -3890,6 +3982,9 @@ class _TestResultCard extends StatelessWidget {
   final String first;
   final String highlighted;
   final String last;
+  final String? label;
+  final String? reason;
+  final double? weight;
 
   @override
   Widget build(BuildContext context) {
@@ -3935,7 +4030,45 @@ class _TestResultCard extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  Text('Check $checkNumber', style: theme.textTheme.labelSmall),
+                  if (label != null && label!.isNotEmpty)
+                    Text(
+                      label!,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  Text(
+                    weight == null
+                        ? 'Check $checkNumber'
+                        : 'Check $checkNumber · '
+                            '${passed ? _formatPoints(weight!) : '0'} of '
+                            '${_formatPoints(weight!)} points',
+                    key: Key('test-result-points-$checkNumber'),
+                    style: theme.textTheme.labelSmall,
+                  ),
+                  if (!passed && failureReasonExplanation(reason) != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      key: Key('test-result-reason-$checkNumber'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.tips_and_updates_outlined,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            failureReasonExplanation(reason)!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.xs),
                   RichText(
                     softWrap: true,

@@ -37,6 +37,9 @@ class AssignmentDto {
   final String? editableFilePath;
   final Map<dynamic, dynamic> vals;
 
+  /// Function students can call from the ungraded input playground, if any.
+  final String? playgroundFunction;
+
   const AssignmentDto({
     required this.id,
     this.stableId = '',
@@ -55,6 +58,7 @@ class AssignmentDto {
     this.projectFiles = const [],
     this.editableFilePath,
     required this.vals,
+    this.playgroundFunction,
   });
 
   factory AssignmentDto.fromJson(Map<String, dynamic> json) {
@@ -114,6 +118,10 @@ class AssignmentDto {
               ? json['editable_file_path'] as String
               : null,
           vals: vals,
+          playgroundFunction: json['playground_function'] is String &&
+                  (json['playground_function'] as String).isNotEmpty
+              ? json['playground_function'] as String
+              : null,
         ),
       _ => throw const FormatException('Failed to load assignment.'),
     };

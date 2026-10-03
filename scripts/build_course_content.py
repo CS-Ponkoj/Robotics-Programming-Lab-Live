@@ -59,8 +59,19 @@ TOPICS = {
     ),
 }
 
+# Practice exercises whose graded, possibly simplified version is an app assignment.
+GRADED_ASSIGNMENTS = {
+    ("obstacle-avoidance", "assignment-bug-algorithm-scenario-1"): 1,
+    ("obstacle-avoidance", "assignment-bug-algorithm-scenario-2"): 2,
+    ("obstacle-avoidance", "assignment-oa"): 3,
+    ("obstacle-avoidance", "assignment-vfh"): 4,
+}
+
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
-ANSWER_START = re.compile(r"^(?:answer|solution|solutions)\s*(?::|$)", re.I)
+ANSWER_START = re.compile(
+    r"^(?:(?:answer|solution|solutions)\s*(?::|$)|solution outline\b|instructor notes?\b)",
+    re.I,
+)
 QUESTION_START = re.compile(r"^question(?:\s+\d+)?\s*(?::|$)", re.I)
 CHOICE = re.compile(r"^([A-D])[.)]\s*(.+)", re.I)
 MATH_NAMESPACES = {"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"}
@@ -513,6 +524,14 @@ def build() -> None:
             section_id = slug(str(directory.relative_to(topic_root)))
             name = label_for_group(directory, topic_root)
             pieces = []
+            assignment_number = GRADED_ASSIGNMENTS.get((topic_id, section_id))
+            if assignment_number is not None:
+                pieces.append(
+                    "<p><strong>Note:</strong> This is the original practice version of "
+                    f"Assignment {assignment_number}. The graded version on the Assignments "
+                    "page may use different values or a simplified model. Where they differ, "
+                    "follow the Assignments page.</p>"
+                )
             ordered = sorted(files, key=lambda path: (
                 "instruction" not in path.stem.lower()
                 and "scenario" not in path.stem.lower()

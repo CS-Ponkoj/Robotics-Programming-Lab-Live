@@ -25,6 +25,22 @@ def test_subprocess_sandbox_rejects_unsafe_numpy_file_api():
     assert "Use of 'np.load' is not allowed" in result["error"]
 
 
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        ("import math\ny = 2\nz = math.pow(2, 3)\n", "line 3 of submission"),
+        ("import math\n\nvalue = '{:.2f}'.format(1.0)\n", "line 3 of submission"),
+        ("value = 1\nimport os\n", "line 2 of submission"),
+        ("def boom():\n    return 1 / 0\n\nboom()\n", "ZeroDivisionError at line 2 of submission"),
+    ],
+)
+def test_subprocess_sandbox_reports_the_students_own_line_number(code, expected):
+    result = SubprocessSandbox().execute(code, [])
+
+    assert result["success"] is False
+    assert expected in result["error"]
+
+
 def test_subprocess_sandbox_keeps_supported_scientific_math():
     result = SubprocessSandbox().execute(
         """

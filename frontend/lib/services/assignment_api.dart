@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/code_draft_dto.dart';
+import 'package:iuse_demo/models/playground_result_dto.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
@@ -145,6 +146,33 @@ Future<UnittestFeedbackDto> fetchUnittestFeedback(int id, String code,
   }
   if (response.statusCode >= 500) {
     throw Exception('Failed to load feedback for $id');
+  }
+  throw ApiRequestException(AuthApi.errorMessage(response));
+}
+
+/// Call the student's function with their own inputs. Practice only: the
+/// server never grades or saves these calls.
+Future<PlaygroundResultDto> tryAssignmentInputs(
+  int assignmentId,
+  String code,
+  String arguments,
+) async {
+  final response = await http
+      .post(
+        Uri.parse('$apiBaseUrl/assignments/$assignmentId/playground'),
+        headers: AuthApi.authorizedHeaders(json: true),
+        body: jsonEncode({'code': code, 'arguments': arguments}),
+      )
+      .timeout(_executionTimeout);
+  if (response.statusCode == 200) {
+    return PlaygroundResultDto.fromJson(
+      Map<String, dynamic>.from(jsonDecode(response.body) as Map),
+    );
+  }
+  if (response.statusCode >= 500) {
+    throw const ApiRequestException(
+      'The code runner is unavailable right now. Please try again shortly.',
+    );
   }
   throw ApiRequestException(AuthApi.errorMessage(response));
 }

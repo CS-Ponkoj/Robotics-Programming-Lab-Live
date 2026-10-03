@@ -71,6 +71,46 @@ def verify_assignment(assignment_id: int, image: str) -> None:
         raise RuntimeError(f"Assignment {assignment_id}: duplicate commands were not rejected.")
     print(f"Assignment {assignment_id}: PASS duplicate-command rejection ({criterion}).")
 
+    # A node that publishes but never moves must not earn motion or safety credit.
+    stationary = never_moving_controller(source["starter_code"], assignment_id)
+    stopped = DockerRos2Executor(image, timeout).execute(
+        stationary, project_files, source.get("grader_config", {}),
+    )
+    stopped_evidence = {item["id"]: item for item in stopped.get("tests", [])}
+    gated = (
+        ("forward-motion", "straight-motion")
+        if assignment_id == 5
+        else ("obstacle-stop", "invalid-scan-stop", "straight-motion")
+    )
+    if stopped.get("success") is not True or any(
+        stopped_evidence.get(test_id, {}).get("passed") is not False
+        for test_id in gated
+    ):
+        raise RuntimeError(
+            f"Assignment {assignment_id}: a never-moving node earned motion credit."
+        )
+    print(f"Assignment {assignment_id}: PASS never-moving node rejection ({', '.join(gated)}).")
+
+
+def never_moving_controller(starter_code: str, assignment_id: int) -> str:
+    """Complete only the ROS wiring so every published command is zero."""
+    code = starter_code.replace(
+        "self.velocity_publisher = None",
+        "self.velocity_publisher = self.create_publisher(Twist, '/cmd_vel', 10)",
+    )
+    if assignment_id == 5:
+        publish_todo = "        # TODO 4: Publish the command.\n        pass"
+    else:
+        code = code.replace(
+            "self.scan_subscription = None",
+            "self.scan_subscription = self.create_subscription("
+            "LaserScan, '/scan', self.handle_scan, 10)",
+        )
+        publish_todo = "        # TODO 6: Publish the velocity command.\n        pass"
+    if publish_todo not in code:
+        raise RuntimeError(f"Assignment {assignment_id}: starter publish TODO changed.")
+    return code.replace(publish_todo, "        self.velocity_publisher.publish(command)")
+
 
 def main() -> None:
     image = os.environ.get(

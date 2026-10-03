@@ -92,10 +92,65 @@ def test_function_grader_returns_safe_error_when_function_is_missing():
     assert result.passed is False
     assert result.score == 0
     assert result.execution_error == (
-        "The required function could not complete every grading scenario."
+        "The required function could not complete every grading scenario (NameError)."
     )
     assert "2" not in result.execution_error
     assert "3" not in result.execution_error
+
+
+def test_function_grader_passes_configured_dict_arguments_as_dicts():
+    target = assignment()
+    target.grader_config = {
+        "function_name": "count_keys",
+        "criteria": [{"id": "keys", "label": "Keys", "weight": 100}],
+        "cases": [
+            {"dict_arguments": [0], "arguments": [[[0, 10], [5, 2]]], "expected": [2]},
+            {"dict_arguments": [0], "arguments": [[[3, 1]]], "expected": [1]},
+        ],
+    }
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(
+        target,
+        "def count_keys(readings):\n"
+        "    copied = readings.copy()\n"
+        "    return (len({angle for angle, distance in copied.items()}),)\n",
+    )
+
+    assert result.score == 100
+
+
+@pytest.mark.parametrize("dict_arguments", [[1], [-1], ["0"], 0])
+def test_function_grader_rejects_invalid_dict_argument_configuration(dict_arguments):
+    target = assignment()
+    target.grader_config = {
+        **target.grader_config,
+        "cases": [{"dict_arguments": dict_arguments, "arguments": [[[0, 1]]], "expected": [1, 1]}],
+    }
+
+    with pytest.raises(ValueError, match="test case configuration"):
+        PythonFunctionGrader(SubprocessSandbox()).grade(
+            target, "def calculate_values(first, second=0):\n    return 1, 1\n"
+        )
+
+
+@pytest.mark.parametrize(
+    "copy_expression",
+    [
+        "dict(seed_readings)",
+        "seed_readings.copy()",
+        "{**seed_readings}",
+        "{angle: distance for angle, distance in seed_readings.items()}",
+    ],
+)
+def test_assignment_four_accepts_every_documented_way_to_copy_readings(copy_expression):
+    data = json.loads((Path(__file__).parents[1] / "assignments/assignment_4.json").read_text(encoding="utf-8"))
+    target = Assignment(id=4, stable_id=data["stable_id"], version=data["version"],
+                        title=data["title"], grader_type=data["grader_type"], grader_config=data["grader_config"])
+    answer = (Path(__file__).parents[2] / "assignments_answers/assignment_4_answer.py").read_text(encoding="utf-8")
+    code = answer.replace("lidar_readings = dict(seed_readings)", f"lidar_readings = {copy_expression}")
+
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(target, code)
+
+    assert result.score == 100
 
 
 @pytest.mark.parametrize("use_parameters, expected_score", [(False, 0), (True, 50)])
@@ -123,3 +178,50 @@ def test_assignment_two_screenshot_global_points_and_genuine_partial_credit(use_
         if not item.passed:
             assert "every input scenario" in item.message
             assert "printed example alone is not enough" in item.message
+
+
+@pytest.mark.parametrize(
+    "code, expected_reasons",
+    [
+        (
+            "def calculate_values(first, second):\n    return first + second, first * second",
+            ["passed", "passed"],
+        ),
+        # Hardcoding the first scenario is right for some inputs, never for all.
+        (
+            "def calculate_values(first, second):\n    return 5, 6",
+            ["wrong_some_inputs", "wrong_some_inputs"],
+        ),
+        (
+            "def calculate_values(first, second):\n    return first - second, 0",
+            ["wrong_all_inputs", "wrong_all_inputs"],
+        ),
+        (
+            "def calculate_values(first, second):\n"
+            "    return first + second, {first * second}",
+            ["passed", "unsupported_type"],
+        ),
+        (
+            "def calculate_values(first, second):\n"
+            "    if first < 0:\n"
+            "        raise ValueError('negative')\n"
+            "    return first + second, first * second",
+            ["error_on_some_inputs", "error_on_some_inputs"],
+        ),
+        # A missing function fails while the grading scenarios run.
+        ("answer = 11", ["error_on_some_inputs", "error_on_some_inputs"]),
+        ("def calculate_values(first, second)\n    return 1, 2", ["not_checked", "not_checked"]),
+    ],
+)
+def test_function_grader_classifies_failure_reasons_with_weights(code, expected_reasons):
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(assignment(), code)
+
+    assert [item.reason for item in result.evidence] == expected_reasons
+    assert [item.weight for item in result.evidence] == [40.0, 60.0]
+    for item in result.evidence:
+        dumped = item.model_dump()
+        # Reasons classify the outcome without exposing protected case data.
+        assert set(dumped) == {
+            "test_id", "label", "passed", "message", "visibility", "reason", "weight",
+        }
+        assert dumped["visibility"] == "hidden"

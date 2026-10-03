@@ -1,3 +1,34 @@
+/// Structured grader detail for one check. Older results omit [reason] and
+/// [weight], so both stay optional.
+class TestEvidenceDto {
+  const TestEvidenceDto({
+    required this.testId,
+    required this.label,
+    required this.passed,
+    this.message = '',
+    this.reason,
+    this.weight,
+  });
+
+  final String testId;
+  final String label;
+  final bool passed;
+  final String message;
+  final String? reason;
+  final double? weight;
+
+  factory TestEvidenceDto.fromJson(Map<String, dynamic> json) {
+    return TestEvidenceDto(
+      testId: json['test_id']?.toString() ?? '',
+      label: json['label']?.toString() ?? '',
+      passed: json['passed'] == true,
+      message: json['message']?.toString() ?? '',
+      reason: json['reason'] is String ? json['reason'] as String : null,
+      weight: json['weight'] is num ? (json['weight'] as num).toDouble() : null,
+    );
+  }
+}
+
 class UnittestFeedbackDto {
   final int id;
   final String submissionId;
@@ -14,6 +45,7 @@ class UnittestFeedbackDto {
   final String tutorSource;
   final String executionStatus;
   final Map<String, dynamic> tutorFeedback;
+  final List<TestEvidenceDto> evidence;
 
   const UnittestFeedbackDto(
       {required this.id,
@@ -30,7 +62,8 @@ class UnittestFeedbackDto {
       required this.hint,
       this.tutorSource = '',
       this.executionStatus = '',
-      this.tutorFeedback = const {}});
+      this.tutorFeedback = const {},
+      this.evidence = const []});
 
   factory UnittestFeedbackDto.fromJson(Map<String, dynamic> json) {
     return switch (json) {
@@ -69,6 +102,14 @@ class UnittestFeedbackDto {
           tutorFeedback: json['tutor_feedback'] is Map
               ? Map<String, dynamic>.from(json['tutor_feedback'] as Map)
               : const {},
+          evidence: json['evidence'] is List
+              ? (json['evidence'] as List)
+                  .whereType<Map>()
+                  .map((item) => TestEvidenceDto.fromJson(
+                        Map<String, dynamic>.from(item),
+                      ))
+                  .toList()
+              : const [],
         ),
       _ => throw const FormatException('Failed to load assignment.'),
     };

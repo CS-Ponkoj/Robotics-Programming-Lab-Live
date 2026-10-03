@@ -48,10 +48,11 @@ from auth_service import (
 )
 from config import Settings, get_settings
 from code_formatting import CodeFormattingError, format_python_code
-from data_contracts import normalize_event_data
+from data_contracts import classify_execution_status, normalize_event_data
 from database import Base, build_engine
 from email_service import EmailService
 from graders import PythonFunctionGrader, PythonVariableGrader, Ros2TopicGrader
+from graders.python_function import PlaygroundInputError, parse_playground_arguments
 from models import (
     Assignment,
     CodeDraft,
@@ -94,6 +95,8 @@ from schemas import (
     LoginRequest,
     LoginResponse,
     LearningEventRequest,
+    PlaygroundRequest,
+    PlaygroundResponse,
     ResetPasswordRequest,
     SolutionRequest,
     StudyHeartbeatRequest,
@@ -1594,6 +1597,65 @@ def create_app(
             ai_tutor_requested=body.use_ai_tutor,
         )
         return response_for(assignment, submission)
+
+    @application.post(
+        "/assignments/{assignment_id}/playground",
+        response_model=PlaygroundResponse,
+    )
+    def try_assignment_inputs(
+        assignment_id: int,
+        body: PlaygroundRequest,
+        request: Request,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        """Run the student's function on their own inputs without grading.
+
+        Playground calls are practice only: they never create submission,
+        attempt, hint, or learning-event rows and never use protected cases.
+        """
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="execution",
+            requests_per_minute=request.app.state.settings.execution_requests_per_minute,
+        )
+        if not body.code.strip():
+            raise HTTPException(400, "A non-empty code string is required.")
+        if len(body.code) > request.app.state.settings.max_submission_chars:
+            raise HTTPException(413, "The code is too large to run.")
+        assignment = get_assignment_or_404(session, assignment_id)
+        if assignment.grader_type != "python_function":
+            raise HTTPException(
+                422, "Trying your own inputs is available for function assignments only."
+            )
+        try:
+            arguments = parse_playground_arguments(body.arguments)
+        except PlaygroundInputError as error:
+            raise HTTPException(422, str(error)) from error
+        grader = grader_for(assignment, request)
+        try:
+            outcome = execute_with_capacity(
+                request,
+                lambda: grader.try_arguments(assignment, body.code, arguments),
+            )
+        except ValueError as error:
+            logger.warning("Playground configuration is invalid for assignment %s.", assignment.id)
+            raise HTTPException(
+                503, "Trying your own inputs is unavailable for this assignment."
+            ) from error
+        return PlaygroundResponse(
+            assignment_version=assignment.version,
+            success=outcome.success,
+            execution_status=classify_execution_status(outcome.success, outcome.error),
+            call=outcome.call,
+            returned=outcome.returned,
+            return_count=outcome.return_count,
+            expected_return_count=outcome.expected_return_count,
+            values=outcome.values,
+            output=outcome.output,
+            error=outcome.error,
+        )
 
     def submit_core(
         assignment_id: int,

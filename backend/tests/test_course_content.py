@@ -284,3 +284,20 @@ def test_generated_pages_keep_word_structure():
     locomotion = repository.section("locomotion", "lesson")["html"]
     assert "<figcaption>" in locomotion
     assert 'alt="Ball or spherical wheel mechanism"' in locomotion
+
+
+def test_course_pages_hide_instructor_notes_and_point_to_graded_assignments():
+    repository = CourseContentRepository()
+    for topic in repository.topics():
+        for section in repository.topic(topic["id"])["sections"]:
+            html = repository.section(topic["id"], section["id"])["html"].lower()
+            assert "instructor notes" not in html
+            assert "solution outline" not in html
+    for section_id, number in {
+        "assignment-bug-algorithm-scenario-1": 1,
+        "assignment-bug-algorithm-scenario-2": 2,
+        "assignment-oa": 3,
+        "assignment-vfh": 4,
+    }.items():
+        html = repository.section("obstacle-avoidance", section_id)["html"]
+        assert f"original practice version of Assignment {number}" in html

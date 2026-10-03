@@ -3,6 +3,6 @@
   "title": "Bug Algorithm · Scenario 1",
   "kind": "exercise",
   "topic_id": "obstacle-avoidance",
-  "html": "<h3><strong>Scenario</strong></h3>\n<p>A small cleaning robot starts at position (2, 1) on a 10x10 grid. Its goal is to reach the charging station located at (8, 9). There is a rectangular obstacle that extends from (4, 3) to (7, 6).</p>\n<figure><img src=\"/content-assets/0b160fe78b73d7dea2fe.png\" alt=\"Diagram from Math Question 1\" loading=\"lazy\" /></figure>\n<h3><strong>Question</strong></h3>\n<p>Assuming the robot uses the Bug 2 algorithm and circumnavigates the obstacle in a clockwise direction, calculates the total distance it travels to reach its goal.</p>",
+  "html": "<p><strong>Note:</strong> This is the original practice version of Assignment 1. The graded version on the Assignments page may use different values or a simplified model. Where they differ, follow the Assignments page.</p>\n<h3><strong>Scenario</strong></h3>\n<p>A small cleaning robot starts at position (2, 1) on a 10x10 grid. Its goal is to reach the charging station located at (8, 9). There is a rectangular obstacle that extends from (4, 3) to (7, 6).</p>\n<figure><img src=\"/content-assets/0b160fe78b73d7dea2fe.png\" alt=\"Diagram from Math Question 1\" loading=\"lazy\" /></figure>\n<h3><strong>Question</strong></h3>\n<p>Assuming the robot uses the Bug 2 algorithm and circumnavigates the obstacle in a clockwise direction, calculates the total distance it travels to reach its goal.</p>",
   "questions": []
 }
