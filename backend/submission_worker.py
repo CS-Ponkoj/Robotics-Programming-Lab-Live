@@ -37,6 +37,12 @@ class SubmissionSyntaxValidator(ast.NodeVisitor):
 
     def __init__(self):
         self.module_aliases = {}
+        self.line_number = 0
+
+    def visit(self, node):
+        # Remember the student's line so a rejection names it, not this file.
+        self.line_number = getattr(node, "lineno", self.line_number)
+        return super().visit(node)
 
     def visit_Import(self, node):
         for alias in node.names:
@@ -95,7 +101,12 @@ class SubmissionSyntaxValidator(ast.NodeVisitor):
 
 def validate_submission(code):
     tree = ast.parse(code, filename="<submission>", mode="exec")
-    SubmissionSyntaxValidator().visit(tree)
+    validator = SubmissionSyntaxValidator()
+    try:
+        validator.visit(tree)
+    except (ImportError, ValueError) as error:
+        error.submission_line = validator.line_number
+        raise
     return tree
 
 
@@ -194,8 +205,15 @@ def _too_large(type_name):
 def format_error(error):
     if isinstance(error, SyntaxError):
         line_number = error.lineno or 0
+    elif hasattr(error, "submission_line"):
+        line_number = error.submission_line
     else:
-        extracted = traceback.extract_tb(error.__traceback__)
+        # Report only the student's frames, never this worker's line numbers.
+        extracted = [
+            frame
+            for frame in traceback.extract_tb(error.__traceback__)
+            if frame.filename == "<submission>"
+        ]
         line_number = extracted[-1].lineno if extracted else 0
     return (
         f"{error.__class__.__name__} at line {line_number} of submission: "

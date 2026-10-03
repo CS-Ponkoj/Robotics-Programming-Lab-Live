@@ -161,9 +161,16 @@ def main() -> None:
     command_topic_ok = bool(settled) and publish_rate >= minimum_rate
     clear_ok = all(forward_ok(phase) for phase in
                    ("clear", "above-threshold", "mixed"))
-    obstacle_ok = all(stopped_ok(phase) for phase in ("obstacle", "threshold"))
-    invalid_ok = all(stopped_ok(phase) for phase in ("invalid", "empty"))
-    straight_ok = bool(settled) and all(
+    # Stopping is only evidence of obstacle handling when the same controller
+    # also drives on a plainly clear scan; an always-stopped node earns none.
+    moves_when_clear = forward_ok("clear")
+    obstacle_ok = moves_when_clear and all(
+        stopped_ok(phase) for phase in ("obstacle", "threshold")
+    )
+    invalid_ok = moves_when_clear and all(
+        stopped_ok(phase) for phase in ("invalid", "empty")
+    )
+    straight_ok = moves_when_clear and all(
         abs(item[3]) <= angular_tolerance for item in settled
     )
     resume_ok = forward_ok("resume")
@@ -211,21 +218,21 @@ def main() -> None:
             obstacle_ok,
             f"The robot stops when an obstacle is within {stop_distance:.2f} m."
             if obstacle_ok
-            else f"Publish zero linear velocity when an obstacle is at or within {stop_distance:.2f} m.",
+            else f"Move forward on a clear scan, and publish zero linear velocity when an obstacle is at or within {stop_distance:.2f} m.",
         ),
         result(
             "invalid-scan-stop",
             invalid_ok,
             "The robot stops when the scan has no valid positive distance."
             if invalid_ok
-            else "Treat a scan with no finite positive distance as unsafe and publish zero velocity.",
+            else "Move forward on a clear scan, and treat a scan with no finite positive distance as unsafe by publishing zero velocity.",
         ),
         result(
             "straight-motion",
             straight_ok,
             "Angular velocity remains zero."
             if straight_ok
-            else "Keep angular.z at zero for this straight-line controller.",
+            else "Move forward on a clear scan and keep angular.z at zero for this straight-line controller.",
         ),
         result(
             "resume-motion",

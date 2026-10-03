@@ -39,12 +39,15 @@ def motion_checks(messages, expected_linear, linear_tolerance,
         bool(messages) and
         (observation_end is None or messages[-1][0] >= observation_end - 0.3)
     )
+    forward_ok = bool(moving) and all(
+        math.isclose(item[1], expected_linear, abs_tol=linear_tolerance)
+        for item in moving
+    )
     return {
-        "forward-motion": bool(moving) and all(
-            math.isclose(item[1], expected_linear, abs_tol=linear_tolerance)
-            for item in moving
-        ),
-        "straight-motion": bool(samples) and all(
+        "forward-motion": forward_ok,
+        # Straight driving is only evidence when the robot actually drives;
+        # a node that never moves must not earn this credit.
+        "straight-motion": forward_ok and all(
             abs(item[2]) <= angular_tolerance for item in samples
         ),
         "safe-stop": stop_ok,
@@ -157,7 +160,7 @@ def main() -> None:
         result(
             "straight-motion",
             straight_ok,
-            "Angular velocity remains zero." if straight_ok else "Keep angular.z at zero while driving straight.",
+            "Angular velocity remains zero while driving forward." if straight_ok else "Drive forward at 0.20 m/s and keep angular.z at zero.",
         ),
         result(
             "safe-stop",

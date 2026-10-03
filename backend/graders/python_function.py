@@ -41,16 +41,31 @@ class PythonFunctionGrader:
 
         criterion_passes = [True] * len(criteria)
         hidden_execution_failed = False
+        hidden_error_type = ""
         for case in cases:
             arguments = case.get("arguments", [])
             expected = case.get("expected", [])
-            if not isinstance(arguments, list) or len(expected) != len(criteria):
+            dict_arguments = case.get("dict_arguments", [])
+            if (
+                not isinstance(arguments, list)
+                or len(expected) != len(criteria)
+                or not isinstance(dict_arguments, list)
+                or any(
+                    not isinstance(index, int) or not 0 <= index < len(arguments)
+                    for index in dict_arguments
+                )
+            ):
                 raise ValueError("Invalid python_function test case configuration.")
+            # JSON cannot hold integer-keyed dicts, so configured arguments are
+            # stored as (key, value) pairs and passed as the dict students see.
+            literals = [repr(value) for value in arguments]
+            for index in dict_arguments:
+                literals[index] = f"dict({literals[index]})"
             result_names = [f"grader_value_{index}" for index in range(len(criteria))]
             harness_lines = [
                 code,
                 "",
-                f"grader_values = {function_name}(*{tuple(arguments)!r})",
+                f"grader_values = {function_name}({', '.join(literals)})",
                 "grader_return_count = len(grader_values)",
                 *[
                     f"{name} = grader_values[{index}]"
@@ -62,6 +77,8 @@ class PythonFunctionGrader:
             )
             if result.get("success") is not True:
                 hidden_execution_failed = True
+                # Share only the exception class; its message could echo inputs.
+                hidden_error_type = str(result.get("error", "")).split(" ", 1)[0]
                 criterion_passes = [False] * len(criteria)
                 break
             actual_values = result.get("values", {})
@@ -120,7 +137,12 @@ class PythonFunctionGrader:
             execution_error=(
                 ""
                 if execution_succeeded
-                else "The required function could not complete every grading scenario."
+                else "The required function could not complete every grading scenario"
+                + (
+                    f" ({hidden_error_type})."
+                    if hidden_error_type.isidentifier()
+                    else "."
+                )
             ),
             tested_names=[str(item.get("id", "")) for item in criteria],
             evidence=evidence,

@@ -265,3 +265,20 @@ def test_instructor_can_read_contents(client):
     assert preview.json()["saved"] is False
     with client.app.state.SessionLocal() as session:
         assert session.scalar(select(CourseQuizAttempt)) is None
+
+
+def test_course_pages_hide_instructor_notes_and_point_to_graded_assignments():
+    repository = CourseContentRepository()
+    for topic in repository.topics():
+        for section in repository.topic(topic["id"])["sections"]:
+            html = repository.section(topic["id"], section["id"])["html"].lower()
+            assert "instructor notes" not in html
+            assert "solution outline" not in html
+    for section_id, number in {
+        "assignment-bug-algorithm-scenario-1": 1,
+        "assignment-bug-algorithm-scenario-2": 2,
+        "assignment-oa": 3,
+        "assignment-vfh": 4,
+    }.items():
+        html = repository.section("obstacle-avoidance", section_id)["html"]
+        assert f"original practice version of Assignment {number}" in html
