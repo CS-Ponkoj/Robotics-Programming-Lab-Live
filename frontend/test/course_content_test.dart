@@ -314,6 +314,33 @@ void main() {
     expect(find.text('Quiz: Not attempted'), findsNothing);
   });
 
+  testWidgets('Previous and Next walk the topic in reading order',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+        home: CourseTopicPage(
+            topicId: 'obstacle-avoidance', user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('previous-section')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('next-section')));
+    await tester.pumpAndSettle();
+    expect(find.text('Next: Practice'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('next-section')));
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<LessonReader>(find.byKey(const Key('course-section-html')))
+            .html,
+        contains('Try the exercise'));
+    await tester.ensureVisible(find.byKey(const Key('previous-section')));
+    await tester.pumpAndSettle();
+    expect(find.text('Previous: Lesson'), findsOneWidget);
+    expect(find.text('Next: Quiz'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('next-section')));
+    await tester.pumpAndSettle();
+    expect(find.text('Which direction?'), findsOneWidget);
+    expect(find.byKey(const Key('next-section')), findsNothing);
+  });
+
   testWidgets(
       'exercises remain readable and quiz score appears only after submission',
       (tester) async {
@@ -334,11 +361,21 @@ void main() {
     expect(find.text('Which direction?'), findsOneWidget);
     expect(find.textContaining('Score:'), findsNothing);
     expect(find.text('Check answer'), findsNothing);
+    // The whole topic page scrolls, so bring each control into view first.
+    await tester.ensureVisible(find.text('Submit quiz'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Submit quiz'));
     await tester.pump();
     expect(find.textContaining('Answer all'), findsOneWidget);
+    expect(find.text('QUESTION 1 OF 1'), findsOneWidget);
+    expect(find.text('0 of 1 answered'), findsOneWidget);
+    await tester.ensureVisible(find.text('B. Forward'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('B. Forward'));
     await tester.pump();
+    expect(find.text('1 of 1 answered'), findsOneWidget);
+    await tester.ensureVisible(find.text('Submit quiz'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Submit quiz'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Score: 100%'), findsOneWidget);

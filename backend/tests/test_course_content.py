@@ -265,3 +265,22 @@ def test_instructor_can_read_contents(client):
     assert preview.json()["saved"] is False
     with client.app.state.SessionLocal() as session:
         assert session.scalar(select(CourseQuizAttempt)) is None
+
+
+def test_generated_pages_keep_word_structure():
+    """Lists, headings, table headers, captions, and equations survive conversion."""
+    repository = CourseContentRepository()
+    for topic in repository.topics():
+        lesson = repository.section(topic["id"], "lesson")["html"]
+        assert len(re.findall(r"<h[23][ >]", lesson)) >= 2, topic["id"]
+        assert "<li>" in lesson, topic["id"]
+    path_planning = repository.section("path-planning", "lesson")["html"]
+    # Equation symbols stay where Word placed them, not at the paragraph end.
+    assert 'Let G <span class="math-expression">⊂</span> X be' in path_planning
+    assert "<sub>att</sub>" in path_planning
+    assert path_planning.count("<thead>") == 5
+    assert '<th scope="row">Working Principle</th>' in repository.section(
+        "range-sensors", "lesson")["html"]
+    locomotion = repository.section("locomotion", "lesson")["html"]
+    assert "<figcaption>" in locomotion
+    assert 'alt="Ball or spherical wheel mechanism"' in locomotion

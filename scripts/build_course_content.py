@@ -14,9 +14,11 @@ from collections import defaultdict
 from pathlib import Path
 
 from docx import Document
+from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.hyperlink import Hyperlink
 from docx.text.paragraph import Paragraph
+from docx.text.run import Run
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -61,6 +63,8 @@ IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
 ANSWER_START = re.compile(r"^(?:answer|solution|solutions)\s*(?::|$)", re.I)
 QUESTION_START = re.compile(r"^question(?:\s+\d+)?\s*(?::|$)", re.I)
 CHOICE = re.compile(r"^([A-D])[.)]\s*(.+)", re.I)
+MATH_NAMESPACES = {"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"}
+WORD_NAMESPACES = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 
 
 def write_json(path: Path, payload: object) -> None:
@@ -98,8 +102,8 @@ def visible_paragraphs(document: Document, *, strip_answers: bool) -> set:
     return visible
 
 
-def image_html(document: Document, paragraph: Paragraph, label: str) -> str:
-    images: list[str] = []
+def image_names(document: Document, paragraph: Paragraph) -> list[str]:
+    names: list[str] = []
     for blip in paragraph._p.xpath(".//a:blip"):
         relation = blip.get(
             "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
@@ -115,77 +119,306 @@ def image_html(document: Document, paragraph: Paragraph, label: str) -> str:
         destination = ASSETS / name
         if not destination.exists():
             destination.write_bytes(blob)
-        images.append(
-            f'<figure><img src="/content-assets/{name}" '
-            f'alt="Diagram from {html.escape(label, quote=True)}" '
-            'loading="lazy" /></figure>'
+        names.append(name)
+    return names
+
+
+def figure_html(names: list[str], alt: str, caption: str = "") -> str:
+    images = "".join(
+        f'<img src="/content-assets/{name}" alt="{html.escape(alt, quote=True)}" '
+        'loading="lazy" />'
+        for name in names
+    )
+    caption_html = f"<figcaption>{caption}</figcaption>" if caption else ""
+    return f"<figure>{images}{caption_html}</figure>"
+
+
+def local_name(element) -> str:
+    return element.tag.rsplit("}", 1)[-1]
+
+
+def omml_html(element) -> str:
+    """Render Word equation markup as inline HTML, keeping every character."""
+    name = local_name(element)
+    if name == "t":
+        return html.escape(element.text or "")
+    if name.endswith("Pr"):
+        return ""
+    parts = {local_name(child): child for child in element}
+
+    def part(key: str) -> str:
+        return omml_html(parts[key]) if key in parts else ""
+
+    def property_value(properties: str, key: str, default: str) -> str:
+        found = element.find(f"m:{properties}/m:{key}", MATH_NAMESPACES)
+        return found.get(f"{{{MATH_NAMESPACES['m']}}}val", default) if found is not None else default
+
+    if name == "f":
+        return f"<sup>{part('num')}</sup>⁄<sub>{part('den')}</sub>"
+    if name == "sSup":
+        return f"{part('e')}<sup>{part('sup')}</sup>"
+    if name == "sSub":
+        return f"{part('e')}<sub>{part('sub')}</sub>"
+    if name == "sSubSup":
+        return f"{part('e')}<sub>{part('sub')}</sub><sup>{part('sup')}</sup>"
+    if name == "rad":
+        degree = part("deg")
+        return f"{f'<sup>{degree}</sup>' if degree else ''}√({part('e')})"
+    if name == "d":
+        begin = property_value("dPr", "begChr", "(")
+        end = property_value("dPr", "endChr", ")")
+        separator = property_value("dPr", "sepChr", ",")
+        items = [omml_html(child) for child in element if local_name(child) == "e"]
+        return f"{html.escape(begin)}{html.escape(separator).join(items)}{html.escape(end)}"
+    if name == "nary":
+        symbol = property_value("naryPr", "chr", "∫")
+        limits = "".join(
+            f"<{tag}>{part(key)}</{tag}>" for key, tag in (("sub", "sub"), ("sup", "sup"))
+            if part(key)
         )
-    return "".join(images)
+        return f"{html.escape(symbol)}{limits}{part('e')}"
+    return "".join(omml_html(child) for child in element)
 
 
-def paragraph_html(document: Document, paragraph: Paragraph, label: str) -> str:
+def inline_html(paragraph: Paragraph) -> str:
+    """Paragraph text with links, emphasis, sub/superscripts, and equations in place."""
     runs: list[str] = []
-    for item in paragraph.iter_inner_content():
-        if isinstance(item, Hyperlink):
+    for child in paragraph._p:
+        name = local_name(child)
+        if name == "hyperlink":
+            item = Hyperlink(child, paragraph)
             text = html.escape(item.text)
             url = item.url or ""
             if url.startswith(("https://", "http://")):
                 runs.append(f'<a href="{html.escape(url, quote=True)}">{text}</a>')
             else:
                 runs.append(text)
-            continue
-        run = item
-        text = html.escape(run.text).replace("\n", "<br />")
-        if not text:
-            continue
-        if run.bold:
-            text = f"<strong>{text}</strong>"
-        if run.italic:
-            text = f"<em>{text}</em>"
-        runs.append(text)
+        elif name == "r" and child.tag == qn("w:r"):
+            run = Run(child, paragraph)
+            text = html.escape(run.text).replace("\n", "<br />")
+            if not text:
+                continue
+            if run.font.subscript:
+                text = f"<sub>{text}</sub>"
+            elif run.font.superscript:
+                text = f"<sup>{text}</sup>"
+            if run.bold:
+                text = f"<strong>{text}</strong>"
+            if run.italic:
+                text = f"<em>{text}</em>"
+            runs.append(text)
+        elif name in {"oMath", "oMathPara"}:
+            equations = [child] if name == "oMath" else child.findall("m:oMath", MATH_NAMESPACES)
+            for equation in equations:
+                runs.append(f'<span class="math-expression">{omml_html(equation)}</span>')
     text_html = "".join(runs)
     if not text_html and paragraph.text.strip():
         text_html = html.escape(paragraph.text.strip())
-    math_tokens = [node.text or "" for node in paragraph._p.xpath(".//m:t")]
-    if math_tokens:
-        text_html += f'<span class="math-expression">{html.escape("".join(math_tokens))}</span>'
-    images = image_html(document, paragraph, label)
-    if not text_html.strip():
-        return images
+    return text_html
+
+
+def numbering_properties(paragraph: Paragraph):
+    """The paragraph's Word numbering, set directly or through its style."""
+    for owner in (paragraph._p, paragraph.style.element if paragraph.style else None):
+        properties = owner.pPr if owner is not None else None
+        if properties is not None and properties.numPr is not None:
+            return properties.numPr
+    return None
+
+
+def list_details(document: Document, paragraph: Paragraph) -> tuple[str, int, str, int, str] | None:
+    """(tag, level, type attribute, first number, numbering id) for list paragraphs."""
     style = paragraph.style.name.lower() if paragraph.style else ""
-    if "heading" in style or style == "title":
+    properties = numbering_properties(paragraph)
+    number_id = properties.numId.val if properties is not None and properties.numId is not None else 0
+    if not number_id:
+        if "list bullet" in style:
+            return "ul", 0, "", 1, "style-bullet"
+        if "list number" in style:
+            return "ol", 0, "", 1, "style-number"
+        return None
+    level = properties.ilvl.val if properties.ilvl is not None else 0
+    number_format, start = "bullet", 1
+    try:
+        numbering = document.part.numbering_part.element
+    except (KeyError, NotImplementedError):
+        numbering = None
+    if numbering is not None:
+        instance = numbering.find(f'w:num[@w:numId="{number_id}"]', WORD_NAMESPACES)
+        if instance is not None:
+            abstract_id = instance.find("w:abstractNumId", WORD_NAMESPACES).get(qn("w:val"))
+            definition = numbering.find(
+                f'w:abstractNum[@w:abstractNumId="{abstract_id}"]/w:lvl[@w:ilvl="{level}"]',
+                WORD_NAMESPACES,
+            )
+            if definition is not None:
+                found_format = definition.find("w:numFmt", WORD_NAMESPACES)
+                found_start = definition.find("w:start", WORD_NAMESPACES)
+                if found_format is not None:
+                    number_format = found_format.get(qn("w:val"))
+                if found_start is not None:
+                    start = int(found_start.get(qn("w:val")))
+    ordered = {"decimal": "", "lowerLetter": "a", "upperLetter": "A",
+               "lowerRoman": "i", "upperRoman": "I"}
+    if number_format in ordered:
+        return "ol", level, ordered[number_format], start, str(number_id)
+    return "ul", level, "", 1, str(number_id)
+
+
+def heading_level(paragraph: Paragraph, styled_document: bool) -> int | None:
+    """Heading level from a Word heading style, or from a short bold-only line."""
+    style = paragraph.style.name.lower() if paragraph.style else ""
+    if style == "title":
+        return 2
+    if "heading" in style:
         match = re.search(r"(\d+)", style)
-        level = min(4, max(2, int(match.group(1)))) if match else 2
-        return f"<h{level}>{text_html}</h{level}>{images}"
-    if "list bullet" in style:
-        return f"<ul><li>{text_html}</li></ul>{images}"
-    if "list number" in style:
-        return f"<ol><li>{text_html}</li></ol>{images}"
-    return f"<p>{text_html}</p>{images}"
+        return min(4, int(match.group(1)) + 1) if match else 2
+    if paragraph._p.xpath("./w:hyperlink | .//m:oMath | .//a:blip"):
+        return None
+    runs = [run for run in paragraph.runs if run.text.strip()]
+    text = paragraph.text.strip()
+    if not runs or not all(run.bold for run in runs):
+        return None
+    if len(text) > 90 or text.endswith(".") or any(mark in text for mark in "=\\|"):
+        return None
+    sizes = [run.font.size.pt for run in runs if run.font.size]
+    size = max(sizes) if sizes else 0
+    if size >= 15:
+        return 2
+    if size >= 13:
+        return 3
+    if styled_document:
+        return 4
+    return 4 if text.endswith(":") else 3
+
+
+def split_blank_lines(text_html: str) -> list[str]:
+    """Split a paragraph at blank lines typed inside it, when no formatting spans the break."""
+    parts = [part.strip() for part in re.split(r"(?:<br />\s*){2,}", text_html)]
+    if len(parts) == 1 or any(
+        part.count(f"<{tag}") != part.count(f"</{tag}>")
+        for part in parts for tag in ("strong", "em", "a", "sub", "sup", "span")
+    ):
+        return [text_html]
+    return [part for part in parts if part]
+
+
+CAPTION = re.compile(r"^(?:fig\.?|figure|image from)\b", re.I)
+CAPTION_PREFIX = re.compile(r"^(?:figure|fig\.?)\s*\d*\s*[:.]?\s*", re.I)
 
 
 def table_html(table: Table) -> str:
-    rows = []
-    for row in table.rows:
-        cells = "".join(
-            f"<td>{html.escape(cell.text).replace(chr(10), '<br />')}</td>"
-            for cell in row.cells
-        )
-        rows.append(f"<tr>{cells}</tr>")
-    return f"<table>{''.join(rows)}</table>"
+    rows = [[html.escape(cell.text).replace("\n", "<br />") for cell in row.cells]
+            for row in table.rows]
+    if not rows:
+        return ""
+    header, body = rows[0], rows[1:]
+    # An empty top-left cell means the first column labels each row.
+    row_labels = not header[0].strip()
+    head = "".join(f'<th scope="col">{cell}</th>' for cell in header)
+    body_rows = []
+    for row in body:
+        cells = [
+            f'<th scope="row">{cell}</th>' if index == 0 and row_labels else f"<td>{cell}</td>"
+            for index, cell in enumerate(row)
+        ]
+        body_rows.append(f"<tr>{''.join(cells)}</tr>")
+    return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(body_rows)}</tbody></table>"
+
+
+def nest_lists(blocks: list[tuple]) -> list[str]:
+    """Join consecutive list items into nested HTML lists."""
+    output: list[str] = []
+    stack: list[tuple[str, int]] = []
+    counters: dict[tuple[str, int], int] = {}
+
+    def close_above(level: int) -> None:
+        while stack and stack[-1][1] > level:
+            output.append(f"</li></{stack.pop()[0]}>")
+
+    for block in blocks:
+        if block[0] != "item":
+            close_above(-1)
+            output.append(block[1])
+            continue
+        _, content, (tag, level, kind, start, number_id) = block
+        # Word continues numbering until a shallower item restarts deeper levels.
+        for key in [key for key in counters if key[0] == number_id and key[1] > level]:
+            del counters[key]
+        number = counters.get((number_id, level), start - 1) + 1
+        counters[(number_id, level)] = number
+        close_above(level)
+        if stack and stack[-1][1] == level and stack[-1][0] != tag:
+            output.append(f"</li></{stack.pop()[0]}>")
+        if stack and stack[-1][1] == level:
+            output.append("</li>")
+        else:
+            attributes = f' type="{kind}"' if kind else ""
+            if tag == "ol" and number != 1:
+                attributes += f' start="{number}"'
+            output.append(f"<{tag}{attributes}>")
+            stack.append((tag, level))
+        output.append(f"<li>{content}")
+    close_above(-1)
+    return output
 
 
 def document_html(path: Path, *, strip_answers: bool = False) -> str:
     document = Document(path)
     visible = visible_paragraphs(document, strip_answers=strip_answers)
-    blocks: list[str] = []
-    for block in document.iter_inner_content():
-        if isinstance(block, Paragraph):
-            if block._p in visible:
-                blocks.append(paragraph_html(document, block, path.stem))
-        elif isinstance(block, Table):
-            blocks.append(table_html(block))
-    return "\n".join(block for block in blocks if block)
+    label = re.sub(r"\s+", " ", path.stem.replace("_", " ")).strip()
+    styled_document = any(
+        paragraph.style is not None
+        and ("heading" in paragraph.style.name.lower() or paragraph.style.name.lower() == "title")
+        for paragraph in document.paragraphs
+    )
+    content = [
+        block for block in document.iter_inner_content()
+        if isinstance(block, Table) or block._p in visible
+    ]
+    blocks: list[tuple] = []
+    index = 0
+    while index < len(content):
+        block = content[index]
+        index += 1
+        if isinstance(block, Table):
+            blocks.append(("block", table_html(block)))
+            continue
+        text_html = inline_html(block)
+        images = image_names(document, block)
+        if images and not text_html.strip():
+            # The next "Figure ..." line, past blank paragraphs, becomes the caption.
+            ahead = index
+            while (ahead < len(content) and isinstance(content[ahead], Paragraph)
+                   and not content[ahead].text.strip()
+                   and not image_names(document, content[ahead])):
+                ahead += 1
+            following = content[ahead] if ahead < len(content) else None
+            if (isinstance(following, Paragraph) and CAPTION.match(following.text.strip())
+                    and not image_names(document, following)):
+                caption = following.text.strip()
+                alt = CAPTION_PREFIX.sub("", caption).strip() or f"Diagram from {label}"
+                if alt.lower() == "source":
+                    alt = f"Diagram from {label}"
+                blocks.append(("block", figure_html(images, alt, inline_html(following))))
+                index = ahead + 1
+            else:
+                blocks.append(("block", figure_html(images, f"Diagram from {label}")))
+            continue
+        figures = figure_html(images, f"Diagram from {label}") if images else ""
+        if not text_html.strip():
+            continue
+        details = list_details(document, block)
+        if details is not None:
+            blocks.append(("item", text_html + figures, details))
+            continue
+        level = heading_level(block, styled_document)
+        if level is not None:
+            blocks.append(("block", f"<h{level}>{text_html}</h{level}>{figures}"))
+        else:
+            paragraphs = "".join(f"<p>{part}</p>" for part in split_blank_lines(text_html))
+            blocks.append(("block", f"{paragraphs}{figures}"))
+    return "\n".join(part for part in nest_lists(blocks) if part)
 
 
 def text_html(path: Path) -> str:
