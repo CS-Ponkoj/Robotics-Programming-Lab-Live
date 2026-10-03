@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
+import 'package:iuse_demo/screens/my_account_page.dart';
 import 'package:iuse_demo/screens/instructor_assignment_admin.dart';
 import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
@@ -121,6 +122,14 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
           child: PopupMenuButton<String>(
             tooltip: 'Account menu',
             onSelected: (value) async {
+              if (value == 'my-account' && context.mounted) {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        MyAccountPage(user: user, onSignedOut: onLogout),
+                  ),
+                );
+              }
               if (value == 'study-data' && context.mounted) {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
@@ -149,6 +158,16 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               const PopupMenuDivider(),
+              if (!user.isDemo)
+                const PopupMenuItem<String>(
+                  key: Key('my-account-menu-item'),
+                  value: 'my-account',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.manage_accounts_outlined),
+                    title: Text('My account'),
+                  ),
+                ),
               if (!user.isDemo)
                 PopupMenuItem<String>(
                   value: 'study-data',

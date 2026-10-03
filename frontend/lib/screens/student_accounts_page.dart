@@ -366,6 +366,12 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                         enabled: !saving,
                         decoration: const InputDecoration(
                           labelText: 'Participant code',
+                          helperText:
+                              'Research views and exports label all of this '
+                              "student's past and future data with the new "
+                              'code. Importing study_accounts.json later '
+                              'restores the code listed in that file.',
+                          helperMaxLines: 4,
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -921,10 +927,16 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                           }
                                         },
                                         itemBuilder: (context) => [
-                                          const PopupMenuItem(
-                                            value: 'edit',
-                                            child: Text('Edit details'),
-                                          ),
+                                          // Instructors have no editable
+                                          // details unless email tools are on.
+                                          if (!instructor ||
+                                              instructorEmailToolsEnabled)
+                                            const PopupMenuItem(
+                                              key:
+                                                  Key('edit-account-menu-item'),
+                                              value: 'edit',
+                                              child: Text('Edit details'),
+                                            ),
                                           const PopupMenuItem(
                                             value: 'reset',
                                             child: Text('Reset password'),

@@ -180,6 +180,28 @@ class AuthApi {
     await clearLocalSession();
   }
 
+  /// Changes the signed-in user's password. The server then signs out every
+  /// session for the account, so the caller must return to sign-in.
+  static Future<void> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    final response = await http
+        .post(
+          Uri.parse('$apiBaseUrl/auth/change-password'),
+          headers: authorizedHeaders(json: true),
+          body: jsonEncode({
+            'current_password': currentPassword,
+            'new_password': newPassword,
+          }),
+        )
+        .timeout(_authTimeout);
+    if (response.statusCode != 200) {
+      throw Exception(errorMessage(response));
+    }
+    await clearLocalSession();
+  }
+
   static String errorMessage(http.Response response) {
     try {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
