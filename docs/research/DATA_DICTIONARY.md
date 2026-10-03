@@ -133,6 +133,25 @@ Standard `execution_status` values are:
 | `internal_error` | The grader returned an invalid/internal response |
 | `execution_error` | A legacy failure without enough detail to classify safely |
 
+Each item in `evidence.tests` describes one grading check: `test_id`, `label`,
+`passed`, `message`, and `visibility`. Function-assignment checks may also
+store `weight` (the check's rubric points) and `reason`, a stable failure
+category that never exposes protected cases. Older records omit both fields;
+analyses must treat a missing value as not collected.
+
+| `reason` value | Simple meaning |
+|---|---|
+| `passed` | The check passed for every grading scenario |
+| `wrong_all_inputs` | The value was wrong for every grading scenario |
+| `wrong_some_inputs` | The value was right for some scenarios but not all |
+| `error_on_some_inputs` | The function raised an error during a grading scenario |
+| `unsupported_type` | The returned value had a type the grader cannot compare |
+| `not_checked` | The code failed before this check could be evaluated |
+
+The **Try inputs** playground (`POST /assignments/{id}/playground`) is
+practice only. It never creates submission, attempt, hint, learning-event, or
+audit rows, and it never uses protected cases.
+
 ### `study_sessions`
 
 One row represents a period of active student use. It stores a participant-code

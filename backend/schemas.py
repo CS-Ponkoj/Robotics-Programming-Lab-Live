@@ -36,6 +36,8 @@ class AssignmentStudent(BaseModel):
     has_solution: bool = False
     solution_html: str = ""
     vals: dict[str, Any] = Field(default_factory=dict)
+    # Required function name when the ungraded input playground is available.
+    playground_function: str | None = None
 
 
 class AssignmentListResponse(BaseModel):
@@ -71,12 +73,25 @@ class SubmissionRequest(BaseModel):
     study_session_id: str | None = Field(default=None, max_length=36)
 
 
+TestFailureReason = Literal[
+    "passed",
+    "wrong_all_inputs",
+    "wrong_some_inputs",
+    "error_on_some_inputs",
+    "unsupported_type",
+    "not_checked",
+]
+
+
 class TestEvidence(BaseModel):
     test_id: str
     label: str
     passed: bool
     message: str
     visibility: Literal["public", "hidden"] = "hidden"
+    # Optional, additive detail; older stored evidence omits both fields.
+    reason: TestFailureReason | None = None
+    weight: float | None = None
 
 
 class TutorFeedback(BaseModel):
@@ -122,6 +137,33 @@ class SubmissionResponse(BaseModel):
     hint: str = ""
     evidence: list[TestEvidence] = Field(default_factory=list)
     tutor_feedback: TutorFeedback | None = None
+
+
+class PlaygroundRequest(BaseModel):
+    code: str = Field(min_length=1)
+    arguments: str = Field(default="", max_length=2_000)
+
+
+class PlaygroundValue(BaseModel):
+    label: str
+    value: Any = None
+    display: str = ""
+
+
+class PlaygroundResponse(BaseModel):
+    """Ungraded result of calling the student's function with their inputs."""
+
+    assignment_version: int
+    graded: Literal[False] = False
+    success: bool
+    execution_status: ExecutionStatus
+    call: str
+    returned: str = ""
+    return_count: int | None = None
+    expected_return_count: int
+    values: list[PlaygroundValue] = Field(default_factory=list)
+    output: str = ""
+    error: str = ""
 
 
 class HintRequest(BaseModel):

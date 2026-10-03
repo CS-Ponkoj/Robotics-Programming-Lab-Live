@@ -111,6 +111,29 @@ def test_student_demo_runs_and_submits_an_assignment(page: Page):
     expect(page.get_by_role("button", name="Try the student demo")).to_be_visible()
 
 
+def test_student_demo_tries_inputs_and_reads_failure_guidance(page: Page):
+    open_app(page)
+    page.get_by_role("button", name="Try the student demo").click()
+    page.get_by_role("button", name="Start assignment").first.click()
+
+    # The ungraded playground calls the starter function with chosen inputs.
+    try_inputs = page.get_by_role("button", name="Try inputs")
+    expect(try_inputs).to_be_enabled(timeout=60_000)
+    try_inputs.click()
+    wait_for_text(page, "not graded, not saved")
+    type_into(page, "Inputs, separated by commas", "(2, 1), (4, 3.5), (4, 6), (6, 6), (8, 9)")
+    page.get_by_role("button", name="Run my function").click()
+    wait_for_text(page, "Approach distance", GRADING_TIMEOUT_MS)
+    wait_for_text(page, "Printed output")
+    page.get_by_role("button", name="Close").click()
+
+    # Graded results name each check, its points, and why it failed.
+    page.get_by_role("button", name="Run tests").click()
+    wait_for_text(page, "Keep refining your solution", GRADING_TIMEOUT_MS)
+    wait_for_text(page, "0 of 25 points")
+    wait_for_text(page, "Wrong for every grading scenario")
+
+
 def test_instructor_signs_in_reviews_studio_and_signs_out(page: Page):
     login = os.environ.get("E2E_INSTRUCTOR_LOGIN")
     password = os.environ.get("E2E_INSTRUCTOR_PASSWORD")

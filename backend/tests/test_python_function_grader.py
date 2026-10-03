@@ -178,3 +178,50 @@ def test_assignment_two_screenshot_global_points_and_genuine_partial_credit(use_
         if not item.passed:
             assert "every input scenario" in item.message
             assert "printed example alone is not enough" in item.message
+
+
+@pytest.mark.parametrize(
+    "code, expected_reasons",
+    [
+        (
+            "def calculate_values(first, second):\n    return first + second, first * second",
+            ["passed", "passed"],
+        ),
+        # Hardcoding the first scenario is right for some inputs, never for all.
+        (
+            "def calculate_values(first, second):\n    return 5, 6",
+            ["wrong_some_inputs", "wrong_some_inputs"],
+        ),
+        (
+            "def calculate_values(first, second):\n    return first - second, 0",
+            ["wrong_all_inputs", "wrong_all_inputs"],
+        ),
+        (
+            "def calculate_values(first, second):\n"
+            "    return first + second, {first * second}",
+            ["passed", "unsupported_type"],
+        ),
+        (
+            "def calculate_values(first, second):\n"
+            "    if first < 0:\n"
+            "        raise ValueError('negative')\n"
+            "    return first + second, first * second",
+            ["error_on_some_inputs", "error_on_some_inputs"],
+        ),
+        # A missing function fails while the grading scenarios run.
+        ("answer = 11", ["error_on_some_inputs", "error_on_some_inputs"]),
+        ("def calculate_values(first, second)\n    return 1, 2", ["not_checked", "not_checked"]),
+    ],
+)
+def test_function_grader_classifies_failure_reasons_with_weights(code, expected_reasons):
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(assignment(), code)
+
+    assert [item.reason for item in result.evidence] == expected_reasons
+    assert [item.weight for item in result.evidence] == [40.0, 60.0]
+    for item in result.evidence:
+        dumped = item.model_dump()
+        # Reasons classify the outcome without exposing protected case data.
+        assert set(dumped) == {
+            "test_id", "label", "passed", "message", "visibility", "reason", "weight",
+        }
+        assert dumped["visibility"] == "hidden"
