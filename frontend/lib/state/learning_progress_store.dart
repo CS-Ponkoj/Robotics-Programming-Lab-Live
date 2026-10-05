@@ -40,6 +40,7 @@ class LearningProgressStore {
     int assignmentId, {
     int? assignmentVersion,
     String starterCode = '',
+    bool hasServerDraft = false,
   }) {
     return resolveAssignmentProgress(
       attemptCount: attemptCounts[assignmentId] ?? 0,
@@ -48,6 +49,7 @@ class LearningProgressStore {
           ? null
           : draftFor(assignmentId, assignmentVersion),
       starterCode: starterCode,
+      hasServerDraft: hasServerDraft,
     );
   }
 

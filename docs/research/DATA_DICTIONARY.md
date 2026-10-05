@@ -90,6 +90,13 @@ One row stores the latest unfinished code for one authenticated student and one
 exact assignment version. Saving a newer draft updates that row. Demo sessions
 never write to this table.
 
+The editor saves each change on the device at once and to this table about a
+third of a second later, and again when the student leaves the workspace. A
+device copy the server has not confirmed is restored and sent the next time the
+student opens that assignment on that device. The student assignment list
+reports `has_saved_draft` (computed from this table, never stored) so the home
+page shows **Continue assignment** on any computer.
+
 | Field | Meaning |
 |---|---|
 | `id` | Unique draft identifier |

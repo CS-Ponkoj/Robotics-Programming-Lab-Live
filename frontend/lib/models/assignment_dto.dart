@@ -40,6 +40,9 @@ class AssignmentDto {
   /// Function students can call from the ungraded input playground, if any.
   final String? playgroundFunction;
 
+  /// True when this student has saved work for this version on the server.
+  final bool hasSavedDraft;
+
   const AssignmentDto({
     required this.id,
     this.stableId = '',
@@ -59,6 +62,7 @@ class AssignmentDto {
     this.editableFilePath,
     required this.vals,
     this.playgroundFunction,
+    this.hasSavedDraft = false,
   });
 
   factory AssignmentDto.fromJson(Map<String, dynamic> json) {
@@ -122,6 +126,7 @@ class AssignmentDto {
                   (json['playground_function'] as String).isNotEmpty
               ? json['playground_function'] as String
               : null,
+          hasSavedDraft: json['has_saved_draft'] == true,
         ),
       _ => throw const FormatException('Failed to load assignment.'),
     };

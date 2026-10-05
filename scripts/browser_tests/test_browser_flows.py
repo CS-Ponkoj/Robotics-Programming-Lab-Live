@@ -181,3 +181,158 @@ def test_instructor_signs_in_reviews_studio_and_signs_out(page: Page):
     page.get_by_role("button", name="Account menu").click()
     page.get_by_role("menuitem", name="Sign out").click()
     expect(page.get_by_role("button", name="Sign in")).to_be_visible()
+
+
+# --- Persistent student drafts -------------------------------------------
+# A real student's half-finished code must come back however they leave.
+# These checks sign in with E2E_STUDENT_LOGIN / E2E_STUDENT_PASSWORD and
+# save draft rows for that account, so they are skipped unless both are set.
+# Use a dedicated test student, never a research participant.
+
+ASSIGNMENT_BUTTON = re.compile(r"^(Start|Continue|Review) assignment$")
+DRAFT_WAIT_MS = 30_000
+
+
+def student_credentials() -> tuple[str, str]:
+    login = os.environ.get("E2E_STUDENT_LOGIN")
+    password = os.environ.get("E2E_STUDENT_PASSWORD")
+    if not (login and password):
+        pytest.skip("Set E2E_STUDENT_LOGIN and E2E_STUDENT_PASSWORD to run.")
+    return login, password
+
+
+def new_page(browser):
+    """A fresh browser profile: what a student sees on another computer."""
+    context = browser.new_context(viewport={"width": 1280, "height": 800})
+    opened = context.new_page()
+    opened.set_default_timeout(30_000)
+    return context, opened
+
+
+def sign_in(page: Page, login: str, password: str) -> None:
+    open_app(page)
+    type_into(page, "Login ID", login)
+    type_into(page, "Password", password)
+    page.keyboard.press("Enter")
+    expect(page.get_by_role("button", name=ASSIGNMENT_BUTTON).first).to_be_visible(
+        timeout=60_000
+    )
+
+
+def open_first_assignment(page: Page) -> None:
+    page.get_by_role("button", name=ASSIGNMENT_BUTTON).first.click()
+    expect(page.get_by_role("button", name="Run tests")).to_be_enabled(timeout=60_000)
+
+
+def editor_shows(page: Page, marker: str, timeout: int = DRAFT_WAIT_MS) -> bool:
+    """Whether the code editor's text contains marker within timeout."""
+    # Flutter publishes the editor text to the accessibility tree once the
+    # editor has focus; clicking only places the cursor.
+    page.wait_for_timeout(500)
+    viewport = page.viewport_size
+    page.mouse.click(viewport["width"] * 0.25, viewport["height"] * 0.55)
+    host = page.locator("flt-semantics-host")
+    for _ in range(timeout // 500):
+        if marker in host.aria_snapshot():
+            return True
+        page.wait_for_timeout(500)
+    return marker in host.aria_snapshot()
+
+
+def write_code(page: Page, marker: str) -> None:
+    # Let the editor finish loading the saved draft before typing over it.
+    page.wait_for_timeout(1_000)
+    replace_editor_code(page, f"# {marker}\nanswer = 1\n")
+    assert editor_shows(page, marker, timeout=5_000), "typing did not reach the editor"
+
+
+def test_student_code_comes_back_however_they_leave(browser):
+    login, password = student_credentials()
+    stamp = str(os.getpid()) + str(abs(hash(FRONTEND_URL)) % 10_000)
+
+    # 1. Back to the home page and reopen.
+    context, page = new_page(browser)
+    sign_in(page, login, password)
+    open_first_assignment(page)
+    first = f"DRAFT-HOME-{stamp}"
+    write_code(page, first)
+    page.wait_for_timeout(2_000)
+    page.get_by_role("button", name="Back").first.click()
+    open_first_assignment(page)
+    assert editor_shows(page, first), "draft lost after going back home"
+
+    # 2. Browser refresh inside the app keeps the session and the code.
+    page.reload()
+    placeholder = page.locator("flt-semantics-placeholder")
+    placeholder.wait_for(state="attached", timeout=60_000)
+    placeholder.dispatch_event("click")
+    expect(page.get_by_role("button", name=ASSIGNMENT_BUTTON).first).to_be_visible(
+        timeout=60_000
+    )
+    open_first_assignment(page)
+    assert editor_shows(page, first), "draft lost after a browser refresh"
+
+    # 3. Sign out and back in.
+    page.get_by_role("button", name="Back").first.click()
+    page.get_by_role("button", name="Account menu").click()
+    page.get_by_role("menuitem", name="Sign out").click()
+    expect(page.get_by_role("button", name="Sign in")).to_be_visible()
+    type_into(page, "Login ID", login)
+    type_into(page, "Password", password)
+    page.keyboard.press("Enter")
+    open_first_assignment(page)
+    assert editor_shows(page, first), "draft lost after signing out and in"
+    context.close()
+
+    # 4. Another computer: only the server copy can supply the code, and the
+    # home page and workspace both say the work is in progress.
+    other, page = new_page(browser)
+    sign_in(page, login, password)
+    expect(page.get_by_role("button", name="Continue assignment").first).to_be_visible()
+    open_first_assignment(page)
+    wait_for_text(page, "In progress")
+    assert editor_shows(page, first), "draft missing on another computer"
+    other.close()
+
+
+def test_student_code_survives_a_closed_tab_and_a_lost_connection(browser):
+    login, password = student_credentials()
+    stamp = str(os.getpid())
+
+    # 5. Close the tab immediately after typing, before the server save.
+    context, page = new_page(browser)
+    sign_in(page, login, password)
+    open_first_assignment(page)
+    closed = f"DRAFT-CLOSED-TAB-{stamp}"
+    page.wait_for_timeout(1_000)
+    # No waiting after typing: the tab closes before the server save runs.
+    replace_editor_code(page, f"# {closed}\nanswer = 1\n")
+    page.close()
+    page = context.new_page()
+    page.set_default_timeout(30_000)
+    sign_in(page, login, password)
+    open_first_assignment(page)
+    assert editor_shows(page, closed), "draft lost when the tab closed at once"
+
+    # 6. Lose the connection while typing, then come back online.
+    offline = f"DRAFT-OFFLINE-{stamp}"
+    context.set_offline(True)
+    write_code(page, offline)
+    page.wait_for_timeout(2_000)
+    context.set_offline(False)
+    page.close()
+    page = context.new_page()
+    page.set_default_timeout(30_000)
+    sign_in(page, login, password)
+    open_first_assignment(page)
+    assert editor_shows(page, offline), "draft lost after the connection dropped"
+    page.wait_for_timeout(2_000)
+    context.close()
+
+    # Reopening on this computer sent the offline code to the server, so
+    # another computer sees it too.
+    other, page = new_page(browser)
+    sign_in(page, login, password)
+    open_first_assignment(page)
+    assert editor_shows(page, offline), "offline draft never reached the server"
+    other.close()

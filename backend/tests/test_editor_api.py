@@ -138,3 +138,47 @@ def test_python_formatter_is_manual_safe_and_reports_invalid_code(editor_client)
     )
     assert invalid.status_code == 422
     assert invalid.json()["error"] == "Fix the Python syntax before formatting."
+
+
+def _saved_flags(client: TestClient, headers: dict) -> dict[int, bool]:
+    assignments = client.get("/assignments", headers=headers).json()["assignments"]
+    return {item["id"]: item["has_saved_draft"] for item in assignments}
+
+
+def test_assignment_list_shows_saved_work_on_any_computer(editor_client):
+    """The home page can say Continue even where no local copy exists."""
+    student = _login(editor_client, "student", "student")
+    instructor = _login(editor_client, "instructor", "instructor")
+    assert not any(_saved_flags(editor_client, student).values())
+
+    first = editor_client.get("/assignments/1", headers=student).json()
+    second = editor_client.get("/assignments/2", headers=student).json()
+    editor_client.put(
+        "/assignments/1/draft",
+        headers=student,
+        json={"assignment_version": first["version"], "code": "answer = 1"},
+    )
+    # A draft identical to the starter code is not saved work yet.
+    editor_client.put(
+        "/assignments/2/draft",
+        headers=student,
+        json={"assignment_version": second["version"], "code": second["starter_code"]},
+    )
+
+    flags = _saved_flags(editor_client, student)
+    assert flags[1] is True
+    assert flags[2] is False
+    assert not any(value for key, value in flags.items() if key != 1)
+    # Another account never sees this student's work.
+    assert not any(_saved_flags(editor_client, instructor).values())
+
+
+def test_assignment_list_shows_no_saved_work_for_demo(editor_client):
+    demo = {"Authorization": f"Bearer {editor_client.post('/auth/demo').json()['token']}"}
+    version = editor_client.get("/assignments/1", headers=demo).json()["version"]
+    editor_client.put(
+        "/assignments/1/draft",
+        headers=demo,
+        json={"assignment_version": version, "code": "answer = 1"},
+    )
+    assert not any(_saved_flags(editor_client, demo).values())

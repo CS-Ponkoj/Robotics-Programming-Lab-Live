@@ -14,6 +14,7 @@ AssignmentProgressState resolveAssignmentProgress({
   required int bestScore,
   String? savedDraft,
   String starterCode = '',
+  bool hasServerDraft = false,
 }) {
   if (bestScore >= 100) {
     return AssignmentProgressState.completed;
@@ -24,6 +25,10 @@ AssignmentProgressState resolveAssignmentProgress({
   if (savedDraft != null &&
       savedDraft.trim().isNotEmpty &&
       savedDraft != starterCode) {
+    return AssignmentProgressState.inProgress;
+  }
+  // Saved on the server from another computer, with no copy on this one.
+  if (hasServerDraft) {
     return AssignmentProgressState.inProgress;
   }
   return AssignmentProgressState.notStarted;

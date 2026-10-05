@@ -1399,10 +1399,29 @@ def create_app(
     )
     def list_assignments(
         session: Session = Depends(session_dependency),
-        _user: User = Depends(current_user),
+        user: User = Depends(current_user),
     ):
         assignments = AssignmentRepository(session).list_published()
-        return {"assignments": [to_student_assignment(item) for item in assignments]}
+        # One query for every draft this student owns; demo drafts are never
+        # stored, so demo sessions simply find none.
+        drafts = {
+            (row.assignment_id, row.assignment_version): row.code
+            for row in session.execute(
+                select(
+                    CodeDraft.assignment_id,
+                    CodeDraft.assignment_version,
+                    CodeDraft.code,
+                ).where(CodeDraft.user_id == user.id)
+            )
+        }
+
+        def with_draft_flag(assignment: Assignment) -> AssignmentStudent:
+            payload = to_student_assignment(assignment)
+            code = drafts.get((assignment.id, assignment.version))
+            saved = bool(code and code.strip() and code != assignment.starter_code)
+            return payload.model_copy(update={"has_saved_draft": saved})
+
+        return {"assignments": [with_draft_flag(item) for item in assignments]}
 
     @application.get(
         "/assignments/{assignment_id}",

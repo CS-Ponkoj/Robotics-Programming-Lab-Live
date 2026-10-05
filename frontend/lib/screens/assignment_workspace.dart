@@ -74,6 +74,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int? _diagnosticLine;
   bool _suppressEditorChange = false;
   String? _playgroundFunction;
+  String _starterCode = '';
   Map<String, dynamic> _simulationConfig = const {};
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
@@ -778,7 +779,17 @@ class _MyHomePageState extends State<MyHomePage> {
         : _selectedWorkspaceTab == 1;
     final showResizeHandle =
         useDesktopLayout && _workspaceFocus == AssignmentWorkspaceFocus.none;
-    final progressState = learningProgress.assignmentState(widget.id);
+    // Saved work shows as in progress, whether it is on this device or
+    // came back from the server.
+    final serverDraft = _serverDraft;
+    final progressState = learningProgress.assignmentState(
+      widget.id,
+      assignmentVersion: _assignmentVersion,
+      starterCode: _starterCode,
+      hasServerDraft: serverDraft != null &&
+          serverDraft.trim().isNotEmpty &&
+          serverDraft != _starterCode,
+    );
     final submissionStatus = lastAttemptAccuracy.containsKey(widget.id)
         ? _hasUnrunChanges
             ? '${progressState.label} • Code changed • Previous score: ${lastAttemptAccuracy[widget.id]}%'
@@ -1009,6 +1020,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                           _selectedProjectFileEditable = true;
                                           _playgroundFunction =
                                               snap.data!.playgroundFunction;
+                                          _starterCode = snap.data!.code;
                                           _simulationConfig =
                                               snap.data!.simulationConfig;
                                           setAssignmentEditorContent(

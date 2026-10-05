@@ -38,6 +38,9 @@ class AssignmentStudent(BaseModel):
     vals: dict[str, Any] = Field(default_factory=dict)
     # Required function name when the ungraded input playground is available.
     playground_function: str | None = None
+    # True when this student has saved work for the current version, so the
+    # home page can say "Continue" on any computer.
+    has_saved_draft: bool = False
 
 
 class AssignmentListResponse(BaseModel):

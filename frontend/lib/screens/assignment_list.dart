@@ -689,6 +689,7 @@ class ListAssignment extends StatelessWidget {
       a.id,
       assignmentVersion: a.version,
       starterCode: a.code,
+      hasServerDraft: a.hasSavedDraft,
     );
     final hasAccuracy = lastAttemptAccuracy.containsKey(a.id);
     final accuracyText = hasAccuracy
@@ -775,6 +776,7 @@ class AssignmentCard extends StatelessWidget {
       a.id,
       assignmentVersion: a.version,
       starterCode: a.code,
+      hasServerDraft: a.hasSavedDraft,
     );
     final hasAccuracy = lastAttemptAccuracy.containsKey(a.id);
     final score = lastAttemptAccuracy[a.id];
