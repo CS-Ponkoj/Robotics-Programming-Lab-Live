@@ -80,7 +80,7 @@ One row describes the current form of an assignment.
 | `rubric` | Criteria, descriptions, and weights |
 | `misconceptions` | Known misunderstanding tags and descriptions |
 | `tutoring_rules` | Hint limits and solution-protection rules |
-| `simulation_config` | Optional simulation settings |
+| `simulation_config` | Optional simulation settings; `diagram` describes the playground drawing |
 | `asset_manifest` | Project files and which file may be edited |
 | `grader_type`, `grader_config` | Server-side grader selection and protected settings |
 
@@ -150,7 +150,17 @@ analyses must treat a missing value as not collected.
 
 The **Try inputs** playground (`POST /assignments/{id}/playground`) is
 practice only. It never creates submission, attempt, hint, learning-event, or
-audit rows, and it never uses protected cases.
+audit rows, and it never uses protected cases. Its response echoes the parsed
+inputs as JSON (`arguments`; tuples become lists and dictionary keys become
+text) so the browser can draw them.
+
+An assignment's optional `simulation_config.diagram` block (provider
+`diagram`) tells the playground what to draw. A `route` view lists points and
+paths by function-argument index and labels each path with a returned-value
+index; a `polar` view draws supplied readings, arcs, and rays. Optional
+`checks` (`sum`, `min_label`) compare the student's returned values with each
+other. Diagrams contain only indices, never expected answers, and the server
+rejects inconsistent references when an assignment is saved.
 
 ### `study_sessions`
 

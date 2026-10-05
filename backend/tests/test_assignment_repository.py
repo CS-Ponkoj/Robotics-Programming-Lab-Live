@@ -30,7 +30,7 @@ def test_newer_seed_versions_upgrade_existing_local_assignments():
         AssignmentRepository(session).sync_seed_assignments()
 
         assignments = AssignmentRepository(session).list_all()
-        assert [item.version for item in assignments] == [10, 10, 11, 10, 8, 8]
+        assert [item.version for item in assignments] == [11, 11, 12, 11, 8, 8]
         for assignment in assignments:
             assert assignment.data_schema_version == 1
             assert assignment.execution_settings["runtime"]
@@ -94,7 +94,10 @@ def test_assignments_1_through_4_use_instructor_authored_learning_metadata():
         assert payload["tutoring_rules"]["ai_enabled_by_default"] is False
         assert payload["tutoring_rules"]["never_reveal_solution"] is True
         assert payload["tutoring_rules"]["never_reveal_hidden_tests"] is True
-        assert payload["simulation_config"]["enabled"] is False
+        # Function assignments draw a playground diagram from student data only.
+        assert payload["simulation_config"]["enabled"] is True
+        assert payload["simulation_config"]["provider"] == "diagram"
+        assert payload["simulation_config"]["diagram"]["view"] in {"route", "polar"}
         assert payload["grader_type"] == "python_function"
         assert payload["grader_config"]["cases"]
         assert payload["reference_solution_path"]

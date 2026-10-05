@@ -1,6 +1,6 @@
 {
   "id": 3,
-  "version": 11,
+  "version": 12,
   "data_schema_version": 1,
   "title": "Assignment 3: Autonomous Robot Navigation in a Multi-Floor Office",
   "description": "Compare two complete multi-floor routes using explicit obstacle detours, elevator delays, and destination-floor travel.",
@@ -143,9 +143,75 @@
     "tone": "Socratic, encouraging, and precise about complete route accounting"
   },
   "simulation_config": {
-    "enabled": false,
-    "provider": null,
-    "scenario": null
+    "enabled": true,
+    "provider": "diagram",
+    "scenario": null,
+    "diagram": {
+      "view": "route",
+      "caption": "Origin floor only, drawn from your coordinates. It shows the route order; the dashed service line does not draw the detour allowance.",
+      "points": [
+        {
+          "id": "S",
+          "arg": 7
+        },
+        {
+          "id": "M",
+          "arg": 11,
+          "each": true
+        },
+        {
+          "id": "E_m",
+          "arg": 9
+        },
+        {
+          "id": "E_s",
+          "arg": 10
+        }
+      ],
+      "paths": [
+        {
+          "points": [
+            "S",
+            "M*",
+            "E_m"
+          ],
+          "value": 0
+        },
+        {
+          "points": [
+            "S",
+            "E_s"
+          ],
+          "value": 1,
+          "style": "dashed",
+          "note": "includes the detour allowance"
+        }
+      ],
+      "legend_values": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "checks": [
+        {
+          "type": "min_label",
+          "candidates": [
+            4,
+            5
+          ],
+          "labels": [
+            "Main Elevator",
+            "Service Elevator"
+          ],
+          "label": 6,
+          "best": 7,
+          "tie_index": 1
+        }
+      ]
+    }
   },
   "asset_manifest": [],
   "grader_type": "python_function",

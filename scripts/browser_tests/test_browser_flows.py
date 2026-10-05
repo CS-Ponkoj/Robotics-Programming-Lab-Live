@@ -14,6 +14,7 @@ rows). It is skipped when those variables are not set.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -125,6 +126,11 @@ def test_student_demo_tries_inputs_and_reads_failure_guidance(page: Page):
     page.get_by_role("button", name="Run my function").click()
     wait_for_text(page, "Approach distance", GRADING_TIMEOUT_MS)
     wait_for_text(page, "Printed output")
+    # The diagram draws the typed points and the values the function returned.
+    wait_for_text(page, "Drawn to scale from your inputs")
+    expect(
+        page.get_by_role("img", name=re.compile(r"^Route diagram\. Points: S at \(2\.0, 1\.0\)"))
+    ).to_have_count(1)
     page.get_by_role("button", name="Close").click()
 
     # Graded results name each check, its points, and why it failed.

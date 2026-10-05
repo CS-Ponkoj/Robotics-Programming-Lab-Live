@@ -162,6 +162,7 @@ class PlaygroundResponse(BaseModel):
     return_count: int | None = None
     expected_return_count: int
     values: list[PlaygroundValue] = Field(default_factory=list)
+    arguments: list[Any] = Field(default_factory=list)
     output: str = ""
     error: str = ""
 

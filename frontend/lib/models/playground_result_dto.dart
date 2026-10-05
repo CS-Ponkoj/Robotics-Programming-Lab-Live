@@ -29,6 +29,7 @@ class PlaygroundResultDto {
     this.returnCount,
     this.expectedReturnCount = 0,
     this.values = const [],
+    this.arguments = const [],
     this.output = '',
     this.error = '',
   });
@@ -40,6 +41,9 @@ class PlaygroundResultDto {
   final int? returnCount;
   final int expectedReturnCount;
   final List<PlaygroundValueDto> values;
+
+  /// The inputs the server parsed, echoed as JSON for diagrams.
+  final List<dynamic> arguments;
   final String output;
   final String error;
 
@@ -71,6 +75,7 @@ class PlaygroundResultDto {
               )
               .toList()
           : const [],
+      arguments: json['arguments'] is List ? json['arguments'] as List : const [],
       output: json['output']?.toString() ?? '',
       error: json['error']?.toString() ?? '',
     );

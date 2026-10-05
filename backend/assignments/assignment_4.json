@@ -1,6 +1,6 @@
 {
   "id": 4,
-  "version": 10,
+  "version": 11,
   "data_schema_version": 1,
   "title": "Assignment 4: Selecting a Direction with a Simplified Vector Field Histogram (VFH)",
   "description": "Build a deterministic inverse-square polar histogram and select the minimum-density sector near a goal direction.",
@@ -92,9 +92,46 @@
     "tone": "Socratic, encouraging, and precise about VFH data transformations"
   },
   "simulation_config": {
-    "enabled": false,
-    "provider": null,
-    "scenario": null
+    "enabled": true,
+    "provider": "diagram",
+    "scenario": null,
+    "diagram": {
+      "view": "polar",
+      "caption": "Robot at the centre, 0 degrees at the top, angles clockwise (illustration only). Only the readings you supplied are drawn.",
+      "readings": {
+        "arg": 0
+      },
+      "arcs": [
+        {
+          "from_arg": 1,
+          "to_arg": 2,
+          "label": "Sectors to fill"
+        }
+      ],
+      "rays": [
+        {
+          "arg": 3,
+          "half_width_arg": 4,
+          "label": "Goal direction and search window",
+          "style": "dashed"
+        },
+        {
+          "arg": 5,
+          "label": "Probe angle"
+        },
+        {
+          "value": 3,
+          "label": "Your optimal angle",
+          "style": "bold"
+        }
+      ],
+      "legend_values": [
+        0,
+        1,
+        2,
+        4
+      ]
+    }
   },
   "asset_manifest": [],
   "grader_type": "python_function",

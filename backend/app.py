@@ -1653,6 +1653,7 @@ def create_app(
             return_count=outcome.return_count,
             expected_return_count=outcome.expected_return_count,
             values=outcome.values,
+            arguments=outcome.arguments,
             output=outcome.output,
             error=outcome.error,
         )

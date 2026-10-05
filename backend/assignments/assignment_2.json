@@ -1,6 +1,6 @@
 {
   "id": 2,
-  "version": 10,
+  "version": 11,
   "data_schema_version": 1,
   "title": "Assignment 2: Obstacle Avoidance: Bug Algorithm Scenario 2",
   "description": "Calculate a geometrically consistent Bug2 detour around a rectangular obstacle.",
@@ -48,7 +48,80 @@
     "ai_enabled_by_default": false,
     "tone": "Socratic, encouraging, and precise about route endpoints"
   },
-  "simulation_config": {"enabled": false, "provider": null, "scenario": null},
+  "simulation_config": {
+    "enabled": true,
+    "provider": "diagram",
+    "scenario": null,
+    "diagram": {
+      "view": "route",
+      "caption": "Drawn to scale from your inputs. Each line is labelled with the value your function returned.",
+      "points": [
+        {
+          "id": "S",
+          "arg": 0
+        },
+        {
+          "id": "H",
+          "arg": 1
+        },
+        {
+          "id": "A",
+          "arg": 2
+        },
+        {
+          "id": "B",
+          "arg": 3
+        },
+        {
+          "id": "L",
+          "arg": 4
+        },
+        {
+          "id": "G",
+          "arg": 5
+        }
+      ],
+      "paths": [
+        {
+          "points": [
+            "S",
+            "H"
+          ],
+          "value": 0
+        },
+        {
+          "points": [
+            "H",
+            "A",
+            "B",
+            "L"
+          ],
+          "value": 1
+        },
+        {
+          "points": [
+            "L",
+            "G"
+          ],
+          "value": 2
+        }
+      ],
+      "legend_values": [
+        3
+      ],
+      "checks": [
+        {
+          "type": "sum",
+          "parts": [
+            0,
+            1,
+            2
+          ],
+          "total": 3
+        }
+      ]
+    }
+  },
   "asset_manifest": [],
   "grader_type": "python_function",
   "grader_config": {

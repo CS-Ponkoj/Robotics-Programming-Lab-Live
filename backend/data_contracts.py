@@ -5,9 +5,16 @@ database models provider-neutral for SQLite development and PostgreSQL staging.
 """
 
 from enum import StrEnum
-from typing import Any, Annotated
+from typing import Any, Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    model_serializer,
+    model_validator,
+)
 
 
 CURRENT_DATA_SCHEMA_VERSION = 1
@@ -109,10 +116,130 @@ class TutoringRules(ContractModel):
     tone: str = Field(default="encouraging and concise", max_length=200)
 
 
+# Playground diagrams draw only the student's own inputs (argument indices)
+# and returned values (value indices); they never compute an answer.
+DIAGRAM_MAX_ARGUMENT_INDEX = 19
+DIAGRAM_MAX_VALUE_INDEX = 29
+DiagramPointId = Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,15}$")]
+DiagramArgumentIndex = Annotated[int, Field(ge=0, le=DIAGRAM_MAX_ARGUMENT_INDEX)]
+DiagramValueIndex = Annotated[int, Field(ge=0, le=DIAGRAM_MAX_VALUE_INDEX)]
+DiagramLabel = Annotated[str, Field(min_length=1, max_length=80)]
+
+
+class DiagramPoint(ContractModel):
+    id: DiagramPointId
+    arg: DiagramArgumentIndex
+    # Expand a list-of-points argument into numbered points (M1, M2, ...).
+    each: bool = False
+
+
+class DiagramPath(ContractModel):
+    # Point IDs in drawing order; "M*" stands for every expanded M point.
+    points: list[Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,15}\*?$")]] = (
+        Field(min_length=2, max_length=20)
+    )
+    value: DiagramValueIndex | None = None
+    style: Literal["solid", "dashed"] = "solid"
+    note: str = Field(default="", max_length=120)
+
+
+class DiagramReadings(ContractModel):
+    arg: DiagramArgumentIndex
+
+
+class DiagramArc(ContractModel):
+    from_arg: DiagramArgumentIndex
+    to_arg: DiagramArgumentIndex
+    label: DiagramLabel
+
+
+class DiagramRay(ContractModel):
+    arg: DiagramArgumentIndex | None = None
+    value: DiagramValueIndex | None = None
+    half_width_arg: DiagramArgumentIndex | None = None
+    label: DiagramLabel
+    style: Literal["solid", "dashed", "bold"] = "solid"
+
+    @model_validator(mode="after")
+    def one_angle_source(self):
+        if (self.arg is None) == (self.value is None):
+            raise ValueError("A diagram ray needs exactly one of arg or value")
+        return self
+
+
+class DiagramCheck(ContractModel):
+    """A consistency hint computed only from the student's returned values."""
+
+    type: Literal["sum", "min_label"]
+    parts: list[DiagramValueIndex] = Field(default_factory=list, max_length=10)
+    total: DiagramValueIndex | None = None
+    candidates: list[DiagramValueIndex] = Field(default_factory=list, max_length=10)
+    labels: list[DiagramLabel] = Field(default_factory=list, max_length=10)
+    label: DiagramValueIndex | None = None
+    best: DiagramValueIndex | None = None
+    tie_index: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def complete_for_type(self):
+        if self.type == "sum" and (len(self.parts) < 2 or self.total is None):
+            raise ValueError("A sum check needs at least two parts and a total")
+        if self.type == "min_label":
+            if len(self.candidates) < 2 or len(self.labels) != len(self.candidates):
+                raise ValueError("A min_label check needs matching candidates and labels")
+            if self.label is None:
+                raise ValueError("A min_label check needs a label value")
+            if self.tie_index is not None and self.tie_index >= len(self.candidates):
+                raise ValueError("tie_index must name one of the candidates")
+        return self
+
+
+class DiagramConfig(ContractModel):
+    view: Literal["route", "polar"]
+    caption: str = Field(default="", max_length=300)
+    points: list[DiagramPoint] = Field(default_factory=list, max_length=20)
+    paths: list[DiagramPath] = Field(default_factory=list, max_length=20)
+    readings: DiagramReadings | None = None
+    arcs: list[DiagramArc] = Field(default_factory=list, max_length=5)
+    rays: list[DiagramRay] = Field(default_factory=list, max_length=8)
+    legend_values: list[DiagramValueIndex] = Field(default_factory=list, max_length=20)
+    checks: list[DiagramCheck] = Field(default_factory=list, max_length=5)
+
+    @model_validator(mode="after")
+    def references_are_consistent(self):
+        if self.view == "route":
+            ids = [item.id for item in self.points]
+            if not self.points or not self.paths:
+                raise ValueError("A route diagram needs points and paths")
+            if len(ids) != len(set(ids)):
+                raise ValueError("Diagram point IDs must be unique")
+            for path in self.paths:
+                for point in path.points:
+                    point_id = point.removesuffix("*")
+                    if point_id not in ids:
+                        raise ValueError(f"Diagram path names an unknown point {point_id}")
+                    expanded = next(item for item in self.points if item.id == point_id).each
+                    if point.endswith("*") != expanded:
+                        raise ValueError(
+                            f"Use {point_id}* only for a point list marked each"
+                        )
+        elif self.readings is None:
+            raise ValueError("A polar diagram needs readings")
+        return self
+
+
 class SimulationConfig(ContractModel):
     enabled: bool = False
     provider: str | None = Field(default=None, max_length=120)
     scenario: str | None = Field(default=None, max_length=300)
+    diagram: DiagramConfig | None = None
+
+    @model_serializer(mode="wrap")
+    def omit_missing_diagram(self, handler):
+        # Configurations without a diagram keep their original stored shape.
+        data = handler(self)
+        if data.get("diagram") is None:
+            data.pop("diagram", None)
+        return data
 
 
 class ProjectFileAsset(ContractModel):

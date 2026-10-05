@@ -73,6 +73,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int? _diagnosticLine;
   bool _suppressEditorChange = false;
   String? _playgroundFunction;
+  Map<String, dynamic> _simulationConfig = const {};
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
 
@@ -360,6 +361,7 @@ class _MyHomePageState extends State<MyHomePage> {
         code: _code,
         initialArguments: _playgroundArguments,
         onArgumentsChanged: (value) => _playgroundArguments = value,
+        simulationConfig: _simulationConfig,
       ),
     );
   }
@@ -994,6 +996,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                           _selectedProjectFileEditable = true;
                                           _playgroundFunction =
                                               snap.data!.playgroundFunction;
+                                          _simulationConfig =
+                                              snap.data!.simulationConfig;
                                           setAssignmentEditorContent(
                                             _controller,
                                             _code,

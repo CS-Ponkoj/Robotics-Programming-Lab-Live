@@ -77,6 +77,8 @@ class PlaygroundOutcome:
     return_count: int | None = None
     expected_return_count: int = 0
     values: list[dict] = field(default_factory=list)
+    # JSON-safe copy of the parsed inputs so diagrams never re-parse Python.
+    arguments: list = field(default_factory=list)
 
 
 class PythonFunctionGrader:
@@ -134,6 +136,7 @@ class PythonFunctionGrader:
             output=str(result.get("output", "")),
             error=str(result.get("error", "")),
             expected_return_count=len(labels),
+            arguments=[playground_json_value(item) for item in arguments],
         )
         if not outcome.success:
             return outcome
@@ -353,6 +356,20 @@ class PythonFunctionGrader:
         if isinstance(actual, (int, float)) and isinstance(expected, (int, float)):
             return isclose(float(actual), float(expected), rel_tol=1e-7, abs_tol=1e-7)
         return actual == expected
+
+
+def playground_json_value(value):
+    """Convert a parsed literal into JSON: tuples and sets become lists and
+    dictionary keys become strings; other non-JSON values become their repr."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [playground_json_value(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return [playground_json_value(item) for item in sorted(value, key=repr)]
+    if isinstance(value, dict):
+        return {str(key): playground_json_value(item) for key, item in value.items()}
+    return repr(value)
 
 
 def _display_value(value) -> str:

@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/models/playground_diagram.dart';
 import 'package:iuse_demo/models/playground_result_dto.dart';
 import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/playground_diagram.dart';
 
 typedef PlaygroundRunner = Future<PlaygroundResultDto> Function(
   int assignmentId,
@@ -37,6 +39,7 @@ class PlaygroundDialog extends StatefulWidget {
     required this.code,
     this.initialArguments = '',
     this.onArgumentsChanged,
+    this.simulationConfig = const {},
     this.runner = tryAssignmentInputs,
   });
 
@@ -45,6 +48,10 @@ class PlaygroundDialog extends StatefulWidget {
   final String code;
   final String initialArguments;
   final ValueChanged<String>? onArgumentsChanged;
+
+  /// The assignment's simulation configuration; its `diagram` block, when
+  /// present, draws the student's inputs and returned values.
+  final Map<String, dynamic> simulationConfig;
   final PlaygroundRunner runner;
 
   @override
@@ -179,7 +186,14 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                 ),
               ] else if (_result != null) ...[
                 const SizedBox(height: AppSpacing.md),
-                _PlaygroundResultView(result: _result!),
+                _PlaygroundResultView(
+                  result: _result!,
+                  diagram: buildPlaygroundDiagram(
+                    widget.simulationConfig,
+                    _result!,
+                    parameterNames: parameters,
+                  ),
+                ),
               ],
             ],
           ),
@@ -197,9 +211,10 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
 }
 
 class _PlaygroundResultView extends StatelessWidget {
-  const _PlaygroundResultView({required this.result});
+  const _PlaygroundResultView({required this.result, this.diagram});
 
   final PlaygroundResultDto result;
+  final PlaygroundDiagramData? diagram;
 
   @override
   Widget build(BuildContext context) {
@@ -279,6 +294,10 @@ class _PlaygroundResultView extends StatelessWidget {
                   ),
               ],
             ),
+        ],
+        if (diagram != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          PlaygroundDiagram(data: diagram!),
         ],
         if (result.output.trim().isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
