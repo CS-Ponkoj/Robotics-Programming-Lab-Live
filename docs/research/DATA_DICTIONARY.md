@@ -162,6 +162,11 @@ index; a `polar` view draws supplied readings, arcs, and rays. Optional
 other. Diagrams contain only indices, never expected answers, and the server
 rejects inconsistent references when an assignment is saved.
 
+`simulation_config.playground.sample_arguments` holds example inputs (the
+instructions' public example call) that prefill an empty Try inputs box. It
+holds inputs only, and the server rejects text its literal parser cannot read.
+Inputs that cannot be drawn are skipped and named under the diagram.
+
 ### `study_sessions`
 
 One row represents a period of active student use. It stores a participant-code

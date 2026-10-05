@@ -146,6 +146,9 @@
     "enabled": true,
     "provider": "diagram",
     "scenario": null,
+    "playground": {
+      "sample_arguments": "1.0, 1.0, 30.0, 10.0, 15.0, 20.0, 5, (5.0, 5.0), (25.0, 30.0), (10.0, 5.0), (6.0, 15.0), [(7.5, 4.5), (8.5, 4.5)]"
+    },
     "diagram": {
       "view": "route",
       "caption": "Origin floor only, drawn from your coordinates. It shows the route order; the dashed service line does not draw the detour allowance.",

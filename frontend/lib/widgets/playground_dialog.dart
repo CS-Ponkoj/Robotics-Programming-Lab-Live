@@ -7,11 +7,12 @@ import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/playground_diagram.dart';
 
-typedef PlaygroundRunner = Future<PlaygroundResultDto> Function(
-  int assignmentId,
-  String code,
-  String arguments,
-);
+typedef PlaygroundRunner =
+    Future<PlaygroundResultDto> Function(
+      int assignmentId,
+      String code,
+      String arguments,
+    );
 
 /// Parameter names of [functionName] in [code], or an empty list.
 List<String> playgroundParameterNames(String code, String functionName) {
@@ -38,6 +39,7 @@ class PlaygroundDialog extends StatefulWidget {
     required this.functionName,
     required this.code,
     this.initialArguments = '',
+    this.sampleArguments = '',
     this.onArgumentsChanged,
     this.simulationConfig = const {},
     this.runner = tryAssignmentInputs,
@@ -47,6 +49,10 @@ class PlaygroundDialog extends StatefulWidget {
   final String functionName;
   final String code;
   final String initialArguments;
+
+  /// The assignment's example inputs (the instructions' public example call),
+  /// used to prefill an empty box so a first run works with one click.
+  final String sampleArguments;
   final ValueChanged<String>? onArgumentsChanged;
 
   /// The assignment's simulation configuration; its `diagram` block, when
@@ -67,7 +73,16 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
   @override
   void initState() {
     super.initState();
-    _arguments = TextEditingController(text: widget.initialArguments);
+    _arguments = TextEditingController(
+      text: widget.initialArguments.isNotEmpty
+          ? widget.initialArguments
+          : widget.sampleArguments,
+    );
+  }
+
+  void _useSample() {
+    _arguments.text = widget.sampleArguments;
+    widget.onArgumentsChanged?.call(widget.sampleArguments);
   }
 
   @override
@@ -113,7 +128,10 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final parameters = playgroundParameterNames(widget.code, widget.functionName);
+    final parameters = playgroundParameterNames(
+      widget.code,
+      widget.functionName,
+    );
     final signature = '${widget.functionName}(${parameters.join(', ')})';
 
     return AlertDialog(
@@ -150,31 +168,53 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                 maxLines: 4,
                 maxLength: 2000,
                 style: const TextStyle(fontFamily: 'roboto-mono'),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Inputs, separated by commas',
                   hintText: '(0, 0), (4, 0), 2.5, [1, 2]',
-                  helperText:
-                      'Use numbers, text, tuples, lists, or dictionaries.',
-                  border: OutlineInputBorder(),
+                  helperText: widget.sampleArguments.isEmpty
+                      ? 'Use numbers, text, tuples, lists, or dictionaries.'
+                      : 'Starts with the example from the instructions. '
+                            'Edit freely.',
+                  helperMaxLines: 2,
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: widget.onArgumentsChanged,
                 onSubmitted: (_) => _run(),
               ),
               const SizedBox(height: AppSpacing.sm),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  key: const Key('playground-run-button'),
-                  onPressed: _running ? null : _run,
-                  icon: _running
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.play_arrow_rounded, size: 20),
-                  label: Text(_running ? 'Running…' : 'Run my function'),
-                ),
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  // Offer the example back once the student has changed it.
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _arguments,
+                    builder: (context, value, _) =>
+                        widget.sampleArguments.isEmpty ||
+                            value.text == widget.sampleArguments
+                        ? const SizedBox.shrink()
+                        : TextButton.icon(
+                            key: const Key('playground-use-example'),
+                            onPressed: _running ? null : _useSample,
+                            icon: const Icon(Icons.restore_rounded, size: 18),
+                            label: const Text('Use example inputs'),
+                          ),
+                  ),
+                  FilledButton.icon(
+                    key: const Key('playground-run-button'),
+                    onPressed: _running ? null : _run,
+                    icon: _running
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.play_arrow_rounded, size: 20),
+                    label: Text(_running ? 'Running…' : 'Run my function'),
+                  ),
+                ],
               ),
               if (_requestError != null) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -279,7 +319,10 @@ class _PlaygroundResultView extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                           vertical: AppSpacing.xs,
                         ),
-                        child: Text(item.label, style: theme.textTheme.bodySmall),
+                        child: Text(
+                          item.label,
+                          style: theme.textTheme.bodySmall,
+                        ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(

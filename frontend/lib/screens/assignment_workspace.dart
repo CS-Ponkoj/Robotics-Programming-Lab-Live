@@ -362,6 +362,11 @@ class _MyHomePageState extends State<MyHomePage> {
         initialArguments: _playgroundArguments,
         onArgumentsChanged: (value) => _playgroundArguments = value,
         simulationConfig: _simulationConfig,
+        sampleArguments: _simulationConfig['playground'] is Map
+            ? ((_simulationConfig['playground'] as Map)['sample_arguments']
+                    ?.toString() ??
+                '')
+            : '',
       ),
     );
   }

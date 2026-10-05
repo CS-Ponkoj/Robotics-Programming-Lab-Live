@@ -20,13 +20,26 @@ const bugRouteConfig = {
       {'id': 'G', 'arg': 4},
     ],
     'paths': [
-      {'points': ['S', 'H'], 'value': 0},
-      {'points': ['H', 'C', 'L'], 'value': 1},
-      {'points': ['L', 'G'], 'value': 2},
+      {
+        'points': ['S', 'H'],
+        'value': 0,
+      },
+      {
+        'points': ['H', 'C', 'L'],
+        'value': 1,
+      },
+      {
+        'points': ['L', 'G'],
+        'value': 2,
+      },
     ],
     'legend_values': [3],
     'checks': [
-      {'type': 'sum', 'parts': [0, 1, 2], 'total': 3},
+      {
+        'type': 'sum',
+        'parts': [0, 1, 2],
+        'total': 3,
+      },
     ],
   },
 };
@@ -43,7 +56,10 @@ const elevatorConfig = {
       {'id': 'E_s', 'arg': 10},
     ],
     'paths': [
-      {'points': ['S', 'M*', 'E_m'], 'value': 0},
+      {
+        'points': ['S', 'M*', 'E_m'],
+        'value': 0,
+      },
       {
         'points': ['S', 'E_s'],
         'value': 1,
@@ -103,7 +119,8 @@ PlaygroundResultDto bugResult({
     call: 'calculate_bug2_route(...)',
     expectedReturnCount: 4,
     returnCount: success ? 4 : null,
-    arguments: arguments ??
+    arguments:
+        arguments ??
         [
           [2, 1],
           [4, 3.5],
@@ -139,7 +156,13 @@ PlaygroundResultDto elevatorResult({
     expectedReturnCount: 8,
     returnCount: 8,
     arguments: [
-      1, 1, 30, 10, 15, 20, 5,
+      1,
+      1,
+      30,
+      10,
+      15,
+      20,
+      5,
       [5, 5],
       [25, 30],
       [10, 5],
@@ -190,17 +213,17 @@ void main() {
       expect(buildPlaygroundDiagram(null, result), isNull);
       expect(buildPlaygroundDiagram(const {'enabled': false}, result), isNull);
       expect(
-        buildPlaygroundDiagram(
-          const {'enabled': false, 'diagram': {'view': 'route'}},
-          result,
-        ),
+        buildPlaygroundDiagram(const {
+          'enabled': false,
+          'diagram': {'view': 'route'},
+        }, result),
         isNull,
       );
       expect(
-        buildPlaygroundDiagram(
-          const {'enabled': true, 'diagram': {'view': '3d'}},
-          result,
-        ),
+        buildPlaygroundDiagram(const {
+          'enabled': true,
+          'diagram': {'view': '3d'},
+        }, result),
         isNull,
       );
     });
@@ -214,8 +237,11 @@ void main() {
 
       expect(diagram.problem, isNull);
       expect(diagram.points.map((p) => p.id), ['S', 'H', 'C', 'L', 'G']);
-      expect(diagram.paths.map((p) => p.points.map((q) => q.id).join()),
-          ['SH', 'HCL', 'LG']);
+      expect(diagram.paths.map((p) => p.points.map((q) => q.id).join()), [
+        'SH',
+        'HCL',
+        'LG',
+      ]);
       expect(diagram.paths.map((p) => p.valueText), ['3.0', '4.5', '3.5']);
       expect(diagram.paths.map((p) => p.shortText), ['3.0', '4.5', '3.5']);
       expect(diagram.legend.last.label, 'Complete route distance');
@@ -250,67 +276,100 @@ void main() {
       expect(diagram.hints, isEmpty);
     });
 
-    test('inputs that cannot be drawn explain what to fix', () {
-      String? problemFor(List<dynamic> arguments) => buildPlaygroundDiagram(
-            bugRouteConfig,
-            bugResult(arguments: arguments),
-            parameterNames: bugParameters,
-          )!
-              .problem;
+    test('unusable inputs are skipped and named, the rest still draws', () {
+      // A student's real attempt: hit and corner typed as single numbers.
+      final partial = buildPlaygroundDiagram(
+        bugRouteConfig,
+        bugResult(
+          arguments: [
+            [0, 0],
+            2,
+            3,
+            [4, 5],
+            [10, 5],
+          ],
+        ),
+        parameterNames: bugParameters,
+      )!;
+      expect(partial.problem, isNull);
+      expect(partial.points.map((p) => p.id), ['S', 'L', 'G']);
+      expect(partial.paths.map((p) => p.points.map((q) => q.id).join()), [
+        'LG',
+      ]);
+      expect(partial.notes, [
+        'Not drawn: hit should be a pair of numbers, like (2, 1).',
+        'Not drawn: corner should be a pair of numbers, like (2, 1).',
+      ]);
+      expect(partial.description, contains('Not drawn: hit'));
 
-      expect(
-        problemFor([
-          [2, 1],
-          'up',
-          [4, 6],
-          [6, 6],
-          [8, 9],
-        ]),
-        contains('hit should be a pair of numbers'),
-      );
-      expect(
-        problemFor([
+      final missing = buildPlaygroundDiagram(
+        bugRouteConfig,
+        bugResult(
+          arguments: [
+            [2, 1],
+            [4, 3],
+          ],
+        ),
+        parameterNames: bugParameters,
+      )!;
+      expect(missing.points.map((p) => p.id), ['S', 'H']);
+      expect(missing.notes.first, contains('enter a value for corner'));
+
+      for (final arguments in [
+        [
           [2, 1, 0],
           [4, 3],
           [4, 6],
           [6, 6],
           [8, 9],
-        ]),
-        contains('start should be a pair'),
-      );
-      expect(
-        problemFor([
+        ],
+        [
           [2e7, 1],
           [4, 3],
           [4, 6],
           [6, 6],
           [8, 9],
-        ]),
-        contains('start should be a pair'),
-      );
-      expect(
-        problemFor([
-          [2, 1],
-          [4, 3],
-        ]),
-        contains('enter a value for corner'),
-      );
-      expect(
-        problemFor([
+        ],
+        [
           [true, 1],
           [4, 3],
           [4, 6],
           [6, 6],
           [8, 9],
-        ]),
-        contains('start should be a pair'),
+        ],
+      ]) {
+        final diagram = buildPlaygroundDiagram(
+          bugRouteConfig,
+          bugResult(arguments: arguments),
+          parameterNames: bugParameters,
+        )!;
+        expect(diagram.problem, isNull);
+        expect(diagram.notes.single, contains('start should be a pair'));
+        expect(diagram.paths.map((p) => p.points.first.id), ['H', 'L']);
+      }
+    });
+
+    test('nothing drawable hides the canvas with one clear reason', () {
+      final diagram = buildPlaygroundDiagram(
+        bugRouteConfig,
+        bugResult(arguments: const [1, 2]),
+        parameterNames: bugParameters,
+      )!;
+      expect(
+        diagram.problem,
+        'Diagram unavailable: start should be a pair of numbers, like (2, 1).',
       );
     });
 
     test('waypoint lists expand into numbered points', () {
       final diagram = buildPlaygroundDiagram(elevatorConfig, elevatorResult())!;
       expect(diagram.points.map((p) => p.id), ['S', 'M1', 'M2', 'E_m', 'E_s']);
-      expect(diagram.paths.first.points.map((p) => p.id), ['S', 'M1', 'M2', 'E_m']);
+      expect(diagram.paths.first.points.map((p) => p.id), [
+        'S',
+        'M1',
+        'M2',
+        'E_m',
+      ]);
       expect(diagram.paths.last.dashed, isTrue);
       expect(diagram.legend[1].note, 'includes the detour allowance');
       expect(diagram.hints, isEmpty);
@@ -322,7 +381,9 @@ void main() {
           success: true,
           call: 'f()',
           arguments: elevatorResult().arguments,
-          values: [value('Main entry route', 5.130648586880582, '5.130648586880582')],
+          values: [
+            value('Main entry route', 5.130648586880582, '5.130648586880582'),
+          ],
         ),
       )!;
       expect(precise.paths.first.shortText, '5.1306');
@@ -338,7 +399,12 @@ void main() {
         elevatorConfig,
         elevatorResult(waypoints: const [7.5]),
       )!;
-      expect(broken.problem, contains('should be a pair of numbers'));
+      // Bad waypoints drop the main route instead of drawing a shortcut.
+      expect(broken.problem, isNull);
+      expect(broken.notes.single, contains('should be a pair of numbers'));
+      expect(broken.paths.map((p) => p.points.map((q) => q.id).join()), [
+        'SE_s',
+      ]);
     });
 
     test('label and best-time hints compare only the student values', () {
@@ -346,14 +412,19 @@ void main() {
         elevatorConfig,
         elevatorResult(label: 'Service Elevator'),
       )!;
-      expect(wrongLabel.hints.single,
-          contains('smaller complete time belongs to "Main Elevator"'));
+      expect(
+        wrongLabel.hints.single,
+        contains('smaller complete time belongs to "Main Elevator"'),
+      );
 
       final tie = buildPlaygroundDiagram(
         elevatorConfig,
         elevatorResult(main: 140, service: 140, best: 140),
       )!;
-      expect(tie.hints.single, contains('tie-break rule picks "Service Elevator"'));
+      expect(
+        tie.hints.single,
+        contains('tie-break rule picks "Service Elevator"'),
+      );
 
       final wrongBest = buildPlaygroundDiagram(
         elevatorConfig,
@@ -377,29 +448,43 @@ void main() {
       expect(diagram.rays.first.halfWidth, 10);
       expect(diagram.rays.last.style, 'bold');
       expect(diagram.description, contains('4 supplied readings'));
-      expect(diagram.description, contains('Your optimal angle: you returned 90'));
+      expect(
+        diagram.description,
+        contains('Your optimal angle: you returned 90'),
+      );
 
       final pairs = buildPlaygroundDiagram(
         vfhConfig,
-        vfhResult(readings: [
-          [0, 10],
-          [90, 8],
-        ]),
+        vfhResult(
+          readings: [
+            [0, 10],
+            [90, 8],
+          ],
+        ),
       )!;
       expect(pairs.readings.map((r) => r.distance), [10, 8]);
     });
 
     test('polar view explains unusable readings and angles', () {
       expect(
-        buildPlaygroundDiagram(vfhConfig, vfhResult(readings: {'0': -1}))!.problem,
+        buildPlaygroundDiagram(
+          vfhConfig,
+          vfhResult(readings: {'0': -1}),
+        )!.problem,
         contains('positive distance'),
       );
       expect(
-        buildPlaygroundDiagram(vfhConfig, vfhResult(readings: {'north': 3}))!.problem,
+        buildPlaygroundDiagram(
+          vfhConfig,
+          vfhResult(readings: {'north': 3}),
+        )!.problem,
         contains('numeric angle'),
       );
       expect(
-        buildPlaygroundDiagram(vfhConfig, vfhResult(readings: const {}))!.problem,
+        buildPlaygroundDiagram(
+          vfhConfig,
+          vfhResult(readings: const {}),
+        )!.problem,
         contains('at least one reading'),
       );
       expect(
@@ -414,7 +499,9 @@ void main() {
       expect(notNumber.problem, isNull);
       expect(notNumber.rays, hasLength(2));
       expect(
-        notNumber.legend.firstWhere((e) => e.label == 'Your optimal angle').note,
+        notNumber.legend
+            .firstWhere((e) => e.label == 'Your optimal angle')
+            .note,
         'not a number, so not drawn',
       );
     });
@@ -434,15 +521,15 @@ void main() {
 
   group('diagram widget', () {
     Widget host(Widget child, {double width = 800}) => MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: SizedBox(
-                width: width,
-                child: SingleChildScrollView(child: child),
-              ),
-            ),
+      home: Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: width,
+            child: SingleChildScrollView(child: child),
           ),
-        );
+        ),
+      ),
+    );
 
     testWidgets('route and polar diagrams paint with a screen-reader summary', (
       WidgetTester tester,
@@ -455,8 +542,14 @@ void main() {
       )!;
       await tester.pumpWidget(host(PlaygroundDiagram(data: route)));
 
-      expect(find.byKey(const Key('playground-diagram-canvas')), findsOneWidget);
-      expect(find.bySemanticsLabel(RegExp('Route diagram. Points: S at')), findsOneWidget);
+      expect(
+        find.byKey(const Key('playground-diagram-canvas')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(RegExp('Route diagram. Points: S at')),
+        findsOneWidget,
+      );
       expect(find.textContaining('you returned 11.0'), findsNothing);
       expect(find.textContaining('you returned 12.5'), findsOneWidget);
       expect(find.byKey(const Key('playground-diagram-hint')), findsOneWidget);
@@ -464,7 +557,10 @@ void main() {
 
       final polar = buildPlaygroundDiagram(vfhConfig, vfhResult())!;
       await tester.pumpWidget(host(PlaygroundDiagram(data: polar)));
-      expect(find.bySemanticsLabel(RegExp('Polar diagram with 4')), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('Polar diagram with 4')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
       handle.dispose();
     });
@@ -479,9 +575,15 @@ void main() {
       )!;
       await tester.pumpWidget(host(PlaygroundDiagram(data: diagram)));
 
-      expect(find.byKey(const Key('playground-diagram-problem')), findsOneWidget);
+      expect(
+        find.byKey(const Key('playground-diagram-problem')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('playground-diagram-canvas')), findsNothing);
-      expect(find.textContaining('start should be a pair of numbers'), findsOneWidget);
+      expect(
+        find.textContaining('start should be a pair of numbers'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('diagrams fit a 360 pixel phone without overflow', (
@@ -492,12 +594,19 @@ void main() {
       addTearDown(tester.view.reset);
 
       for (final data in [
-        buildPlaygroundDiagram(elevatorConfig, elevatorResult(label: 'Service Elevator'))!,
+        buildPlaygroundDiagram(
+          elevatorConfig,
+          elevatorResult(label: 'Service Elevator'),
+        )!,
         buildPlaygroundDiagram(vfhConfig, vfhResult())!,
       ]) {
-        await tester.pumpWidget(host(PlaygroundDiagram(data: data), width: 296));
+        await tester.pumpWidget(
+          host(PlaygroundDiagram(data: data), width: 296),
+        );
         expect(tester.takeException(), isNull);
-        final size = tester.getSize(find.byKey(const Key('playground-diagram-canvas')));
+        final size = tester.getSize(
+          find.byKey(const Key('playground-diagram-canvas')),
+        );
         expect(size.width, lessThanOrEqualTo(296));
         expect(size.width, size.height);
       }
@@ -508,26 +617,30 @@ void main() {
     ) async {
       final same = buildPlaygroundDiagram(
         bugRouteConfig,
-        bugResult(arguments: const [
-          [1, 1],
-          [1, 1],
-          [1, 1],
-          [1, 1],
-          [1, 1],
-        ]),
+        bugResult(
+          arguments: const [
+            [1, 1],
+            [1, 1],
+            [1, 1],
+            [1, 1],
+            [1, 1],
+          ],
+        ),
       )!;
       await tester.pumpWidget(host(PlaygroundDiagram(data: same)));
       expect(tester.takeException(), isNull);
 
       final tiny = buildPlaygroundDiagram(
         bugRouteConfig,
-        bugResult(arguments: const [
-          [0, 0],
-          [0.0001, 0],
-          [0.0001, 0.0002],
-          [0.0003, 0.0002],
-          [0.0004, 0.0004],
-        ]),
+        bugResult(
+          arguments: const [
+            [0, 0],
+            [0.0001, 0],
+            [0.0001, 0.0002],
+            [0.0003, 0.0002],
+            [0.0004, 0.0004],
+          ],
+        ),
       )!;
       await tester.pumpWidget(host(PlaygroundDiagram(data: tiny)));
       expect(tester.takeException(), isNull);
@@ -542,7 +655,8 @@ void main() {
             body: PlaygroundDialog(
               assignmentId: 1,
               functionName: 'calculate_bug2_route',
-              code: 'def calculate_bug2_route(start, hit, corner, leave, goal):\n'
+              code:
+                  'def calculate_bug2_route(start, hit, corner, leave, goal):\n'
                   '    return 0.0, 0.0, 0.0, 0.0',
               simulationConfig: bugRouteConfig,
               runner: (_, __, ___) async => bugResult(),
@@ -578,6 +692,102 @@ void main() {
       await tester.tap(find.byKey(const Key('playground-run-button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('playground-diagram')), findsNothing);
+    });
+  });
+
+  group('example inputs', () {
+    const sample =
+        '(2.0, 1.0), (4.0, 3.6666666666666665), (4.0, 6.0), (5.75, 6.0), (8.0, 9.0)';
+
+    Widget dialog({
+      String initial = '',
+      String sampleArguments = sample,
+      List<String>? calls,
+      ValueChanged<String>? onChanged,
+    }) {
+      return MaterialApp(
+        home: Scaffold(
+          body: PlaygroundDialog(
+            assignmentId: 1,
+            functionName: 'calculate_bug2_route',
+            code:
+                'def calculate_bug2_route(start, hit, corner, leave, goal):\n'
+                '    return 0.0, 0.0, 0.0, 0.0',
+            initialArguments: initial,
+            sampleArguments: sampleArguments,
+            onArgumentsChanged: onChanged,
+            runner: (_, __, arguments) async {
+              calls?.add(arguments);
+              return bugResult();
+            },
+          ),
+        ),
+      );
+    }
+
+    String fieldText(WidgetTester tester) => tester
+        .widget<TextField>(find.byKey(const Key('playground-arguments')))
+        .controller!
+        .text;
+
+    testWidgets('an empty box starts with the example so one click runs', (
+      WidgetTester tester,
+    ) async {
+      final calls = <String>[];
+      await tester.pumpWidget(dialog(calls: calls));
+
+      expect(fieldText(tester), sample);
+      expect(
+        find.textContaining('example from the instructions'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('playground-use-example')), findsNothing);
+      await tester.tap(find.byKey(const Key('playground-run-button')));
+      await tester.pumpAndSettle();
+      expect(calls, [sample]);
+    });
+
+    testWidgets('earlier inputs are kept and the example can be restored', (
+      WidgetTester tester,
+    ) async {
+      String? latest;
+      await tester.pumpWidget(
+        dialog(initial: '(0, 0), (1, 1)', onChanged: (value) => latest = value),
+      );
+
+      expect(fieldText(tester), '(0, 0), (1, 1)');
+      await tester.tap(find.byKey(const Key('playground-use-example')));
+      await tester.pump();
+      expect(fieldText(tester), sample);
+      expect(latest, sample);
+      expect(find.byKey(const Key('playground-use-example')), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('playground-arguments')),
+        '1',
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('playground-use-example')), findsOneWidget);
+    });
+
+    testWidgets('assignments without an example keep the empty box', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(dialog(sampleArguments: ''));
+      expect(fieldText(tester), isEmpty);
+      expect(find.byKey(const Key('playground-use-example')), findsNothing);
+      expect(find.textContaining('Use numbers, text, tuples'), findsOneWidget);
+    });
+
+    testWidgets('the example controls fit a phone', (
+      WidgetTester tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 740);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(dialog(initial: '1, 2'));
+      expect(find.byKey(const Key('playground-use-example')), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 

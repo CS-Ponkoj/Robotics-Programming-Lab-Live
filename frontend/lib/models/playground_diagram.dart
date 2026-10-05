@@ -96,6 +96,7 @@ class PlaygroundDiagramData {
     this.arcs = const [],
     this.legend = const [],
     this.hints = const [],
+    this.notes = const [],
     this.description = '',
   });
 
@@ -111,6 +112,9 @@ class PlaygroundDiagramData {
   final List<DiagramArcData> arcs;
   final List<DiagramLegendEntry> legend;
   final List<String> hints;
+
+  /// Inputs that could not be drawn while the rest of the diagram still is.
+  final List<String> notes;
   final String description;
 }
 
@@ -153,7 +157,9 @@ PlaygroundDiagramData? buildPlaygroundDiagram(
   final diagram = Map<String, dynamic>.from(config);
   final view = diagram['view'];
   if (view != 'route' && view != 'polar') return null;
-  final caption = diagram['caption'] is String ? diagram['caption'] as String : '';
+  final caption = diagram['caption'] is String
+      ? diagram['caption'] as String
+      : '';
   final values = result.success ? result.values : const <PlaygroundValueDto>[];
   final context = _DiagramContext(result.arguments, values, parameterNames);
   try {
@@ -164,7 +170,7 @@ PlaygroundDiagramData? buildPlaygroundDiagram(
     return PlaygroundDiagramData(
       view: view as String,
       caption: caption,
-      problem: error.message,
+      problem: 'Diagram unavailable: ${error.message}',
     );
   }
 }
@@ -182,15 +188,15 @@ class _DiagramContext {
 
   Object? argument(int index) {
     if (index < 0 || index >= arguments.length) {
-      throw _DiagramInputError(
-        'Diagram unavailable: enter a value for ${argumentName(index)}.',
-      );
+      throw _DiagramInputError('enter a value for ${argumentName(index)}.');
     }
     return arguments[index];
   }
 
   PlaygroundValueDto? value(Object? index) =>
-      index is int && index >= 0 && index < values.length ? values[index] : null;
+      index is int && index >= 0 && index < values.length
+      ? values[index]
+      : null;
 
   String labelFor(Object? index, String fallback) =>
       value(index)?.label ?? fallback;
@@ -213,9 +219,7 @@ DiagramPointData _point(String id, Object? value, String name) {
       return DiagramPointData(id, x, y);
     }
   }
-  throw _DiagramInputError(
-    'Diagram unavailable: $name should be a pair of numbers, like (2, 1).',
-  );
+  throw _DiagramInputError('$name should be a pair of numbers, like (2, 1).');
 }
 
 PlaygroundDiagramData _buildRoute(
@@ -225,32 +229,66 @@ PlaygroundDiagramData _buildRoute(
 ) {
   final groups = <String, List<DiagramPointData>>{};
   final allPoints = <DiagramPointData>[];
+  final notes = <String>[];
   for (final spec in _maps(diagram['points'])) {
     final id = spec['id']?.toString() ?? '';
     final arg = spec['arg'];
     if (id.isEmpty || arg is! int) continue;
-    final value = context.argument(arg);
-    final name = context.argumentName(arg);
-    if (spec['each'] == true) {
-      if (value is! List) {
-        throw _DiagramInputError(
-          'Diagram unavailable: $name should be a list of points, '
-          'like [(7.5, 4.5), (8.5, 4.5)].',
-        );
-      }
-      final expanded = [
-        for (var index = 0; index < value.length; index++)
-          _point('$id${index + 1}', value[index], name),
-      ];
-      groups[id] = expanded;
-      allPoints.addAll(expanded);
-    } else {
-      final point = _point(id, value, name);
-      groups[id] = [point];
-      allPoints.add(point);
+    try {
+      _addRoutePoints(spec, id, arg, context, groups, allPoints);
+    } on _DiagramInputError catch (error) {
+      // Draw everything else; tell the student what was left out.
+      notes.add('Not drawn: ${error.message}');
     }
   }
+  if (allPoints.isEmpty) {
+    throw _DiagramInputError(
+      notes.isEmpty
+          ? 'there are no points to draw.'
+          : notes.first.replaceFirst('Not drawn: ', ''),
+    );
+  }
+  return _routeData(diagram, caption, context, groups, allPoints, notes);
+}
 
+void _addRoutePoints(
+  Map<String, dynamic> spec,
+  String id,
+  int arg,
+  _DiagramContext context,
+  Map<String, List<DiagramPointData>> groups,
+  List<DiagramPointData> allPoints,
+) {
+  final value = context.argument(arg);
+  final name = context.argumentName(arg);
+  if (spec['each'] == true) {
+    if (value is! List) {
+      throw _DiagramInputError(
+        '$name should be a list of points, '
+        'like [(7.5, 4.5), (8.5, 4.5)].',
+      );
+    }
+    final expanded = [
+      for (var index = 0; index < value.length; index++)
+        _point('$id${index + 1}', value[index], name),
+    ];
+    groups[id] = expanded;
+    allPoints.addAll(expanded);
+  } else {
+    final point = _point(id, value, name);
+    groups[id] = [point];
+    allPoints.add(point);
+  }
+}
+
+PlaygroundDiagramData _routeData(
+  Map<String, dynamic> diagram,
+  String caption,
+  _DiagramContext context,
+  Map<String, List<DiagramPointData>> groups,
+  List<DiagramPointData> allPoints,
+  List<String> notes,
+) {
   final paths = <DiagramPathData>[];
   final legend = <DiagramLegendEntry>[];
   final descriptions = <String>[];
@@ -258,8 +296,13 @@ PlaygroundDiagramData _buildRoute(
   for (var index = 0; index < pathSpecs.length; index++) {
     final spec = pathSpecs[index];
     final ids = spec['points'] is List ? spec['points'] as List : const [];
+    final pointIds = ids.map((id) => id.toString().replaceFirst('*', ''));
+    // A path with any undrawable point is left out rather than redrawn as a
+    // shortcut that the student did not describe.
+    final complete = pointIds.every(groups.containsKey);
     final points = <DiagramPointData>[
-      for (final id in ids) ...?groups[id.toString().replaceFirst('*', '')],
+      if (complete)
+        for (final id in pointIds) ...groups[id]!,
     ];
     final value = context.value(spec['value']);
     final dashed = spec['style'] == 'dashed';
@@ -288,15 +331,19 @@ PlaygroundDiagramData _buildRoute(
     );
     final route = points.map((point) => point.id).join(' to ');
     descriptions.add(
-      value == null ? '$label: $route' : '$label: $route, you returned ${value.text}',
+      value == null
+          ? '$label: $route'
+          : '$label: $route, you returned ${value.text}',
     );
   }
   legend.addAll(_legendValues(diagram, context));
 
   final placed = allPoints
-      .map((point) =>
-          '${point.id} at (${formatDiagramNumber(point.x)}, '
-          '${formatDiagramNumber(point.y)})')
+      .map(
+        (point) =>
+            '${point.id} at (${formatDiagramNumber(point.x)}, '
+            '${formatDiagramNumber(point.y)})',
+      )
       .join(', ');
   return PlaygroundDiagramData(
     view: 'route',
@@ -305,7 +352,12 @@ PlaygroundDiagramData _buildRoute(
     paths: paths,
     legend: legend,
     hints: _hints(diagram, context),
-    description: 'Route diagram. Points: $placed. ${descriptions.join('. ')}.',
+    notes: notes,
+    description: [
+      'Route diagram. Points: $placed.',
+      if (descriptions.isNotEmpty) '${descriptions.join('. ')}.',
+      ...notes,
+    ].join(' '),
   );
 }
 
@@ -326,7 +378,7 @@ List<DiagramReading> _readings(Object? value, String name) {
   }
   if (value is! Map && value is! List) {
     throw _DiagramInputError(
-      'Diagram unavailable: $name should map angles to distances, '
+      '$name should map angles to distances, '
       'like {0: 10, 90: 8}.',
     );
   }
@@ -340,16 +392,14 @@ List<DiagramReading> _readings(Object? value, String name) {
         distance <= 0 ||
         distance > maxDiagramCoordinate) {
       throw _DiagramInputError(
-        'Diagram unavailable: every reading in $name needs a numeric angle '
+        'every reading in $name needs a numeric angle '
         'and a positive distance.',
       );
     }
     readings.add(DiagramReading(angle % 360, distance));
   }
   if (readings.isEmpty) {
-    throw _DiagramInputError(
-      'Diagram unavailable: add at least one reading to $name.',
-    );
+    throw _DiagramInputError('add at least one reading to $name.');
   }
   readings.sort((a, b) => a.angle.compareTo(b.angle));
   return readings.length > maxDiagramReadings
@@ -364,7 +414,9 @@ PlaygroundDiagramData _buildPolar(
 ) {
   final readingsSpec = diagram['readings'];
   final readingsArg = readingsSpec is Map ? readingsSpec['arg'] : null;
-  if (readingsArg is! int) return PlaygroundDiagramData(view: 'polar', caption: caption);
+  if (readingsArg is! int) {
+    return PlaygroundDiagramData(view: 'polar', caption: caption);
+  }
   final readings = _readings(
     context.argument(readingsArg),
     context.argumentName(readingsArg),
@@ -392,7 +444,8 @@ PlaygroundDiagramData _buildPolar(
     legend.add(
       DiagramLegendEntry(
         label: label,
-        note: '${formatDiagramAngle(from)} to ${formatDiagramAngle(to)} degrees',
+        note:
+            '${formatDiagramAngle(from)} to ${formatDiagramAngle(to)} degrees',
         colorIndex: color,
       ),
     );
@@ -410,8 +463,8 @@ PlaygroundDiagramData _buildPolar(
     final angle = fromStudent
         ? context.numberFor(spec['value'])
         : spec['arg'] is int
-            ? _number(context.argument(spec['arg'] as int))
-            : null;
+        ? _number(context.argument(spec['arg'] as int))
+        : null;
     final halfWidth = spec['half_width_arg'] is int
         ? _number(context.argument(spec['half_width_arg'] as int))
         : null;
@@ -422,7 +475,9 @@ PlaygroundDiagramData _buildPolar(
           label: label,
           valueText: studentText,
           note: fromStudent
-              ? (studentText == null ? 'not returned' : 'not a number, so not drawn')
+              ? (studentText == null
+                    ? 'not returned'
+                    : 'not a number, so not drawn')
               : 'not a number, so not drawn',
           colorIndex: color,
           style: style,
@@ -431,7 +486,9 @@ PlaygroundDiagramData _buildPolar(
       continue;
     }
     final usableHalfWidth =
-        halfWidth != null && halfWidth >= 0 && halfWidth <= 180 ? halfWidth : null;
+        halfWidth != null && halfWidth >= 0 && halfWidth <= 180
+        ? halfWidth
+        : null;
     rays.add(
       DiagramRayData(
         angle: angle % 360,
@@ -443,7 +500,7 @@ PlaygroundDiagramData _buildPolar(
     final where = usableHalfWidth == null
         ? '${formatDiagramAngle(angle)} degrees'
         : '${formatDiagramAngle(angle)} degrees, plus or minus '
-            '${formatDiagramAngle(usableHalfWidth)}';
+              '${formatDiagramAngle(usableHalfWidth)}';
     legend.add(
       DiagramLegendEntry(
         label: label,
@@ -454,7 +511,9 @@ PlaygroundDiagramData _buildPolar(
       ),
     );
     descriptions.add(
-      fromStudent ? '$label: you returned $studentText degrees' : '$label at $where',
+      fromStudent
+          ? '$label: you returned $studentText degrees'
+          : '$label at $where',
     );
   }
   legend.addAll(_legendValues(diagram, context));
@@ -536,17 +595,17 @@ List<String> _hints(Map<String, dynamic> diagram, _DiagramContext context) {
       final int? expected = tied.length == 1
           ? tied.single
           : tieIndex is int && tied.contains(tieIndex)
-              ? tieIndex
-              : null;
+          ? tieIndex
+          : null;
       if (expected == null) continue;
       final returnedLabel = context.value(check['label'])?.value;
       if (returnedLabel is String && returnedLabel != labels[expected]) {
         hints.add(
           tied.length > 1
               ? 'Your times are equal, so the tie-break rule picks '
-                  '"${labels[expected]}", but your label says "$returnedLabel".'
+                    '"${labels[expected]}", but your label says "$returnedLabel".'
               : 'Your label says "$returnedLabel", but your smaller complete '
-                  'time belongs to "${labels[expected]}".',
+                    'time belongs to "${labels[expected]}".',
         );
       }
       final best = context.numberFor(check['best']);

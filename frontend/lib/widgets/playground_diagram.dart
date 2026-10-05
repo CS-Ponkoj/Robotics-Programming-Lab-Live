@@ -20,20 +20,24 @@ Color diagramColor(int index) => diagramPalette[index % diagramPalette.length];
 /// A "nice" grid step (1, 2, or 5 times a power of ten) near [rough].
 double niceDiagramStep(double rough) {
   if (!rough.isFinite || rough <= 0) return 1;
-  final magnitude = math.pow(10, (math.log(rough) / math.ln10).floor()).toDouble();
+  final magnitude = math
+      .pow(10, (math.log(rough) / math.ln10).floor())
+      .toDouble();
   final fraction = rough / magnitude;
   final nice = fraction <= 1
       ? 1
       : fraction <= 2
-          ? 2
-          : fraction <= 5
-              ? 5
-              : 10;
+      ? 2
+      : fraction <= 5
+      ? 5
+      : 10;
   return nice * magnitude;
 }
 
 String _tickLabel(double value, double step) {
-  final decimals = step >= 1 ? 0 : (-math.log(step) / math.ln10).ceil().clamp(0, 6);
+  final decimals = step >= 1
+      ? 0
+      : (-math.log(step) / math.ln10).ceil().clamp(0, 6);
   final text = value.toStringAsFixed(decimals);
   return text == '-0' ? '0' : text;
 }
@@ -66,10 +70,15 @@ class PlaygroundDiagram extends StatelessWidget {
             key: const Key('playground-diagram-problem'),
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded,
-                  size: 18, color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.info_outline_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: AppSpacing.sm),
-              Expanded(child: Text(data.problem!, style: theme.textTheme.bodySmall)),
+              Expanded(
+                child: Text(data.problem!, style: theme.textTheme.bodySmall),
+              ),
             ],
           )
         else ...[
@@ -87,7 +96,9 @@ class PlaygroundDiagram extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(AppRadii.sm),
-                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(AppRadii.sm),
@@ -113,6 +124,23 @@ class PlaygroundDiagram extends StatelessWidget {
               ),
             ),
           ),
+          for (final note in data.notes)
+            Padding(
+              key: const Key('playground-diagram-note'),
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(child: Text(note, style: theme.textTheme.bodySmall)),
+                ],
+              ),
+            ),
           if (data.legend.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
             for (final entry in data.legend) _LegendRow(entry: entry),
@@ -124,8 +152,11 @@ class PlaygroundDiagram extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.tips_and_updates_outlined,
-                      size: 18, color: AppColors.performanceMid),
+                  Icon(
+                    Icons.tips_and_updates_outlined,
+                    size: 18,
+                    color: AppColors.performanceMid,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(child: Text(hint, style: theme.textTheme.bodySmall)),
                 ],
@@ -291,7 +322,12 @@ class RouteDiagramPainter extends CustomPainter {
     const left = 34.0;
     const bottom = 20.0;
     const pad = 12.0;
-    final plot = Rect.fromLTRB(left, pad, size.width - pad, size.height - bottom);
+    final plot = Rect.fromLTRB(
+      left,
+      pad,
+      size.width - pad,
+      size.height - bottom,
+    );
     if (plot.width <= 0 || plot.height <= 0) return;
 
     var minX = data.points.map((p) => p.x).reduce(math.min);
@@ -313,10 +349,8 @@ class RouteDiagramPainter extends CustomPainter {
       plot.left + (plot.width - span * scale) / 2,
       plot.top + (plot.height - span * scale) / 2,
     );
-    Offset toScreen(double x, double y) => Offset(
-          origin.dx + (x - minX) * scale,
-          origin.dy + (maxY - y) * scale,
-        );
+    Offset toScreen(double x, double y) =>
+        Offset(origin.dx + (x - minX) * scale, origin.dy + (maxY - y) * scale);
 
     final step = niceDiagramStep(span / 5);
     final gridPaint = Paint()
@@ -326,7 +360,12 @@ class RouteDiagramPainter extends CustomPainter {
       final top = toScreen(x, maxY);
       final base = toScreen(x, minY);
       canvas.drawLine(top, base, gridPaint);
-      _drawText(canvas, _tickLabel(x, step), base + const Offset(0, 9), textColor);
+      _drawText(
+        canvas,
+        _tickLabel(x, step),
+        base + const Offset(0, 9),
+        textColor,
+      );
     }
     for (var y = (minY / step).ceil() * step; y <= maxY + 1e-9; y += step) {
       final start = toScreen(minX, y);
@@ -348,8 +387,13 @@ class RouteDiagramPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round;
       final screen = path.points.map((p) => toScreen(p.x, p.y)).toList();
       for (var index = 0; index < screen.length - 1; index++) {
-        drawDiagramLine(canvas, screen[index], screen[index + 1], paint,
-            dashed: path.dashed);
+        drawDiagramLine(
+          canvas,
+          screen[index],
+          screen[index + 1],
+          paint,
+          dashed: path.dashed,
+        );
       }
       _drawArrowHead(canvas, screen[screen.length - 2], screen.last, color);
       if (path.shortText != null) {
@@ -392,8 +436,14 @@ class RouteDiagramPainter extends CustomPainter {
     final normal = Offset(-unit.dy, unit.dx);
     final path = ui.Path()
       ..moveTo(tip.dx, tip.dy)
-      ..lineTo((tip - unit * 9 + normal * 5).dx, (tip - unit * 9 + normal * 5).dy)
-      ..lineTo((tip - unit * 9 - normal * 5).dx, (tip - unit * 9 - normal * 5).dy)
+      ..lineTo(
+        (tip - unit * 9 + normal * 5).dx,
+        (tip - unit * 9 + normal * 5).dy,
+      )
+      ..lineTo(
+        (tip - unit * 9 - normal * 5).dx,
+        (tip - unit * 9 - normal * 5).dy,
+      )
       ..close();
     canvas.drawPath(path, Paint()..color = color);
   }
@@ -427,7 +477,8 @@ class PolarDiagramPainter extends CustomPainter {
     final center = size.center(Offset.zero);
     final radius = size.shortestSide / 2 - 30;
     if (radius <= 0) return;
-    Offset at(double angle, double distance) => center +
+    Offset at(double angle, double distance) =>
+        center +
         Offset(
           distance * math.sin(_radians(angle)),
           -distance * math.cos(_radians(angle)),
@@ -445,12 +496,23 @@ class PolarDiagramPainter extends CustomPainter {
     for (var ring = step; ring <= outer + 1e-9; ring += step) {
       canvas.drawCircle(center, ring * scale, gridPaint);
       // Ring labels sit on the 45-degree diagonal, away from the 0-degree line.
-      _drawText(canvas, _tickLabel(ring, step), at(45, ring * scale), textColor,
-          fontSize: 9, background: gridColor.withValues(alpha: 0.35));
+      _drawText(
+        canvas,
+        _tickLabel(ring, step),
+        at(45, ring * scale),
+        textColor,
+        fontSize: 9,
+        background: gridColor.withValues(alpha: 0.35),
+      );
     }
     for (var angle = 0; angle < 360; angle += 30) {
       canvas.drawLine(center, at(angle.toDouble(), radius), gridPaint);
-      _drawText(canvas, '$angle°', at(angle.toDouble(), radius + 15), textColor);
+      _drawText(
+        canvas,
+        '$angle°',
+        at(angle.toDouble(), radius + 15),
+        textColor,
+      );
     }
 
     for (final ray in data.rays.where((ray) => ray.halfWidth != null)) {
@@ -458,7 +520,12 @@ class PolarDiagramPainter extends CustomPainter {
       final start = _radians(ray.angle - ray.halfWidth! - 90);
       final wedge = ui.Path()
         ..moveTo(center.dx, center.dy)
-        ..arcTo(Rect.fromCircle(center: center, radius: radius), start, sweep, false)
+        ..arcTo(
+          Rect.fromCircle(center: center, radius: radius),
+          start,
+          sweep,
+          false,
+        )
         ..close();
       canvas.drawPath(
         wedge,
@@ -498,7 +565,13 @@ class PolarDiagramPainter extends CustomPainter {
         ..strokeWidth = ray.style == 'bold' ? 4 : 2
         ..strokeCap = StrokeCap.round;
       final end = at(ray.angle, radius);
-      drawDiagramLine(canvas, center, end, paint, dashed: ray.style == 'dashed');
+      drawDiagramLine(
+        canvas,
+        center,
+        end,
+        paint,
+        dashed: ray.style == 'dashed',
+      );
       if (ray.style == 'bold') {
         canvas.drawCircle(end, 5, Paint()..color = color);
       }

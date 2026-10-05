@@ -7,11 +7,13 @@ database models provider-neutral for SQLite development and PostgreSQL staging.
 from enum import StrEnum
 from typing import Any, Annotated, Literal
 
+from playground_inputs import PlaygroundInputError, parse_playground_arguments
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     TypeAdapter,
+    field_validator,
     model_serializer,
     model_validator,
 )
@@ -227,18 +229,35 @@ class DiagramConfig(ContractModel):
         return self
 
 
+class PlaygroundConfig(ContractModel):
+    # Inputs only (normally the instructions' public example call); outputs
+    # always come from the student's own code.
+    sample_arguments: str = Field(default="", max_length=2000)
+
+    @field_validator("sample_arguments")
+    @classmethod
+    def sample_is_literal(cls, value: str) -> str:
+        try:
+            parse_playground_arguments(value)
+        except PlaygroundInputError as error:
+            raise ValueError(f"sample_arguments is not valid input: {error}") from error
+        return value
+
+
 class SimulationConfig(ContractModel):
     enabled: bool = False
     provider: str | None = Field(default=None, max_length=120)
     scenario: str | None = Field(default=None, max_length=300)
     diagram: DiagramConfig | None = None
+    playground: PlaygroundConfig | None = None
 
     @model_serializer(mode="wrap")
-    def omit_missing_diagram(self, handler):
-        # Configurations without a diagram keep their original stored shape.
+    def omit_missing_optional_blocks(self, handler):
+        # Configurations without these blocks keep their original stored shape.
         data = handler(self)
-        if data.get("diagram") is None:
-            data.pop("diagram", None)
+        for key in ("diagram", "playground"):
+            if data.get(key) is None:
+                data.pop(key, None)
         return data
 
 

@@ -52,6 +52,9 @@
     "enabled": true,
     "provider": "diagram",
     "scenario": null,
+    "playground": {
+      "sample_arguments": "(0, 0), (4, 0), (4, -1), (6, -1), (6, 0), (10, 0)"
+    },
     "diagram": {
       "view": "route",
       "caption": "Drawn to scale from your inputs. Each line is labelled with the value your function returned.",

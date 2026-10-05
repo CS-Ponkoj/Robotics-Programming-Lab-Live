@@ -95,6 +95,9 @@
     "enabled": true,
     "provider": "diagram",
     "scenario": null,
+    "playground": {
+      "sample_arguments": "{0: 10, 1: 8, 2: 12, 358: 7, 359: 9}, 3, 357, 90, 10, 90"
+    },
     "diagram": {
       "view": "polar",
       "caption": "Robot at the centre, 0 degrees at the top, angles clockwise (illustration only). Only the readings you supplied are drawn.",

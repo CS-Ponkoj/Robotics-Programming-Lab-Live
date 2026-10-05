@@ -122,7 +122,8 @@ def test_student_demo_tries_inputs_and_reads_failure_guidance(page: Page):
     expect(try_inputs).to_be_enabled(timeout=60_000)
     try_inputs.click()
     wait_for_text(page, "not graded, not saved")
-    type_into(page, "Inputs, separated by commas", "(2, 1), (4, 3.5), (4, 6), (6, 6), (8, 9)")
+    # The box starts with the instructions' example, so one click runs it.
+    wait_for_text(page, "Starts with the example from the instructions")
     page.get_by_role("button", name="Run my function").click()
     wait_for_text(page, "Approach distance", GRADING_TIMEOUT_MS)
     wait_for_text(page, "Printed output")
