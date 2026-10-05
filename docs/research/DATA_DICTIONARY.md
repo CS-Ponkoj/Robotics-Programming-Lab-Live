@@ -162,9 +162,15 @@ index; a `polar` view draws supplied readings, arcs, and rays. Optional
 other. Diagrams contain only indices, never expected answers, and the server
 rejects inconsistent references when an assignment is saved.
 
-`simulation_config.playground.sample_arguments` holds example inputs (the
-instructions' public example call) that prefill an empty Try inputs box. It
-holds inputs only, and the server rejects text its literal parser cannot read.
+`simulation_config.playground.parameters` describes each function input in
+order: `name`, `kind` (`point`, `number`, `integer`, `list_of_points`,
+`angle_map`, or `text`), `label`, `meaning`, `unit`, `example` (an input value
+from the instructions' public example), and an optional display `group`. The
+browser shows one labelled field per parameter, prefilled with its example.
+Before running, the server checks each input's kind and returns HTTP 400 with
+`details` entries carrying `parameter_index`, so the message appears on that
+field. `playground.hints_enabled` (default true) lets instructors turn
+consistency hints off. A v6.3 `sample_arguments` value is accepted and ignored.
 Inputs that cannot be drawn are skipped and named under the diagram.
 
 ### `study_sessions`

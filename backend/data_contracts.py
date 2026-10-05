@@ -7,13 +7,17 @@ database models provider-neutral for SQLite development and PostgreSQL staging.
 from enum import StrEnum
 from typing import Any, Annotated, Literal
 
-from playground_inputs import PlaygroundInputError, parse_playground_arguments
+from playground_inputs import (
+    PlaygroundInputError,
+    matches_parameter_kind,
+    parameter_kind_hint,
+    parse_playground_arguments,
+)
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     TypeAdapter,
-    field_validator,
     model_serializer,
     model_validator,
 )
@@ -229,19 +233,45 @@ class DiagramConfig(ContractModel):
         return self
 
 
-class PlaygroundConfig(ContractModel):
-    # Inputs only (normally the instructions' public example call); outputs
-    # always come from the student's own code.
-    sample_arguments: str = Field(default="", max_length=2000)
+class PlaygroundParameter(ContractModel):
+    """Describes one function input for a labelled playground field."""
 
-    @field_validator("sample_arguments")
-    @classmethod
-    def sample_is_literal(cls, value: str) -> str:
+    name: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,39}$")
+    kind: Literal["point", "number", "integer", "list_of_points", "angle_map", "text"]
+    label: str = Field(min_length=1, max_length=60)
+    meaning: str = Field(default="", max_length=200)
+    unit: str = Field(default="", max_length=20)
+    # An input value only (normally from the instructions' public example);
+    # outputs always come from the student's own code.
+    example: str = Field(min_length=1, max_length=400)
+    group: str = Field(default="", max_length=40)
+
+    @model_validator(mode="after")
+    def example_matches_kind(self):
         try:
-            parse_playground_arguments(value)
+            values = parse_playground_arguments(self.example)
         except PlaygroundInputError as error:
-            raise ValueError(f"sample_arguments is not valid input: {error}") from error
-        return value
+            raise ValueError(f"The example for {self.name} is not valid input: {error}") from error
+        if len(values) != 1 or not matches_parameter_kind(self.kind, values[0]):
+            raise ValueError(
+                f"The example for {self.name} should be {parameter_kind_hint(self.kind)}"
+            )
+        return self
+
+
+class PlaygroundConfig(ContractModel):
+    parameters: list[PlaygroundParameter] = Field(default_factory=list, max_length=20)
+    # Instructors can turn consistency hints off for a study condition.
+    hints_enabled: bool = True
+    # Accepted from v6.3 records and ignored; examples now come from parameters.
+    sample_arguments: str | None = Field(default=None, max_length=2000, exclude=True)
+
+    @model_validator(mode="after")
+    def unique_parameter_names(self):
+        names = [item.name for item in self.parameters]
+        if len(names) != len(set(names)):
+            raise ValueError("Playground parameter names must be unique")
+        return self
 
 
 class SimulationConfig(ContractModel):

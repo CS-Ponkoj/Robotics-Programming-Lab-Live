@@ -1,6 +1,6 @@
 {
   "id": 2,
-  "version": 11,
+  "version": 12,
   "data_schema_version": 1,
   "title": "Assignment 2: Obstacle Avoidance: Bug Algorithm Scenario 2",
   "description": "Calculate a geometrically consistent Bug2 detour around a rectangular obstacle.",
@@ -53,7 +53,56 @@
     "provider": "diagram",
     "scenario": null,
     "playground": {
-      "sample_arguments": "(0, 0), (4, 0), (4, -1), (6, -1), (6, 0), (10, 0)"
+      "parameters": [
+        {
+          "name": "start",
+          "kind": "point",
+          "label": "Start",
+          "meaning": "Where the robot begins (O)",
+          "unit": "m",
+          "example": "(0, 0)"
+        },
+        {
+          "name": "hit",
+          "kind": "point",
+          "label": "Hit point",
+          "meaning": "Where the robot first reaches the obstacle (H)",
+          "unit": "m",
+          "example": "(4, 0)"
+        },
+        {
+          "name": "corner_a",
+          "kind": "point",
+          "label": "Corner A",
+          "meaning": "First lower corner on the right-turn detour",
+          "unit": "m",
+          "example": "(4, -1)"
+        },
+        {
+          "name": "corner_b",
+          "kind": "point",
+          "label": "Corner B",
+          "meaning": "Second lower corner on the right-turn detour",
+          "unit": "m",
+          "example": "(6, -1)"
+        },
+        {
+          "name": "leave",
+          "kind": "point",
+          "label": "Leave point",
+          "meaning": "Where the robot leaves the obstacle (L)",
+          "unit": "m",
+          "example": "(6, 0)"
+        },
+        {
+          "name": "goal",
+          "kind": "point",
+          "label": "Goal",
+          "meaning": "Where the robot must arrive (G)",
+          "unit": "m",
+          "example": "(10, 0)"
+        }
+      ]
     },
     "diagram": {
       "view": "route",

@@ -1,6 +1,6 @@
 {
   "id": 4,
-  "version": 11,
+  "version": 12,
   "data_schema_version": 1,
   "title": "Assignment 4: Selecting a Direction with a Simplified Vector Field Histogram (VFH)",
   "description": "Build a deterministic inverse-square polar histogram and select the minimum-density sector near a goal direction.",
@@ -96,7 +96,62 @@
     "provider": "diagram",
     "scenario": null,
     "playground": {
-      "sample_arguments": "{0: 10, 1: 8, 2: 12, 358: 7, 359: 9}, 3, 357, 90, 10, 90"
+      "parameters": [
+        {
+          "name": "seed_readings",
+          "kind": "angle_map",
+          "label": "Supplied LIDAR readings",
+          "meaning": "Whole-number angle in degrees mapped to a distance",
+          "unit": "m",
+          "example": "{0: 10, 1: 8, 2: 12, 358: 7, 359: 9}",
+          "group": "Readings"
+        },
+        {
+          "name": "fill_start",
+          "kind": "integer",
+          "label": "Fill start",
+          "meaning": "First sector to generate",
+          "unit": "degrees",
+          "example": "3",
+          "group": "Readings"
+        },
+        {
+          "name": "fill_end",
+          "kind": "integer",
+          "label": "Fill end",
+          "meaning": "Last sector to generate, included",
+          "unit": "degrees",
+          "example": "357",
+          "group": "Readings"
+        },
+        {
+          "name": "goal_direction",
+          "kind": "integer",
+          "label": "Goal direction",
+          "meaning": "Direction of the goal",
+          "unit": "degrees",
+          "example": "90",
+          "group": "Search"
+        },
+        {
+          "name": "search_half_width",
+          "kind": "integer",
+          "label": "Search half width",
+          "meaning": "Degrees searched on each side of the goal direction",
+          "unit": "degrees",
+          "example": "10",
+          "group": "Search"
+        },
+        {
+          "name": "probe_angle",
+          "kind": "integer",
+          "label": "Probe angle",
+          "meaning": "Sector whose density you report",
+          "unit": "degrees",
+          "example": "90",
+          "group": "Search"
+        }
+      ]
     },
     "diagram": {
       "view": "polar",

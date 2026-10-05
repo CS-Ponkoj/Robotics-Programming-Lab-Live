@@ -1,6 +1,6 @@
 {
   "id": 3,
-  "version": 12,
+  "version": 13,
   "data_schema_version": 1,
   "title": "Assignment 3: Autonomous Robot Navigation in a Multi-Floor Office",
   "description": "Compare two complete multi-floor routes using explicit obstacle detours, elevator delays, and destination-floor travel.",
@@ -147,7 +147,116 @@
     "provider": "diagram",
     "scenario": null,
     "playground": {
-      "sample_arguments": "1.0, 1.0, 30.0, 10.0, 15.0, 20.0, 5, (5.0, 5.0), (25.0, 30.0), (10.0, 5.0), (6.0, 15.0), [(7.5, 4.5), (8.5, 4.5)]"
+      "parameters": [
+        {
+          "name": "robot_speed",
+          "kind": "number",
+          "label": "Robot speed",
+          "meaning": "Travel speed on both floors",
+          "unit": "m/s",
+          "example": "1.0",
+          "group": "Robot"
+        },
+        {
+          "name": "service_detour_radius",
+          "kind": "number",
+          "label": "Service detour radius",
+          "meaning": "Radius r of the half-circle detour allowance (pi * r)",
+          "unit": "m",
+          "example": "1.0",
+          "group": "Robot"
+        },
+        {
+          "name": "main_elevator_wait",
+          "kind": "number",
+          "label": "Main elevator wait",
+          "meaning": "Waiting time before the main elevator arrives",
+          "unit": "s",
+          "example": "30.0",
+          "group": "Elevators"
+        },
+        {
+          "name": "service_elevator_wait",
+          "kind": "number",
+          "label": "Service elevator wait",
+          "meaning": "Waiting time before the service elevator arrives",
+          "unit": "s",
+          "example": "10.0",
+          "group": "Elevators"
+        },
+        {
+          "name": "main_seconds_per_floor",
+          "kind": "number",
+          "label": "Main elevator ride",
+          "meaning": "Ride time per floor in the main elevator",
+          "unit": "s per floor",
+          "example": "15.0",
+          "group": "Elevators"
+        },
+        {
+          "name": "service_seconds_per_floor",
+          "kind": "number",
+          "label": "Service elevator ride",
+          "meaning": "Ride time per floor in the service elevator",
+          "unit": "s per floor",
+          "example": "20.0",
+          "group": "Elevators"
+        },
+        {
+          "name": "floors_to_travel",
+          "kind": "integer",
+          "label": "Floors to travel",
+          "meaning": "Number of floor intervals between the two floors",
+          "unit": "floors",
+          "example": "5",
+          "group": "Elevators"
+        },
+        {
+          "name": "start",
+          "kind": "point",
+          "label": "Start",
+          "meaning": "Robot position on the origin floor (S)",
+          "unit": "m",
+          "example": "(5.0, 5.0)",
+          "group": "Map"
+        },
+        {
+          "name": "goal",
+          "kind": "point",
+          "label": "Goal",
+          "meaning": "Destination on the destination floor (G)",
+          "unit": "m",
+          "example": "(25.0, 30.0)",
+          "group": "Map"
+        },
+        {
+          "name": "main_elevator",
+          "kind": "point",
+          "label": "Main elevator",
+          "meaning": "Main elevator position, the same on both floors (E_m)",
+          "unit": "m",
+          "example": "(10.0, 5.0)",
+          "group": "Map"
+        },
+        {
+          "name": "service_elevator",
+          "kind": "point",
+          "label": "Service elevator",
+          "meaning": "Service elevator position, the same on both floors (E_s)",
+          "unit": "m",
+          "example": "(6.0, 15.0)",
+          "group": "Map"
+        },
+        {
+          "name": "main_waypoints",
+          "kind": "list_of_points",
+          "label": "Main route waypoints",
+          "meaning": "Waypoints M1, M2, ... on the origin floor, in order; [] means a direct route",
+          "unit": "m",
+          "example": "[(7.5, 4.5), (8.5, 4.5)]",
+          "group": "Map"
+        }
+      ]
     },
     "diagram": {
       "view": "route",

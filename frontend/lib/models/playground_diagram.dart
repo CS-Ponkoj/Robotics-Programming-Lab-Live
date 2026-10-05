@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:iuse_demo/models/playground_parameter.dart';
 import 'package:iuse_demo/models/playground_result_dto.dart';
 
 /// Inputs beyond this magnitude cannot be drawn legibly.
@@ -161,7 +162,12 @@ PlaygroundDiagramData? buildPlaygroundDiagram(
       ? diagram['caption'] as String
       : '';
   final values = result.success ? result.values : const <PlaygroundValueDto>[];
-  final context = _DiagramContext(result.arguments, values, parameterNames);
+  final context = _DiagramContext(
+    result.arguments,
+    values,
+    parameterNames,
+    hintsEnabled: playgroundHintsEnabled(simulationConfig),
+  );
   try {
     return view == 'route'
         ? _buildRoute(diagram, caption, context)
@@ -176,9 +182,15 @@ PlaygroundDiagramData? buildPlaygroundDiagram(
 }
 
 class _DiagramContext {
-  const _DiagramContext(this.arguments, this.values, this.parameterNames);
+  const _DiagramContext(
+    this.arguments,
+    this.values,
+    this.parameterNames, {
+    this.hintsEnabled = true,
+  });
 
   final List<dynamic> arguments;
+  final bool hintsEnabled;
   final List<PlaygroundValueDto> values;
   final List<String> parameterNames;
 
@@ -351,7 +363,7 @@ PlaygroundDiagramData _routeData(
     points: allPoints,
     paths: paths,
     legend: legend,
-    hints: _hints(diagram, context),
+    hints: context.hintsEnabled ? _hints(diagram, context) : const [],
     notes: notes,
     description: [
       'Route diagram. Points: $placed.',
@@ -525,7 +537,7 @@ PlaygroundDiagramData _buildPolar(
     rays: rays,
     arcs: arcs,
     legend: legend,
-    hints: _hints(diagram, context),
+    hints: context.hintsEnabled ? _hints(diagram, context) : const [],
     description: '${descriptions.join('. ')}.',
   );
 }

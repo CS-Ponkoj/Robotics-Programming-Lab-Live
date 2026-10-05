@@ -60,3 +60,88 @@ def _finite_literals(value) -> bool:
     if isinstance(value, (list, tuple, set, frozenset)):
         return all(_finite_literals(item) for item in value)
     return True
+
+
+PARAMETER_KINDS = ("point", "number", "integer", "list_of_points", "angle_map", "text")
+
+_KIND_HINTS = {
+    "point": "a point with two numbers, like (2.0, 1.0)",
+    "number": "a number, like 1.5",
+    "integer": "a whole number, like 5",
+    "list_of_points": "a list of points, like [(7.5, 4.5), (8.5, 4.5)]",
+    "angle_map": "a map of whole-number angles to distances, like {0: 10, 90: 8}",
+    "text": "text in quotes, like 'Main Elevator'",
+}
+
+
+def _is_number(value) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(value)
+    )
+
+
+def _is_point(value) -> bool:
+    return (
+        isinstance(value, (list, tuple))
+        and len(value) == 2
+        and all(_is_number(item) for item in value)
+    )
+
+
+def matches_parameter_kind(kind: str, value) -> bool:
+    """Whether a parsed literal has the shape a parameter kind expects."""
+    if kind == "point":
+        return _is_point(value)
+    if kind == "number":
+        return _is_number(value)
+    if kind == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if kind == "list_of_points":
+        return isinstance(value, (list, tuple)) and all(_is_point(item) for item in value)
+    if kind == "angle_map":
+        return isinstance(value, dict) and all(
+            isinstance(key, int) and not isinstance(key, bool) and _is_number(item)
+            for key, item in value.items()
+        )
+    if kind == "text":
+        return isinstance(value, str)
+    return False
+
+
+def parameter_kind_hint(kind: str) -> str:
+    return _KIND_HINTS.get(kind, "a Python value")
+
+
+def parameter_problems(arguments: list, parameters: list[dict]) -> list[dict]:
+    """Describe inputs that do not match the declared parameters.
+
+    Returns entries of {"parameter_index": int | None, "message": str}; an
+    empty list means every input has the expected shape.
+    """
+    if not parameters:
+        return []
+    if len(arguments) != len(parameters):
+        names = ", ".join(str(item.get("name", "")) for item in parameters)
+        return [
+            {
+                "parameter_index": None,
+                "message": (
+                    f"Enter {len(parameters)} inputs, one for each parameter "
+                    f"({names}); you entered {len(arguments)}."
+                ),
+            }
+        ]
+    problems = []
+    for index, (value, parameter) in enumerate(zip(arguments, parameters)):
+        kind = str(parameter.get("kind", ""))
+        if not matches_parameter_kind(kind, value):
+            label = str(parameter.get("label") or parameter.get("name") or f"Input {index + 1}")
+            problems.append(
+                {
+                    "parameter_index": index,
+                    "message": f"{label} should be {parameter_kind_hint(kind)}.",
+                }
+            )
+    return problems

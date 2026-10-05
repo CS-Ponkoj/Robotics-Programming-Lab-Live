@@ -7,6 +7,7 @@ import 'package:iuse_demo/editor/indent_guides.dart';
 import 'package:iuse_demo/editor/editor_tools.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
+import 'package:iuse_demo/models/playground_parameter.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
@@ -362,11 +363,8 @@ class _MyHomePageState extends State<MyHomePage> {
         initialArguments: _playgroundArguments,
         onArgumentsChanged: (value) => _playgroundArguments = value,
         simulationConfig: _simulationConfig,
-        sampleArguments: _simulationConfig['playground'] is Map
-            ? ((_simulationConfig['playground'] as Map)['sample_arguments']
-                    ?.toString() ??
-                '')
-            : '',
+        sampleArguments: playgroundSampleArguments(_simulationConfig),
+        parameters: playgroundParameters(_simulationConfig),
       ),
     );
   }

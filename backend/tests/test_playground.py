@@ -216,7 +216,7 @@ def test_playground_route_never_exposes_protected_assignment_data(app_client):
         "/assignments/2/playground",
         json={
             "code": "def calculate_bug_route(*points):\n    return 0, 0, 0, 0",
-            "arguments": "1",
+            "arguments": ASSIGNMENT_2_INPUTS,
         },
         headers=headers,
     )
@@ -242,7 +242,9 @@ def test_playground_route_validates_input_role_and_assignment_type(app_client):
         json={"code": ASSIGNMENT_2_ANSWER, "arguments": "__import__('os')"},
         headers=headers,
     )
-    assert unsafe.status_code == 422
+    # Input errors use the standard 400 shape with a details list.
+    assert unsafe.status_code == 400
+    assert unsafe.json()["details"][0]["type"] == "parse"
     assert "Inputs can contain only" in unsafe.json()["error"]
 
     ros = app_client.post(

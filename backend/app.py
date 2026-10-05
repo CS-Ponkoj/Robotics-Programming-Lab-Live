@@ -53,6 +53,7 @@ from database import Base, build_engine
 from email_service import EmailService
 from graders import PythonFunctionGrader, PythonVariableGrader, Ros2TopicGrader
 from graders.python_function import PlaygroundInputError, parse_playground_arguments
+from playground_inputs import parameter_problems
 from models import (
     Assignment,
     CodeDraft,
@@ -1598,6 +1599,28 @@ def create_app(
         )
         return response_for(assignment, submission)
 
+    def playground_input_error(problems: list[dict], error_type: str) -> JSONResponse:
+        """Use the API's standard validation shape; parameter_index is additive."""
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": problems[0]["message"],
+                "details": [
+                    {
+                        "type": error_type,
+                        "location": (
+                            ["arguments"]
+                            if item["parameter_index"] is None
+                            else ["arguments", str(item["parameter_index"])]
+                        ),
+                        "message": item["message"],
+                        "parameter_index": item["parameter_index"],
+                    }
+                    for item in problems
+                ],
+            },
+        )
+
     @application.post(
         "/assignments/{assignment_id}/playground",
         response_model=PlaygroundResponse,
@@ -1632,7 +1655,14 @@ def create_app(
         try:
             arguments = parse_playground_arguments(body.arguments)
         except PlaygroundInputError as error:
-            raise HTTPException(422, str(error)) from error
+            return playground_input_error(
+                [{"parameter_index": None, "message": str(error)}], "parse"
+            )
+        playground_config = (assignment.simulation_config or {}).get("playground") or {}
+        problems = parameter_problems(arguments, playground_config.get("parameters") or [])
+        if problems:
+            # Check input shapes before running so errors name the exact field.
+            return playground_input_error(problems, "parameter_kind")
         grader = grader_for(assignment, request)
         try:
             outcome = execute_with_capacity(

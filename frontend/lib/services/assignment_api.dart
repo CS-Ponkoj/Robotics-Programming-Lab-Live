@@ -19,6 +19,14 @@ class ApiRequestException implements Exception {
   String toString() => message;
 }
 
+/// Playground inputs the server rejected, with messages for specific inputs
+/// keyed by parameter position.
+class PlaygroundInputException extends ApiRequestException {
+  const PlaygroundInputException(super.message, {this.fieldErrors = const {}});
+
+  final Map<int, String> fieldErrors;
+}
+
 const _requestTimeout = Duration(seconds: 15);
 const _executionTimeout = Duration(seconds: 90);
 
@@ -172,6 +180,28 @@ Future<PlaygroundResultDto> tryAssignmentInputs(
   if (response.statusCode >= 500) {
     throw const ApiRequestException(
       'The code runner is unavailable right now. Please try again shortly.',
+    );
+  }
+  if (response.statusCode == 400) {
+    final fieldErrors = <int, String>{};
+    try {
+      final body = jsonDecode(response.body);
+      final details = body is Map ? body['details'] : null;
+      if (details is List) {
+        for (final item in details.whereType<Map>()) {
+          final index = item['parameter_index'];
+          final message = item['message'];
+          if (index is int && message is String) {
+            fieldErrors.putIfAbsent(index, () => message);
+          }
+        }
+      }
+    } on FormatException {
+      // Fall back to the general message below.
+    }
+    throw PlaygroundInputException(
+      AuthApi.errorMessage(response),
+      fieldErrors: fieldErrors,
     );
   }
   throw ApiRequestException(AuthApi.errorMessage(response));
