@@ -1,7 +1,7 @@
 {
   "id": 6,
   "stable_id": "ros2-obstacle-stop",
-  "version": 7,
+  "version": 8,
   "data_schema_version": 1,
   "title": "Assignment 6: Stop for an Obstacle with ROS 2",
   "description": "Use LaserScan sensor data to move through a clear path, stop for a nearby obstacle, and resume safely.",
@@ -17,7 +17,7 @@
   ],
   "execution_settings": {
     "runtime": "ros2-jazzy-python",
-    "timeout_seconds": 20,
+    "timeout_seconds": 30,
     "editable_file": "src/reactive_navigation/reactive_navigation/controller.py",
     "network_enabled": false,
     "simulation_enabled": false

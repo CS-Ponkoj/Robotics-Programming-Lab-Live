@@ -1,7 +1,7 @@
 {
   "id": 5,
   "stable_id": "ros2-drive-forward",
-  "version": 7,
+  "version": 8,
   "data_schema_version": 1,
   "title": "Assignment 5: Drive Forward and Stop with ROS 2",
   "description": "Create a ROS 2 velocity publisher that moves a robot forward and then stops safely.",
@@ -17,7 +17,7 @@
   ],
   "execution_settings": {
     "runtime": "ros2-jazzy-python",
-    "timeout_seconds": 20,
+    "timeout_seconds": 30,
     "editable_file": "src/robot_motion/robot_motion/controller.py",
     "network_enabled": false,
     "simulation_enabled": false
