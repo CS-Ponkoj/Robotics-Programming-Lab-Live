@@ -30,11 +30,28 @@ Prepare this computer once, or after dependency changes:
 Start the application:
 
 ```powershell
-.\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
+.\scripts\run-local.ps1
 ```
 
-Open the frontend URL printed by the script, normally
-`http://127.0.0.1:8180/app`. Keep the PowerShell window open.
+Open the frontend URL printed by the script, `http://127.0.0.1:8180/app`. Keep
+the PowerShell window open.
+
+> **Where the app runs.** The launchers use these local addresses by default
+> on Windows and Ubuntu:
+>
+> | Service | Address |
+> |---|---|
+> | App (open this in the browser) | `http://127.0.0.1:8180/app` |
+> | Backend API | `http://127.0.0.1:5100` (health: `/health`) |
+> | Code sandbox | `http://127.0.0.1:5101` (health: `/health`) |
+>
+> Always open the app at the same address. Signed-in students' scores, attempt
+> counts, and "solution viewed" marks are saved in that browser for that exact
+> address, so a different port (for example `8080`) shows an empty student
+> history even though graded submissions are still in Neon. Use
+> `-FrontendPort`, `-BackendPort`, and `-SandboxPort` (Ubuntu:
+> `--frontend-port`, `--backend-port`, `--sandbox-port`) only when a port is
+> already taken, and then open the address the launcher prints.
 
 The launcher builds and serves the same optimized Flutter release bundle that
 Vercel deploys, so pages load quickly. Frontend developers who need hot reload
@@ -51,7 +68,7 @@ Stop the application:
 
 ```bash
 ./scripts/setup-local.sh
-./scripts/run-local.sh --frontend-port 8180 --backend-port 5100 --sandbox-port 5101
+./scripts/run-local.sh
 ./scripts/stop-local.sh
 ```
 
@@ -230,7 +247,7 @@ normal local launcher makes AI available without making an API request. Turn on
 `-EnableAi` flag now only checks that a key is configured before starting:
 
 ```powershell
-.\scripts\run-local.ps1 -EnableAi -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
+.\scripts\run-local.ps1 -EnableAi
 ```
 
 On Ubuntu, `--enable-ai` performs the same optional startup check. Neither
@@ -262,7 +279,7 @@ quiz persistence, assignment versions, or research calculations.
 Ubuntu's optional startup-check command is:
 
 ```bash
-./scripts/run-local.sh --enable-ai --frontend-port 8180 --backend-port 5100 --sandbox-port 5101
+./scripts/run-local.sh --enable-ai
 ```
 
 ## Verification
@@ -306,7 +323,7 @@ instructor test is skipped. Playwright runs in its own environment under the OS
 user-data folder; Windows uses the installed Google Chrome and Ubuntu downloads
 Playwright's Chromium.
 
-Check the three local services manually when using the example ports:
+Check the three local services manually at their default addresses:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8180/app

@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect, sync_playwright
 
-FRONTEND_URL = os.environ.get("E2E_FRONTEND_URL", "http://127.0.0.1:8080").rstrip("/")
+FRONTEND_URL = os.environ.get("E2E_FRONTEND_URL", "http://127.0.0.1:8180").rstrip("/")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 # Read at run time only; the maintained answer is never copied into tests.
 ASSIGNMENT_1_ANSWER = REPOSITORY_ROOT / "assignments_answers" / "assignment_1_answer.py"

@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=./scripts/linux-local-common.sh
 source "$SCRIPT_DIR/linux-local-common.sh"
 
-api_base_url="http://127.0.0.1:5000"
+api_base_url="http://127.0.0.1:5100"
 if [[ "${1:-}" == "--api-base-url" ]]; then
   api_base_url="$2"
   shift 2

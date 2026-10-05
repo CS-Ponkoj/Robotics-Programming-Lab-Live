@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     demo_student_password: str = "student"
     demo_instructor_password: str = "instructor"
     study_accounts_file: Path = BASE_DIR / "data" / "study_accounts.json"
-    public_app_url: str = "http://127.0.0.1:8080"
+    public_app_url: str = "http://127.0.0.1:8180"
     auth_session_hours: int = 12
     password_reset_minutes: int = 30
     # New-account invitations may be opened the next day, unlike resets.

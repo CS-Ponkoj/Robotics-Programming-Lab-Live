@@ -2,9 +2,9 @@ param(
     [switch]$EnableAi,
     # Serve the slower Flutter debug build with hot reload instead of a release build.
     [switch]$DebugFrontend,
-    [int]$FrontendPort = 8080,
-    [int]$BackendPort = 5000,
-    [int]$SandboxPort = 5001
+    [int]$FrontendPort = 8180,
+    [int]$BackendPort = 5100,
+    [int]$SandboxPort = 5101
 )
 
 $ErrorActionPreference = "Stop"

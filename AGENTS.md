@@ -230,11 +230,16 @@ Start the complete local stack connected to Neon staging:
 .\scripts\run-local.ps1
 ```
 
+The launchers default to `http://127.0.0.1:8180/app` (API 5100, sandbox 5101)
+on both operating systems. Student progress is stored per browser address, so
+keep using that address, and document any change to these defaults in
+`README.md` and both first-time guides.
+
 Ubuntu uses the equivalent commands:
 
 ```bash
 ./scripts/setup-local.sh
-./scripts/run-local.sh --frontend-port 8180 --backend-port 5100 --sandbox-port 5101
+./scripts/run-local.sh
 ./scripts/stop-local.sh
 ```
 

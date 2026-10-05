@@ -8,9 +8,9 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=./scripts/linux-local-common.sh
 source "$SCRIPT_DIR/linux-local-common.sh"
 
-frontend_port="8080"
-backend_port="5000"
-sandbox_port="5001"
+frontend_port="8180"
+backend_port="5100"
+sandbox_port="5101"
 enable_ai="false"
 debug_frontend="false"
 

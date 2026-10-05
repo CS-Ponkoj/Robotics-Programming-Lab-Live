@@ -41,7 +41,7 @@ Run the complete application:
 ```
 
 This connects to the dedicated Neon `robotics_lab_staging` database and starts
-the sandbox, API, and Flutter web application. Python and Flutter generated
+the sandbox, API, and Flutter web application at `http://127.0.0.1:8180/app`. Python and Flutter generated
 files stay outside the clone. The ignored repository-root `.env` supplies the
 Neon connection and optional AI configuration. Git supplies the password-free
 account roster at `backend/data/study_accounts.json`.

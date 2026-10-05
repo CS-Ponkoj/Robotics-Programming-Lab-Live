@@ -142,10 +142,12 @@ dependencies changed:
 ## 5. Start the application
 
 ```bash
-./scripts/run-local.sh --frontend-port 8180 --backend-port 5100 --sandbox-port 5101
+./scripts/run-local.sh
 ```
 
-Open `http://127.0.0.1:8180/app` in the browser. The launcher connects to Neon
+Open the app at `http://127.0.0.1:8180/app` (API `http://127.0.0.1:5100`,
+sandbox `http://127.0.0.1:5101`). Keep using that address: student progress is
+saved per browser address, so another port shows an empty history. The launcher connects to Neon
 and starts the Python sandbox, FastAPI, and Flutter web. The AI tutoring switch
 is off by default. If the ignored repository-root `.env` contains
 `OPENAI_API_KEY`, the normal launcher makes AI available when you turn on the

@@ -1967,7 +1967,7 @@ void main() {
 
     expect(find.byKey(const Key('test-run-error-state')), findsOneWidget);
     expect(find.text('Grading service unavailable'), findsOneWidget);
-    expect(find.textContaining('http://127.0.0.1:5000'), findsOneWidget);
+    expect(find.textContaining('http://127.0.0.1:5100'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('retry-test-run-button')));
     expect(retryCount, 1);

@@ -80,14 +80,17 @@ Rebuild after its Dockerfile or ROS grading dependencies change.
 ## 5. Start and stop
 
 ```powershell
-.\scripts\run-local.ps1 -FrontendPort 8180 -BackendPort 5100 -SandboxPort 5101
+.\scripts\run-local.ps1
 ```
 
 The AI tutoring switch starts off. If the private repository-root `.env` has
 `OPENAI_API_KEY`, turning on the switch makes AI available without a separate
 launcher flag. The optional `-EnableAi` flag only checks for a key at startup.
 
-Open `http://127.0.0.1:8180/app`. Stop safely with:
+Open the app at `http://127.0.0.1:8180/app` (API `http://127.0.0.1:5100`,
+sandbox `http://127.0.0.1:5101`). Keep using that address: student progress is
+saved per browser address, so another port shows an empty history. Stop
+safely with:
 
 ```powershell
 .\scripts\stop-local.ps1
