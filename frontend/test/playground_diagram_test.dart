@@ -197,7 +197,7 @@ PlaygroundResultDto vfhResult({Object? readings, Object? optimal = 90}) {
       45,
     ],
     values: [
-      value('Complete LIDAR sectors', 360),
+      value('Complete LiDAR sectors', 360),
       value('Inclusive search window', 21),
       value('Inverse-square density', 0.01),
       value('Optimal sector angle', optimal),

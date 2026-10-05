@@ -136,6 +136,87 @@ void main() {
       expect(find.byKey(const Key('test-result-reason-1')), findsNothing);
       expect(find.textContaining('Right for some scenarios'), findsOneWidget);
     });
+
+    testWidgets('held-back scaffold credit shows zero points for a pass', (
+      WidgetTester tester,
+    ) async {
+      const feedback = UnittestFeedbackDto(
+        id: 5,
+        score: 0,
+        testedVals: [],
+        pass: false,
+        unittestFeedback: ['Built.', 'Publish commands.'],
+        unittestPassResults: [true, false],
+        codeExecResult: '',
+        codeOutput: 'Observed 0 Twist messages at approximately 0.0 Hz.',
+        execSuccess: true,
+        hint: '',
+        evidence: [
+          TestEvidenceDto(
+            testId: 'package-build',
+            label: 'ROS 2 package builds successfully',
+            passed: true,
+            weight: 10,
+            earnedWeight: 0,
+          ),
+          TestEvidenceDto(
+            testId: 'cmd-vel-topic',
+            label: 'Publishes Twist messages on /cmd_vel',
+            passed: false,
+            weight: 20,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: app.Feedback(data: feedback))),
+      );
+
+      expect(find.text('Check 1 · 0 of 10 points'), findsOneWidget);
+      expect(find.text('Check 2 · 0 of 20 points'), findsOneWidget);
+    });
+
+    testWidgets('a failed run still shows what the program printed', (
+      WidgetTester tester,
+    ) async {
+      const feedback = UnittestFeedbackDto(
+        id: 4,
+        score: 0,
+        testedVals: [],
+        pass: false,
+        unittestFeedback: ['Fix the error.'],
+        unittestPassResults: [false],
+        codeExecResult:
+            'The required function could not complete every grading scenario (ValueError).',
+        codeOutput: '360 20 0.0069 90 0.0069',
+        execSuccess: false,
+        hint: '',
+        evidence: [],
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: app.Feedback(data: feedback))),
+      );
+
+      expect(find.text('Execution error'), findsOneWidget);
+      expect(find.text('Your printed output'), findsOneWidget);
+      expect(find.textContaining('360 20 0.0069'), findsOneWidget);
+    });
+
+    test('parses held-back credit from evidence JSON', () {
+      final parsed = TestEvidenceDto.fromJson({
+        'test_id': 'node-start',
+        'label': 'Starts',
+        'passed': true,
+        'weight': 5,
+        'earned_weight': 0,
+      });
+      expect(parsed.earnedWeight, 0.0);
+      expect(
+        TestEvidenceDto.fromJson({'test_id': 'a', 'passed': true}).earnedWeight,
+        isNull,
+      );
+    });
   });
 
   group('input playground', () {

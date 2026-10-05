@@ -28,7 +28,7 @@ def test_subprocess_sandbox_rejects_unsafe_numpy_file_api():
 @pytest.mark.parametrize(
     ("code", "expected"),
     [
-        ("import math\ny = 2\nz = math.pow(2, 3)\n", "line 3 of submission"),
+        ("import math\ny = 2\nz = math.ldexp(2, 3)\n", "line 3 of submission"),
         ("import math\n\nvalue = '{:.2f}'.format(1.0)\n", "line 3 of submission"),
         ("value = 1\nimport os\n", "line 2 of submission"),
         ("def boom():\n    return 1 / 0\n\nboom()\n", "ZeroDivisionError at line 2 of submission"),
@@ -39,6 +39,46 @@ def test_subprocess_sandbox_reports_the_students_own_line_number(code, expected)
 
     assert result["success"] is False
     assert expected in result["error"]
+
+
+def test_subprocess_sandbox_allows_common_student_numeric_spellings():
+    result = SubprocessSandbox().execute(
+        """
+import math
+import numpy as np
+
+readings = {}
+readings.update({a: 10 + 2 * np.sin(np.deg2rad(a)) for a in range(3)})
+readings.setdefault(5, 7.0)
+dens = np.array([1 / readings[a] ** 2 for a in range(3)])
+best = int(np.argmin(dens))
+total = 0.0
+for _ in range(2):
+    total += math.pow(2, 2) + np.hypot(3, 4) + float(np.min(dens)) * 0
+value = (best, float(total), bool(np.isfinite(np.mean(dens))), float(np.rad2deg(np.pi)))
+""",
+        ["value"],
+    )
+
+    assert result["success"] is True, result["error"]
+    # Angle 2 has the largest distance, so the smallest density.
+    assert result["values"]["value"]["repr"] == "(2, 18.0, True, 180.0)"
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "import numpy as np\nnp.save('/tmp/x', [1])",
+        "import numpy as np\nnp.fromfile('/etc/passwd')",
+        "__import__('os')",
+        "x = '{0}'.format(1)",
+    ],
+)
+def test_subprocess_sandbox_still_blocks_file_and_introspection_apis(code):
+    result = SubprocessSandbox().execute(code, [])
+
+    assert result["success"] is False
+    assert "not allowed" in result["error"]
 
 
 def test_subprocess_sandbox_keeps_supported_scientific_math():

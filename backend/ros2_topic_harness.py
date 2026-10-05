@@ -12,7 +12,11 @@ import time
 import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
-from ros2_callback_audit import launch_student, exactly_one_per_callback
+from ros2_callback_audit import (
+    exactly_one_per_callback,
+    launch_student,
+    summarize_student_failure,
+)
 
 
 def result(test_id: str, passed: bool, message: str) -> dict:
@@ -133,11 +137,25 @@ def main() -> None:
     runtime_error = (
         ""
         if alive_at_end
-        else (
-            student_stderr.strip()[-1000:]
-            or "The robot_controller node exited unexpectedly."
-        )
+        else summarize_student_failure(student_stderr, student.returncode)
     )
+    publishing_ok = bool(messages) and publish_rate >= minimum_rate and one_command
+    # A node that is alive but went quiet (for example, a cancelled timer)
+    # needs that fact first, not a generic queue-depth reminder.
+    last_message = messages[-1][0] if messages else 0.0
+    went_quiet = alive_at_end and bool(messages) and last_message < observation_seconds - 1.0
+    if publishing_ok:
+        publishing_message = "Exactly one Twist command was published per timer callback on /cmd_vel."
+    elif went_quiet:
+        publishing_message = (
+            f"Your node stopped publishing about {last_message:.1f} s after it started. "
+            "Publish exactly one command in every 0.1-second callback, including after the stop."
+        )
+    else:
+        publishing_message = (
+            "Use queue depth 10 and a 0.1-second timer; publish exactly one Twist command "
+            "on /cmd_vel in every callback, without duplicates or skipped callbacks."
+        )
 
     tests = [
         result(
@@ -145,13 +163,7 @@ def main() -> None:
             alive_at_end or bool(messages),
             "The robot_controller node started." if alive_at_end or messages else "The robot_controller node exited before it could be tested.",
         ),
-        result(
-            "cmd-vel-topic",
-            bool(messages) and publish_rate >= minimum_rate and one_command,
-            "Exactly one Twist command was published per timer callback on /cmd_vel."
-            if messages and publish_rate >= minimum_rate and one_command
-            else "Use queue depth 10 and a 0.1-second timer; publish exactly one Twist command on /cmd_vel in every callback, without duplicates or skipped callbacks.",
-        ),
+        result("cmd-vel-topic", publishing_ok, publishing_message),
         result(
             "forward-motion",
             forward_ok,
@@ -185,11 +197,6 @@ def main() -> None:
                 "runtime_error": runtime_error,
                 "output": (
                     f"Observed {len(messages)} Twist messages at approximately {publish_rate:.1f} Hz."
-                    + (
-                        f"\nNode stderr: {student_stderr.strip()[-1000:]}"
-                        if runtime_error
-                        else ""
-                    )
                     + (
                         f"\nNode stdout: {student_stdout.strip()[-1000:]}"
                         if student_stdout.strip()

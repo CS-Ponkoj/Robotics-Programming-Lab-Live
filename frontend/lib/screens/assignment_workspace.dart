@@ -1248,7 +1248,7 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
           _sectionLink('Scenario', _scenario),
           if (sections.task.isNotEmpty) _sectionLink('Your task', _task),
           if (sections.support.isNotEmpty)
-            _sectionLink('Data & rules', _support),
+            _sectionLink('Rules & scoring', _support),
         ]),
         const SizedBox(height: 12),
         SizedBox(key: _scenario),
@@ -1266,7 +1266,7 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
             key: const Key('instruction-task-section'),
             icon: Icons.task_alt_rounded,
             title: 'Your task',
-            subtitle: 'What your solution needs to calculate',
+            subtitle: 'What your solution needs to do',
             html: taskList.remainingHtml,
             introHtml: taskList.introHtml,
             checklistItems: taskList.items,
@@ -1278,8 +1278,8 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
           _InstructionSectionCard(
             key: const Key('instruction-support-section'),
             icon: Icons.tips_and_updates_outlined,
-            title: 'Helpful information',
-            subtitle: 'Given data, hints, and assumptions',
+            title: 'Rules, scoring, and checks',
+            subtitle: 'Rules, scoring, given data, and hints',
             html: sections.support,
           ),
         ],
@@ -1330,7 +1330,7 @@ class AssignmentInstructionSections {
   final String solution;
 
   static final RegExp _sectionHeading = RegExp(
-    r'<p><strong(?:\s[^>]*)?>\s*(Scenario|Given Data|Task|Questions?|Hints?|Assumptions?|Solution):?\s*</strong></p>',
+    r'<p><strong(?:\s[^>]*)?>\s*(Scenario|Given Data|Task|Questions?|Hints?|Assumptions?|Solution|Rules|Scope and scoring|How scoring works|Safety requirements|Safety and recovery requirements|What Run Tests checks|Before you run the tests):?\s*</strong></p>',
     caseSensitive: false,
   );
 
@@ -1365,7 +1365,9 @@ class AssignmentInstructionSections {
         _ => 'support',
       };
 
-      if (buffers[destination]!.isNotEmpty) {
+      // The rules card gathers several named parts (Rules, Hints, How
+      // scoring works, ...), so every one keeps its own heading.
+      if (buffers[destination]!.isNotEmpty || destination == 'support') {
         buffers[destination]!.write(
           '<p><strong>${match.group(1)}</strong></p>',
         );
@@ -1613,8 +1615,8 @@ class _SolutionSection extends StatelessWidget {
         icon: const Icon(Icons.visibility_outlined),
         title: const Text('Reveal worked solution?'),
         content: const Text(
-          'The full answer will be shown and this assignment will be marked '
-          'as Solution viewed.',
+          'A worked explanation will be shown and this assignment will be '
+          'marked as Solution viewed.',
         ),
         actions: [
           TextButton(
@@ -2957,6 +2959,7 @@ class Feedback extends StatelessWidget {
         label: detail?.label,
         reason: detail?.reason,
         weight: detail?.weight,
+        earnedWeight: detail?.earnedWeight,
       );
     }).toList();
 
@@ -3452,14 +3455,69 @@ class _TerminalOutput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (data.execSuccess) {
+      return _TerminalPanel(
+        key: const Key('terminal-output'),
+        title: 'Terminal output',
+        semanticsLabel: 'Terminal output',
+        icon: Icons.terminal_rounded,
+        iconColor: const Color(0xFF90D8B5),
+        text: data.codeOutput,
+      );
+    }
+    // A failed run still shows what the program printed before it stopped;
+    // that output is often the student's best clue.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _TerminalPanel(
+          key: const Key('terminal-output'),
+          title: 'Execution error',
+          semanticsLabel: 'Code execution error',
+          icon: Icons.error_outline_rounded,
+          iconColor: const Color(0xFFFFB4AB),
+          text: data.codeExecResult,
+        ),
+        if (data.codeOutput.trim().isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _TerminalPanel(
+            key: const Key('terminal-printed-output'),
+            title: 'Your printed output',
+            semanticsLabel: 'Printed output before the error',
+            icon: Icons.terminal_rounded,
+            iconColor: const Color(0xFF90D8B5),
+            text: data.codeOutput,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _TerminalPanel extends StatelessWidget {
+  const _TerminalPanel({
+    super.key,
+    required this.title,
+    required this.semanticsLabel,
+    required this.icon,
+    required this.iconColor,
+    required this.text,
+  });
+
+  final String title;
+  final String semanticsLabel;
+  final IconData icon;
+  final Color iconColor;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final output = data.execSuccess ? data.codeOutput : data.codeExecResult;
 
     return Semantics(
       container: true,
-      label: data.execSuccess ? 'Terminal output' : 'Code execution error',
+      label: semanticsLabel,
       child: Container(
-        key: const Key('terminal-output'),
         decoration: BoxDecoration(
           color: const Color(0xFF17242B),
           borderRadius: BorderRadius.circular(AppRadii.md),
@@ -3474,18 +3532,10 @@ class _TerminalOutput extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    data.execSuccess
-                        ? Icons.terminal_rounded
-                        : Icons.error_outline_rounded,
-                    size: 18,
-                    color: data.execSuccess
-                        ? const Color(0xFF90D8B5)
-                        : const Color(0xFFFFB4AB),
-                  ),
+                  Icon(icon, size: 18, color: iconColor),
                   const SizedBox(width: AppSpacing.sm),
                   Text(
-                    data.execSuccess ? 'Terminal output' : 'Execution error',
+                    title,
                     style: theme.textTheme.labelLarge?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -3498,7 +3548,7 @@ class _TerminalOutput extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: SelectableText(
-                '> ${output.isEmpty ? 'No output returned.' : output}',
+                '> ${text.isEmpty ? 'No output returned.' : text}',
                 style: const TextStyle(
                   color: Color(0xFFE3EDF2),
                   fontFamily: 'roboto-mono',
@@ -4004,6 +4054,7 @@ class _TestResultCard extends StatelessWidget {
     this.label,
     this.reason,
     this.weight,
+    this.earnedWeight,
   });
 
   final int checkNumber;
@@ -4014,11 +4065,13 @@ class _TestResultCard extends StatelessWidget {
   final String? label;
   final String? reason;
   final double? weight;
+  final double? earnedWeight;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final statusColor = passed ? AppColors.success : theme.colorScheme.error;
+    final earned = earnedWeight ?? (passed ? weight : 0);
 
     return Semantics(
       container: true,
@@ -4070,7 +4123,7 @@ class _TestResultCard extends StatelessWidget {
                     weight == null
                         ? 'Check $checkNumber'
                         : 'Check $checkNumber · '
-                            '${passed ? _formatPoints(weight!) : '0'} of '
+                            '${_formatPoints(earned ?? 0)} of '
                             '${_formatPoints(weight!)} points',
                     key: Key('test-result-points-$checkNumber'),
                     style: theme.textTheme.labelSmall,

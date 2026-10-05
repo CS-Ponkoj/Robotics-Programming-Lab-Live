@@ -143,8 +143,15 @@ Standard `execution_status` values are:
 Each item in `evidence.tests` describes one grading check: `test_id`, `label`,
 `passed`, `message`, and `visibility`. Function-assignment checks may also
 store `weight` (the check's rubric points) and `reason`, a stable failure
-category that never exposes protected cases. Older records omit both fields;
-analyses must treat a missing value as not collected.
+category that never exposes protected cases. ROS 2 checks also store `weight`
+from 2026-10-05. Two further optional fields were added on 2026-10-05:
+`earned_weight` records points actually counted when they differ from
+`passed` times `weight` (a ROS check whose supplied-scaffold credit is held
+back until a behavior check passes stores `0`; otherwise it is null), and
+`misconception_tag` names the assignment's configured misconception tag for a
+function-assignment check that returned a wrong value (null when the check
+passed, crashed, or has no tag). Older records omit these fields; analyses
+must treat a missing value as not collected.
 
 | `reason` value | Simple meaning |
 |---|---|

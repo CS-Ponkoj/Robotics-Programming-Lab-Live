@@ -900,7 +900,11 @@ void main() {
       find.textContaining('The path is 16 units.', findRichText: true),
       findsNothing,
     );
+    // The rules card keeps each part's own heading.
+    expect(find.textContaining('Hints', findRichText: true), findsWidgets);
 
+    await tester.ensureVisible(find.byKey(const Key('reveal-solution-button')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('reveal-solution-button')));
     await tester.pumpAndSettle();
 

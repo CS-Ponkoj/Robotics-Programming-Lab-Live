@@ -14,12 +14,19 @@ MAX_VALUE_CHARS = 20_000
 ALLOWED_MODULE_ATTRIBUTES = {
     "math": {
         "acos", "asin", "atan", "atan2", "ceil", "cos", "degrees", "dist", "e",
-        "exp", "fabs", "floor", "hypot", "inf", "isclose", "log", "log10",
-        "pi", "radians", "sin", "sqrt", "tan", "tau",
+        "exp", "fabs", "floor", "fsum", "hypot", "inf", "isclose", "isfinite",
+        "isinf", "isnan", "log", "log10", "nan", "pi", "pow", "radians", "sin",
+        "sqrt", "tan", "tau", "trunc",
     },
+    # Pure numeric functions students commonly reach for; no file, I/O, or
+    # object-loading APIs (np.load, np.save, np.fromfile stay blocked).
     "numpy": {
-        "abs", "arange", "cos", "degrees", "e", "exp", "linspace", "pi",
-        "radians", "sin", "sqrt", "tan",
+        "abs", "amax", "amin", "arange", "argmax", "argmin", "argsort", "array",
+        "asarray", "ceil", "clip", "cos", "deg2rad", "degrees", "e", "exp",
+        "floor", "hypot", "inf", "isclose", "isfinite", "isnan", "linspace",
+        "max", "maximum", "mean", "min", "minimum", "nan", "ones", "pi",
+        "power", "rad2deg", "radians", "round", "sin", "sort", "sqrt", "square",
+        "sum", "tan", "where", "zeros",
     },
     "scipy.spatial": {"distance"},
     "scipy.spatial.distance": {"euclidean"},
@@ -27,8 +34,8 @@ ALLOWED_MODULE_ATTRIBUTES = {
 ALLOWED_VALUE_METHODS = {
     "append", "clear", "copy", "count", "endswith", "extend", "get",
     "index", "insert", "items", "join", "keys", "lower", "pop", "remove",
-    "replace", "reverse", "sort", "split", "startswith", "strip", "upper",
-    "values",
+    "replace", "reverse", "setdefault", "sort", "split", "startswith",
+    "strip", "update", "upper", "values",
 }
 
 
@@ -67,7 +74,9 @@ class SubmissionSyntaxValidator(ast.NodeVisitor):
             )
 
     def visit_Name(self, node):
-        if node.id.startswith("_"):
+        # A lone "_" is the ordinary throwaway loop name; any longer
+        # underscore name could reach Python internals.
+        if node.id.startswith("_") and node.id != "_":
             raise ValueError(f"Name '{node.id}' is not allowed")
 
     def visit_Attribute(self, node):

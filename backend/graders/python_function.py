@@ -216,6 +216,16 @@ class PythonFunctionGrader:
                     " This check must work for every input scenario. Use the function "
                     "parameters; correct output for the printed example alone is not enough."
                 )
+            reason = self._failure_reason(
+                passed=passed,
+                execution_failed=hidden_execution_failed,
+                unsupported=unsupported_values[index],
+                failed_cases=failed_case_counts[index],
+                total_cases=len(cases),
+            )
+            # A tag is grader evidence only when this value was compared and
+            # wrong; a crash says nothing about the student's concept.
+            tag = str(criterion.get("misconception", "")).strip()
             evidence.append(
                 TestEvidence(
                     test_id=str(criterion.get("id", f"criterion-{index + 1}")),
@@ -223,14 +233,13 @@ class PythonFunctionGrader:
                     passed=passed,
                     message=message,
                     visibility="hidden",
-                    reason=self._failure_reason(
-                        passed=passed,
-                        execution_failed=hidden_execution_failed,
-                        unsupported=unsupported_values[index],
-                        failed_cases=failed_case_counts[index],
-                        total_cases=len(cases),
-                    ),
+                    reason=reason,
                     weight=weight,
+                    misconception_tag=(
+                        tag
+                        if tag and reason in {"wrong_all_inputs", "wrong_some_inputs"}
+                        else None
+                    ),
                 )
             )
 

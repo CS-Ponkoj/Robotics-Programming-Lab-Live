@@ -2,7 +2,11 @@ import os
 
 import pytest
 
-from ros2_callback_audit import exactly_one_per_callback, instrument
+from ros2_callback_audit import (
+    exactly_one_per_callback,
+    instrument,
+    summarize_student_failure,
+)
 
 
 @pytest.mark.parametrize("kind", ["timer", "scan"])
@@ -54,3 +58,64 @@ def test_no_callback_evidence_cannot_pass():
     read_fd, write_fd = os.pipe()
     os.close(write_fd)
     assert not exactly_one_per_callback(read_fd)
+
+
+CRASHED_NODE_STDERR = """[WARN] [1791232022.128912342] [rcl]: ROS_LOCALHOST_ONLY is deprecated but still honored if it is enabled.
+Traceback (most recent call last):
+  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 592, in handler
+    await call_coroutine()
+  File "/grader/ros2_callback_audit.py", line 40, in invoke
+    return callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/install/robot_motion/lib/python3.12/site-packages/robot_motion/controller.py", line 28, in control_robot
+    self.velocity_publisher.publish(command)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'publish'
+"""
+
+
+def test_failure_summary_keeps_only_the_students_frame_and_exception():
+    summary = summarize_student_failure(CRASHED_NODE_STDERR, 1)
+
+    assert summary == "\n".join([
+        "Your node stopped with an error:",
+        "controller.py, line 28, in control_robot",
+        "    self.velocity_publisher.publish(command)",
+        "AttributeError: 'NoneType' object has no attribute 'publish'",
+    ])
+    assert "grader" not in summary
+    assert "rclpy" not in summary
+    assert "WARN" not in summary
+
+
+def test_failure_summary_explains_an_error_raised_inside_ros_code():
+    stderr = "\n".join([
+        "Traceback (most recent call last):",
+        '  File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 9, in create_publisher',
+        "    raise TypeError(...)",
+        "TypeError: Expected QoSProfile or int",
+    ])
+
+    assert summarize_student_failure(stderr, 1) == "\n".join([
+        "The error was raised inside ROS code called by your node:",
+        "TypeError: Expected QoSProfile or int",
+    ])
+
+
+def test_failure_summary_for_a_clean_exit_ignores_ros_warnings():
+    stderr = "[WARN] [1.0] [rcl]: ROS_LOCALHOST_ONLY is deprecated\n"
+
+    summary = summarize_student_failure(stderr, 0)
+
+    assert summary.startswith("The node exited early (exit code 0).")
+    assert "rclpy.spin()" in summary
+    assert "deprecated" not in summary
+
+
+def test_failure_summary_never_echoes_grader_paths():
+    stderr = "something failed in /grader/ros2_topic_harness.py\nRuntimeError: boom\n"
+
+    summary = summarize_student_failure(stderr, 2)
+
+    assert "/grader/" not in summary
+    assert "RuntimeError: boom" in summary

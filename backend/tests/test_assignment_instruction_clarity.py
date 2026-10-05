@@ -62,3 +62,34 @@ def test_tutor_review_versions_match_current_assignment_contracts():
         review = json.loads((root / "ai_evaluation_cases" /
                              f"assignment_{number}.json").read_text())
         assert review["assignment_version"] == source(number)["version"]
+
+
+def test_python_assignments_describe_the_current_sandbox_allowlist():
+    for number in (1, 2, 3, 4):
+        instructions = source(number)["assignment_html"]
+        assert "np.deg2rad" in instructions and "np.argmin" in instructions
+        # These now run, so instructions must not call them unavailable.
+        assert "<code>dict.update</code>" not in instructions
+        assert "<code>math.pow</code>" not in instructions
+        assert "a lone <code>_</code> is fine" in instructions
+
+
+def test_vfh_states_that_a_zero_half_width_is_a_valid_input():
+    instructions = source(4)["assignment_html"]
+    assert "<code>search_half_width</code> may be 0" in instructions
+    widths = [case["arguments"][4] for case in source(4)["grader_config"]["cases"]]
+    assert 0 in widths
+
+
+def test_obstacle_assignment_does_not_repeat_the_full_ros_terms_list():
+    instructions = source(6)["assignment_html"]
+    assert "<strong>ROS terms</strong>" not in instructions
+    assert "Reminders from Assignment 5" in instructions
+
+
+def test_misconception_tags_name_configured_misconceptions():
+    for number in (1, 2, 3, 4):
+        data = source(number)
+        known = {item["tag"] for item in data["common_misconceptions"]}
+        tags = [c["misconception"] for c in data["grader_config"]["criteria"] if "misconception" in c]
+        assert tags and set(tags) <= known

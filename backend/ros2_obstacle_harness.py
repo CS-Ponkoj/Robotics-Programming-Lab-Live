@@ -13,7 +13,11 @@ import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from ros2_callback_audit import launch_student, exactly_one_per_callback
+from ros2_callback_audit import (
+    exactly_one_per_callback,
+    launch_student,
+    summarize_student_failure,
+)
 
 
 def result(test_id: str, passed: bool, message: str) -> dict:
@@ -178,10 +182,7 @@ def main() -> None:
     runtime_error = (
         ""
         if alive_at_end
-        else (
-            student_stderr.strip()[-1000:]
-            or "The obstacle_stop_controller node exited unexpectedly."
-        )
+        else summarize_student_failure(student_stderr, student.returncode)
     )
 
     tests = [
@@ -254,11 +255,6 @@ def main() -> None:
                 "runtime_error": runtime_error,
                 "output": (
                     f"Observed {len(settled)} settled Twist messages at approximately {publish_rate:.1f} Hz."
-                    + (
-                        f"\nNode stderr: {student_stderr.strip()[-1000:]}"
-                        if runtime_error
-                        else ""
-                    )
                     + (
                         f"\nNode stdout: {student_stdout.strip()[-1000:]}"
                         if student_stdout.strip()

@@ -8,8 +8,61 @@ from contextvars import ContextVar
 from functools import wraps
 import importlib.metadata
 import os
+import re
 import subprocess
 import sys
+
+
+_ROS_LOG_LINE = re.compile(r"^\[(?:DEBUG|INFO|WARN|WARNING)\]")
+_FRAME = re.compile(r'^\s*File "([^"]+)", line (\d+), in (.+)$')
+
+
+def summarize_student_failure(stderr, returncode):
+    """Explain why the student's node stopped, using only the student's frames.
+
+    Raw stderr mixes ROS log warnings, rclpy executor frames, and this file's
+    instrumentation frame; students need their own line and the exception.
+    """
+    lines = [
+        line for line in (stderr or "").splitlines()
+        if line.strip() and not _ROS_LOG_LINE.match(line.strip())
+    ]
+    starts = [
+        index for index, line in enumerate(lines)
+        if line.startswith("Traceback (most recent call last)")
+    ]
+    if starts:
+        block = lines[starts[-1] + 1:]
+        kept = []
+        in_student_frame = False
+        exception = "Unknown error"
+        for line in block:
+            frame = _FRAME.match(line)
+            if frame:
+                in_student_frame = "/workspace/" in frame.group(1)
+                if in_student_frame:
+                    file_name = frame.group(1).rsplit("/", 1)[-1]
+                    kept.append(f"{file_name}, line {frame.group(2)}, in {frame.group(3)}")
+                continue
+            if line.startswith(" "):
+                # The code line under a student frame; skip caret markers.
+                if in_student_frame and line.strip().strip("^~ "):
+                    kept.append("    " + line.strip())
+                    in_student_frame = False
+                continue
+            exception = line.strip()
+        kept.append(exception)
+        if len(kept) == 1:
+            kept.insert(0, "The error was raised inside ROS code called by your node:")
+        else:
+            kept.insert(0, "Your node stopped with an error:")
+        return "\n".join(kept).replace("/grader/", "")
+    other = [line.strip() for line in lines if "/grader/" not in line][-3:]
+    advice = (
+        "Keep rclpy.spin() running so the node stays alive and keeps publishing."
+    )
+    summary = f"The node exited early (exit code {returncode}). {advice}"
+    return "\n".join([summary, *other]) if other else summary
 
 
 def instrument(node_class, publisher_class, report_fd, kind, topic, scan_topic):

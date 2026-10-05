@@ -92,9 +92,14 @@ class TestEvidence(BaseModel):
     passed: bool
     message: str
     visibility: Literal["public", "hidden"] = "hidden"
-    # Optional, additive detail; older stored evidence omits both fields.
+    # Optional, additive detail; older stored evidence omits these fields.
     reason: TestFailureReason | None = None
     weight: float | None = None
+    # Points actually counted when they differ from passed-times-weight,
+    # such as supplied-scaffold credit held back until a behavior passes.
+    earned_weight: float | None = None
+    # The assignment's configured misconception tag for a failed check.
+    misconception_tag: str | None = None
 
 
 class TutorFeedback(BaseModel):

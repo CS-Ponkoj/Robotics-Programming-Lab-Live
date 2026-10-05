@@ -53,6 +53,23 @@ class Ros2TopicGrader:
             for item in evidence
             if item.passed and (behavior_passed or item.test_id not in scaffold)
         )
+        if weights:
+            # Show each check's points, as function assignments do; held-back
+            # scaffold credit is recorded as earning nothing yet.
+            evidence = [
+                item.model_copy(
+                    update={
+                        "weight": float(weights.get(item.test_id, 1)),
+                        "earned_weight": (
+                            0.0
+                            if item.passed and item.test_id in scaffold
+                            and not behavior_passed
+                            else None
+                        ),
+                    }
+                )
+                for item in evidence
+            ]
         score = round((passed_weight / total_weight) * 100) if total_weight else 0
         execution_succeeded = result.get("success") is True
         return GradeResult(

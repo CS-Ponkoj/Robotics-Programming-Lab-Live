@@ -223,5 +223,32 @@ def test_function_grader_classifies_failure_reasons_with_weights(code, expected_
         # Reasons classify the outcome without exposing protected case data.
         assert set(dumped) == {
             "test_id", "label", "passed", "message", "visibility", "reason", "weight",
+            "earned_weight", "misconception_tag",
         }
+        assert dumped["earned_weight"] is None
         assert dumped["visibility"] == "hidden"
+
+
+def test_function_grader_attaches_misconception_tags_only_to_wrong_values():
+    tagged = assignment()
+    tagged.grader_config = {
+        **tagged.grader_config,
+        "criteria": [
+            {**item, "misconception": f"incorrect-{item['id']}"}
+            for item in tagged.grader_config["criteria"]
+        ],
+    }
+    grader = PythonFunctionGrader(SubprocessSandbox())
+
+    wrong_product = grader.grade(
+        tagged, "def calculate_values(first, second):\n    return first + second, 0"
+    )
+    crashed = grader.grade(
+        tagged, "def calculate_values(first, second):\n    return 1 / 0, 0"
+    )
+
+    assert [item.misconception_tag for item in wrong_product.evidence] == [
+        None, "incorrect-product",
+    ]
+    # A crash is not evidence about the student's concept.
+    assert [item.misconception_tag for item in crashed.evidence] == [None, None]

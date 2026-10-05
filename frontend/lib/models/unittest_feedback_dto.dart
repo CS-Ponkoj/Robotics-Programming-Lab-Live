@@ -1,5 +1,5 @@
-/// Structured grader detail for one check. Older results omit [reason] and
-/// [weight], so both stay optional.
+/// Structured grader detail for one check. Older results omit [reason],
+/// [weight], and [earnedWeight], so all stay optional.
 class TestEvidenceDto {
   const TestEvidenceDto({
     required this.testId,
@@ -8,6 +8,7 @@ class TestEvidenceDto {
     this.message = '',
     this.reason,
     this.weight,
+    this.earnedWeight,
   });
 
   final String testId;
@@ -17,6 +18,10 @@ class TestEvidenceDto {
   final String? reason;
   final double? weight;
 
+  /// Points actually counted when they differ from passed-times-weight,
+  /// such as supplied-scaffold credit held back on a ROS assignment.
+  final double? earnedWeight;
+
   factory TestEvidenceDto.fromJson(Map<String, dynamic> json) {
     return TestEvidenceDto(
       testId: json['test_id']?.toString() ?? '',
@@ -25,6 +30,9 @@ class TestEvidenceDto {
       message: json['message']?.toString() ?? '',
       reason: json['reason'] is String ? json['reason'] as String : null,
       weight: json['weight'] is num ? (json['weight'] as num).toDouble() : null,
+      earnedWeight: json['earned_weight'] is num
+          ? (json['earned_weight'] as num).toDouble()
+          : null,
     );
   }
 }

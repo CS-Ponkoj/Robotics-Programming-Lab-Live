@@ -334,7 +334,7 @@ def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
     assert response.status_code == 200
     assignments = response.json()["assignments"]
     assert [assignment["id"] for assignment in assignments] == [1, 2, 3, 4, 5, 6]
-    assert [assignment["version"] for assignment in assignments] == [13, 13, 14, 13, 8, 8]
+    assert [assignment["version"] for assignment in assignments] == [14, 14, 15, 14, 9, 9]
     assert all(assignment["stable_id"] for assignment in assignments)
     assert all(assignment["solution_html"] == "" for assignment in assignments)
     assert all(assignment["vals"] == {} for assignment in assignments)
@@ -427,7 +427,7 @@ def test_correct_submission_passes_and_records_assignment_version(client):
     assert body["pass"] is True
     assert body["ex_success"] is True
     assert body["execution_status"] == "completed"
-    assert body["assignment_version"] == 13
+    assert body["assignment_version"] == 14
     assert body["submission_id"]
     assert body["unittest_pass_results"] == [True, True, True, True]
     assert body["hint"] == ""
