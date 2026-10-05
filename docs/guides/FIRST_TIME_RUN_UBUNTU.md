@@ -146,8 +146,8 @@ dependencies changed:
 ```
 
 Open the app at `http://127.0.0.1:8180/app` (API `http://127.0.0.1:5100`,
-sandbox `http://127.0.0.1:5101`). Keep using that address: student progress is
-saved per browser address, so another port shows an empty history. The launcher connects to Neon
+sandbox `http://127.0.0.1:5101`). Signed-in students see their saved progress
+after signing in, on any browser or address. The launcher connects to Neon
 and starts the Python sandbox, FastAPI, and Flutter web. The AI tutoring switch
 is off by default. If the ignored repository-root `.env` contains
 `OPENAI_API_KEY`, the normal launcher makes AI available when you turn on the

@@ -45,10 +45,12 @@ the PowerShell window open.
 > | Backend API | `http://127.0.0.1:5100` (health: `/health`) |
 > | Code sandbox | `http://127.0.0.1:5101` (health: `/health`) |
 >
-> Always open the app at the same address. Signed-in students' scores, attempt
-> counts, and "solution viewed" marks are saved in that browser for that exact
-> address, so a different port (for example `8080`) shows an empty student
-> history even though graded submissions are still in Neon. Use
+> Open the app at the same address each time. Signed-in students' scores,
+> attempt counts, and "solution viewed" marks are kept in the browser for that
+> address and also restored from the server at sign-in, so a new browser,
+> computer, or port shows the same history after the student signs in. Code
+> drafts follow the existing server-draft rules; demo progress is never saved.
+> Use
 > `-FrontendPort`, `-BackendPort`, and `-SandboxPort` (Ubuntu:
 > `--frontend-port`, `--backend-port`, `--sandbox-port`) only when a port is
 > already taken, and then open the address the launcher prints.

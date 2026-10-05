@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iuse_demo/state/learning_progress_store.dart';
 import 'package:iuse_demo/models/assignment_progress.dart';
+import 'package:iuse_demo/models/server_progress_dto.dart';
 import 'package:iuse_demo/state/progress_storage_base.dart';
 
 void main() {
@@ -212,5 +213,86 @@ void main() {
     final cleared = LearningProgressStore();
     await cleared.load(storage: storage);
     expect(cleared.hasUnsyncedDraft(3), isFalse);
+  });
+
+  test('server progress fills a new browser for a signed-in student', () async {
+    final storage = InMemoryProgressStorage();
+    final store = LearningProgressStore();
+    await store.loadForUser('user-1', storage: storage);
+
+    await store.syncFromServer(() async => [
+          ServerAssignmentProgress.fromJson({
+            'assignment_id': 1,
+            'attempt_count': 3,
+            'best_score': 100,
+            'latest_score': 75,
+            'latest_submission_id': 'submission-current',
+            'solution_revealed': true,
+          })!,
+        ]);
+
+    expect(store.attemptCounts[1], 3);
+    expect(store.bestScores[1], 100);
+    expect(store.latestScores[1], 75);
+    expect(store.submissionIds[1], 'submission-current');
+    expect(store.revealedSolutions, contains(1));
+    expect(store.assignmentState(1), AssignmentProgressState.completed);
+
+    // The merged history is saved for this browser and user.
+    final reloaded = LearningProgressStore();
+    await reloaded.loadForUser('user-1', storage: storage);
+    expect(reloaded.attemptCounts[1], 3);
+    expect(reloaded.bestScores[1], 100);
+  });
+
+  test('server progress never hides newer work from this browser', () async {
+    final store = LearningProgressStore();
+    await store.loadForUser('user-2', storage: InMemoryProgressStorage());
+    await store.recordAttempt(4, 60);
+    await store.recordAttempt(4, 80);
+    await store.recordAttempt(4, 40);
+    await store.recordSubmission(4, 'submission-local');
+
+    await store.mergeServerProgress([
+      ServerAssignmentProgress.fromJson({
+        'assignment_id': 4,
+        'attempt_count': 2,
+        'best_score': 90,
+        'latest_score': 90,
+        'latest_submission_id': 'submission-older',
+      })!,
+    ]);
+
+    expect(store.attemptCounts[4], 3);
+    expect(store.latestScores[4], 40);
+    expect(store.bestScores[4], 90);
+    expect(store.submissionIds[4], 'submission-local');
+  });
+
+  test('an unreachable server leaves local progress unchanged', () async {
+    final store = LearningProgressStore();
+    await store.loadForUser('user-3', storage: InMemoryProgressStorage());
+    await store.recordAttempt(2, 50);
+
+    await store.syncFromServer(() async => throw Exception('offline'));
+    await store.syncFromServer(
+      () => Future.delayed(const Duration(seconds: 1), () => const []),
+      limit: const Duration(milliseconds: 10),
+    );
+
+    expect(store.attemptCounts[2], 1);
+    expect(store.bestScores[2], 50);
+  });
+
+  test('server progress parsing ignores malformed items', () {
+    expect(ServerAssignmentProgress.fromJson('bad'), isNull);
+    expect(ServerAssignmentProgress.fromJson({'assignment_id': '1'}), isNull);
+    final parsed = ServerAssignmentProgress.fromJson({
+      'assignment_id': 5,
+      'latest_submission_id': '',
+    })!;
+    expect(parsed.attemptCount, 0);
+    expect(parsed.latestSubmissionId, isNull);
+    expect(parsed.solutionRevealed, isFalse);
   });
 }

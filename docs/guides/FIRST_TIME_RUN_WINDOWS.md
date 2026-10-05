@@ -88,9 +88,8 @@ The AI tutoring switch starts off. If the private repository-root `.env` has
 launcher flag. The optional `-EnableAi` flag only checks for a key at startup.
 
 Open the app at `http://127.0.0.1:8180/app` (API `http://127.0.0.1:5100`,
-sandbox `http://127.0.0.1:5101`). Keep using that address: student progress is
-saved per browser address, so another port shows an empty history. Stop
-safely with:
+sandbox `http://127.0.0.1:5101`). Signed-in students see their saved progress
+after signing in, on any browser or address. Stop safely with:
 
 ```powershell
 .\scripts\stop-local.ps1

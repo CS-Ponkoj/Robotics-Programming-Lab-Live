@@ -301,6 +301,7 @@ configuration explicitly. All assignment files declare
 | `GET /research/metrics` | Versioned definitions for the 55 implemented basic metrics |
 | `GET /research/me` | Student-self overview and assignment/version summaries |
 | `GET /research/me/attempts` | Paginated student-self attempt history |
+| `GET /me/assignment-progress` | Student-self progress summary per assignment (attempt count, best and latest score, current-version latest submission ID, solution revealed); read-only, rejected for instructors and demo sessions |
 | `GET /admin/research/summary` | Classroom, participant, assignment, and data-health summaries |
 | `GET /admin/research/students/{student_id}` | Instructor-authorized participant detail |
 | `GET /admin/research/students/{student_id}/attempts` | Paginated instructor-authorized participant history |

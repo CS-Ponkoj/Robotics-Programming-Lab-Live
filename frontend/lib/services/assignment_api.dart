@@ -5,6 +5,7 @@ import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/code_draft_dto.dart';
 import 'package:iuse_demo/models/playground_result_dto.dart';
+import 'package:iuse_demo/models/server_progress_dto.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
@@ -41,6 +42,30 @@ Future<AssignmentDto> fetchAssignment(int id) async {
     return AssignmentDto.fromJson(jsonDecode(response.body));
   }
   throw Exception('Failed to load assignment $id');
+}
+
+/// The signed-in student's progress for every attempted assignment.
+Future<List<ServerAssignmentProgress>> fetchMyAssignmentProgress({
+  Duration timeout = _requestTimeout,
+}) async {
+  final response = await http
+      .get(
+        Uri.parse('$apiBaseUrl/me/assignment-progress'),
+        headers: AuthApi.authorizedHeaders(),
+      )
+      .timeout(timeout);
+  if (response.statusCode != 200) {
+    throw Exception(AuthApi.errorMessage(response));
+  }
+  final body = jsonDecode(response.body);
+  final items = body is Map ? body['assignments'] : null;
+  if (items is! List) {
+    return const [];
+  }
+  return items
+      .map(ServerAssignmentProgress.fromJson)
+      .whereType<ServerAssignmentProgress>()
+      .toList();
 }
 
 Future<CodeDraftDto> fetchCodeDraft(int assignmentId) async {

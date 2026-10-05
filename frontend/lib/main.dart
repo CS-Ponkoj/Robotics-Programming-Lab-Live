@@ -6,6 +6,7 @@ import 'package:iuse_demo/navigation/browser_entry_stub.dart'
     if (dart.library.js_interop) 'package:iuse_demo/navigation/browser_entry_web.dart';
 import 'package:iuse_demo/screens/assignment_list.dart';
 import 'package:iuse_demo/screens/login_page.dart';
+import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
@@ -63,6 +64,9 @@ class _MyAppState extends State<MyApp> {
         user.id,
         migrateLegacy: user.loginId == 'student',
       );
+      if (!user.isInstructor) {
+        await learningProgress.syncFromServer(fetchMyAssignmentProgress);
+      }
     }
     if (user != null && !user.isInstructor && !user.isDemo) {
       unawaited(researchTracker.startSafely());
@@ -98,6 +102,8 @@ class _MyAppState extends State<MyApp> {
         migrateLegacy: user.loginId == 'student',
       );
       if (!user.isInstructor) {
+        // History follows the student to any browser, device, or address.
+        await learningProgress.syncFromServer(fetchMyAssignmentProgress);
         unawaited(researchTracker.startSafely());
       }
     }

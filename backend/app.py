@@ -54,6 +54,7 @@ from email_service import EmailService
 from graders import PythonFunctionGrader, PythonVariableGrader, Ros2TopicGrader
 from graders.python_function import PlaygroundInputError, parse_playground_arguments
 from playground_inputs import parameter_problems
+from progress_service import student_assignment_progress
 from models import (
     Assignment,
     CodeDraft,
@@ -1294,6 +1295,22 @@ def create_app(
             assignment_id=assignment_id,
             assignment_version=assignment_version,
         )
+
+    @application.get("/me/assignment-progress")
+    def my_assignment_progress(
+        request: Request,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        # Identity comes from the session; no student ID is accepted.
+        if user.role != "student":
+            raise HTTPException(403, "Student access required.")
+        if is_ephemeral_demo(request, user):
+            raise HTTPException(
+                409,
+                "Demo progress is temporary and is not saved on the server.",
+            )
+        return {"assignments": student_assignment_progress(session, user)}
 
     @application.get("/admin/research/summary")
     def admin_research_summary(

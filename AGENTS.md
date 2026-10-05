@@ -231,9 +231,10 @@ Start the complete local stack connected to Neon staging:
 ```
 
 The launchers default to `http://127.0.0.1:8180/app` (API 5100, sandbox 5101)
-on both operating systems. Student progress is stored per browser address, so
-keep using that address, and document any change to these defaults in
-`README.md` and both first-time guides.
+on both operating systems. Document any change to these defaults in
+`README.md` and both first-time guides. Signed-in student progress is cached
+per browser address and restored at sign-in from `GET /me/assignment-progress`,
+which derives everything from the authenticated student's own records.
 
 Ubuntu uses the equivalent commands:
 

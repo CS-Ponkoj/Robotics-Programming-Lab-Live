@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../models/assignment_progress.dart';
+import '../models/server_progress_dto.dart';
 import 'progress_storage.dart';
 import 'progress_storage_base.dart';
 
@@ -214,6 +215,63 @@ class LearningProgressStore {
           _scopedKey(_attemptCountsKey),
           _encodeMap(attemptCounts),
         ),
+    ]);
+  }
+
+  /// Load the server's record for a signed-in student and merge it. A slow
+  /// or unreachable server leaves this browser's progress unchanged.
+  Future<void> syncFromServer(
+    Future<List<ServerAssignmentProgress>> Function() fetch, {
+    Duration limit = const Duration(seconds: 6),
+  }) async {
+    try {
+      await mergeServerProgress(await fetch().timeout(limit));
+    } on Object {
+      // Progress still shows from this browser; the next sign-in retries.
+    }
+  }
+
+  /// Combine the server's record with this browser's copy. Each value keeps
+  /// the larger history, so work done here but not yet seen by the server
+  /// (or done elsewhere) is never hidden.
+  Future<void> mergeServerProgress(
+    Iterable<ServerAssignmentProgress> serverProgress,
+  ) async {
+    var changed = false;
+    for (final item in serverProgress) {
+      final id = item.assignmentId;
+      final localAttempts = attemptCounts[id] ?? 0;
+      if (item.attemptCount > localAttempts) {
+        attemptCounts[id] = item.attemptCount;
+        latestScores[id] = item.latestScore;
+        changed = true;
+      }
+      if (item.bestScore > (bestScores[id] ?? -1)) {
+        bestScores[id] = item.bestScore;
+        changed = true;
+      }
+      final submissionId = item.latestSubmissionId;
+      if (submissionId != null && submissionIds[id] != submissionId &&
+          item.attemptCount >= localAttempts) {
+        submissionIds[id] = submissionId;
+        changed = true;
+      }
+      if (item.solutionRevealed && revealedSolutions.add(id)) {
+        changed = true;
+      }
+    }
+    if (!changed || _storage == null) {
+      return;
+    }
+    await Future.wait([
+      _storage!.setString(_scopedKey(_latestScoresKey), _encodeMap(latestScores)),
+      _storage!.setString(_scopedKey(_bestScoresKey), _encodeMap(bestScores)),
+      _storage!.setString(_scopedKey(_attemptCountsKey), _encodeMap(attemptCounts)),
+      _storage!.setString(_scopedKey(_submissionIdsKey), _encodeMap(submissionIds)),
+      _storage!.setString(
+        _scopedKey(_revealedSolutionsKey),
+        jsonEncode(revealedSolutions.toList()..sort()),
+      ),
     ]);
   }
 
