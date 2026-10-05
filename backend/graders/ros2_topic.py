@@ -25,11 +25,33 @@ class Ros2TopicGrader:
             project_files,
             assignment.grader_config or {},
         )
+        config = assignment.grader_config or {}
         evidence = self._evidence(assignment, result)
-        weights = (assignment.grader_config or {}).get("test_weights", {})
+        weights = config.get("test_weights", {})
+        # Supplied scaffold (build/start) earns credit only once the student's
+        # own code passes at least one behavior check; a starter earns 0%.
+        scaffold = {str(test_id) for test_id in config.get("scaffold_tests", [])}
+        behavior_passed = any(
+            item.passed for item in evidence if item.test_id not in scaffold
+        )
+        if scaffold and not behavior_passed:
+            evidence = [
+                item.model_copy(
+                    update={
+                        "message": item.message
+                        + " This supplied-scaffold credit counts once your code"
+                        " passes at least one behavior check."
+                    }
+                )
+                if item.test_id in scaffold and item.passed
+                else item
+                for item in evidence
+            ]
         total_weight = sum(float(weights.get(item.test_id, 1)) for item in evidence)
         passed_weight = sum(
-            float(weights.get(item.test_id, 1)) for item in evidence if item.passed
+            float(weights.get(item.test_id, 1))
+            for item in evidence
+            if item.passed and (behavior_passed or item.test_id not in scaffold)
         )
         score = round((passed_weight / total_weight) * 100) if total_weight else 0
         execution_succeeded = result.get("success") is True

@@ -180,8 +180,47 @@ def test_ros2_obstacle_grader_rejects_starter_and_wrong_behavior():
 
     assert result.execution_succeeded is True
     assert result.passed is False
-    assert result.score == 15
+    assert result.score == 0
     assert [item.test_id for item in result.evidence] == A6_TEST_IDS
+    build = next(item for item in result.evidence if item.test_id == "package-build")
+    assert build.passed is True
+    assert "counts once your code passes at least one behavior check" in build.message
+
+
+class SelectedChecksExecutor:
+    def __init__(self, passing):
+        self.passing = set(passing)
+
+    def execute(self, code, project_files, config):
+        return {
+            "success": True,
+            "error": "",
+            "output": "",
+            "tests": [
+                {"id": test_id, "passed": test_id in self.passing, "message": "Observed."}
+                for test_id in config["test_weights"]
+            ],
+        }
+
+
+@pytest.mark.parametrize(
+    ("passing", "expected_score"),
+    [
+        ({"package-build", "node-start"}, 0),
+        ({"package-build", "node-start", "cmd-vel-topic"}, 40),
+        ({"cmd-vel-topic"}, 20),
+    ],
+)
+def test_scaffold_credit_counts_only_with_a_passing_behavior_check(passing, expected_score):
+    gated = assignment()
+    gated.grader_config = {
+        **gated.grader_config,
+        "scaffold_tests": ["package-build", "node-start"],
+    }
+
+    result = Ros2TopicGrader(SelectedChecksExecutor(passing)).grade(gated, "pass")
+
+    assert result.score == expected_score
 
 
 def test_ros2_controller_validation_allows_ros_imports_and_blocks_os():
@@ -464,7 +503,7 @@ def test_ros2_assignment_submission_uses_injected_executor(tmp_path):
 
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
-    assert assignment_body["version"] == 6
+    assert assignment_body["version"] == 7
     assert 'src="/images/5"' in assignment_body["assignment_html"]
     assert "src/robot_motion/robot_motion/controller.py" in assignment_body["assignment_html"]
     assert response.status_code == 200
@@ -509,7 +548,7 @@ def test_ros2_obstacle_assignment_submission_uses_behavior_harness(tmp_path):
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
     assert assignment_body["stable_id"] == "ros2-obstacle-stop"
-    assert assignment_body["version"] == 6
+    assert assignment_body["version"] == 7
     assert 'src="/images/6"' in assignment_body["assignment_html"]
     assert "src/reactive_navigation/reactive_navigation/controller.py" in assignment_body["assignment_html"]
     assert assignment_body["editable_file_path"].endswith("controller.py")

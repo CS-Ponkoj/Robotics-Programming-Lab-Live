@@ -118,6 +118,7 @@ def test_all_ros_weight_combinations(i):
     assignment = target(i)
     ids = [item['id'] for item in source(i)['public_tests']]
     weights = source(i)['grader_config']['test_weights']
+    scaffold = set(source(i)['grader_config']['scaffold_tests'])
     class Executor:
         def execute(self, code, files, config):
             return {'success': True, 'tests': [dict(id=t, passed=p) for t, p in zip(ids, self.mask)]}
@@ -125,7 +126,11 @@ def test_all_ros_weight_combinations(i):
     for mask in itertools.product([False, True], repeat=len(ids)):
         executor.mask = mask
         result = Ros2TopicGrader(executor).grade(assignment, '')
-        assert result.score == sum(weights[t] for t, ok in zip(ids, mask) if ok)
+        # Supplied build/start credit counts only alongside a passing behavior check.
+        behavior = any(ok for t, ok in zip(ids, mask) if t not in scaffold)
+        assert result.score == sum(
+            weights[t] for t, ok in zip(ids, mask) if ok and (behavior or t not in scaffold)
+        )
         assert result.passed == all(mask)
 
 
