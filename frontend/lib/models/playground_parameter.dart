@@ -44,6 +44,97 @@ class PlaygroundParameterSpec {
   }
 }
 
+/// An instructor-written set of inputs for exploring an edge case. Scenarios
+/// hold inputs only, never expected outputs.
+class PlaygroundScenarioSpec {
+  const PlaygroundScenarioSpec({
+    required this.id,
+    required this.label,
+    required this.values,
+    this.description = '',
+  });
+
+  final String id;
+  final String label;
+  final String description;
+  final Map<String, String> values;
+
+  static PlaygroundScenarioSpec? fromJson(Object? json) {
+    if (json is! Map || json['values'] is! Map) return null;
+    final id = json['id'] is String ? json['id'] as String : '';
+    final label = json['label'] is String ? json['label'] as String : '';
+    if (id.isEmpty || label.isEmpty) return null;
+    return PlaygroundScenarioSpec(
+      id: id,
+      label: label,
+      description: json['description'] is String
+          ? json['description'] as String
+          : '',
+      values: {
+        for (final entry in (json['values'] as Map).entries)
+          entry.key.toString(): entry.value.toString(),
+      },
+    );
+  }
+
+  /// The scenario's inputs in parameter order, or null if any is missing.
+  List<String>? valuesFor(List<PlaygroundParameterSpec> parameters) {
+    final ordered = [for (final item in parameters) values[item.name]];
+    return ordered.contains(null) ? null : ordered.cast<String>();
+  }
+}
+
+/// Instructor scenarios that fill every described parameter.
+List<PlaygroundScenarioSpec> playgroundScenarios(
+  Map<String, dynamic>? simulationConfig,
+) {
+  final items = _playground(simulationConfig)['scenarios'];
+  if (items is! List) return const [];
+  final parameters = playgroundParameters(simulationConfig);
+  return items
+      .map(PlaygroundScenarioSpec.fromJson)
+      .whereType<PlaygroundScenarioSpec>()
+      .where((item) => item.valuesFor(parameters) != null)
+      .toList();
+}
+
+const _number = r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?';
+const _integer = r'[+-]?\d+';
+const _point = '[([]\\s*$_number\\s*,\\s*$_number\\s*,?\\s*[)\\]]';
+
+final _kindPatterns = <String, RegExp>{
+  'point': RegExp('^$_point\$'),
+  'number': RegExp('^$_number\$'),
+  'integer': RegExp('^$_integer\$'),
+  'list_of_points': RegExp(
+    '^[[(]\\s*(?:$_point\\s*(?:,\\s*$_point\\s*)*,?\\s*)?[)\\]]\$',
+  ),
+  'angle_map': RegExp(
+    '^\\{\\s*(?:$_integer\\s*:\\s*$_number\\s*'
+    '(?:,\\s*$_integer\\s*:\\s*$_number\\s*)*,?\\s*)?\\}\$',
+  ),
+  'text': RegExp(r'''^(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")$'''),
+};
+
+/// Same wording as the server's kind hints in backend/playground_inputs.py.
+const _kindHints = {
+  'point': 'a point with two numbers, like (2.0, 1.0)',
+  'number': 'a number, like 1.5',
+  'integer': 'a whole number, like 5',
+  'list_of_points': 'a list of points, like [(7.5, 4.5), (8.5, 4.5)]',
+  'angle_map': 'a map of whole-number angles to distances, like {0: 10, 90: 8}',
+  'text': "text in quotes, like 'Main Elevator'",
+};
+
+/// An instant, advisory check of one field. The server stays authoritative:
+/// this never blocks a run, and the server's answer replaces it.
+String? kindProblem(PlaygroundParameterSpec parameter, String text) {
+  final pattern = _kindPatterns[parameter.kind];
+  final value = text.trim();
+  if (pattern == null || value.isEmpty || pattern.hasMatch(value)) return null;
+  return '${parameter.label} should be ${_kindHints[parameter.kind]}.';
+}
+
 String parameterKindLabel(String kind) => switch (kind) {
   'point' => 'point (x, y)',
   'number' => 'number',

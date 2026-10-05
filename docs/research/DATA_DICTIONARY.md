@@ -171,6 +171,11 @@ Before running, the server checks each input's kind and returns HTTP 400 with
 `details` entries carrying `parameter_index`, so the message appears on that
 field. `playground.hints_enabled` (default true) lets instructors turn
 consistency hints off. A v6.3 `sample_arguments` value is accepted and ignored.
+`playground.scenarios` lists up to eight instructor-written presets (`id`, `label`,
+`description`, and `values` keyed by parameter name). They hold inputs only:
+the server requires exactly one valid value per parameter and rejects any other
+key, so no expected output can be stored. The browser keeps the last three
+successful runs in memory for comparison; they are never saved or sent.
 Inputs that cannot be drawn are skipped and named under the diagram.
 
 ### `study_sessions`

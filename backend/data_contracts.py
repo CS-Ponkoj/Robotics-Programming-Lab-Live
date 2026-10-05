@@ -259,8 +259,23 @@ class PlaygroundParameter(ContractModel):
         return self
 
 
+class PlaygroundScenario(ContractModel):
+    """An instructor-written set of inputs for exploring an edge case.
+
+    Scenarios hold inputs only; extra keys are forbidden, so no expected
+    output can be stored with them.
+    """
+
+    id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,39}$")
+    label: str = Field(min_length=1, max_length=60)
+    # What to look at when it runs, never a value to expect.
+    description: str = Field(default="", max_length=200)
+    values: dict[str, Annotated[str, Field(min_length=1, max_length=400)]]
+
+
 class PlaygroundConfig(ContractModel):
     parameters: list[PlaygroundParameter] = Field(default_factory=list, max_length=20)
+    scenarios: list[PlaygroundScenario] = Field(default_factory=list, max_length=8)
     # Instructors can turn consistency hints off for a study condition.
     hints_enabled: bool = True
     # Accepted from v6.3 records and ignored; examples now come from parameters.
@@ -271,6 +286,32 @@ class PlaygroundConfig(ContractModel):
         names = [item.name for item in self.parameters]
         if len(names) != len(set(names)):
             raise ValueError("Playground parameter names must be unique")
+        return self
+
+    @model_validator(mode="after")
+    def scenarios_fill_every_parameter(self):
+        ids = [item.id for item in self.scenarios]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Playground scenario IDs must be unique")
+        kinds = {item.name: item.kind for item in self.parameters}
+        for scenario in self.scenarios:
+            if set(scenario.values) != set(kinds):
+                raise ValueError(
+                    f"Scenario {scenario.id} must give exactly one value for each "
+                    "parameter"
+                )
+            for name, text in scenario.values.items():
+                try:
+                    values = parse_playground_arguments(text)
+                except PlaygroundInputError as error:
+                    raise ValueError(
+                        f"Scenario {scenario.id} value for {name} is not valid input: {error}"
+                    ) from error
+                if len(values) != 1 or not matches_parameter_kind(kinds[name], values[0]):
+                    raise ValueError(
+                        f"Scenario {scenario.id} value for {name} should be "
+                        f"{parameter_kind_hint(kinds[name])}"
+                    )
         return self
 
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:iuse_demo/models/playground_diagram.dart';
 import 'package:iuse_demo/models/playground_parameter.dart';
 import 'package:iuse_demo/models/playground_result_dto.dart';
@@ -29,6 +30,25 @@ List<String> playgroundParameterNames(String code, String functionName) {
       .toList();
 }
 
+/// One successful playground run, kept in memory to compare runs.
+class PlaygroundRun {
+  const PlaygroundRun({
+    required this.label,
+    required this.inputs,
+    required this.values,
+  });
+
+  /// Which inputs were used: a scenario label, the example, or "Custom".
+  final String label;
+
+  /// Input label and text, in parameter order.
+  final List<MapEntry<String, String>> inputs;
+  final List<PlaygroundValueDto> values;
+}
+
+/// Runs kept for comparison; older runs fall off.
+const maxPlaygroundRuns = 3;
+
 /// Lets a student call their own function with inputs they choose.
 ///
 /// Practice only: calls are not graded, not saved, and never count as an
@@ -43,6 +63,9 @@ class PlaygroundDialog extends StatefulWidget {
     this.initialArguments = '',
     this.sampleArguments = '',
     this.parameters = const [],
+    this.scenarios = const [],
+    this.history = const [],
+    this.onHistoryChanged,
     this.onArgumentsChanged,
     this.simulationConfig = const {},
     this.runner = tryAssignmentInputs,
@@ -61,6 +84,13 @@ class PlaygroundDialog extends StatefulWidget {
 
   /// Described inputs; when present each gets its own labelled field.
   final List<PlaygroundParameterSpec> parameters;
+
+  /// Instructor scenarios (inputs only) offered in a dropdown.
+  final List<PlaygroundScenarioSpec> scenarios;
+
+  /// Earlier runs this session, newest first; memory only, never sent.
+  final List<PlaygroundRun> history;
+  final ValueChanged<List<PlaygroundRun>>? onHistoryChanged;
   final ValueChanged<String>? onArgumentsChanged;
 
   /// The assignment's simulation configuration; its `diagram` block, when
@@ -81,6 +111,13 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
   String? _requestError;
   String? _modeNote;
   Map<int, String> _fieldErrors = const {};
+  // Instant, advisory kind problems; a server answer replaces them.
+  Map<int, String> _clientErrors = const {};
+  late List<PlaygroundRun> _history;
+  String _scenarioChoice = _exampleChoice;
+
+  static const _exampleChoice = 'instructions_example';
+  static const _customChoice = 'custom';
 
   bool get _hasFields => widget.parameters.isNotEmpty;
 
@@ -107,6 +144,78 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
     ];
     // Earlier inputs that do not fit the fields stay editable as one line.
     _oneLine = _hasFields && widget.initialArguments.isNotEmpty && !fits;
+    _history = List.of(widget.history);
+    _scenarioChoice = _matchingChoice();
+  }
+
+  /// Which dropdown entry the current field values match.
+  String _matchingChoice() {
+    final current = [for (final field in _fields) field.text.trim()];
+    bool same(List<String> values) =>
+        values.length == current.length &&
+        [
+          for (var index = 0; index < values.length; index++)
+            values[index].trim() == current[index],
+        ].every((item) => item);
+    if (same([for (final item in widget.parameters) item.example])) {
+      return _exampleChoice;
+    }
+    for (final scenario in widget.scenarios) {
+      final values = scenario.valuesFor(widget.parameters);
+      if (values != null && same(values)) return scenario.id;
+    }
+    return _customChoice;
+  }
+
+  String get _choiceLabel {
+    if (!_useFields) return 'Custom';
+    if (_scenarioChoice == _exampleChoice) return 'Instructions example';
+    for (final scenario in widget.scenarios) {
+      if (scenario.id == _scenarioChoice) return scenario.label;
+    }
+    return 'Custom';
+  }
+
+  void _selectScenario(String? choice) {
+    if (choice == null || choice == _customChoice) return;
+    final values = choice == _exampleChoice
+        ? [for (final item in widget.parameters) item.example]
+        : widget.scenarios
+              .firstWhere((item) => item.id == choice)
+              .valuesFor(widget.parameters)!;
+    for (var index = 0; index < _fields.length; index++) {
+      _fields[index].text = values[index];
+    }
+    setState(() {
+      _scenarioChoice = choice;
+      _fieldErrors = const {};
+      _clientErrors = const {};
+      _modeNote = null;
+    });
+    widget.onArgumentsChanged?.call(_currentArguments);
+  }
+
+  void _recordRun(PlaygroundResultDto result) {
+    if (!result.success) return;
+    final List<MapEntry<String, String>> inputs;
+    final parts = _useFields
+        ? [for (final field in _fields) field.text.trim()]
+        : splitPlaygroundArguments(_arguments.text);
+    if (_hasFields &&
+        parts != null &&
+        parts.length == widget.parameters.length) {
+      inputs = [
+        for (var index = 0; index < parts.length; index++)
+          MapEntry(widget.parameters[index].label, parts[index]),
+      ];
+    } else {
+      inputs = [MapEntry('Inputs', _currentArguments.trim())];
+    }
+    _history = [
+      PlaygroundRun(label: _choiceLabel, inputs: inputs, values: result.values),
+      ..._history,
+    ].take(maxPlaygroundRuns).toList();
+    widget.onHistoryChanged?.call(_history);
   }
 
   @override
@@ -131,6 +240,15 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
       if (field != null && _fieldErrors.containsKey(field)) {
         _fieldErrors = Map.of(_fieldErrors)..remove(field);
       }
+      if (field != null) {
+        final problem = kindProblem(
+          widget.parameters[field],
+          _fields[field].text,
+        );
+        _clientErrors = Map.of(_clientErrors)..remove(field);
+        if (problem != null) _clientErrors[field] = problem;
+        _scenarioChoice = _matchingChoice();
+      }
     });
     widget.onArgumentsChanged?.call(_currentArguments);
   }
@@ -142,6 +260,8 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
     _arguments.text = widget.sampleArguments;
     setState(() {
       _fieldErrors = const {};
+      _clientErrors = const {};
+      _scenarioChoice = _exampleChoice;
       _modeNote = null;
     });
     widget.onArgumentsChanged?.call(_currentArguments);
@@ -171,6 +291,12 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
     setState(() {
       _oneLine = false;
       _modeNote = null;
+      _clientErrors = {
+        for (var index = 0; index < parts.length; index++)
+          if (kindProblem(widget.parameters[index], parts[index]) != null)
+            index: kindProblem(widget.parameters[index], parts[index])!,
+      };
+      _scenarioChoice = _matchingChoice();
     });
   }
 
@@ -203,7 +329,10 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
         _currentArguments,
       );
       if (!mounted) return;
-      setState(() => _result = result);
+      setState(() {
+        _result = result;
+        _recordRun(result);
+      });
     } on PlaygroundInputException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -253,7 +382,7 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
           labelText: spec.label,
           helperText: spec.helper,
           helperMaxLines: 3,
-          errorText: _fieldErrors[index],
+          errorText: _fieldErrors[index] ?? _clientErrors[index],
           errorMaxLines: 3,
           counterText: '',
           border: const OutlineInputBorder(),
@@ -289,6 +418,55 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
     ];
   }
 
+  Widget _scenarioPicker(ThemeData theme) {
+    final selected = widget.scenarios
+        .where((item) => item.id == _scenarioChoice)
+        .firstOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<String>(
+          key: const Key('playground-scenario'),
+          value: _scenarioChoice,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Start from',
+            helperText: 'Pick a case to explore, then edit any box.',
+            helperMaxLines: 2,
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem(
+              value: _exampleChoice,
+              child: Text('Instructions example'),
+            ),
+            for (final scenario in widget.scenarios)
+              DropdownMenuItem(
+                value: scenario.id,
+                child: Text(scenario.label, overflow: TextOverflow.ellipsis),
+              ),
+            if (_scenarioChoice == _customChoice)
+              const DropdownMenuItem(
+                value: _customChoice,
+                child: Text('Custom (your own values)'),
+              ),
+          ],
+          onChanged: _running ? null : _selectScenario,
+        ),
+        if (selected != null && selected.description.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: _PlaygroundMessage(
+              key: const Key('playground-scenario-description'),
+              icon: Icons.lightbulb_outline_rounded,
+              color: theme.colorScheme.primary,
+              text: selected.description,
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _oneLineField() {
     return TextField(
       key: const Key('playground-arguments'),
@@ -320,123 +498,148 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
       widget.functionName,
     );
     final signature = '${widget.functionName}(${parameters.join(', ')})';
+    final hasScenarioPicker = _useFields && widget.scenarios.isNotEmpty;
+    // The scenario dropdown already offers the example in field mode.
     final showExampleButton =
-        widget.sampleArguments.isNotEmpty && _differsFromExample;
+        widget.sampleArguments.isNotEmpty &&
+        _differsFromExample &&
+        !hasScenarioPicker;
 
     return AlertDialog(
       key: const Key('playground-dialog'),
       title: const Text('Try your own inputs'),
-      content: SizedBox(
-        width: 560,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Call your function with values you choose and see what it '
-                'returns. This is practice only: it is not graded, not saved, '
-                'and does not count as an attempt.',
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text('Function', style: theme.textTheme.labelMedium),
-              SelectableText(
-                signature,
-                key: const Key('playground-signature'),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'roboto-mono',
-                  fontWeight: FontWeight.w700,
+      content: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.enter, control: true): _run,
+          const SingleActivator(LogicalKeyboardKey.enter, meta: true): _run,
+        },
+        child: SizedBox(
+          width: 560,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Call your function with values you choose and see what it '
+                  'returns. This is practice only: it is not graded, not saved, '
+                  'and does not count as an attempt.',
+                  style: theme.textTheme.bodyMedium,
                 ),
-              ),
-              if (_useFields)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.xs),
-                  child: Text(
-                    'Each box starts with the example from the instructions. '
-                    'Edit freely.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(height: AppSpacing.md),
+                Text('Function', style: theme.textTheme.labelMedium),
+                SelectableText(
+                  signature,
+                  key: const Key('playground-signature'),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'roboto-mono',
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (_useFields && !hasScenarioPicker)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Text(
+                      'Each box starts with the example from the instructions. '
+                      'Edit freely.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-              const SizedBox(height: AppSpacing.md),
-              if (_useFields) ..._fieldList(theme) else _oneLineField(),
-              if (_modeNote != null)
-                _PlaygroundMessage(
-                  key: const Key('playground-mode-note'),
-                  icon: Icons.info_outline_rounded,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  text: _modeNote!,
-                ),
-              const SizedBox(height: AppSpacing.xs),
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.xs,
-                children: [
-                  Wrap(
-                    spacing: AppSpacing.xs,
-                    children: [
-                      if (_hasFields)
-                        TextButton.icon(
-                          key: const Key('playground-mode-toggle'),
-                          onPressed: _running ? null : _toggleMode,
-                          icon: Icon(
-                            _useFields
-                                ? Icons.short_text_rounded
-                                : Icons.view_list_rounded,
-                            size: 18,
-                          ),
-                          label: Text(
-                            _useFields ? 'Edit as one line' : 'Edit each input',
-                          ),
-                        ),
-                      // Offer the example back once the student has changed it.
-                      if (showExampleButton)
-                        TextButton.icon(
-                          key: const Key('playground-use-example'),
-                          onPressed: _running ? null : _useSample,
-                          icon: const Icon(Icons.restore_rounded, size: 18),
-                          label: const Text('Use example inputs'),
-                        ),
-                    ],
+                const SizedBox(height: AppSpacing.md),
+                if (hasScenarioPicker) ...[
+                  _scenarioPicker(theme),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                if (_useFields) ..._fieldList(theme) else _oneLineField(),
+                if (_modeNote != null)
+                  _PlaygroundMessage(
+                    key: const Key('playground-mode-note'),
+                    icon: Icons.info_outline_rounded,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    text: _modeNote!,
                   ),
-                  FilledButton.icon(
-                    key: const Key('playground-run-button'),
-                    onPressed: _running ? null : _run,
-                    icon: _running
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.play_arrow_rounded, size: 20),
-                    label: Text(_running ? 'Running…' : 'Run my function'),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      children: [
+                        if (_hasFields)
+                          TextButton.icon(
+                            key: const Key('playground-mode-toggle'),
+                            onPressed: _running ? null : _toggleMode,
+                            icon: Icon(
+                              _useFields
+                                  ? Icons.short_text_rounded
+                                  : Icons.view_list_rounded,
+                              size: 18,
+                            ),
+                            label: Text(
+                              _useFields
+                                  ? 'Edit as one line'
+                                  : 'Edit each input',
+                            ),
+                          ),
+                        // Offer the example back once the student has changed it.
+                        if (showExampleButton)
+                          TextButton.icon(
+                            key: const Key('playground-use-example'),
+                            onPressed: _running ? null : _useSample,
+                            icon: const Icon(Icons.restore_rounded, size: 18),
+                            label: const Text('Use example inputs'),
+                          ),
+                      ],
+                    ),
+                    Tooltip(
+                      message: 'Run my function (Ctrl+Enter)',
+                      child: FilledButton.icon(
+                        key: const Key('playground-run-button'),
+                        onPressed: _running ? null : _run,
+                        icon: _running
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.play_arrow_rounded, size: 20),
+                        label: Text(_running ? 'Running…' : 'Run my function'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_requestError != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _PlaygroundMessage(
+                    key: const Key('playground-request-error'),
+                    icon: Icons.error_outline_rounded,
+                    color: theme.colorScheme.error,
+                    text: _requestError!,
+                  ),
+                ] else if (_result != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _PlaygroundResultView(
+                    result: _result!,
+                    diagram: buildPlaygroundDiagram(
+                      widget.simulationConfig,
+                      _result!,
+                      parameterNames: parameters,
+                    ),
                   ),
                 ],
-              ),
-              if (_requestError != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                _PlaygroundMessage(
-                  key: const Key('playground-request-error'),
-                  icon: Icons.error_outline_rounded,
-                  color: theme.colorScheme.error,
-                  text: _requestError!,
-                ),
-              ] else if (_result != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                _PlaygroundResultView(
-                  result: _result!,
-                  diagram: buildPlaygroundDiagram(
-                    widget.simulationConfig,
-                    _result!,
-                    parameterNames: parameters,
-                  ),
-                ),
+                if (_history.length > 1) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _RunHistory(runs: _history),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -601,6 +804,103 @@ class _PlaygroundMessage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The last few runs side by side so a student sees how outputs change when
+/// one input changes. Inputs that differ from the previous run are marked.
+class _RunHistory extends StatelessWidget {
+  const _RunHistory({required this.runs});
+
+  final List<PlaygroundRun> runs;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final mono = theme.textTheme.bodySmall?.copyWith(fontFamily: 'roboto-mono');
+    final inputLabels = runs.first.inputs.map((item) => item.key).toList();
+    final outputLabels = runs.first.values.map((item) => item.label).toList();
+
+    String inputOf(PlaygroundRun run, int row) =>
+        row < run.inputs.length && run.inputs[row].key == inputLabels[row]
+        ? run.inputs[row].value
+        : '';
+    String outputOf(PlaygroundRun run, int row) =>
+        row < run.values.length ? run.values[row].text : '';
+
+    Widget cell(String text, {bool changed = false, bool header = false}) {
+      return Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        color: changed ? theme.colorScheme.primaryContainer : null,
+        child: Text(
+          text,
+          style: header
+              ? theme.textTheme.labelMedium
+              : (changed ? mono?.copyWith(fontWeight: FontWeight.w800) : mono),
+        ),
+      );
+    }
+
+    return Column(
+      key: const Key('playground-history'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Compare your last runs', style: theme.textTheme.labelLarge),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Newest first. Highlighted inputs changed since the run before.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Table(
+            defaultColumnWidth: const IntrinsicColumnWidth(),
+            border: TableBorder.all(color: theme.colorScheme.outlineVariant),
+            children: [
+              TableRow(
+                children: [
+                  cell('', header: true),
+                  for (var index = 0; index < runs.length; index++)
+                    cell(
+                      index == 0
+                          ? 'Latest: ${runs[index].label}'
+                          : runs[index].label,
+                      header: true,
+                    ),
+                ],
+              ),
+              for (var row = 0; row < inputLabels.length; row++)
+                TableRow(
+                  children: [
+                    cell(inputLabels[row], header: true),
+                    for (var index = 0; index < runs.length; index++)
+                      cell(
+                        inputOf(runs[index], row),
+                        changed:
+                            index + 1 < runs.length &&
+                            inputOf(runs[index], row) !=
+                                inputOf(runs[index + 1], row),
+                      ),
+                  ],
+                ),
+              for (var row = 0; row < outputLabels.length; row++)
+                TableRow(
+                  children: [
+                    cell(outputLabels[row], header: true),
+                    for (final run in runs) cell(outputOf(run, row)),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

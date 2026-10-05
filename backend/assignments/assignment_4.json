@@ -1,6 +1,6 @@
 {
   "id": 4,
-  "version": 12,
+  "version": 13,
   "data_schema_version": 1,
   "title": "Assignment 4: Selecting a Direction with a Simplified Vector Field Histogram (VFH)",
   "description": "Build a deterministic inverse-square polar histogram and select the minimum-density sector near a goal direction.",
@@ -150,6 +150,47 @@
           "unit": "degrees",
           "example": "90",
           "group": "Search"
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "narrow_window",
+          "label": "Narrow search window",
+          "description": "A half width of 0 leaves a single candidate. How many candidates does your window hold?",
+          "values": {
+            "seed_readings": "{0: 10, 1: 8, 2: 12, 358: 7, 359: 9}",
+            "fill_start": "3",
+            "fill_end": "357",
+            "goal_direction": "90",
+            "search_half_width": "0",
+            "probe_angle": "90"
+          }
+        },
+        {
+          "id": "goal_on_the_left",
+          "label": "Goal on the left",
+          "description": "The goal points to 270 degrees. Check that your search uses goal_direction, not a fixed angle.",
+          "values": {
+            "seed_readings": "{0: 10, 1: 8, 2: 12, 358: 7, 359: 9}",
+            "fill_start": "3",
+            "fill_end": "357",
+            "goal_direction": "270",
+            "search_half_width": "15",
+            "probe_angle": "250"
+          }
+        },
+        {
+          "id": "few_sectors",
+          "label": "Few sectors to fill",
+          "description": "Only sectors 82 to 100 are generated. Does your sector count use fill_start and fill_end?",
+          "values": {
+            "seed_readings": "{80: 5, 81: 6}",
+            "fill_start": "82",
+            "fill_end": "100",
+            "goal_direction": "90",
+            "search_half_width": "5",
+            "probe_angle": "85"
+          }
         }
       ]
     },

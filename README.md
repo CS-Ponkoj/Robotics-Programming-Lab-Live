@@ -116,7 +116,9 @@ instead of deleting an account so its research history remains intact.
 - Test-case grading with server-only hidden evidence and maintained answers
 - Try inputs playground: students fill one labelled field per function input
   (type, meaning, and unit shown; prefilled with the instructions' example),
-  call their own function (ungraded, never saved), and see a to-scale route
+  start from instructor edge-case presets, get instant shape feedback per
+  field, call their own function (ungraded, never saved), compare their last
+  three runs side by side, and see a to-scale route
   map (Assignments 1-3) or a polar VFH view (Assignment 4) drawn from their
   inputs and returned values
 - Student coding workspace with cross-device version-scoped drafts, manual

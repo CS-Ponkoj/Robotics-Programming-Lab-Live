@@ -1,6 +1,6 @@
 {
   "id": 2,
-  "version": 12,
+  "version": 13,
   "data_schema_version": 1,
   "title": "Assignment 2: Obstacle Avoidance: Bug Algorithm Scenario 2",
   "description": "Calculate a geometrically consistent Bug2 detour around a rectangular obstacle.",
@@ -101,6 +101,47 @@
           "meaning": "Where the robot must arrive (G)",
           "unit": "m",
           "example": "(10, 0)"
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "wide_detour",
+          "label": "Wide detour",
+          "description": "A much larger obstacle. Watch how the boundary distance grows compared with the other parts.",
+          "values": {
+            "start": "(0, 0)",
+            "hit": "(3, 0)",
+            "corner_a": "(3, -4)",
+            "corner_b": "(9, -4)",
+            "leave": "(9, 0)",
+            "goal": "(12, 0)"
+          }
+        },
+        {
+          "id": "hit_at_start",
+          "label": "Obstacle right at the start",
+          "description": "The robot starts touching the obstacle. What should the approach distance be?",
+          "values": {
+            "start": "(0, 0)",
+            "hit": "(0, 0)",
+            "corner_a": "(0, -1)",
+            "corner_b": "(2, -1)",
+            "leave": "(2, 0)",
+            "goal": "(5, 0)"
+          }
+        },
+        {
+          "id": "diagonal_route",
+          "label": "Diagonal route",
+          "description": "The m-line is not horizontal. Make sure no part of your code assumes y stays at 0.",
+          "values": {
+            "start": "(0, 0)",
+            "hit": "(2, 2)",
+            "corner_a": "(3, 1)",
+            "corner_b": "(5, 3)",
+            "leave": "(4, 4)",
+            "goal": "(7, 7)"
+          }
         }
       ]
     },

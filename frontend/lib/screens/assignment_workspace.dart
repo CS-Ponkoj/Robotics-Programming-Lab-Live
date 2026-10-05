@@ -77,6 +77,9 @@ class _MyHomePageState extends State<MyHomePage> {
   Map<String, dynamic> _simulationConfig = const {};
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
+  // Playground runs for the current code only; memory only, never sent.
+  List<PlaygroundRun> _playgroundHistory = const [];
+  String _playgroundHistoryCode = '';
 
   @override
   void initState() {
@@ -348,6 +351,10 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _openPlayground() async {
     final functionName = _playgroundFunction;
     if (_init || functionName == null) return;
+    if (_playgroundHistoryCode != _code) {
+      _playgroundHistory = const [];
+      _playgroundHistoryCode = _code;
+    }
     if (!hasNonWhitespaceCode(_code)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Write some code before trying inputs.')),
@@ -365,6 +372,9 @@ class _MyHomePageState extends State<MyHomePage> {
         simulationConfig: _simulationConfig,
         sampleArguments: playgroundSampleArguments(_simulationConfig),
         parameters: playgroundParameters(_simulationConfig),
+        scenarios: playgroundScenarios(_simulationConfig),
+        history: _playgroundHistory,
+        onHistoryChanged: (runs) => _playgroundHistory = runs,
       ),
     );
   }

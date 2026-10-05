@@ -1,6 +1,6 @@
 {
   "id": 3,
-  "version": 13,
+  "version": 14,
   "data_schema_version": 1,
   "title": "Assignment 3: Autonomous Robot Navigation in a Multi-Floor Office",
   "description": "Compare two complete multi-floor routes using explicit obstacle detours, elevator delays, and destination-floor travel.",
@@ -255,6 +255,84 @@
           "unit": "m",
           "example": "[(7.5, 4.5), (8.5, 4.5)]",
           "group": "Map"
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "no_waypoints",
+          "label": "No waypoints (direct route)",
+          "description": "An empty waypoint list. Your main entry path should go straight to the main elevator.",
+          "values": {
+            "robot_speed": "1.0",
+            "service_detour_radius": "1.0",
+            "main_elevator_wait": "30.0",
+            "service_elevator_wait": "10.0",
+            "main_seconds_per_floor": "15.0",
+            "service_seconds_per_floor": "20.0",
+            "floors_to_travel": "5",
+            "start": "(5.0, 5.0)",
+            "goal": "(25.0, 30.0)",
+            "main_elevator": "(10.0, 5.0)",
+            "service_elevator": "(6.0, 15.0)",
+            "main_waypoints": "[]"
+          }
+        },
+        {
+          "id": "one_floor",
+          "label": "One floor",
+          "description": "Only one floor interval. Do both complete times still include every part of the trip?",
+          "values": {
+            "robot_speed": "1.0",
+            "service_detour_radius": "1.0",
+            "main_elevator_wait": "30.0",
+            "service_elevator_wait": "10.0",
+            "main_seconds_per_floor": "15.0",
+            "service_seconds_per_floor": "20.0",
+            "floors_to_travel": "1",
+            "start": "(5.0, 5.0)",
+            "goal": "(25.0, 30.0)",
+            "main_elevator": "(10.0, 5.0)",
+            "service_elevator": "(6.0, 15.0)",
+            "main_waypoints": "[(7.5, 4.5), (8.5, 4.5)]"
+          }
+        },
+        {
+          "id": "short_wait_slow_ride",
+          "label": "Service: short wait, slow ride",
+          "description": "The service elevator arrives fast but rides slowly. Does your label follow the smaller complete time?",
+          "values": {
+            "robot_speed": "1.0",
+            "service_detour_radius": "1.0",
+            "main_elevator_wait": "30.0",
+            "service_elevator_wait": "2.0",
+            "main_seconds_per_floor": "15.0",
+            "service_seconds_per_floor": "40.0",
+            "floors_to_travel": "5",
+            "start": "(5.0, 5.0)",
+            "goal": "(25.0, 30.0)",
+            "main_elevator": "(10.0, 5.0)",
+            "service_elevator": "(6.0, 15.0)",
+            "main_waypoints": "[(7.5, 4.5), (8.5, 4.5)]"
+          }
+        },
+        {
+          "id": "faster_robot",
+          "label": "Faster robot",
+          "description": "Doubling the speed should change only the travel parts of each time.",
+          "values": {
+            "robot_speed": "2.0",
+            "service_detour_radius": "1.0",
+            "main_elevator_wait": "30.0",
+            "service_elevator_wait": "10.0",
+            "main_seconds_per_floor": "15.0",
+            "service_seconds_per_floor": "20.0",
+            "floors_to_travel": "5",
+            "start": "(5.0, 5.0)",
+            "goal": "(25.0, 30.0)",
+            "main_elevator": "(10.0, 5.0)",
+            "service_elevator": "(6.0, 15.0)",
+            "main_waypoints": "[(7.5, 4.5), (8.5, 4.5)]"
+          }
         }
       ]
     },

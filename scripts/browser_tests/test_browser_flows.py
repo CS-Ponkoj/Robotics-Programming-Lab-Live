@@ -122,9 +122,9 @@ def test_student_demo_tries_inputs_and_reads_failure_guidance(page: Page):
     expect(try_inputs).to_be_enabled(timeout=60_000)
     try_inputs.click()
     wait_for_text(page, "not graded, not saved")
-    # Each input has its own labelled box holding the instructions' example,
-    # so one click runs it.
-    wait_for_text(page, "starts with the example from the instructions")
+    # Each input has its own labelled box, starting from the instructions'
+    # example, so one click runs it; presets offer edge cases to explore.
+    wait_for_text(page, "Pick a case to explore")
     expect(page.get_by_label("Hit point")).to_be_visible()
     page.get_by_role("button", name="Run my function").click()
     wait_for_text(page, "Approach distance", GRADING_TIMEOUT_MS)
@@ -134,6 +134,12 @@ def test_student_demo_tries_inputs_and_reads_failure_guidance(page: Page):
     expect(
         page.get_by_role("img", name=re.compile(r"^Route diagram\. Points: S at \(2\.0, 1\.0\)"))
     ).to_have_count(1)
+    # A preset fills every field; a second run lets the student compare runs.
+    page.get_by_role("button", name=re.compile("Start from|Instructions example")).first.click()
+    page.get_by_role("menuitem", name="Hit right after start").click()
+    page.get_by_role("button", name="Run my function").click()
+    wait_for_text(page, "Compare your last runs", GRADING_TIMEOUT_MS)
+    wait_for_text(page, "Latest: Hit right after start")
     page.get_by_role("button", name="Close").click()
 
     # Graded results name each check, its points, and why it failed.

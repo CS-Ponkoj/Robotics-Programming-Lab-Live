@@ -107,7 +107,11 @@ def test_playground_block_rules():
     legacy = SimulationConfig.model_validate(
         {"playground": {"sample_arguments": "(1, 2)"}}
     ).model_dump(mode="json")
-    assert legacy["playground"] == {"parameters": [], "hints_enabled": True}
+    assert legacy["playground"] == {
+        "parameters": [],
+        "scenarios": [],
+        "hints_enabled": True,
+    }
     assert "playground" not in SimulationConfig.model_validate(
         source(5)["simulation_config"]
     ).model_dump(mode="json")
@@ -212,3 +216,98 @@ def test_student_payload_carries_parameter_descriptions(client):
     )
     assert playground["hints_enabled"] is True
     assert "sample_arguments" not in playground
+
+
+ANSWERS = Path(__file__).parents[2] / "assignments_answers"
+
+
+def scenario_line(data: dict, scenario: dict) -> str:
+    """The one-line input a scenario fills, in parameter order."""
+    parameters = data["simulation_config"]["playground"]["parameters"]
+    return ", ".join(scenario["values"][item["name"]] for item in parameters)
+
+
+@pytest.mark.parametrize("number", [1, 2, 3, 4])
+def test_every_scenario_runs_on_starter_code_and_the_maintained_answer(number):
+    data = source(number)
+    assignment = Assignment(
+        id=number,
+        stable_id=data["stable_id"],
+        version=data["version"],
+        title=data["title"],
+        grader_type=data["grader_type"],
+        grader_config=data["grader_config"],
+    )
+    grader = PythonFunctionGrader(SubprocessSandbox(timeout_seconds=15))
+    answer = (ANSWERS / f"assignment_{number}_answer.py").read_text(encoding="utf-8")
+    scenarios = data["simulation_config"]["playground"]["scenarios"]
+    assert len(scenarios) >= 3
+    for scenario in scenarios:
+        arguments = parse_playground_arguments(scenario_line(data, scenario))
+        for code in (data["starter_code"], answer):
+            outcome = grader.try_arguments(assignment, code, arguments)
+            assert outcome.success is True, (scenario["id"], outcome.error)
+            assert outcome.return_count == outcome.expected_return_count
+
+
+@pytest.mark.parametrize("number", [1, 2, 3, 4])
+def test_scenarios_hold_inputs_only(number):
+    """Descriptions guide what to look at and never quote a grading value."""
+    data = source(number)
+    scenarios = data["simulation_config"]["playground"]["scenarios"]
+    # Inputs may hold any number; the free text must never quote a result.
+    text = " ".join(item["label"] + " " + item["description"] for item in scenarios)
+    for case in data["grader_config"]["cases"]:
+        for expected in case["expected"]:
+            if isinstance(expected, float) and not expected.is_integer():
+                assert repr(expected) not in text
+                assert f"{expected:.2f}" not in text
+
+
+def scenario(**overrides) -> dict:
+    return {
+        "id": "edge",
+        "label": "Edge case",
+        "values": {"start": "(0, 0)"},
+        **overrides,
+    }
+
+
+@pytest.mark.parametrize(
+    "item, message",
+    [
+        (scenario(values={}), "exactly one value for each parameter"),
+        (scenario(values={"start": "(0, 0)", "goal": "(1, 1)"}), "exactly one value"),
+        (scenario(values={"start": "5"}), "should be a point"),
+        (scenario(values={"start": "__import__('os')"}), "not valid input"),
+        (scenario(expected=[1.0]), "Extra inputs"),
+        (scenario(id="Edge"), "String should match pattern"),
+        (scenario(label=""), "at least 1 character"),
+    ],
+)
+def test_invalid_scenarios_are_rejected(item, message):
+    with pytest.raises(ValidationError, match=message):
+        SimulationConfig.model_validate(
+            {"playground": {"parameters": [parameter()], "scenarios": [item]}}
+        )
+
+
+def test_scenario_ids_are_unique_and_limited():
+    with pytest.raises(ValidationError, match="unique"):
+        SimulationConfig.model_validate(
+            {
+                "playground": {
+                    "parameters": [parameter()],
+                    "scenarios": [scenario(), scenario(label="Again")],
+                }
+            }
+        )
+    with pytest.raises(ValidationError, match="at most 8"):
+        SimulationConfig.model_validate(
+            {
+                "playground": {
+                    "parameters": [parameter()],
+                    "scenarios": [scenario(id=f"edge_{index}") for index in range(9)],
+                }
+            }
+        )
