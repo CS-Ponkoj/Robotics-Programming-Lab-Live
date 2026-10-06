@@ -257,7 +257,9 @@ def write_code(page: Page, marker: str) -> None:
     # Let the editor finish loading the saved draft before typing over it.
     page.wait_for_timeout(1_000)
     replace_editor_code(page, f"# {marker}\nanswer = 1\n")
-    assert editor_shows(page, marker, timeout=5_000), "typing did not reach the editor"
+    # Allow for a slow accessibility-tree update after typing, especially
+    # right after the browser goes offline; 5 s failed about one run in three.
+    assert editor_shows(page, marker, timeout=15_000), "typing did not reach the editor"
 
 
 def test_student_code_comes_back_however_they_leave(browser):
