@@ -273,3 +273,26 @@ def test_demo_payload_hides_the_shared_student_account_identity(demo_client):
         assert user["id"] != real_id
         assert user["participant_code"] is None
         assert user["email"] is None
+
+
+def test_demo_list_never_shows_the_shared_student_accounts_saved_drafts(demo_client):
+    student = demo_client.post(
+        "/auth/login", json={"login_id": "student", "password": "student"}
+    ).json()
+    headers = {"Authorization": f"Bearer {student['token']}"}
+    version = demo_client.get("/assignments/1", headers=headers).json()["version"]
+    saved = demo_client.put(
+        "/assignments/1/draft",
+        headers=headers,
+        json={"assignment_version": version, "code": "# the real student's work\n"},
+    )
+    assert saved.status_code == 200
+    real_list = demo_client.get("/assignments", headers=headers).json()["assignments"]
+    assert next(a for a in real_list if a["id"] == 1)["has_saved_draft"] is True
+
+    demo = demo_client.post("/auth/demo").json()
+    demo_headers = {"Authorization": f"Bearer {demo['token']}"}
+    demo_list = demo_client.get("/assignments", headers=demo_headers).json()["assignments"]
+    # The demo runs as the seeded student row but must not see its work.
+    assert all(item["has_saved_draft"] is False for item in demo_list)
+    assert demo_client.get("/assignments/1/draft", headers=demo_headers).json()["code"] is None

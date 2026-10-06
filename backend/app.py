@@ -1415,13 +1415,15 @@ def create_app(
         include_in_schema=False,
     )
     def list_assignments(
+        request: Request,
         session: Session = Depends(session_dependency),
         user: User = Depends(current_user),
     ):
         assignments = AssignmentRepository(session).list_published()
-        # One query for every draft this student owns; demo drafts are never
-        # stored, so demo sessions simply find none.
-        drafts = {
+        # One query for every draft this student owns. Demo sessions run as the
+        # shared seeded student row, so they must never see that account's
+        # saved drafts; demo drafts themselves are never stored.
+        drafts = {} if is_ephemeral_demo(request, user) else {
             (row.assignment_id, row.assignment_version): row.code
             for row in session.execute(
                 select(

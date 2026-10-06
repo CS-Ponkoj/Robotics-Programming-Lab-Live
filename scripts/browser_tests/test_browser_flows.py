@@ -239,6 +239,20 @@ def editor_shows(page: Page, marker: str, timeout: int = DRAFT_WAIT_MS) -> bool:
     return marker in host.aria_snapshot()
 
 
+CARD_STATUS = re.compile(r"\b01 .*?\b(Completed|Attempted|In progress|Not started)\b")
+
+
+def first_card_status(page: Page) -> str:
+    """The progress label on the first assignment card of the home page."""
+    expect(page.get_by_role("button", name=ASSIGNMENT_BUTTON).first).to_be_visible(
+        timeout=60_000
+    )
+    page.wait_for_timeout(1_000)
+    match = CARD_STATUS.search(page.locator("flt-semantics-host").aria_snapshot())
+    assert match, "first assignment card has no progress label"
+    return match.group(1)
+
+
 def write_code(page: Page, marker: str) -> None:
     # Let the editor finish loading the saved draft before typing over it.
     page.wait_for_timeout(1_000)
@@ -282,15 +296,17 @@ def test_student_code_comes_back_however_they_leave(browser):
     page.keyboard.press("Enter")
     open_first_assignment(page)
     assert editor_shows(page, first), "draft lost after signing out and in"
+    page.get_by_role("button", name="Back").first.click()
+    status_here = first_card_status(page)
     context.close()
 
     # 4. Another computer: only the server copy can supply the code, and the
-    # home page and workspace both say the work is in progress.
+    # home page shows the same status as the student's usual browser (the
+    # server restores attempts and scores, so it is not always "In progress").
     other, page = new_page(browser)
     sign_in(page, login, password)
-    expect(page.get_by_role("button", name="Continue assignment").first).to_be_visible()
+    assert first_card_status(page) == status_here, "status differs on another computer"
     open_first_assignment(page)
-    wait_for_text(page, "In progress")
     assert editor_shows(page, first), "draft missing on another computer"
     other.close()
 
