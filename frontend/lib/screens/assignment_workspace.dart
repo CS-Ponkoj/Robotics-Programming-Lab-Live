@@ -15,6 +15,7 @@ import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/theme/editor_palette.dart';
 import 'package:iuse_demo/widgets/playground_dialog.dart';
+import 'package:iuse_demo/widgets/run_terminal.dart';
 import 'package:highlight/languages/python.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -75,6 +76,13 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _suppressEditorChange = false;
   String? _playgroundFunction;
   String _starterCode = '';
+  // Terminal under the editor: what the last run printed and any error.
+  bool _terminalExpanded = false;
+  double _terminalHeight = 180;
+  List<TerminalLine> _terminalLines = const [];
+  String? _terminalRequestError;
+  String _terminalFileName = 'your_code.py';
+  bool _terminalPython = true;
   Map<String, dynamic> _simulationConfig = const {};
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
@@ -307,7 +315,11 @@ class _MyHomePageState extends State<MyHomePage> {
       _openResultsPanel();
       return;
     }
+    final ranCode = _code;
     setState(() {
+      _terminalExpanded = true;
+      _terminalLines = const [];
+      _terminalRequestError = null;
       _submitted = true;
       _emptyCodeAttempted = false;
       _isRunning = true;
@@ -331,6 +343,12 @@ class _MyHomePageState extends State<MyHomePage> {
           lastAttemptAccuracy[widget.id] = score;
           _submissionId = feedback.submissionId;
           _isRunning = false;
+          _terminalLines = buildRunTerminalLines(
+            data: feedback,
+            code: ranCode,
+            fileName: _terminalFileName,
+            python: _terminalPython,
+          );
           _diagnosticLine = extractPythonErrorLine(
             '${feedback.codeExecResult}\n${feedback.codeOutput}',
             _controller.fullText.split('\n').length,
@@ -341,9 +359,15 @@ class _MyHomePageState extends State<MyHomePage> {
         );
         unawaited(learningProgress.recordAttempt(widget.id, score));
       },
-      onError: (_) {
+      onError: (Object error) {
         if (mounted) {
-          setState(() => _isRunning = false);
+          setState(() {
+            _isRunning = false;
+            _terminalRequestError = error is ApiRequestException
+                ? error.message
+                : 'Could not reach the code runner. Check your connection '
+                    'and try again.';
+          });
         }
       },
     );
@@ -560,6 +584,18 @@ class _MyHomePageState extends State<MyHomePage> {
       baseOffset: match,
       extentOffset: match + query.length,
     );
+    _editorFocusNode.requestFocus();
+  }
+
+  void _openLineInEditor(int line) {
+    final lines = _controller.fullText.split('\n');
+    if (line < 1 || line > lines.length) return;
+    var offset = 0;
+    for (var index = 0; index < line - 1; index++) {
+      offset += lines[index].length + 1;
+    }
+    _controller.selection = TextSelection.collapsed(offset: offset);
+    setState(() => _diagnosticLine = line);
     _editorFocusNode.requestFocus();
   }
 
@@ -1021,6 +1057,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                           _playgroundFunction =
                                               snap.data!.playgroundFunction;
                                           _starterCode = snap.data!.code;
+                                          _terminalFileName = snap
+                                                  .data!.editableFilePath
+                                                  ?.split('/')
+                                                  .last ??
+                                              'your_code.py';
+                                          _terminalPython =
+                                              snap.data!.language == 'python';
                                           _simulationConfig =
                                               snap.data!.simulationConfig;
                                           setAssignmentEditorContent(
@@ -1065,6 +1108,24 @@ class _MyHomePageState extends State<MyHomePage> {
                                       );
                                     },
                                   ),
+                                ),
+                                RunTerminalPanel(
+                                  expanded: _terminalExpanded,
+                                  height: _terminalHeight,
+                                  running: _isRunning,
+                                  lines: _terminalLines,
+                                  requestError: _terminalRequestError,
+                                  onToggle: () => setState(
+                                    () => _terminalExpanded =
+                                        !_terminalExpanded,
+                                  ),
+                                  onResize: (value) =>
+                                      setState(() => _terminalHeight = value),
+                                  onClear: () => setState(() {
+                                    _terminalLines = const [];
+                                    _terminalRequestError = null;
+                                  }),
+                                  onOpenLine: _openLineInEditor,
                                 ),
                               ],
                             ),

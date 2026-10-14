@@ -141,8 +141,10 @@ instead of deleting an account so its research history remains intact.
   map (Assignments 1-3) or a polar VFH view (Assignment 4) drawn from their
   inputs and returned values
 - Student coding workspace with cross-device version-scoped drafts, manual
-  Python formatting, completion help, search/replace, results, progressive
-  hints, and study progress
+  Python formatting, completion help, search/replace, a VS Code style
+  terminal under the editor (printed output, errors with a link to the
+  failing line, and a test summary), results, progressive hints, and study
+  progress
 - Instructor assignment, account, analytics, and research-export tools
 - Server-side sessions and role authorization
 - Shared Neon PostgreSQL with a dedicated staging database

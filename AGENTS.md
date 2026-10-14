@@ -525,6 +525,11 @@ Treat every submission as hostile input.
   retain their full workspace height; do not dock Results beneath them without
   explicit owner approval. Preserve results when minimizing/reopening and keep
   AI tutoring off by default.
+- A collapsible, resizable terminal under the code editor (owner-approved
+  2026-10-14) shows each run's printed output, the error with the student's
+  own line, and a test summary, like the VS Code terminal. It adds to the
+  Results overlay and never replaces it; build its lines only from the run
+  result and the student's code, never from protected tests.
 
 - Keep networking in `lib/services`, shared state in `lib/state`, transport data
   in `lib/models`, and screens focused on presentation and interaction.

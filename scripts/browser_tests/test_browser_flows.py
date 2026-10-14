@@ -253,13 +253,39 @@ def first_card_status(page: Page) -> str:
     return match.group(1)
 
 
+def device_copy_has(page: Page, marker: str, timeout: int = 10_000) -> bool:
+    """Whether this browser's saved draft copy contains marker.
+
+    The editor writes this copy on every change, before any server save, so
+    it is the reliable sign that typing reached the app.
+    """
+    script = (
+        "m => Object.entries(window.localStorage)"
+        ".some(([key, value]) => key.includes('code_drafts') && value.includes(m))"
+    )
+    for _ in range(timeout // 250):
+        if page.evaluate(script, marker):
+            return True
+        page.wait_for_timeout(250)
+    return bool(page.evaluate(script, marker))
+
+
 def write_code(page: Page, marker: str) -> None:
-    # Let the editor finish loading the saved draft before typing over it.
+    # Let the editor finish loading the saved draft, and take focus, before
+    # typing over it; Flutter applies typed text a moment after the browser.
     page.wait_for_timeout(1_000)
-    replace_editor_code(page, f"# {marker}\nanswer = 1\n")
-    # Allow for a slow accessibility-tree update after typing, especially
-    # right after the browser goes offline; 5 s failed about one run in three.
-    assert editor_shows(page, marker, timeout=15_000), "typing did not reach the editor"
+    viewport = page.viewport_size
+    # Synthetic typing occasionally arrives before Flutter's hidden text field
+    # has focus and is dropped; a person's keystrokes are not. Retry until the
+    # app has the text, then the checks below test what matters: whether it
+    # comes back.
+    for _ in range(3):
+        page.mouse.click(viewport["width"] * 0.25, viewport["height"] * 0.55)
+        page.wait_for_timeout(300)
+        replace_editor_code(page, f"# {marker}\nanswer = 1\n")
+        if device_copy_has(page, marker, timeout=3_000):
+            return
+    raise AssertionError("typing did not reach the editor")
 
 
 def test_student_code_comes_back_however_they_leave(browser):
@@ -317,14 +343,19 @@ def test_student_code_survives_a_closed_tab_and_a_lost_connection(browser):
     login, password = student_credentials()
     stamp = str(os.getpid())
 
-    # 5. Close the tab immediately after typing, before the server save.
+    # 5. Close the tab before the server save happens. Blocking draft saves
+    # makes that certain, instead of racing the short save delay.
     context, page = new_page(browser)
     sign_in(page, login, password)
     open_first_assignment(page)
+    page.route(
+        re.compile(r".*/assignments/\d+/draft$"),
+        lambda route: route.abort()
+        if route.request.method == "PUT"
+        else route.continue_(),
+    )
     closed = f"DRAFT-CLOSED-TAB-{stamp}"
-    page.wait_for_timeout(1_000)
-    # No waiting after typing: the tab closes before the server save runs.
-    replace_editor_code(page, f"# {closed}\nanswer = 1\n")
+    write_code(page, closed)
     page.close()
     page = context.new_page()
     page.set_default_timeout(30_000)
@@ -354,3 +385,66 @@ def test_student_code_survives_a_closed_tab_and_a_lost_connection(browser):
     open_first_assignment(page)
     assert editor_shows(page, offline), "offline draft never reached the server"
     other.close()
+
+
+def terminal_shows(page: Page, text: str, timeout: int = 30_000) -> None:
+    """Wait until a terminal line containing text is in the accessibility tree."""
+    host = page.locator("flt-semantics-host")
+    for _ in range(timeout // 500):
+        if text in host.aria_snapshot():
+            return
+        page.wait_for_timeout(500)
+    assert text in host.aria_snapshot(), f"terminal never showed {text!r}"
+
+
+def test_terminal_under_the_editor_shows_output_and_errors(page: Page):
+    open_app(page)
+    page.get_by_role("button", name="Try the student demo").click()
+    page.get_by_role("button", name="Start assignment").first.click()
+    run_tests = page.get_by_role("button", name="Run tests")
+    expect(run_tests).to_be_enabled(timeout=60_000)
+    # Before the first run the terminal waits, collapsed, under the editor.
+    expect(page.get_by_role("button", name="Open terminal")).to_be_visible()
+
+    # A normal run: the command, what print() wrote, and the test summary.
+    run_tests.click()
+    # Results open over the page; minimizing them shows the terminal.
+    minimize = page.get_by_role("button", name="Minimize results")
+    expect(minimize).to_be_visible(timeout=GRADING_TIMEOUT_MS)
+    wait_for_text(page, "Test score", GRADING_TIMEOUT_MS)
+    minimize.click()
+    terminal_shows(page, "Tests finished:")
+    terminal_shows(page, "$ python")
+    terminal_shows(page, "Total travel distance:")
+
+    # An error: the printed line before it, the student's own failing line,
+    # and the error message, like a VS Code terminal.
+    broken = (
+        "print('before the error')\n"
+        "def calculate_bug2_route(start, hit, corner, leave, goal):\n"
+        "    return missing_name\n"
+        "calculate_bug2_route(1, 2, 3, 4, 5)\n"
+    )
+    # Demo drafts are memory-only, so confirm the typing from the editor
+    # itself, retrying if a synthetic keystroke arrives before focus.
+    viewport = page.viewport_size
+    for _ in range(3):
+        page.wait_for_timeout(500)
+        page.mouse.click(viewport["width"] * 0.25, viewport["height"] * 0.45)
+        page.wait_for_timeout(300)
+        replace_editor_code(page, broken)
+        if editor_shows(page, "return missing_name", timeout=3_000):
+            break
+    else:
+        raise AssertionError("typing did not reach the editor")
+    page.get_by_role("button", name="Run tests").click()
+    expect(minimize).to_be_visible(timeout=GRADING_TIMEOUT_MS)
+    wait_for_text(page, "resolve the execution error", GRADING_TIMEOUT_MS)
+    minimize.click()
+    terminal_shows(page, "NameError: name 'missing_name' is not defined")
+    terminal_shows(page, "before the error")
+    terminal_shows(page, "return missing_name")
+    go_to_line = page.get_by_role("button", name=re.compile(r"^Go to line 3 in the editor"))
+    expect(go_to_line).to_have_count(1)
+    go_to_line.click()
+    terminal_shows(page, "Tests did not finish")
