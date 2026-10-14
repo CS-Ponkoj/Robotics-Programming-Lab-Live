@@ -403,8 +403,10 @@ def test_terminal_under_the_editor_shows_output_and_errors(page: Page):
     page.get_by_role("button", name="Start assignment").first.click()
     run_tests = page.get_by_role("button", name="Run tests")
     expect(run_tests).to_be_enabled(timeout=60_000)
-    # Before the first run the terminal waits, collapsed, under the editor.
-    expect(page.get_by_role("button", name="Open terminal")).to_be_visible()
+    # Like the VS Code panel, the terminal is open under the editor from the
+    # start and says what it will show.
+    expect(page.get_by_role("button", name="Collapse terminal")).to_be_visible()
+    terminal_shows(page, "Run tests to see what your program prints")
 
     # A normal run: the command, what print() wrote, and the test summary.
     run_tests.click()
@@ -441,6 +443,10 @@ def test_terminal_under_the_editor_shows_output_and_errors(page: Page):
     expect(minimize).to_be_visible(timeout=GRADING_TIMEOUT_MS)
     wait_for_text(page, "resolve the execution error", GRADING_TIMEOUT_MS)
     minimize.click()
+    terminal_shows(page, "Traceback (most recent call last):")
+    terminal_shows(page, "line 4, in <module>")
+    terminal_shows(page, "calculate_bug2_route(1, 2, 3, 4, 5)")
+    terminal_shows(page, "line 3, in calculate_bug2_route")
     terminal_shows(page, "NameError: name 'missing_name' is not defined")
     terminal_shows(page, "before the error")
     terminal_shows(page, "return missing_name")

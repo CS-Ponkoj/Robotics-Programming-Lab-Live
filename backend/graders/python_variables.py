@@ -1,6 +1,6 @@
 from math import isclose
 
-from graders.base import GradeResult
+from graders.base import GradeResult, safe_error_frames
 from models import Assignment
 from sandbox import Sandbox
 from schemas import TestEvidence
@@ -32,6 +32,7 @@ class PythonVariableGrader:
             score=100 if success else 0,
             code_output=result.get("output", ""),
             execution_error="" if success else result.get("error", ""),
+            error_frames=[] if success else safe_error_frames(result.get("frames")),
             tested_names=[],
             evidence=evidence,
         )
@@ -79,6 +80,9 @@ class PythonVariableGrader:
             score=score,
             code_output=result.get("output", ""),
             execution_error="" if execution_succeeded else result.get("error", ""),
+            error_frames=(
+                [] if execution_succeeded else safe_error_frames(result.get("frames"))
+            ),
             tested_names=names,
             evidence=evidence,
         )

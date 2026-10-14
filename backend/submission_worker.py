@@ -230,6 +230,25 @@ def format_error(error):
     )
 
 
+MAX_ERROR_FRAMES = 20
+
+
+def error_frames(error):
+    """The student's own call stack for an error, outermost call first.
+
+    Only frames from the submitted code are kept: line numbers and function
+    names the student wrote, never this worker's internals or any values.
+    """
+    if isinstance(error, SyntaxError) or hasattr(error, "submission_line"):
+        return []
+    frames = [
+        {"line": frame.lineno or 0, "name": frame.name}
+        for frame in traceback.extract_tb(error.__traceback__)
+        if frame.filename == "<submission>"
+    ]
+    return frames[-MAX_ERROR_FRAMES:]
+
+
 def execute(request):
     namespace = {
         "__builtins__": safe_builtins(),
@@ -245,6 +264,7 @@ def execute(request):
         return {
             "success": False,
             "error": format_error(error),
+            "frames": error_frames(error),
             "output": output.getvalue(),
             "values": {},
         }

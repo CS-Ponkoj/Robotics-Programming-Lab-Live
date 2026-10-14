@@ -56,7 +56,39 @@ List<TerminalLine> buildRunTerminalLines({
     final match = _errorPattern.firstMatch(error);
     final lineNumber = match == null ? null : int.tryParse(match.group(2)!);
     final codeLines = code.split('\n');
-    if (match != null && lineNumber != null && lineNumber >= 1) {
+    if (match != null && data.errorFrames.isNotEmpty) {
+      // A full Python traceback of the student's own calls.
+      lines.add(
+        const TerminalLine(
+          'Traceback (most recent call last):',
+          TerminalLineKind.error,
+        ),
+      );
+      for (final frame in data.errorFrames) {
+        final known = frame.line <= codeLines.length;
+        lines.add(
+          TerminalLine(
+            '  File "$fileName", line ${frame.line}, in ${frame.name}',
+            TerminalLineKind.location,
+            line: known ? frame.line : null,
+          ),
+        );
+        if (known && codeLines[frame.line - 1].trim().isNotEmpty) {
+          lines.add(
+            TerminalLine(
+              '    ${codeLines[frame.line - 1].trim()}',
+              TerminalLineKind.source,
+            ),
+          );
+        }
+      }
+      lines.add(
+        TerminalLine(
+          '${match.group(1)}: ${match.group(3)}',
+          TerminalLineKind.error,
+        ),
+      );
+    } else if (match != null && lineNumber != null && lineNumber >= 1) {
       lines.add(
         TerminalLine(
           '  File "$fileName", line $lineNumber',

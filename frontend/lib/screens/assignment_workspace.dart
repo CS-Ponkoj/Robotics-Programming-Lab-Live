@@ -77,7 +77,8 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _playgroundFunction;
   String _starterCode = '';
   // Terminal under the editor: what the last run printed and any error.
-  bool _terminalExpanded = false;
+  // Open from the start, like the VS Code panel.
+  bool _terminalExpanded = true;
   double _terminalHeight = 180;
   List<TerminalLine> _terminalLines = const [];
   String? _terminalRequestError;
@@ -940,6 +941,9 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Scaffold(
             key: _scaffoldKey,
             appBar: appBar,
+            // Results slide in without dimming the editor, so the terminal
+            // stays readable next to the feedback.
+            drawerScrimColor: Colors.transparent,
             endDrawer: Drawer(
               width: MediaQuery.sizeOf(context).width >= 600
                   ? 520

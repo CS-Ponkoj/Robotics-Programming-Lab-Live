@@ -712,6 +712,8 @@ def create_app(
             "code_output": result.code_output,
             "tested_names": result.tested_names,
             "tests": [item.model_dump() for item in result.evidence],
+            # Line numbers and function names from the student's own code.
+            "error_frames": result.error_frames,
         }
         submission = Submission(
             id=str(uuid4()),
@@ -862,6 +864,7 @@ def create_app(
             score=submission.score,
             hint=tutor_feedback.hint if tutor_feedback else "",
             evidence=tests,
+            error_frames=evidence.get("error_frames", []),
             tutor_feedback=tutor_feedback,
         )
         return response.model_dump(by_alias=True)

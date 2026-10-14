@@ -37,6 +37,24 @@ class TestEvidenceDto {
   }
 }
 
+/// One step of the student's own call stack when their code raised.
+class ErrorFrameDto {
+  const ErrorFrameDto({required this.line, required this.name});
+
+  final int line;
+  final String name;
+
+  static ErrorFrameDto? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final line = json['line'];
+    final name = json['name'];
+    if (line is! int || line < 1 || name is! String || name.isEmpty) {
+      return null;
+    }
+    return ErrorFrameDto(line: line, name: name);
+  }
+}
+
 class UnittestFeedbackDto {
   final int id;
   final String submissionId;
@@ -55,6 +73,9 @@ class UnittestFeedbackDto {
   final Map<String, dynamic> tutorFeedback;
   final List<TestEvidenceDto> evidence;
 
+  /// Outermost call first, like a Python traceback; empty for older runs.
+  final List<ErrorFrameDto> errorFrames;
+
   const UnittestFeedbackDto(
       {required this.id,
       this.submissionId = '',
@@ -71,7 +92,8 @@ class UnittestFeedbackDto {
       this.tutorSource = '',
       this.executionStatus = '',
       this.tutorFeedback = const {},
-      this.evidence = const []});
+      this.evidence = const [],
+      this.errorFrames = const []});
 
   factory UnittestFeedbackDto.fromJson(Map<String, dynamic> json) {
     return switch (json) {
@@ -116,6 +138,12 @@ class UnittestFeedbackDto {
                   .map((item) => TestEvidenceDto.fromJson(
                         Map<String, dynamic>.from(item),
                       ))
+                  .toList()
+              : const [],
+          errorFrames: json['error_frames'] is List
+              ? (json['error_frames'] as List)
+                  .map(ErrorFrameDto.fromJson)
+                  .whereType<ErrorFrameDto>()
                   .toList()
               : const [],
         ),

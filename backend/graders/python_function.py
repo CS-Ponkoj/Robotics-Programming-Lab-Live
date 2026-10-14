@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from math import isclose
 import re
 
-from graders.base import GradeResult
+from graders.base import GradeResult, safe_error_frames
 from playground_inputs import (  # noqa: F401 - re-exported for the API
     MAX_PLAYGROUND_ARGUMENTS,
     PLAYGROUND_INPUT_HELP,
@@ -272,6 +272,9 @@ class PythonFunctionGrader:
             score=0,
             code_output=result.get("output", ""),
             execution_error=result.get("error", "The program could not be executed."),
+            # Only the student's own run of their code; hidden scenarios
+            # never reach this path with frames.
+            error_frames=safe_error_frames(result.get("frames")),
             tested_names=[str(item.get("id", "")) for item in criteria],
             evidence=[
                 TestEvidence(

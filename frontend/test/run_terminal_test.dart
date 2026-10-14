@@ -9,6 +9,7 @@ UnittestFeedbackDto result({
   String error = '',
   List<bool> checks = const [true, false],
   int score = 50,
+  List<ErrorFrameDto> frames = const [],
 }) => UnittestFeedbackDto(
   id: 1,
   score: score,
@@ -20,6 +21,7 @@ UnittestFeedbackDto result({
   codeOutput: output,
   execSuccess: success,
   hint: '',
+  errorFrames: frames,
 );
 
 const code =
@@ -134,6 +136,88 @@ void main() {
         python: false,
       );
       expect(lines.first.text, r'$ run assignment tests');
+    });
+  });
+
+  group('python traceback', () {
+    const program =
+        "print('before the error')\n"
+        'def calculate(value):\n'
+        '    return missing_name\n'
+        'calculate(1)\n';
+
+    test('frames print a traceback with the student lines, outermost first', () {
+      final lines = buildRunTerminalLines(
+        data: result(
+          success: false,
+          output: 'before the error\n',
+          error:
+              "NameError at line 3 of submission: name 'missing_name' is not defined",
+          frames: const [
+            ErrorFrameDto(line: 4, name: '<module>'),
+            ErrorFrameDto(line: 3, name: 'calculate'),
+          ],
+        ),
+        code: program,
+      );
+      expect(texts(lines), [
+        r'$ python your_code.py',
+        'before the error',
+        'Traceback (most recent call last):',
+        '  File "your_code.py", line 4, in <module>',
+        '    calculate(1)',
+        '  File "your_code.py", line 3, in calculate',
+        '    return missing_name',
+        "NameError: name 'missing_name' is not defined",
+        'Tests did not finish: fix the error above, then run again.',
+      ]);
+      expect(
+        lines
+            .where((l) => l.kind == TerminalLineKind.location)
+            .map((l) => l.line),
+        [4, 3],
+      );
+    });
+
+    test('older results without frames keep the single-line location', () {
+      final lines = buildRunTerminalLines(
+        data: result(
+          success: false,
+          error:
+              "NameError at line 3 of submission: name 'missing_name' is not defined",
+        ),
+        code: program,
+      );
+      expect(
+        texts(lines),
+        isNot(contains('Traceback (most recent call last):')),
+      );
+      expect(texts(lines), contains('  File "your_code.py", line 3'));
+    });
+
+    test('the submit response frames are read safely', () {
+      final parsed = UnittestFeedbackDto.fromJson({
+        'id': 1,
+        'tested_vals': [],
+        'pass': false,
+        'ex_success': false,
+        'unittest_results': [],
+        'unittest_pass_results': [],
+        'code_exec_result': 'NameError at line 3 of submission: x',
+        'code_output': '',
+        'hint': '',
+        'error_frames': [
+          {'line': 4, 'name': '<module>'},
+          {'line': 0, 'name': 'bad'},
+          {'line': 3},
+          'junk',
+          {'line': 3, 'name': 'calculate'},
+        ],
+      });
+      expect(parsed.errorFrames.map((f) => '${f.line} ${f.name}'), [
+        '4 <module>',
+        '3 calculate',
+      ]);
     });
   });
 

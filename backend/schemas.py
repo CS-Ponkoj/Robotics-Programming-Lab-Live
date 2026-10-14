@@ -129,6 +129,13 @@ class TutorGeneratedContent(BaseModel):
     next_action: str = Field(min_length=1, max_length=300)
 
 
+class ErrorFrame(BaseModel):
+    """One step of the student's own call stack when their code raised."""
+
+    line: int = Field(ge=1)
+    name: str
+
+
 class SubmissionResponse(BaseModel):
     id: int
     submission_id: str
@@ -144,6 +151,8 @@ class SubmissionResponse(BaseModel):
     score: int
     hint: str = ""
     evidence: list[TestEvidence] = Field(default_factory=list)
+    # Outermost call first, like a Python traceback; empty for older runs.
+    error_frames: list[ErrorFrame] = Field(default_factory=list)
     tutor_feedback: TutorFeedback | None = None
 
 
