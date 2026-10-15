@@ -1066,8 +1066,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                                   ?.split('/')
                                                   .last ??
                                               'your_code.py';
-                                          _terminalPython =
-                                              snap.data!.language == 'python';
+                                          _terminalPython = snap.data!.language
+                                              .startsWith('python');
                                           _simulationConfig =
                                               snap.data!.simulationConfig;
                                           setAssignmentEditorContent(

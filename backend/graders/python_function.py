@@ -17,6 +17,27 @@ from schemas import TestEvidence
 
 
 _FUNCTION_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+_WORKER_ERROR = re.compile(r"^([A-Za-z_]\w*) at line \d+ of submission: (.*)$", re.DOTALL)
+# Python's own wording for errors that depend only on the student's code.
+# Any other message could echo a hidden input, so only its class is shown.
+_NAME_MESSAGES = {
+    "NameError": re.compile(r"^name '([A-Za-z_]\w*)' is not defined$"),
+    "UnboundLocalError": re.compile(
+        r"^cannot access local variable '([A-Za-z_]\w*)' where it is not "
+        r"associated with a value$"
+    ),
+}
+_FIXED_MESSAGES = {
+    "ZeroDivisionError": {
+        "division by zero",
+        "float division by zero",
+        "float floor division by zero",
+        "float modulo by zero",
+        "integer division or modulo by zero",
+        "integer modulo by zero",
+    },
+    "RecursionError": {"maximum recursion depth exceeded"},
+}
 # Extra returned values beyond the required count are still shown, up to a bound.
 MAX_PLAYGROUND_EXTRA_VALUES = 4
 
@@ -137,6 +158,8 @@ class PythonFunctionGrader:
         unsupported_values = [False] * len(criteria)
         hidden_execution_failed = False
         hidden_error_type = ""
+        hidden_error_message = ""
+        hidden_error_frames: list[dict] = []
         for case in cases:
             arguments = case.get("arguments", [])
             expected = case.get("expected", [])
@@ -172,8 +195,12 @@ class PythonFunctionGrader:
             )
             if result.get("success") is not True:
                 hidden_execution_failed = True
-                # Share only the exception class; its message could echo inputs.
-                hidden_error_type = str(result.get("error", "")).split(" ", 1)[0]
+                # Share the class, the student's own frames, and only messages
+                # that cannot echo a hidden input.
+                error_text = str(result.get("error", ""))
+                hidden_error_type = error_text.split(" ", 1)[0]
+                hidden_error_message = _safe_crash_message(error_text, code)
+                hidden_error_frames = _student_frames(result.get("frames"), code)
                 criterion_passes = [False] * len(criteria)
                 break
             actual_values = result.get("values", {})
@@ -255,11 +282,14 @@ class PythonFunctionGrader:
                 if execution_succeeded
                 else "The required function could not complete every grading scenario"
                 + (
-                    f" ({hidden_error_type})."
+                    f" ({hidden_error_type}"
+                    + (f": {hidden_error_message}" if hidden_error_message else "")
+                    + ")."
                     if hidden_error_type.isidentifier()
                     else "."
                 )
             ),
+            error_frames=hidden_error_frames,
             tested_names=[str(item.get("id", "")) for item in criteria],
             evidence=evidence,
         )
@@ -342,3 +372,26 @@ def _display_value(value) -> str:
     if isinstance(value, dict) and "unsupported_type" in value:
         return str(value.get("repr", ""))
     return repr(value)
+
+
+def _student_frames(raw, code: str) -> list[dict]:
+    """Frames inside the student's own lines; the grader's call line is dropped."""
+    line_count = len(code.splitlines())
+    return [
+        frame for frame in safe_error_frames(raw) if frame["line"] <= line_count
+    ]
+
+
+def _safe_crash_message(error_text: str, code: str) -> str:
+    match = _WORKER_ERROR.match(error_text.strip())
+    if not match:
+        return ""
+    error_type, message = match.group(1), match.group(2).strip()
+    pattern = _NAME_MESSAGES.get(error_type)
+    if pattern:
+        name = pattern.match(message)
+        # The name must be one the student wrote, not a value from an input.
+        if name and re.search(rf"\b{re.escape(name.group(1))}\b", code):
+            return message
+        return ""
+    return message if message in _FIXED_MESSAGES.get(error_type, set()) else ""

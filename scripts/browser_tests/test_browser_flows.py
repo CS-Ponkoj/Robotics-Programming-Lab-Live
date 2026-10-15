@@ -454,3 +454,32 @@ def test_terminal_under_the_editor_shows_output_and_errors(page: Page):
     expect(go_to_line).to_have_count(1)
     go_to_line.click()
     terminal_shows(page, "Tests did not finish")
+
+    # A bug only a grading test reaches: the traceback still walks the
+    # student's own lines, while the test input stays hidden.
+    inner = (
+        "def calculate_bug2_route(start, hit, corner, leave, goal):\n"
+        "    distance = missing_name\n"
+        "    return distance\n"
+    )
+    for _ in range(3):
+        page.wait_for_timeout(500)
+        page.mouse.click(viewport["width"] * 0.25, viewport["height"] * 0.45)
+        page.wait_for_timeout(300)
+        replace_editor_code(page, inner)
+        if editor_shows(page, "distance = missing_name", timeout=3_000):
+            break
+    else:
+        raise AssertionError("typing did not reach the editor")
+    page.get_by_role("button", name="Run tests").click()
+    expect(minimize).to_be_visible(timeout=GRADING_TIMEOUT_MS)
+    wait_for_text(page, "Test score", GRADING_TIMEOUT_MS)
+    minimize.click()
+    terminal_shows(page, "A grading test called your function")
+    terminal_shows(page, "line 2, in calculate_bug2_route")
+    terminal_shows(page, "NameError: name 'missing_name' is not defined")
+    expect(
+        page.get_by_role("button", name=re.compile(r"^Go to line 2 in the editor"))
+    ).to_have_count(1)
+    if os.environ.get("E2E_SCREENSHOT"):
+        page.screenshot(path=os.environ["E2E_SCREENSHOT"])

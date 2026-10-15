@@ -114,7 +114,7 @@ def test_a_failing_student_run_reports_frames():
     ]
 
 
-def test_hidden_scenario_failures_never_report_frames():
+def test_hidden_scenario_failures_report_only_student_frames():
     """The student's module runs fine; only a hidden input makes it fail."""
     result = PythonFunctionGrader(SubprocessSandbox()).grade(
         function_assignment(),
@@ -122,7 +122,7 @@ def test_hidden_scenario_failures_never_report_frames():
         "    return 1 / first, second\n",
     )
     assert result.execution_succeeded is False
-    assert result.error_frames == []
+    assert result.error_frames == [{"line": 2, "name": "calculate_values"}]
 
 
 @pytest.fixture()
@@ -166,3 +166,69 @@ def test_submit_response_includes_frames_for_the_terminal(client):
         headers=headers,
     )
     assert ok.json()["error_frames"] == []
+
+
+def _bug2_like_assignment():
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        grader_config={
+            "function_name": "route",
+            "criteria": [{"id": "total", "label": "Total", "weight": 100}],
+            "cases": [{"arguments": [3, 4], "expected": [7]}],
+        }
+    )
+
+
+def _grade(code):
+    from graders.python_function import PythonFunctionGrader
+    from sandbox import SubprocessSandbox
+
+    return PythonFunctionGrader(SubprocessSandbox()).grade(_bug2_like_assignment(), code)
+
+
+def test_a_crash_inside_a_grading_call_shows_the_student_traceback():
+    code = (
+        "def helper(a):\n"
+        "    return a + missing_name\n"
+        "\n"
+        "def route(a, b):\n"
+        "    return (helper(a),)\n"
+    )
+    result = _grade(code)
+    assert result.execution_succeeded is False
+    assert result.execution_error == (
+        "The required function could not complete every grading scenario "
+        "(NameError: name 'missing_name' is not defined)."
+    )
+    # Only the student's lines; the grader's own call line is dropped.
+    assert result.error_frames == [
+        {"line": 5, "name": "route"},
+        {"line": 2, "name": "helper"},
+    ]
+
+
+def test_a_crash_message_that_could_echo_a_hidden_input_is_withheld():
+    code = (
+        "def route(a, b):\n"
+        "    return ({}[a],)\n"
+    )
+    result = _grade(code)
+    assert result.execution_error == (
+        "The required function could not complete every grading scenario (KeyError)."
+    )
+    assert "3" not in result.execution_error
+    assert result.error_frames == [{"line": 2, "name": "route"}]
+
+
+def test_a_name_the_student_did_not_write_is_withheld():
+    from graders.python_function import _safe_crash_message
+
+    error = "NameError at line 2 of submission: name 'v3' is not defined"
+    assert _safe_crash_message(error, "def route(a, b):\n    return v\n") == ""
+    assert _safe_crash_message(error, "v3 = 1\n") == "name 'v3' is not defined"
+
+
+def test_fixed_python_messages_are_kept():
+    result = _grade("def route(a, b):\n    return (a / 0,)\n")
+    assert result.execution_error.endswith("(ZeroDivisionError: division by zero).")

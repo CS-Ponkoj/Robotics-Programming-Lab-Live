@@ -10,22 +10,22 @@ UnittestFeedbackDto result({
   List<bool> checks = const [true, false],
   int score = 50,
   List<ErrorFrameDto> frames = const [],
-}) => UnittestFeedbackDto(
-  id: 1,
-  score: score,
-  testedVals: const [],
-  pass: checks.every((item) => item),
-  unittestFeedback: [for (final _ in checks) 'Check'],
-  unittestPassResults: checks,
-  codeExecResult: error,
-  codeOutput: output,
-  execSuccess: success,
-  hint: '',
-  errorFrames: frames,
-);
+}) =>
+    UnittestFeedbackDto(
+      id: 1,
+      score: score,
+      testedVals: const [],
+      pass: checks.every((item) => item),
+      unittestFeedback: [for (final _ in checks) 'Check'],
+      unittestPassResults: checks,
+      codeExecResult: error,
+      codeOutput: output,
+      execSuccess: success,
+      hint: '',
+      errorFrames: frames,
+    );
 
-const code =
-    'import math\n'
+const code = 'import math\n'
     '\n'
     'def route(start, goal):\n'
     '    distance = math.hypot(dx)\n'
@@ -106,8 +106,7 @@ void main() {
       final lines = buildRunTerminalLines(
         data: result(
           success: false,
-          error:
-              'The required function could not complete every grading '
+          error: 'The required function could not complete every grading '
               'scenario (KeyError).\nSecond line',
         ),
         code: code,
@@ -140,13 +139,13 @@ void main() {
   });
 
   group('python traceback', () {
-    const program =
-        "print('before the error')\n"
+    const program = "print('before the error')\n"
         'def calculate(value):\n'
         '    return missing_name\n'
         'calculate(1)\n';
 
-    test('frames print a traceback with the student lines, outermost first', () {
+    test('frames print a traceback with the student lines, outermost first',
+        () {
       final lines = buildRunTerminalLines(
         data: result(
           success: false,
@@ -176,6 +175,72 @@ void main() {
             .where((l) => l.kind == TerminalLineKind.location)
             .map((l) => l.line),
         [4, 3],
+      );
+    });
+
+    test('a crash inside a grading call shows the student traceback', () {
+      final lines = buildRunTerminalLines(
+        data: result(
+          success: false,
+          error: 'The required function could not complete every grading '
+              "scenario (NameError: name 'missing_name' is not defined).",
+          frames: const [ErrorFrameDto(line: 3, name: 'calculate')],
+        ),
+        code: program,
+      );
+      expect(texts(lines), [
+        r'$ python your_code.py',
+        'A grading test called your function (its input is hidden):',
+        'Traceback (most recent call last):',
+        '  File "your_code.py", line 3, in calculate',
+        '    return missing_name',
+        "NameError: name 'missing_name' is not defined",
+        'Tests did not finish: fix the error above, then run again.',
+      ]);
+    });
+
+    test('a withheld message still names the error class', () {
+      final lines = buildRunTerminalLines(
+        data: result(
+          success: false,
+          error: 'The required function could not complete every grading '
+              'scenario (KeyError).',
+          frames: const [ErrorFrameDto(line: 3, name: 'calculate')],
+        ),
+        code: program,
+      );
+      expect(texts(lines), contains('KeyError'));
+      expect(lines.where((l) => l.line == 3), hasLength(1));
+    });
+
+    test('a ROS node error becomes a clickable traceback', () {
+      const node = 'import rclpy\n'
+          'class Robot:\n'
+          '    def tick(self):\n'
+          '        self.pub.publish(speed)\n';
+      final lines = buildRunTerminalLines(
+        data: result(
+          success: false,
+          error: 'Your node stopped with an error:\n'
+              'controller.py, line 4, in tick\n'
+              '    self.pub.publish(speed)\n'
+              "NameError: name 'speed' is not defined",
+        ),
+        code: node,
+        fileName: 'controller.py',
+      );
+      expect(texts(lines), [
+        r'$ python controller.py',
+        'Your node stopped with an error:',
+        'Traceback (most recent call last):',
+        '  File "controller.py", line 4, in tick',
+        '    self.pub.publish(speed)',
+        "NameError: name 'speed' is not defined",
+        'Tests did not finish: fix the error above, then run again.',
+      ]);
+      expect(
+        lines.firstWhere((l) => l.kind == TerminalLineKind.location).line,
+        4,
       );
     });
 

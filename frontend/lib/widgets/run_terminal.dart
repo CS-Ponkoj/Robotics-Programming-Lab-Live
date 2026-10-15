@@ -25,6 +25,14 @@ final _errorPattern = RegExp(
   r'^([A-Za-z_][\w.]*) at line (\d+) of submission: (.*)$',
   dotAll: true,
 );
+final _scenarioPattern = RegExp(
+  r'^The required function could not complete every grading scenario '
+  r'\(([A-Za-z_]\w*)(?:: (.*))?\)\.$',
+);
+// A frame as the ROS grader reports it: "controller.py, line 12, in tick".
+final _textFramePattern = RegExp(
+  r'^\s*(?:File ")?([\w.-]+\.py)"?, line (\d+), in (.+)$',
+);
 
 /// Lines a VS Code style terminal shows after a run: the command, everything
 /// the program printed, the error with the student's own line of code, and a
@@ -53,11 +61,32 @@ List<TerminalLine> buildRunTerminalLines({
 
   if (!data.execSuccess) {
     final error = data.codeExecResult.trim();
-    final match = _errorPattern.firstMatch(error);
-    final lineNumber = match == null ? null : int.tryParse(match.group(2)!);
     final codeLines = code.split('\n');
-    if (match != null && data.errorFrames.isNotEmpty) {
-      // A full Python traceback of the student's own calls.
+
+    void addFrame(int line, String? name, {String? file}) {
+      // A frame in another project file is shown but cannot open here.
+      final known = (file == null || file == fileName) &&
+          line >= 1 &&
+          line <= codeLines.length;
+      lines.add(
+        TerminalLine(
+          '  File "${file ?? fileName}", line $line'
+          '${name == null ? '' : ', in $name'}',
+          TerminalLineKind.location,
+          line: known ? line : null,
+        ),
+      );
+      if (known && codeLines[line - 1].trim().isNotEmpty) {
+        lines.add(
+          TerminalLine(
+            '    ${codeLines[line - 1].trim()}',
+            TerminalLineKind.source,
+          ),
+        );
+      }
+    }
+
+    void addTraceback(String exception) {
       lines.add(
         const TerminalLine(
           'Traceback (most recent call last):',
@@ -65,46 +94,33 @@ List<TerminalLine> buildRunTerminalLines({
         ),
       );
       for (final frame in data.errorFrames) {
-        final known = frame.line <= codeLines.length;
-        lines.add(
-          TerminalLine(
-            '  File "$fileName", line ${frame.line}, in ${frame.name}',
-            TerminalLineKind.location,
-            line: known ? frame.line : null,
-          ),
-        );
-        if (known && codeLines[frame.line - 1].trim().isNotEmpty) {
-          lines.add(
-            TerminalLine(
-              '    ${codeLines[frame.line - 1].trim()}',
-              TerminalLineKind.source,
-            ),
-          );
-        }
+        addFrame(frame.line, frame.name);
       }
+      lines.add(TerminalLine(exception, TerminalLineKind.error));
+    }
+
+    final match = _errorPattern.firstMatch(error);
+    final scenario = _scenarioPattern.firstMatch(error);
+    final lineNumber = match == null ? null : int.tryParse(match.group(2)!);
+    if (match != null && data.errorFrames.isNotEmpty) {
+      // A full Python traceback of the student's own calls.
+      addTraceback('${match.group(1)}: ${match.group(3)}');
+    } else if (scenario != null && data.errorFrames.isNotEmpty) {
+      // A grading test called the student's function; the test input
+      // itself stays hidden, the student's own lines do not.
       lines.add(
-        TerminalLine(
-          '${match.group(1)}: ${match.group(3)}',
-          TerminalLineKind.error,
+        const TerminalLine(
+          'A grading test called your function (its input is hidden):',
+          TerminalLineKind.info,
         ),
+      );
+      addTraceback(
+        scenario.group(2) == null
+            ? scenario.group(1)!
+            : '${scenario.group(1)}: ${scenario.group(2)}',
       );
     } else if (match != null && lineNumber != null && lineNumber >= 1) {
-      lines.add(
-        TerminalLine(
-          '  File "$fileName", line $lineNumber',
-          TerminalLineKind.location,
-          line: lineNumber <= codeLines.length ? lineNumber : null,
-        ),
-      );
-      if (lineNumber <= codeLines.length &&
-          codeLines[lineNumber - 1].trim().isNotEmpty) {
-        lines.add(
-          TerminalLine(
-            '    ${codeLines[lineNumber - 1].trim()}',
-            TerminalLineKind.source,
-          ),
-        );
-      }
+      addFrame(lineNumber, null);
       lines.add(
         TerminalLine(
           '${match.group(1)}: ${match.group(3)}',
@@ -112,11 +128,42 @@ List<TerminalLine> buildRunTerminalLines({
         ),
       );
     } else {
-      for (final text
-          in (error.isEmpty ? 'The program could not be run.' : error).split(
-            '\n',
-          )) {
-        lines.add(TerminalLine(text, TerminalLineKind.error));
+      // Errors reported as text, such as a ROS node's traceback, where
+      // "controller.py, line 12, in tick" frames become clickable lines.
+      final text = error.isEmpty ? 'The program could not be run.' : error;
+      var tracebackShown = false;
+      for (final raw in text.split('\n')) {
+        final frame = _textFramePattern.firstMatch(raw);
+        if (frame == null) {
+          lines.add(
+            TerminalLine(
+              raw.startsWith('    ') ? raw : raw.trimRight(),
+              raw.startsWith('    ')
+                  ? TerminalLineKind.source
+                  : TerminalLineKind.error,
+            ),
+          );
+          continue;
+        }
+        if (!tracebackShown) {
+          tracebackShown = true;
+          lines.add(
+            const TerminalLine(
+              'Traceback (most recent call last):',
+              TerminalLineKind.error,
+            ),
+          );
+        }
+        lines.add(
+          TerminalLine(
+            '  File "${frame.group(1)}", line ${frame.group(2)}, '
+            'in ${frame.group(3)}',
+            TerminalLineKind.location,
+            line: frame.group(1) == fileName
+                ? int.tryParse(frame.group(2)!)
+                : null,
+          ),
+        );
       }
     }
     lines.add(
@@ -149,14 +196,14 @@ const _headerBackground = Color(0xFF252526);
 const _border = Color(0xFF3C3C3C);
 
 Color _lineColor(TerminalLineKind kind) => switch (kind) {
-  TerminalLineKind.command => const Color(0xFF9CDCFE),
-  TerminalLineKind.output => const Color(0xFFD4D4D4),
-  TerminalLineKind.error => const Color(0xFFF48771),
-  TerminalLineKind.location => const Color(0xFF4FC1FF),
-  TerminalLineKind.source => const Color(0xFFCE9178),
-  TerminalLineKind.info => const Color(0xFF9DA5B4),
-  TerminalLineKind.success => const Color(0xFF89D185),
-};
+      TerminalLineKind.command => const Color(0xFF9CDCFE),
+      TerminalLineKind.output => const Color(0xFFD4D4D4),
+      TerminalLineKind.error => const Color(0xFFF48771),
+      TerminalLineKind.location => const Color(0xFF4FC1FF),
+      TerminalLineKind.source => const Color(0xFFCE9178),
+      TerminalLineKind.info => const Color(0xFF9DA5B4),
+      TerminalLineKind.success => const Color(0xFF89D185),
+    };
 
 /// A terminal panel under the code editor, like the one in VS Code. It opens
 /// on each run and can be resized, collapsed, cleared, and copied.
@@ -204,9 +251,9 @@ class RunTerminalPanel extends StatelessWidget {
   }
 
   String get _plainText => [
-    ...lines.map((line) => line.text),
-    if (requestError != null) requestError!,
-  ].join('\n');
+        ...lines.map((line) => line.text),
+        if (requestError != null) requestError!,
+      ].join('\n');
 
   @override
   Widget build(BuildContext context) {

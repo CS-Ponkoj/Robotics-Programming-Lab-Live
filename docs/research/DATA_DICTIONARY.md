@@ -141,12 +141,20 @@ Standard `execution_status` values are:
 | `execution_error` | A legacy failure without enough detail to classify safely |
 
 `evidence.error_frames` lists the student's own call stack when their code
-raised during their own run, outermost call first: each entry is a `line`
-number and a function `name` (`<module>` for top-level code). It never holds
-values, source text, or worker internals, is capped at 20 entries, and is
-always empty for syntax errors, rejected code, hidden-scenario failures, and
-records saved before it existed. The editor terminal uses it to print a
-Python-style traceback; research exports do not include it.
+raised, outermost call first: each entry is a `line` number and a function
+`name` (`<module>` for top-level code). When a grading scenario's call into
+the student's function raised, only frames within the student's own lines are
+kept; the grader's call line is dropped. It never holds values, source text,
+or worker internals, is capped at 20 entries, and is always empty for syntax
+errors, rejected code, and records saved before it existed. The editor
+terminal uses it to print a Python-style traceback; research exports do not
+include it.
+
+For a grading-scenario crash, `execution_error` names the exception class and
+adds Python's message only when it cannot echo a hidden input: a `NameError`
+or `UnboundLocalError` naming an identifier the student wrote, or a fixed
+`ZeroDivisionError` or `RecursionError` message. Records saved before
+2026-10-14 name only the class.
 
 Each item in `evidence.tests` describes one grading check: `test_id`, `label`,
 `passed`, `message`, and `visibility`. Function-assignment checks may also
