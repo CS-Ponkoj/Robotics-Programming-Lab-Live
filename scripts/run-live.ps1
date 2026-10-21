@@ -1,14 +1,15 @@
 param(
     [int]$FrontendPort = 8180,
     [int]$BackendPort = 5100,
-    [string]$ApiBaseUrl = "https://rpl-api.ponkoj.com",
+    [string]$ApiBaseUrl = "https://rpl.ponkoj.com/api",
     [switch]$SkipBuild
 )
 
 # Starts the self-hosted production stack on the lab PC: database migrations,
-# the API (Docker-isolated code execution), and the Flutter web build. Settings
-# come from the ignored repository-root .env. Cloudflare Tunnel publishes the
-# two local ports; nothing here listens beyond 127.0.0.1.
+# the API (Docker-isolated code execution), the Flutter web build, and Caddy,
+# which serves both on 127.0.0.1:8080 with the API under /api. Settings come
+# from the ignored repository-root .env. Cloudflare Tunnel publishes port 8080;
+# nothing here listens beyond 127.0.0.1.
 
 $ErrorActionPreference = "Stop"
 Import-Module (Join-Path $PSScriptRoot "local-environment.psm1") -Force
@@ -62,6 +63,11 @@ Start-Process -FilePath $python -WindowStyle Hidden `
     -ArgumentList @("`"$(Join-Path $PSScriptRoot 'serve_web.py')`"", "--directory", "`"$webBuild`"", "--port", "$FrontendPort") `
     -RedirectStandardOutput (Join-Path $logs "web.out.log") -RedirectStandardError (Join-Path $logs "web.err.log")
 
+$caddy = (Get-Command caddy -ErrorAction Stop).Source
+Start-Process -FilePath $caddy -WindowStyle Hidden `
+    -ArgumentList @("run", "--config", "`"$(Join-Path $PSScriptRoot 'Caddyfile.live')`"", "--adapter", "caddyfile") `
+    -RedirectStandardOutput (Join-Path $logs "caddy.out.log") -RedirectStandardError (Join-Path $logs "caddy.err.log")
+
 Write-Output "Live stack starting at release $($release.Substring(0, 12))."
-Write-Output "API: http://127.0.0.1:$BackendPort  Web: http://127.0.0.1:$FrontendPort/app"
+Write-Output "Local address: http://127.0.0.1:8080/app (API at /api)"
 Write-Output "Logs: $logs"

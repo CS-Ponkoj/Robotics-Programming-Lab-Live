@@ -1,0 +1,16 @@
+# Single public address for the self-hosted lab PC. Cloudflare Tunnel sends
+# rpl.ponkoj.com here; /api/* goes to the API without the prefix, and every
+# other path goes to the Flutter web server. Cloudflare provides HTTPS.
+{
+	admin off
+	auto_https off
+}
+
+http://127.0.0.1:8080 {
+	handle_path /api/* {
+		reverse_proxy 127.0.0.1:5100
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8180
+	}
+}
