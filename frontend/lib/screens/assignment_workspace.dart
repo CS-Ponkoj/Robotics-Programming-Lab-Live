@@ -1363,16 +1363,18 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
 }
 
 // A new assignment version must not reuse Flutter/browser's old image URL.
+// The path is made relative so it resolves under an API base URL that has a
+// path prefix, such as https://rpl.ponkoj.com/api/.
 String versionAssignmentImages(String html, int version) {
   return html.replaceAllMapped(
     RegExp(r'''(<img\b[^>]*\bsrc\s*=\s*)(["'])([^"']+)\2''',
         caseSensitive: false),
     (match) {
       final uri = Uri.tryParse(match[3]!);
-      if (uri == null || !RegExp(r'^/images/\d+$').hasMatch(uri.path)) {
+      if (uri == null || !RegExp(r'^/?images/\d+$').hasMatch(uri.path)) {
         return match[0]!;
       }
-      final updated = uri.replace(queryParameters: {
+      final updated = uri.replace(path: uri.path.replaceFirst(RegExp('^/'), ''), queryParameters: {
         ...uri.queryParameters,
         'assignment_version': '$version',
       });
