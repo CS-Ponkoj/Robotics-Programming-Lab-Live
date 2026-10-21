@@ -6,7 +6,9 @@
 	auto_https off
 }
 
-http://127.0.0.1:8080 {
+# Any Host header (the tunnel sends rpl.ponkoj.com), but only on localhost.
+:8080 {
+	bind 127.0.0.1
 	handle_path /api/* {
 		reverse_proxy 127.0.0.1:5100
 	}

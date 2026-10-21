@@ -68,6 +68,11 @@ Start-Process -FilePath $caddy -WindowStyle Hidden `
     -ArgumentList @("run", "--config", "`"$(Join-Path $PSScriptRoot 'Caddyfile.live')`"", "--adapter", "caddyfile") `
     -RedirectStandardOutput (Join-Path $logs "caddy.out.log") -RedirectStandardError (Join-Path $logs "caddy.err.log")
 
+$cloudflared = (Get-Command cloudflared -ErrorAction Stop).Source
+Start-Process -FilePath $cloudflared -WindowStyle Hidden `
+    -ArgumentList @("tunnel", "run", "rpl-live") `
+    -RedirectStandardOutput (Join-Path $logs "tunnel.out.log") -RedirectStandardError (Join-Path $logs "tunnel.err.log")
+
 Write-Output "Live stack starting at release $($release.Substring(0, 12))."
 Write-Output "Local address: http://127.0.0.1:8080/app (API at /api)"
 Write-Output "Logs: $logs"
