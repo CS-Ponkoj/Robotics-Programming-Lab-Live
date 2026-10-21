@@ -389,6 +389,10 @@ A change is complete only when:
   failure must never silently create or switch to a local database.
 - SQLite and local PostgreSQL are allowed only as explicitly configured,
   disposable automated-test databases (`ENVIRONMENT=testing`), not app modes.
+  The one exception is the owner-approved (2026-10-20) self-hosted live
+  instance on the lab PC: `ENVIRONMENT=production` with
+  `SELF_HOSTED_DATABASE=true` uses that PC's local PostgreSQL. It never applies
+  to development or staging, and that database needs off-machine backups.
 - Reconcile legacy records before importing them. Preserve newer Neon accounts,
   assignments, and session state; never restore an old dump over the shared DB.
 - Every production schema change requires an Alembic migration.

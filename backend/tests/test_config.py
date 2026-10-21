@@ -10,6 +10,7 @@ def isolated_config_environment(monkeypatch):
         "DATABASE_URL",
         "NEON_DATABASE_URL",
         "NEON_DATABASE_NAME",
+        "SELF_HOSTED_DATABASE",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -96,3 +97,37 @@ def test_production_connection_keeps_its_database_name():
         database_url="postgresql://user:secret@example.neon.tech/neondb",
     )
     assert settings.application_database_url.endswith("/neondb")
+
+
+def test_self_hosted_production_accepts_local_postgresql():
+    settings = Settings(
+        environment="production",
+        self_hosted_database=True,
+        database_url="postgresql+psycopg://rpl:secret@127.0.0.1:5432/rpl_live",
+    )
+    assert settings.application_database_url.endswith("/rpl_live")
+
+
+def test_self_hosted_production_still_refuses_sqlite():
+    with pytest.raises(RuntimeError, match="PostgreSQL"):
+        Settings(
+            environment="production",
+            self_hosted_database=True,
+            database_url="sqlite:///local.db",
+        ).application_database_url
+
+
+def test_production_refuses_local_postgresql_without_opt_in():
+    with pytest.raises(RuntimeError, match="Neon"):
+        Settings(
+            environment="production",
+            database_url="postgresql://rpl:secret@127.0.0.1:5432/rpl_live",
+        ).application_database_url
+
+
+def test_self_hosted_flag_does_not_relax_development():
+    with pytest.raises(RuntimeError, match="Neon"):
+        Settings(
+            self_hosted_database=True,
+            neon_database_url="postgresql://rpl:secret@127.0.0.1:5432/rpl_live",
+        ).application_database_url

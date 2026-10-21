@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     database_url: str = ""
     neon_database_url: str | None = None
     neon_database_name: str = "robotics_lab_staging"
+    # Production on the lab PC keeps its data in a local PostgreSQL server.
+    self_hosted_database: bool = False
     auto_create_schema: bool = True
     redis_url: str = "redis://127.0.0.1:6379/0"
     openai_api_key: str | None = None
@@ -107,11 +109,17 @@ class Settings(BaseSettings):
                 "Neon configuration is missing. Configure NEON_DATABASE_URL in the root .env."
             )
         parsed = urlsplit(selected)
+        self_hosted = (
+            self.self_hosted_database
+            and self.environment.lower() == "production"
+        )
         if parsed.scheme not in {
             "postgresql",
             "postgresql+psycopg",
             "postgres",
-        } or not (parsed.hostname or "").endswith(".neon.tech"):
+        }:
+            raise RuntimeError("Application data must use PostgreSQL.")
+        if not self_hosted and not (parsed.hostname or "").endswith(".neon.tech"):
             raise RuntimeError(
                 "Application data must use Neon PostgreSQL; local database fallback is disabled."
             )
