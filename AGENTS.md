@@ -137,8 +137,7 @@ scripts/                          Local run, verification, and release automatio
   build_course_content.py         Rebuild web pages after reviewed source changes
   course_quiz_bank.json           Authored questions for topics without a source quiz
 .github/workflows/ci.yml          Continuous-integration release gates
-render.yaml                       API and sandbox hosting configuration
-vercel.json                       Flutter web deployment configuration
+scripts/run-live.ps1              Self-hosted live stack on the lab PC (Caddy + Cloudflare Tunnel)
 ```
 
 Read `README.md`, `docs/README.md`,

@@ -243,7 +243,7 @@ try {
         # cannot race the compiler and render a blank page.
         Wait-ForEndpoint -Name "Frontend entrypoint" -Url "http://127.0.0.1:$FrontendPort/web_entrypoint.dart" -Attempts 240 -AcceptAnySuccess
     } else {
-        # The same optimized build that Vercel deploys: one compiled bundle
+        # The same optimized build the live site serves: one compiled bundle
         # instead of hundreds of debug modules.
         Write-Output "Building the Flutter web release bundle..."
         # An explicit output path ignores any machine-wide Flutter build-dir setting.

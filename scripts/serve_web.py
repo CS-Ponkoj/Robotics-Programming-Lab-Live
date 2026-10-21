@@ -1,10 +1,10 @@
-"""Serve a Flutter release build locally with the same routing as Vercel.
+"""Serve a Flutter release build on 127.0.0.1 with single-page-app routing.
 
 Usage: python serve_web.py --directory <build/web> --port 8080
 
-Paths that are not files fall back to index.html, matching the vercel.json
-rewrite, so deep links such as /app load the application. The server binds to
-127.0.0.1 only and is for local staging runs, not deployment.
+Paths that are not files fall back to index.html, so deep links such as /app
+load the application. The server binds to 127.0.0.1 only. Local runs use it
+directly; the self-hosted live stack puts Caddy and Cloudflare Tunnel in front.
 """
 
 from __future__ import annotations

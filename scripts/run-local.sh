@@ -178,7 +178,7 @@ if [[ "$debug_frontend" == "true" ]]; then
   robotics_wait_for_http 'Frontend shell' "http://127.0.0.1:$frontend_port" 240
   robotics_wait_for_http 'Frontend entrypoint' "http://127.0.0.1:$frontend_port/web_entrypoint.dart" 240
 else
-  # The same optimized build that Vercel deploys: one compiled bundle
+  # The same optimized build the live site serves: one compiled bundle
   # instead of hundreds of debug modules.
   printf 'Building the Flutter web release bundle...\n'
   (
