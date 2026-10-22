@@ -26,6 +26,26 @@ if (-not (Select-String -Path (Join-Path $repositoryRoot ".env") -Pattern '^ENVI
     throw "The live launcher requires ENVIRONMENT=production in the repository-root .env."
 }
 
+$components = @('uvicorn app:app', 'serve_web\.py', 'Caddyfile\.live', 'tunnel run rpl-live')
+$commandLines = @(Get-CimInstance Win32_Process | ForEach-Object { $_.CommandLine } | Where-Object { $_ })
+$runningComponents = @($components | Where-Object { $pattern = $_; $commandLines -match $pattern })
+if ($runningComponents.Count -eq $components.Count) {
+    # Already running, so a repeated scheduled run changes nothing.
+    exit 0
+}
+if ($runningComponents.Count -gt 0) {
+    # Partly running (for example after a killed start): restart cleanly.
+    & (Join-Path $PSScriptRoot "stop-live.ps1") | Out-Null
+}
+
+# After a reboot Docker Desktop can take several minutes to accept commands.
+for ($i = 0; $i -lt 60; $i++) {
+    Invoke-RoboticsNative docker info | Out-Null
+    if ($LASTEXITCODE -eq 0) { break }
+    Start-Sleep -Seconds 5
+}
+if ($LASTEXITCODE -ne 0) { throw "Docker did not become ready." }
+
 Invoke-RoboticsNative docker start rpl-live-postgres | Out-Null
 for ($i = 0; $i -lt 30; $i++) {
     Invoke-RoboticsNative docker exec rpl-live-postgres pg_isready -q -U rpl -d rpl_live
