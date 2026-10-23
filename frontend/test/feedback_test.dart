@@ -130,7 +130,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(find.text('ROS build hangs'), findsOneWidget);
-      expect(find.textContaining('dave (student)'), findsOneWidget);
+      expect(find.textContaining('Login ID: dave'), findsOneWidget);
       expect(find.text('New (1)'), findsOneWidget);
 
       await tester.tap(find.text('Mark resolved'));
@@ -140,5 +140,49 @@ void main() {
     expect(patched, 'resolved');
     expect(find.text('No feedback here yet.'), findsOneWidget);
     expect(find.text('New (0)'), findsOneWidget);
+  });
+
+  testWidgets('phones get a full-screen form that sends feedback',
+      (tester) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    Map<String, dynamic>? sent;
+    final client = MockClient((request) async {
+      sent = jsonDecode(request.body) as Map<String, dynamic>;
+      return http.Response(jsonEncode({'id': '1', 'status': 'received'}), 201);
+    });
+    await http.runWithClient(() async {
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => showFeedbackDialog(context, 'Home: Contents'),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsOneWidget);
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(feedbackFormOpen.value, isTrue);
+
+      await tester.enterText(
+          find.byKey(const Key('feedback-message')), 'Quiz button overlaps');
+      await tester.tap(find.byKey(const Key('feedback-send')));
+      await tester.pumpAndSettle();
+    }, () => client);
+
+    expect(sent?['page'], 'Home: Contents');
+    expect(sent?['message'], 'Quiz button overlaps');
+    expect(find.byType(Dialog), findsNothing);
+    expect(feedbackFormOpen.value, isFalse);
+    expect(find.text('Thank you. Your feedback was sent.'), findsOneWidget);
   });
 }

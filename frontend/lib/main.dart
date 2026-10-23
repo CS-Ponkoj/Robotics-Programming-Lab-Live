@@ -140,7 +140,12 @@ class _MyAppState extends State<MyApp> {
                   left: 12,
                   bottom: 12,
                   child: SafeArea(
-                    child: FeedbackButton(navigatorKey: _navigatorKey),
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: feedbackFormOpen,
+                      builder: (context, open, _) => open
+                          ? const SizedBox.shrink()
+                          : FeedbackButton(navigatorKey: _navigatorKey),
+                    ),
                   ),
                 ),
             ],

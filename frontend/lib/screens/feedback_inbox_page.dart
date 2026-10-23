@@ -203,7 +203,7 @@ class _FeedbackCard extends StatelessWidget {
     final created =
         DateTime.tryParse(item['created_at'] as String? ?? '')?.toLocal();
     final sender = item['sender_login_id'] as String? ??
-        (item['sender_role'] == 'demo' ? 'Demo visitor' : 'Unknown');
+        (item['sender_role'] == 'demo' ? 'Demo visitor (no login)' : 'Unknown');
     final resolved = item['status'] == 'resolved';
     final when = created == null
         ? ''
@@ -229,6 +229,19 @@ class _FeedbackCard extends StatelessWidget {
                 Text(item['page'] as String, style: theme.textTheme.titleSmall),
               ],
             ),
+            const SizedBox(height: 6),
+            Text.rich(
+              key: const Key('feedback-sender'),
+              TextSpan(children: [
+                const TextSpan(text: 'Login ID: '),
+                TextSpan(
+                  text: sender,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextSpan(text: '  ·  ${item['sender_role']}'),
+              ]),
+              style: theme.textTheme.bodyMedium,
+            ),
             const SizedBox(height: 8),
             SelectableText(item['message'] as String,
                 style: theme.textTheme.bodyMedium),
@@ -237,7 +250,7 @@ class _FeedbackCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '$sender (${item['sender_role']}) · $when',
+                    when,
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
