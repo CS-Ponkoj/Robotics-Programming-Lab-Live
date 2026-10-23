@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:iuse_demo/screens/sign_in_history_page.dart';
+import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/feature_flags.dart';
 import 'package:iuse_demo/services/student_admin_api.dart';
@@ -250,10 +253,12 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
       },
     );
 
-    loginController.dispose();
-    participantController.dispose();
-    emailController.dispose();
-    passwordController.dispose();
+    _disposeAfterDialogCloses([
+      loginController,
+      participantController,
+      emailController,
+      passwordController,
+    ]);
     if (result != null) {
       await _load();
       if (mounted) {
@@ -269,40 +274,79 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     final user = Map<String, dynamic>.from(result['user'] as Map);
     final password = result['temporary_password'] as String?;
     final emailSent = result['email_sent'] as bool? ?? false;
+    var copied = false;
+    var copyBlocked = false;
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: SizedBox(
-          width: 440,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SelectableText('Login ID: ${user['login_id']}'),
-              const SizedBox(height: 8),
-              if (password != null) ...[
-                SelectableText('Temporary password: $password'),
-                const SizedBox(height: 12),
-                const Text(
-                  'Copy and share this password securely now. It will not be '
-                  'shown again.',
-                ),
-              ] else if (emailSent)
-                Text(
-                  'An invitation was sent to ${user['email'] ?? 'the account owner'}. '
-                  'It contains the login ID and a one-time link to set a '
-                  'password, valid for 72 hours.',
-                ),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SelectableText('Login ID: ${user['login_id']}'),
+                const SizedBox(height: 8),
+                if (password != null) ...[
+                  SelectableText('Temporary password: $password'),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Copy and share this password securely now. It will not be '
+                    'shown again.',
+                  ),
+                  if (copyBlocked) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'This browser blocked copying. Select the login ID and '
+                      'password above and copy them by hand.',
+                      key: const Key('copy-blocked'),
+                      style:
+                          TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ],
+                ] else if (emailSent)
+                  Text(
+                    'An invitation was sent to ${user['email'] ?? 'the account owner'}. '
+                    'It contains the login ID and a one-time link to set a '
+                    'password, valid for 72 hours.',
+                  ),
+              ],
+            ),
           ),
+          actions: [
+            if (password != null)
+              OutlinedButton.icon(
+                key: const Key('copy-credentials'),
+                onPressed: () async {
+                  try {
+                    await Clipboard.setData(ClipboardData(
+                      text: credentialsMessage(
+                        loginId: user['login_id'].toString(),
+                        password: password,
+                        appUrl: Uri.base.resolve('/app').toString(),
+                      ),
+                    ));
+                    setDialogState(() {
+                      copied = true;
+                      copyBlocked = false;
+                    });
+                  } on Object {
+                    // Some browsers block clipboard access; the text above
+                    // stays selectable for a manual copy.
+                    setDialogState(() => copyBlocked = true);
+                  }
+                },
+                icon: Icon(copied ? Icons.check_rounded : Icons.copy_rounded),
+                label: Text(copied ? 'Copied' : 'Copy credentials'),
+              ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Done'),
+            ),
+          ],
         ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Done'),
-          ),
-        ],
       ),
     );
   }
@@ -532,10 +576,19 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
         },
       ),
     );
-    passwordController.dispose();
+    _disposeAfterDialogCloses([passwordController]);
     if (result != null && mounted) {
       await _showCredentials(result, title: 'Password reset');
     }
+  }
+
+  // The dialog still rebuilds its fields during its closing animation.
+  void _disposeAfterDialogCloses(List<TextEditingController> controllers) {
+    Future<void>.delayed(const Duration(milliseconds: 500), () {
+      for (final controller in controllers) {
+        controller.dispose();
+      }
+    });
   }
 
   Future<void> _toggleActive(Map<String, dynamic> student) async {
@@ -924,6 +977,23 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                               _resetPassword(student);
                                             case 'active':
                                               _toggleActive(student);
+                                            case 'history':
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute<void>(
+                                                  settings: RouteSettings(
+                                                    arguments: FeedbackPage(
+                                                      'Sign-in history: ${student['login_id']}',
+                                                    ),
+                                                  ),
+                                                  builder: (_) =>
+                                                      SignInHistoryPage(
+                                                    userId: student['id']
+                                                        .toString(),
+                                                    loginId: student['login_id']
+                                                        .toString(),
+                                                  ),
+                                                ),
+                                              );
                                           }
                                         },
                                         itemBuilder: (context) => [
@@ -940,6 +1010,11 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                           const PopupMenuItem(
                                             value: 'reset',
                                             child: Text('Reset password'),
+                                          ),
+                                          const PopupMenuItem(
+                                            key: Key('history-menu-item'),
+                                            value: 'history',
+                                            child: Text('Sign-in history'),
                                           ),
                                           PopupMenuItem(
                                             value: 'active',
@@ -969,3 +1044,15 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
 String _displayError(Object error) {
   return error.toString().replaceFirst('Exception: ', '');
 }
+
+/// Ready-to-paste sign-in details for a new or reset account.
+String credentialsMessage({
+  required String loginId,
+  required String password,
+  required String appUrl,
+}) =>
+    'Robotics Programming Lab\n'
+    'Site: $appUrl\n'
+    'Login ID: $loginId\n'
+    'Temporary password: $password\n'
+    'Please change your password after you sign in (account menu > My account).';
