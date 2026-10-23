@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/services/course_content_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
@@ -120,6 +121,8 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
                                             onTap: () async {
                                               await Navigator.of(context).push(
                                                 MaterialPageRoute<void>(
+                                                  settings: RouteSettings(arguments: FeedbackPage('Course topic: ${topics[i]['title'] ?? topics[i]['id']}'),
+                                                  ),
                                                   builder: (_) =>
                                                       CourseTopicPage(
                                                     topicId: topics[i]['id']

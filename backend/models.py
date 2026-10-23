@@ -463,3 +463,41 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )
+
+
+class PageFeedback(Base):
+    """A bug report or suggestion sent from the Feedback button on any page."""
+
+    __tablename__ = "page_feedback"
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('bug', 'suggestion', 'content', 'other')",
+            name="ck_page_feedback_category",
+        ),
+        CheckConstraint(
+            "status IN ('new', 'resolved')", name="ck_page_feedback_status"
+        ),
+        CheckConstraint(
+            "sender_role IN ('student', 'instructor', 'demo')",
+            name="ck_page_feedback_sender_role",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+    # Empty for the public student demo, which has no persistent account.
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    sender_role: Mapped[str] = mapped_column(String(20))
+    page: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(20))
+    message: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="new", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

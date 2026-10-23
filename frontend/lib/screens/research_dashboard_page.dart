@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 
@@ -300,6 +301,8 @@ class _InstructorResearchDashboardState
             ? null
             : () => Navigator.of(context).push(
                   MaterialPageRoute(
+                    settings: const RouteSettings(arguments: FeedbackPage('Research study: student detail'),
+                    ),
                     builder: (_) => ResearchStudentDetailPage(
                       studentId: participant['student_id'].toString(),
                     ),

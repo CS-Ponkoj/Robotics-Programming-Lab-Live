@@ -10,7 +10,9 @@ import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
+import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/feedback_button.dart';
 
 export 'package:iuse_demo/screens/assignment_workspace.dart';
 export 'package:iuse_demo/services/assignment_api.dart';
@@ -35,6 +37,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
   AuthenticatedUser? _user;
   bool _restoringSession = true;
 
@@ -116,6 +119,8 @@ class _MyAppState extends State<MyApp> {
       title: 'Robotics Programming Lab',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      navigatorKey: _navigatorKey,
+      navigatorObservers: [feedbackPages],
       builder: (context, child) => Focus(
         canRequestFocus: false,
         onKeyEvent: (_, __) {
@@ -127,7 +132,19 @@ class _MyAppState extends State<MyApp> {
           onPointerDown: (_) => researchTracker.recordUserInteraction(),
           onPointerMove: (_) => researchTracker.recordUserInteraction(),
           onPointerSignal: (_) => researchTracker.recordUserInteraction(),
-          child: child ?? const SizedBox.shrink(),
+          child: Stack(
+            children: [
+              Positioned.fill(child: child ?? const SizedBox.shrink()),
+              if (_user != null)
+                Positioned(
+                  left: 12,
+                  bottom: 12,
+                  child: SafeArea(
+                    child: FeedbackButton(navigatorKey: _navigatorKey),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
       home: _restoringSession

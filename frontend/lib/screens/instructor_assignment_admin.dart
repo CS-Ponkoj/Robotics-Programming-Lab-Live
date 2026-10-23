@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/state/feedback_page_tracker.dart';
+import 'package:iuse_demo/screens/feedback_inbox_page.dart';
 import 'package:iuse_demo/screens/student_accounts_page.dart';
 import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
@@ -50,6 +52,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
   Future<void> _edit([Map<String, dynamic>? assignment]) async {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
+        settings: const RouteSettings(arguments: FeedbackPage('Assignment editor')),
         builder: (_) => AssignmentEditorPage(
           adminToken: AuthApi.token ?? '',
           assignment: assignment,
@@ -66,8 +69,12 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
     final theme = Theme.of(context);
     final published =
         _assignments.where((a) => a['status'] == 'published').length;
-    void open(Widget page) => Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => page));
+    void open(Widget page, String name) => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            settings: RouteSettings(arguments: FeedbackPage(name)),
+            builder: (_) => page,
+          ),
+        );
 
     final createButton = FilledButton.icon(
       key: const Key('create-assignment-button'),
@@ -139,29 +146,42 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
                       title: 'Manage accounts',
                       detail:
                           'Create student logins, reset access, and link participant codes.',
-                      onTap: () => open(const StudentAccountsPage()),
+                      onTap: () => open(
+                          const StudentAccountsPage(), 'Manage accounts'),
                     ),
                     _StudioLinkCard(
                       icon: Icons.insights_rounded,
                       title: 'Research study dashboard',
                       detail:
                           'Participation, attempts, and privacy-safe research exports.',
-                      onTap: () => open(const InstructorResearchDashboard()),
+                      onTap: () => open(const InstructorResearchDashboard(),
+                          'Research study dashboard'),
+                    ),
+                    _StudioLinkCard(
+                      key: const Key('studio-feedback-card'),
+                      icon: Icons.feedback_outlined,
+                      title: 'Feedback',
+                      detail:
+                          'Bug reports and suggestions sent from any page.',
+                      onTap: () =>
+                          open(const FeedbackInboxPage(), 'Feedback inbox'),
                     ),
                   ];
-                  if (constraints.maxWidth < 640) {
+                  if (constraints.maxWidth < 900) {
                     return Column(children: [
-                      cards[0],
-                      const SizedBox(height: 12),
-                      cards[1],
+                      for (var i = 0; i < cards.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 12),
+                        cards[i],
+                      ],
                     ]);
                   }
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: cards[0]),
-                      const SizedBox(width: 16),
-                      Expanded(child: cards[1]),
+                      for (var i = 0; i < cards.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 16),
+                        Expanded(child: cards[i]),
+                      ],
                     ],
                   );
                 },
@@ -212,6 +232,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
 
 class _StudioLinkCard extends StatelessWidget {
   const _StudioLinkCard({
+    super.key,
     required this.icon,
     required this.title,
     required this.detail,

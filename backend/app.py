@@ -60,6 +60,7 @@ from models import (
     CodeDraft,
     CourseQuizAttempt,
     HintInteraction,
+    PageFeedback,
     StudySession,
     Submission,
     User,
@@ -77,6 +78,9 @@ from research_service import (
 from sandbox import build_sandbox
 from ros2_executor import DockerRos2Executor
 from schemas import (
+    PageFeedbackCreate,
+    PageFeedbackResponse,
+    PageFeedbackStatusUpdate,
     AdminAssignmentPayload,
     AdminPasswordReset,
     AdminStudentCreate,
@@ -1314,6 +1318,84 @@ def create_app(
                 "Demo progress is temporary and is not saved on the server.",
             )
         return {"assignments": student_assignment_progress(session, user)}
+
+    def feedback_payload(feedback: PageFeedback, login_id: str | None) -> dict:
+        return PageFeedbackResponse.model_validate(feedback).model_copy(
+            update={"sender_login_id": login_id}
+        ).model_dump()
+
+    @application.post("/feedback", status_code=201)
+    def submit_page_feedback(
+        body: PageFeedbackCreate,
+        request: Request,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        enforce_rate_limit(
+            request, user, bucket="feedback", requests_per_minute=5
+        )
+        demo = is_ephemeral_demo(request, user)
+        feedback = PageFeedback(
+            # Demo visitors share one seeded account, so their feedback is
+            # stored without a sender instead of being credited to it.
+            user_id=None if demo else user.id,
+            sender_role="demo" if demo else user.role,
+            page=body.page,
+            category=body.category,
+            message=body.message,
+        )
+        session.add(feedback)
+        session.commit()
+        return {"id": feedback.id, "status": "received"}
+
+    @application.get("/admin/feedback")
+    def admin_list_feedback(
+        status: str | None = Query(default=None, pattern="^(new|resolved)$"),
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=50, ge=1, le=100),
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        filters = [PageFeedback.status == status] if status else []
+        total = session.scalar(
+            select(func.count()).select_from(PageFeedback).where(*filters)
+        )
+        new_count = session.scalar(
+            select(func.count())
+            .select_from(PageFeedback)
+            .where(PageFeedback.status == "new")
+        )
+        rows = session.execute(
+            select(PageFeedback, User.login_id)
+            .outerjoin(User, User.id == PageFeedback.user_id)
+            .where(*filters)
+            .order_by(PageFeedback.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        ).all()
+        return {
+            "items": [feedback_payload(row[0], row[1]) for row in rows],
+            "total": total or 0,
+            "new_count": new_count or 0,
+            "page": page,
+            "page_size": page_size,
+        }
+
+    @application.patch("/admin/feedback/{feedback_id}")
+    def admin_update_feedback(
+        feedback_id: str,
+        body: PageFeedbackStatusUpdate,
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        feedback = session.get(PageFeedback, feedback_id)
+        if feedback is None:
+            raise HTTPException(404, "Feedback not found.")
+        feedback.status = body.status
+        feedback.resolved_at = utc_now() if body.status == "resolved" else None
+        session.commit()
+        sender = session.get(User, feedback.user_id) if feedback.user_id else None
+        return feedback_payload(feedback, sender.login_id if sender else None)
 
     @application.get("/admin/research/summary")
     def admin_research_summary(

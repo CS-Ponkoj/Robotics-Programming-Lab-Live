@@ -286,6 +286,28 @@ session. Students can read their own 20 most recent attempts per topic through
 `GET /contents/{topic_id}/quiz/attempts`. Quiz attempts are not currently part
 of the research exports or the Phase 1 analytics metrics.
 
+### `page_feedback`
+
+One row stores one bug report or suggestion sent from the **Feedback** button
+shown on every signed-in page. Instructors read and resolve it from
+**Instructor studio → Feedback** (`GET /admin/feedback`,
+`PATCH /admin/feedback/{id}`).
+
+| Field | Meaning |
+|---|---|
+| `id` | Unique feedback identifier |
+| `user_id` | Account that sent it; empty for the public student demo, whose shared seeded account is never credited |
+| `sender_role` | `student`, `instructor`, or `demo` |
+| `page` | Page the sender was on, such as `Assignment 2: ...` or `Home: Contents` (up to 200 characters) |
+| `category` | `bug`, `content`, `suggestion`, or `other` |
+| `message` | The sender's text, 1–2000 characters |
+| `status` | `new` or `resolved` |
+| `created_at` | UTC time it was sent |
+| `resolved_at` | UTC time an instructor marked it resolved; cleared when reopened |
+
+Feedback is operational, not research data: it is not part of the research
+exports or analytics. Each sender is limited to five messages per minute.
+
 ## Assignment JSON fields
 
 Every assignment is normalized into the same fields before database storage.
@@ -309,6 +331,8 @@ configuration explicitly. All assignment files declare
   tracking and nullable active-time snapshots without changing old attempts.
 - Alembic migration `0006_course_quiz_attempts` adds the separate quiz-score
   table without changing coding-assignment submissions.
+- Alembic migration `0007_page_feedback` adds the page-feedback table without
+  changing any existing table.
 
 ## Phase 1 analytics interfaces
 

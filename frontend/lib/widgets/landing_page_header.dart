@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/screens/my_account_page.dart';
 import 'package:iuse_demo/screens/instructor_assignment_admin.dart';
@@ -111,6 +112,7 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
+                  settings: const RouteSettings(arguments: FeedbackPage('Instructor studio')),
                   builder: (_) => const InstructorAssignmentAdmin(),
                 ),
               );
@@ -125,6 +127,7 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
               if (value == 'my-account' && context.mounted) {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
+                    settings: const RouteSettings(arguments: FeedbackPage('My account')),
                     builder: (_) =>
                         MyAccountPage(user: user, onSignedOut: onLogout),
                   ),
@@ -133,6 +136,7 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
               if (value == 'study-data' && context.mounted) {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
+                    settings: const RouteSettings(arguments: FeedbackPage('Study data')),
                     builder: (_) => user.isInstructor
                         ? const InstructorResearchDashboard()
                         : const StudentResearchPage(),

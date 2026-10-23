@@ -364,3 +364,38 @@ class LearningEventRequest(BaseModel):
                 "assignment_id and assignment_version must be provided together"
             )
         return self
+
+
+FeedbackCategory = Literal["bug", "suggestion", "content", "other"]
+
+
+class PageFeedbackCreate(BaseModel):
+    page: str = Field(min_length=1, max_length=200)
+    category: FeedbackCategory
+    message: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("page", "message")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
+
+
+class PageFeedbackStatusUpdate(BaseModel):
+    status: Literal["new", "resolved"]
+
+
+class PageFeedbackResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    page: str
+    category: str
+    message: str
+    status: str
+    sender_role: str
+    sender_login_id: str | None = None
+    created_at: datetime
+    resolved_at: datetime | None = None

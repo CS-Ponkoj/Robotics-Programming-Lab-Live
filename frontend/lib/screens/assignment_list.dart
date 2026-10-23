@@ -9,6 +9,7 @@ import 'package:iuse_demo/widgets/landing_page_header.dart';
 export 'package:iuse_demo/widgets/landing_page_header.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
+import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
@@ -65,6 +66,8 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    feedbackPages.homeLabel =
+        _showContents ? 'Home: Contents' : 'Home: Assignments';
 
     return LandingPageFrame(
       user: widget.user,
@@ -457,7 +460,10 @@ void openAssignment(
 ) {
   Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => MyHomePage(title: a.title, id: a.id)),
+    MaterialPageRoute(
+      settings: RouteSettings(arguments: FeedbackPage(a.title)),
+      builder: (_) => MyHomePage(title: a.title, id: a.id),
+    ),
   ).then((_) {
     // Rebuild when the learner returns so the latest score is visible.
     onReturn();
@@ -732,6 +738,7 @@ class ListAssignment extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
+                      settings: RouteSettings(arguments: FeedbackPage(a.title)),
                       builder: (_) => MyHomePage(title: a.title, id: a.id),
                     ),
                   ).then((_) {
