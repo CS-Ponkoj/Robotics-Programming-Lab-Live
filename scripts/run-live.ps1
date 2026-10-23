@@ -65,7 +65,9 @@ try {
 if (-not $SkipBuild) {
     Push-Location (Join-Path $repositoryRoot "frontend")
     try {
-        Invoke-RoboticsNative flutter build web --release "--dart-define=API_BASE_URL=$ApiBaseUrl" --output $webBuild
+        # No offline cache: the default offline-first service worker kept
+        # browsers on an old build after each deploy.
+        Invoke-RoboticsNative flutter build web --release --pwa-strategy=none "--dart-define=API_BASE_URL=$ApiBaseUrl" --output $webBuild
         if ($LASTEXITCODE -ne 0) { throw "flutter build web failed." }
     } finally {
         Pop-Location
