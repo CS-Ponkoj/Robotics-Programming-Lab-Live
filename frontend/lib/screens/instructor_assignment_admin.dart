@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/screens/feedback_inbox_page.dart';
+import 'package:iuse_demo/screens/sign_in_history_page.dart';
 import 'package:iuse_demo/screens/student_accounts_page.dart';
 import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
@@ -52,7 +53,8 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
   Future<void> _edit([Map<String, dynamic>? assignment]) async {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        settings: const RouteSettings(arguments: FeedbackPage('Assignment editor')),
+        settings:
+            const RouteSettings(arguments: FeedbackPage('Assignment editor')),
         builder: (_) => AssignmentEditorPage(
           adminToken: AuthApi.token ?? '',
           assignment: assignment,
@@ -146,8 +148,8 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
                       title: 'Manage accounts',
                       detail:
                           'Create student logins, reset access, and link participant codes.',
-                      onTap: () => open(
-                          const StudentAccountsPage(), 'Manage accounts'),
+                      onTap: () =>
+                          open(const StudentAccountsPage(), 'Manage accounts'),
                     ),
                     _StudioLinkCard(
                       icon: Icons.insights_rounded,
@@ -161,13 +163,20 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
                       key: const Key('studio-feedback-card'),
                       icon: Icons.feedback_outlined,
                       title: 'Feedback',
-                      detail:
-                          'Bug reports and suggestions sent from any page.',
+                      detail: 'Bug reports and suggestions sent from any page.',
                       onTap: () =>
                           open(const FeedbackInboxPage(), 'Feedback inbox'),
                     ),
+                    _StudioLinkCard(
+                      key: const Key('studio-sign-in-history-card'),
+                      icon: Icons.history_rounded,
+                      title: 'Sign-in history',
+                      detail: 'When each account signed in and out.',
+                      onTap: () =>
+                          open(const SignInHistoryPage(), 'Sign-in history'),
+                    ),
                   ];
-                  if (constraints.maxWidth < 900) {
+                  if (constraints.maxWidth < 1000) {
                     return Column(children: [
                       for (var i = 0; i < cards.length; i++) ...[
                         if (i > 0) const SizedBox(height: 12),

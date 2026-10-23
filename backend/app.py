@@ -57,6 +57,7 @@ from playground_inputs import parameter_problems
 from progress_service import student_assignment_progress
 from models import (
     Assignment,
+    AuthSession,
     CodeDraft,
     CourseQuizAttempt,
     HintInteraction,
@@ -1396,6 +1397,64 @@ def create_app(
         session.commit()
         sender = session.get(User, feedback.user_id) if feedback.user_id else None
         return feedback_payload(feedback, sender.login_id if sender else None)
+
+    @application.get("/admin/sign-in-history")
+    def admin_sign_in_history(
+        user_id: str | None = Query(default=None, max_length=36),
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=50, ge=1, le=100),
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        filters = [AuthSession.user_id == user_id] if user_id else []
+        total = session.scalar(
+            select(func.count()).select_from(AuthSession).where(*filters)
+        )
+        rows = session.execute(
+            select(AuthSession, User.login_id, User.role)
+            .join(User, User.id == AuthSession.user_id)
+            .where(*filters)
+            .order_by(AuthSession.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        ).all()
+        now = utc_now()
+
+        def as_utc(value):
+            # SQLite returns naive datetimes; stored values are always UTC.
+            return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+        items = []
+        for auth_session, login_id, role in rows:
+            if auth_session.revoked_at is not None:
+                state = "signed_out"
+            elif as_utc(auth_session.expires_at) <= now:
+                state = "expired"
+            else:
+                state = "active"
+            items.append(
+                {
+                    "session_id": auth_session.id,
+                    "user_id": auth_session.user_id,
+                    "login_id": login_id,
+                    "role": role,
+                    "signed_in_at": as_utc(auth_session.created_at),
+                    "last_active_at": as_utc(auth_session.last_used_at),
+                    "signed_out_at": (
+                        as_utc(auth_session.revoked_at)
+                        if auth_session.revoked_at
+                        else None
+                    ),
+                    "expires_at": as_utc(auth_session.expires_at),
+                    "state": state,
+                }
+            )
+        return {
+            "items": items,
+            "total": total or 0,
+            "page": page,
+            "page_size": page_size,
+        }
 
     @application.get("/admin/research/summary")
     def admin_research_summary(
