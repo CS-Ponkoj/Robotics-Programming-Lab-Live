@@ -13,6 +13,12 @@
 		reverse_proxy 127.0.0.1:5100
 	}
 	handle {
-		reverse_proxy 127.0.0.1:8180
+		# Cloudflare's Browser Cache TTL replaces a plain no-cache header, which
+		# kept browsers on an old app for hours after a deploy. It leaves
+		# private/no-store alone, so every page load checks for the new build.
+		header Cache-Control "private, no-cache, no-store, must-revalidate"
+		reverse_proxy 127.0.0.1:8180 {
+			header_down -Cache-Control
+		}
 	}
 }
