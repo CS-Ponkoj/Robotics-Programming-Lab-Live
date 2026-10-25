@@ -19,7 +19,7 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onHome;
 
   @override
-  Size get preferredSize => const Size.fromHeight(116);
+  Size get preferredSize => const Size.fromHeight(110);
 
   @override
   Widget build(BuildContext context) {
