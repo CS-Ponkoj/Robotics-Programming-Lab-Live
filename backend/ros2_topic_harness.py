@@ -33,6 +33,29 @@ def unused_axes_zero(item) -> bool:
                for value in item[3:])
 
 
+UNUSED_AXES = ("linear.y", "linear.z", "angular.x", "angular.y")
+
+
+def first_unused_axis(samples):
+    """The first command with a forbidden component: (time, field, value)."""
+    for item in samples:
+        for name, value in zip(UNUSED_AXES, item[3:]):
+            if not (math.isfinite(value) and abs(value) <= STOP_TOLERANCE):
+                return item[0], name, value
+    return None
+
+
+def unused_axes_message(samples) -> str:
+    found = first_unused_axis(samples)
+    if found is None:
+        return UNUSED_AXES_MESSAGE
+    at, name, value = found
+    return (
+        f"At {at:.1f} s after the first command, {name} was {value:.2f}. "
+        + UNUSED_AXES_MESSAGE
+    )
+
+
 def is_stop(item) -> bool:
     """A stop command has all six Twist fields at zero."""
     return (abs(item[1]) <= STOP_TOLERANCE and abs(item[2]) <= STOP_TOLERANCE
@@ -87,6 +110,20 @@ def motion_evidence(messages, expected_linear, linear_tolerance,
         forward_problem = "stopped-early"
     else:
         forward_problem = ""
+    # Speed and turning set to zero while another component is not: the
+    # student meant to stop, but it is not a full stop.
+    partial_stop = next(
+        (item for item in samples
+         if abs(item[1]) <= STOP_TOLERANCE and abs(item[2]) <= STOP_TOLERANCE
+         and not is_stop(item)),
+        None,
+    )
+    if (
+        forward_problem in {"wrong-speed", "never-stopped"}
+        and partial_stop is not None
+        and (wrong_speed is None or wrong_speed[0] >= partial_stop[0])
+    ):
+        forward_problem = "partial-stop"
     forward_ok = not forward_problem
     checks = {
         "forward-motion": forward_ok,
@@ -109,6 +146,7 @@ def motion_evidence(messages, expected_linear, linear_tolerance,
         "forward_problem": forward_problem,
         "wrong_speed": wrong_speed,
         "first_stop": first_stop,
+        "partial_stop": partial_stop,
     }
 
 
@@ -122,6 +160,20 @@ def forward_message(evidence, expected_linear: float) -> str:
             f"At {item[0]:.1f} s after the first command, linear.x was {item[1]:.2f} m/s. "
             f"Every command before the stop must use linear.x = {expected_linear:.2f} m/s; "
             "then switch directly to a full stop."
+        )
+    if problem == "partial-stop":
+        item = evidence["partial_stop"]
+        field = next(
+            (f"{name} was {value:.2f}"
+             for name, value in zip(UNUSED_AXES, item[3:])
+             if not (math.isfinite(value) and abs(value) <= STOP_TOLERANCE)),
+            "another component was not zero",
+        )
+        return (
+            f"At {item[0]:.1f} s after the first command, linear.x and angular.z "
+            f"were 0.0 but {field}, so this was not a full stop. A full stop "
+            "needs all six Twist components at 0.0; forward-motion credit "
+            "requires the drive to end in a full stop."
         )
     if problem == "never-stopped":
         return (
@@ -212,7 +264,9 @@ def main() -> None:
     stop_ok = checks["safe-stop"]
     held_stop = checks["hold-stop"]
     unused_ok = checks["unused-axes-zero"]
-    unused_hint = "" if unused_ok else " " + UNUSED_AXES_MESSAGE
+    unused_hint = "" if unused_ok else " " + unused_axes_message(
+        [(item[0] - messages[0][0], *item[1:]) for item in messages]
+    )
     runtime_error = (
         ""
         if alive_at_end

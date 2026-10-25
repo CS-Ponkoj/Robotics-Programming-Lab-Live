@@ -138,7 +138,8 @@ def motion_checks():
     # Extract the pure function without requiring host ROS installation.
     tree = ast.parse((ROOT / 'backend/ros2_topic_harness.py').read_text(encoding='utf-8'))
     wanted = {'motion_checks', 'motion_evidence', 'unused_axes_zero', 'is_stop',
-              'STOP_TOLERANCE'}
+              'STOP_TOLERANCE', 'UNUSED_AXES', 'UNUSED_AXES_MESSAGE',
+              'forward_message', 'first_unused_axis', 'unused_axes_message'}
     nodes = [
         item for item in tree.body
         if (isinstance(item, ast.FunctionDef) and item.name in wanted)
@@ -259,6 +260,19 @@ def test_ros_forward_failure_reasons_are_specific():
     assert evidence(forward_samples(99), 0.2, 0.02, 0.01, 5, 0.5)['forward_problem'] == 'never-stopped'
     assert evidence(forward_samples(4.0), 0.2, 0.02, 0.01, 5, 0.5)['forward_problem'] == 'stopped-early'
     assert evidence(forward_samples(5.0), 0.2, 0.02, 0.01, 5, 0.5)['forward_problem'] == ''
+
+
+def test_ros_sideways_component_is_named_instead_of_the_correct_linear_x():
+    scope = motion_checks().__globals__
+    samples = [(t, x, z, 0.3, 0.0, 0.0, 0.0) for t, x, z, *_ in forward_samples(5.0)]
+    found = scope['motion_evidence'](samples, 0.2, 0.02, 0.01, 5, 0.5)
+    assert found['forward_problem'] == 'partial-stop'
+    assert not found['checks']['forward-motion']
+    message = scope['forward_message'](found, 0.2)
+    assert 'linear.y was 0.30' in message and 'not a full stop' in message
+    assert 'linear.x was 0.00' not in message
+    hint = scope['unused_axes_message'](samples)
+    assert hint.startswith('At 0.0 s after the first command, linear.y was 0.30.')
 
 
 def attribute_commands():

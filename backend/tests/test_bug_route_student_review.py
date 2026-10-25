@@ -61,6 +61,33 @@ def test_exact_return_contract_rejects_extra_values(assignment_id):
 
 
 @pytest.mark.parametrize('assignment_id', [1, 2])
+@pytest.mark.parametrize('ending, returned', [
+    (', d(leave, goal)', 'returned 3'),
+    ('', 'single value or nothing'),
+])
+def test_short_or_single_return_names_the_required_order(assignment_id, ending, returned):
+    prefix = student_code(assignment_id).rsplit('    return ', 1)[0]
+    code = prefix + '    return d(start, hit), d(start, hit)' + ending
+    if not ending:
+        code = prefix + '    return d(start, hit)'
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(target(source(assignment_id)), code)
+    assert result.score == 0 and not result.execution_succeeded
+    assert 'IndexError' not in result.execution_error
+    assert 'TypeError' not in result.execution_error
+    assert 'Return exactly 4 values in this order:' in result.execution_error
+    assert returned in result.execution_error
+
+
+def test_endless_loop_reports_the_time_limit():
+    data = source(1)
+    code = student_code(1).replace('    return ', '    while True:\n        pass\n    return ', 1)
+    sandbox = SubprocessSandbox(timeout_seconds=1)
+    result = PythonFunctionGrader(sandbox).grade(target(data), code)
+    assert result.score == 0 and not result.execution_succeeded
+    assert 'did not finish within the 1-second time limit' in result.execution_error
+
+
+@pytest.mark.parametrize('assignment_id', [1, 2])
 def test_return_order_is_not_masked_by_equal_displayed_distances(assignment_id):
     code = student_code(assignment_id, (True, True, True, False))
     code = code.replace('return d(start, hit),', 'return d(leave, goal),')

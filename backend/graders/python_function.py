@@ -221,11 +221,20 @@ class PythonFunctionGrader:
                 *setup_lines,
                 f"grader_values = {function_name}({', '.join(call_arguments)})",
                 *check_lines,
-                "grader_return_count = len(grader_values)",
+                # Count first, so a short or single return is reported as a
+                # return-shape problem rather than an IndexError or TypeError.
+                "try:",
+                "    grader_return_count = len(grader_values)",
+                # A bare except: the sandbox's restricted builtins have no Exception.
+                "except:",
+                "    grader_return_count = None",
+                f"if grader_return_count == {len(criteria)}:",
                 *[
-                    f"{name} = grader_values[{index}]"
+                    f"    {name} = grader_values[{index}]"
                     for index, name in enumerate(result_names)
                 ],
+                "else:",
+                *[f"    {name} = None" for name in result_names],
             ]
             result = self.sandbox.execute(
                 "\n".join(harness_lines),
@@ -242,10 +251,23 @@ class PythonFunctionGrader:
                 criterion_passes = [False] * len(criteria)
                 break
             actual_values = result.get("values", {})
-            if actual_values.get("grader_return_count") != len(criteria):
+            return_count = actual_values.get("grader_return_count")
+            if return_count != len(criteria):
+                order = ", ".join(
+                    str(item.get("label", item.get("id", f"value {index + 1}")))
+                    for index, item in enumerate(criteria)
+                )
+                returned = (
+                    f"Your function returned {return_count}."
+                    if isinstance(return_count, int)
+                    else "Your function returned a single value or nothing."
+                )
                 return self._execution_failure(criteria, {
                     "output": base_result.get("output", ""),
-                    "error": f"Return exactly {len(criteria)} values in the required order.",
+                    "error": (
+                        f"Return exactly {len(criteria)} values in this order: "
+                        f"{order}. {returned}"
+                    ),
                 })
             for index, name in enumerate(result_names):
                 actual = actual_values.get(name)
@@ -345,6 +367,7 @@ class PythonFunctionGrader:
 
         score = round((earned_weight / total_weight) * 100) if total_weight else 0
         execution_succeeded = not hidden_execution_failed
+        limit = getattr(self.sandbox, "timeout_seconds", None)
         return GradeResult(
             execution_succeeded=execution_succeeded,
             passed=execution_succeeded and all(criterion_passes),
@@ -353,6 +376,11 @@ class PythonFunctionGrader:
             execution_error=(
                 ""
                 if execution_succeeded
+                else "Your function did not finish within the "
+                + (f"{limit:g}-second " if isinstance(limit, (int, float)) else "")
+                + "time limit for a grading scenario. Check that every loop "
+                "ends, for example that a while loop's condition becomes false."
+                if hidden_error_type == "TimeoutError"
                 else "The required function could not complete every grading scenario"
                 + (
                     f" ({hidden_error_type}"
