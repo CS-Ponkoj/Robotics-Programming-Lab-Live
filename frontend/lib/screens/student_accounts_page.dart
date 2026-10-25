@@ -113,7 +113,6 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                       children: [
                         TextFormField(
                           controller: loginController,
-                          autofocus: true,
                           enabled: !saving,
                           decoration: const InputDecoration(
                             labelText: 'Login ID',
@@ -465,8 +464,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
         },
       ),
     );
-    emailController.dispose();
-    participantController.dispose();
+    _disposeAfterDialogCloses([emailController, participantController]);
     if (saved == true) {
       await _load();
     }
@@ -582,6 +580,21 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     }
   }
 
+  void _openHistory(Map<String, dynamic> account) {
+    final loginId = account['login_id'].toString();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: RouteSettings(
+          arguments: FeedbackPage('Account sign-ins: $loginId'),
+        ),
+        builder: (_) => SignInHistoryPage(
+          userId: account['id'].toString(),
+          loginId: loginId,
+        ),
+      ),
+    );
+  }
+
   // The dialog still rebuilds its fields during its closing animation.
   void _disposeAfterDialogCloses(List<TextEditingController> controllers) {
     Future<void>.delayed(const Duration(milliseconds: 500), () {
@@ -643,17 +656,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
       final report = await importStudyAccounts();
       await _load();
       if (mounted) {
-        final errors = report['errors'] as List? ?? const [];
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'JSON import complete: '
-              '${(report['created'] as List? ?? const []).length} created, '
-              '${(report['updated'] as List? ?? const []).length} updated, '
-              '${errors.length} errors.',
-            ),
-          ),
-        );
+        await _showImportReport(report);
       }
     } on Object catch (error) {
       if (mounted) {
@@ -663,6 +666,54 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
         });
       }
     }
+  }
+
+  /// Lists exactly which accounts were created or updated, and any errors.
+  Future<void> _showImportReport(Map<String, dynamic> report) {
+    List<String> names(String key) => [
+          for (final item in report[key] as List? ?? const [])
+            item is Map ? '${item['login_id'] ?? item}' : '$item',
+        ];
+    final created = names('created');
+    final updated = names('updated');
+    final errors = names('errors');
+    Widget section(String title, List<String> items) => ExpansionTile(
+          key: Key('import-$title'),
+          title: Text('$title (${items.length})'),
+          initiallyExpanded: items.isNotEmpty && items.length <= 20,
+          children: [
+            if (items.isEmpty)
+              const ListTile(dense: true, title: Text('None'))
+            else
+              for (final item in items)
+                ListTile(dense: true, title: SelectableText(item)),
+          ],
+        );
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('JSON import complete'),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                section('Created', created),
+                section('Updated', updated),
+                section('Errors', errors),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _testEmailDelivery() async {
@@ -678,7 +729,6 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
             key: formKey,
             child: TextFormField(
               controller: controller,
-              autofocus: true,
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 labelText: 'Recipient email address',
@@ -709,7 +759,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
         ],
       ),
     );
-    controller.dispose();
+    _disposeAfterDialogCloses([controller]);
     if (recipient == null || !mounted) {
       return;
     }
@@ -882,6 +932,10 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                       );
                                   return Card(
                                     child: ListTile(
+                                      key: Key('account-row-$loginId'),
+                                      onTap: () => _openHistory(student),
+                                      // Signals that the row opens sign-ins.
+                                      mouseCursor: SystemMouseCursors.click,
                                       contentPadding: const EdgeInsets.fromLTRB(
                                           16, 8, 8, 8),
                                       leading: Container(
@@ -977,23 +1031,6 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                               _resetPassword(student);
                                             case 'active':
                                               _toggleActive(student);
-                                            case 'history':
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute<void>(
-                                                  settings: RouteSettings(
-                                                    arguments: FeedbackPage(
-                                                      'Sign-in history: ${student['login_id']}',
-                                                    ),
-                                                  ),
-                                                  builder: (_) =>
-                                                      SignInHistoryPage(
-                                                    userId: student['id']
-                                                        .toString(),
-                                                    loginId: student['login_id']
-                                                        .toString(),
-                                                  ),
-                                                ),
-                                              );
                                           }
                                         },
                                         itemBuilder: (context) => [
@@ -1010,11 +1047,6 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                           const PopupMenuItem(
                                             value: 'reset',
                                             child: Text('Reset password'),
-                                          ),
-                                          const PopupMenuItem(
-                                            key: Key('history-menu-item'),
-                                            value: 'history',
-                                            child: Text('Sign-in history'),
                                           ),
                                           PopupMenuItem(
                                             value: 'active',

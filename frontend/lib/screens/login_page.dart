@@ -136,7 +136,6 @@ class _LoginPageState extends State<LoginPage> {
                     TextField(
                       controller: controller,
                       enabled: !sending,
-                      autofocus: true,
                       decoration: const InputDecoration(
                         labelText: 'Login ID or email',
                         border: OutlineInputBorder(),
@@ -184,7 +183,8 @@ class _LoginPageState extends State<LoginPage> {
         );
       },
     );
-    controller.dispose();
+    // The dialog still rebuilds its field during its closing animation.
+    Future<void>.delayed(const Duration(milliseconds: 500), controller.dispose);
   }
 
   @override

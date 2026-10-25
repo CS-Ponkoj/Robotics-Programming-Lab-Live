@@ -506,7 +506,6 @@ class _MyHomePageState extends State<MyHomePage> {
             children: [
               TextField(
                 key: const Key('replace-find-field'),
-                autofocus: true,
                 decoration: const InputDecoration(labelText: 'Find'),
                 onChanged: (value) => query = value,
               ),
@@ -551,7 +550,6 @@ class _MyHomePageState extends State<MyHomePage> {
         title: const Text('Find in code'),
         content: TextField(
           key: const Key('editor-find-field'),
-          autofocus: true,
           decoration: const InputDecoration(labelText: 'Find'),
           onChanged: (value) => enteredQuery = value,
           onSubmitted: (value) => Navigator.pop(dialogContext, value),
