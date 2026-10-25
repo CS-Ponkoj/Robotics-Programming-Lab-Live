@@ -1595,10 +1595,13 @@ def create_app(
     )
     def get_assignment(
         assignment_id: int,
+        request: Request,
         session: Session = Depends(session_dependency),
         _user: User = Depends(current_user),
     ):
-        return to_student_assignment(get_assignment_or_404(session, assignment_id))
+        payload = to_student_assignment(get_assignment_or_404(session, assignment_id))
+        available = bool(request.app.state.settings.openai_api_key)
+        return payload.model_copy(update={"ai_tutor_available": available})
 
     @application.get(
         "/assignments/{assignment_id}/draft",

@@ -55,6 +55,9 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _serverDraft;
   int? _assignmentVersion;
   bool _enableFeedback = false;
+  // Set from the server once the assignment loads; AI stays off until then.
+  bool _aiTutorAvailable = false;
+  bool _isRos2 = false;
   bool _submitted = false;
   bool _emptyCodeAttempted = false;
   bool _isRunning = false;
@@ -112,6 +115,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<AssignmentDto> _loadAssignment() async {
     final assignment = await fetchAssignment(widget.id);
+    if (mounted) {
+      setState(() {
+        _aiTutorAvailable = assignment.aiTutorAvailable;
+        _isRos2 = assignment.language.contains('ros2');
+        if (!_aiTutorAvailable) _enableFeedback = false;
+      });
+    }
     _controller.autocompleter.setCustomWords(
       assignmentCompletionWords(assignment),
     );
@@ -303,6 +313,10 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  /// AI feedback is requested only when the server offers it and the student
+  /// turned it on; otherwise use_ai_tutor is always false.
+  bool get _aiTutorOn => _aiTutorAvailable && _enableFeedback;
+
   void _runTests() {
     // Until the assignment loads, _code is not the code shown in the editor;
     // running now would wrongly report an empty editor.
@@ -329,7 +343,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _feedback = fetchUnittestFeedback(
         widget.id,
         _code,
-        useAiTutor: _enableFeedback,
+        useAiTutor: _aiTutorOn,
       );
     });
     _openResultsPanel();
@@ -760,14 +774,17 @@ class _MyHomePageState extends State<MyHomePage> {
             SwitchListTile(
               key: const Key('results-ai-toggle'),
               title: const Text('AI tutoring'),
-              subtitle: const Text(
-                  'Off by default; built-in feedback remains available'),
-              value: _enableFeedback,
-              onChanged: (value) {
-                setState(() => _enableFeedback = value);
-                unawaited(_trackWorkspaceEvent(
-                    'ai_tutor_toggled', {'enabled': value}));
-              },
+              subtitle: Text(_aiTutorAvailable
+                  ? 'Off by default; built-in feedback remains available'
+                  : aiTutorUnavailableMessage),
+              value: _aiTutorOn,
+              onChanged: _aiTutorAvailable
+                  ? (value) {
+                      setState(() => _enableFeedback = value);
+                      unawaited(_trackWorkspaceEvent(
+                          'ai_tutor_toggled', {'enabled': value}));
+                    }
+                  : null,
             ),
             Expanded(
                 child: _emptyCodeAttempted
@@ -778,7 +795,8 @@ class _MyHomePageState extends State<MyHomePage> {
                             builder: (ctx, snap) {
                               if (snap.connectionState ==
                                   ConnectionState.waiting) {
-                                return const SecureGraderLoadingState();
+                                return SecureGraderLoadingState(
+                                    ros2Package: _isRos2);
                               }
                               if (snap.hasError) {
                                 final error = snap.error;
@@ -792,7 +810,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               if (snap.hasData) {
                                 return Feedback(
                                     data: snap.data!,
-                                    aiTutorEnabled: _enableFeedback);
+                                    aiTutorEnabled: _aiTutorOn);
                               }
                               return const SizedBox.shrink();
                             })
@@ -837,7 +855,8 @@ class _MyHomePageState extends State<MyHomePage> {
       title: widget.title,
       assignmentId: widget.id,
       status: assignmentStatus,
-      feedbackEnabled: _enableFeedback,
+      feedbackEnabled: _aiTutorOn,
+      aiTutorAvailable: _aiTutorAvailable,
       onBack: () => Navigator.pop(context),
       onHome: () => Navigator.of(context).popUntil((route) => route.isFirst),
       onResultsOpen: _openResultsPanel,
@@ -1111,6 +1130,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                     },
                                   ),
                                 ),
+                                if (_isRunning && _isRos2)
+                                  const Ros2RunningNote(),
                                 RunTerminalPanel(
                                   expanded: _terminalExpanded,
                                   height: _terminalHeight,
@@ -2589,6 +2610,10 @@ class AssignmentPageHeader extends StatelessWidget
   final int assignmentId;
   final String status;
   final bool feedbackEnabled;
+
+  /// False when the server has no AI provider: the switch stays off and
+  /// disabled.
+  final bool aiTutorAvailable;
   final VoidCallback onBack;
   final VoidCallback onHome;
   final VoidCallback onResultsOpen;
@@ -2600,6 +2625,7 @@ class AssignmentPageHeader extends StatelessWidget
     required this.assignmentId,
     required this.status,
     required this.feedbackEnabled,
+    this.aiTutorAvailable = true,
     required this.onBack,
     required this.onHome,
     required this.onResultsOpen,
@@ -2612,6 +2638,12 @@ class AssignmentPageHeader extends StatelessWidget
         ? title.substring(prefix.length).trim()
         : title;
   }
+
+  static Widget _withUnavailableTooltip({
+    required bool show,
+    required Widget child,
+  }) =>
+      show ? Tooltip(message: aiTutorUnavailableMessage, child: child) : child;
 
   @override
   Size get preferredSize => const Size.fromHeight(76);
@@ -2709,33 +2741,39 @@ class AssignmentPageHeader extends StatelessWidget
             label: const Text('Home'),
           ),
         const SizedBox(width: AppSpacing.xs),
-        Semantics(
-          label: 'AI tutoring',
-          toggled: feedbackEnabled,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.lightbulb_outline_rounded, size: 18),
-              if (showFeedbackLabel) ...[
+        _withUnavailableTooltip(
+          show: !aiTutorAvailable,
+          child: Semantics(
+            label: 'AI tutoring',
+            hint: aiTutorAvailable ? null : aiTutorUnavailableMessage,
+            toggled: aiTutorAvailable && feedbackEnabled,
+            enabled: aiTutorAvailable,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lightbulb_outline_rounded, size: 18),
+                if (showFeedbackLabel) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  const Text('AI tutoring'),
+                ],
+                Switch(
+                  key: const Key('header-ai-toggle'),
+                  value: aiTutorAvailable && feedbackEnabled,
+                  onChanged: aiTutorAvailable ? onFeedbackChanged : null,
+                  activeColor: theme.colorScheme.primary,
+                  activeTrackColor: theme.colorScheme.onPrimary.withValues(
+                    alpha: 0.9,
+                  ),
+                  inactiveThumbColor: theme.colorScheme.onPrimary.withValues(
+                    alpha: 0.7,
+                  ),
+                  inactiveTrackColor: theme.colorScheme.onPrimary.withValues(
+                    alpha: 0.2,
+                  ),
+                ),
                 const SizedBox(width: AppSpacing.sm),
-                const Text('AI tutoring'),
               ],
-              Switch(
-                value: feedbackEnabled,
-                onChanged: onFeedbackChanged,
-                activeColor: theme.colorScheme.primary,
-                activeTrackColor: theme.colorScheme.onPrimary.withValues(
-                  alpha: 0.9,
-                ),
-                inactiveThumbColor: theme.colorScheme.onPrimary.withValues(
-                  alpha: 0.7,
-                ),
-                inactiveTrackColor: theme.colorScheme.onPrimary.withValues(
-                  alpha: 0.2,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-            ],
+            ),
           ),
         ),
       ],
@@ -2920,8 +2958,56 @@ class TestRunErrorState extends StatelessWidget {
   }
 }
 
+/// Shown beside a disabled AI switch when the server has no AI provider.
+const aiTutorUnavailableMessage =
+    'Not enabled for this course. Built-in hints still work.';
+
+/// Status shown while a ROS 2 package builds and runs; Python runs are quick.
+const ros2RunningMessage = 'Building and running your ROS 2 package. '
+    'This usually takes about 15 seconds.';
+
+class Ros2RunningNote extends StatelessWidget {
+  const Ros2RunningNote({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        key: const Key('ros2-running-note'),
+        width: double.infinity,
+        color: theme.colorScheme.surfaceContainerHighest,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                ros2RunningMessage,
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class SecureGraderLoadingState extends StatelessWidget {
-  const SecureGraderLoadingState({super.key});
+  const SecureGraderLoadingState({super.key, this.ros2Package = false});
+
+  /// True for ROS 2 assignments, whose package build takes noticeably longer.
+  final bool ros2Package;
 
   @override
   Widget build(BuildContext context) {
@@ -2942,6 +3028,15 @@ class SecureGraderLoadingState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
+            if (ros2Package) ...[
+              Text(
+                ros2RunningMessage,
+                key: const Key('ros2-grader-loading-note'),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
             Text(
               'The first run can take up to one minute on the free hosting tier.',
               textAlign: TextAlign.center,

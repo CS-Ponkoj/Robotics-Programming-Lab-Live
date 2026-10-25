@@ -281,7 +281,18 @@ def test_tutor_rejects_provider_output_containing_replacement_code():
 
     assert feedback.source == "fallback"
     assert feedback.solution_revealed is False
-    assert "cannot interpret free-form questions" in feedback.answer
+    assert "AI tutoring is temporarily unavailable" in feedback.answer
+    assert "built-in hints" in feedback.answer
+
+
+def test_tutor_question_without_configured_ai_says_ai_is_not_enabled():
+    feedback = TutorService(Settings(openai_api_key=None)).feedback(
+        _assignment(), _submission(), student_question="Why does it fail?"
+    )
+
+    assert feedback.source == "fallback"
+    assert "not enabled for this course" in feedback.answer
+    assert "built-in hints" in feedback.answer
 
 
 def test_tutor_sends_student_question_as_untrusted_input_and_returns_answer():

@@ -41,6 +41,9 @@ class AssignmentStudent(BaseModel):
     # True when this student has saved work for the current version, so the
     # home page can say "Continue" on any computer.
     has_saved_draft: bool = False
+    # True only when the server has an AI provider configured. It reveals no
+    # key or provider detail; the workspace uses it to offer the AI switch.
+    ai_tutor_available: bool = False
 
 
 class AssignmentListResponse(BaseModel):

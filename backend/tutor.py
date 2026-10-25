@@ -65,6 +65,11 @@ class TutorService:
             student_question=normalized_question,
         )
         if not use_ai_tutor or (self.client is None and not self.settings.openai_api_key):
+            if normalized_question:
+                return fallback.model_copy(update={
+                    "answer": "AI tutoring is not enabled for this course. "
+                              "Your built-in hints below still work.",
+                })
             return fallback
         if _PROTECTED_REQUEST.search(normalized_question):
             return fallback.model_copy(update={
@@ -364,9 +369,8 @@ class TutorService:
             diagnosis=diagnosis,
             misconception=misconception,
             answer=(
-                "Use the current test evidence to narrow the question to the first "
-                "failing behavior; the built-in tutor cannot interpret free-form "
-                "questions while AI is unavailable."
+                "AI tutoring is temporarily unavailable. Your built-in hints "
+                "below still work; ask again later."
                 if student_question
                 else ""
             ),

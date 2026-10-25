@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/api_config.dart';
@@ -6,6 +8,16 @@ import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/widgets/landing_page_header.dart';
 import 'package:iuse_demo/widgets/lesson_reader.dart';
+
+/// Names the unanswered quiz questions by their 1-based display numbers,
+/// for example "Answer questions 2, 5 and 9 before submitting."
+String unansweredQuizMessage(List<int> numbers) {
+  if (numbers.length == 1) {
+    return 'Answer question ${numbers.single} before submitting.';
+  }
+  final leading = numbers.sublist(0, numbers.length - 1).join(', ');
+  return 'Answer questions $leading and ${numbers.last} before submitting.';
+}
 
 /// Course reading and quizzes are separate from graded coding assignments.
 class CourseCatalogPage extends StatefulWidget {
@@ -594,6 +606,8 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
   final _scroll = ScrollController();
   bool _showTop = false;
   final Map<String, String> _choices = {};
+  // Lets an incomplete submission scroll to the first unanswered question.
+  final Map<String, GlobalKey> _questionKeys = {};
   Map<String, dynamic>? _result;
   bool _submitting = false;
   String? _quizError;
@@ -624,11 +638,22 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
 
   Future<void> _submit(Map<String, dynamic> section) async {
     final questions = (section['questions'] as List).cast<Map>();
-    if (_choices.length != questions.length) {
-      setState(
-        () => _quizError =
-            'Answer all ${questions.length} questions before submitting.',
-      );
+    final missing = [
+      for (final (index, question) in questions.indexed)
+        if (!_choices.containsKey(question['id'])) index + 1,
+    ];
+    if (missing.isNotEmpty) {
+      setState(() => _quizError = unansweredQuizMessage(missing));
+      final firstContext =
+          _questionKeys['${questions[missing.first - 1]['id']}']
+              ?.currentContext;
+      if (firstContext != null) {
+        unawaited(Scrollable.ensureVisible(
+          firstContext,
+          duration: const Duration(milliseconds: 300),
+          alignment: 0.1,
+        ));
+      }
       return;
     }
     setState(() {
@@ -801,10 +826,13 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
       ),
       for (final (index, rawQuestion) in questions.indexed) ...[
         const SizedBox(height: 16),
-        _quizQuestion(
-          Map<String, dynamic>.from(rawQuestion),
-          index + 1,
-          questions.length,
+        KeyedSubtree(
+          key: _questionKeys.putIfAbsent('${rawQuestion['id']}', GlobalKey.new),
+          child: _quizQuestion(
+            Map<String, dynamic>.from(rawQuestion),
+            index + 1,
+            questions.length,
+          ),
         ),
       ],
       const SizedBox(height: 20),

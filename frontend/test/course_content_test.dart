@@ -16,6 +16,14 @@ const _student =
 Future<void> _logout() async {}
 
 void main() {
+  test('incomplete quiz message names the unanswered question numbers', () {
+    expect(unansweredQuizMessage([3]), 'Answer question 3 before submitting.');
+    expect(unansweredQuizMessage([3, 7]),
+        'Answer questions 3 and 7 before submitting.');
+    expect(unansweredQuizMessage([2, 5, 9]),
+        'Answer questions 2, 5 and 9 before submitting.');
+  });
+
   testWidgets('expired session is distinguished from a content outage',
       (tester) async {
     CourseContentApi.testClient =
@@ -366,7 +374,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Submit quiz'));
     await tester.pump();
-    expect(find.textContaining('Answer all'), findsOneWidget);
+    expect(find.text('Answer question 1 before submitting.'), findsOneWidget);
     expect(find.text('QUESTION 1 OF 1'), findsOneWidget);
     expect(find.text('0 of 1 answered'), findsOneWidget);
     await tester.ensureVisible(find.text('B. Forward'));

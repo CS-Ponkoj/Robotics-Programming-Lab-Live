@@ -357,6 +357,34 @@ def test_gets_each_assignment_without_hidden_grader_data(client, assignment_id):
     assert "common_misconceptions" not in assignment
 
 
+def test_assignment_reports_ai_tutor_unavailable_without_provider_key(client):
+    assignment = client.get("/assignments/1").json()
+
+    assert assignment["ai_tutor_available"] is False
+    assert "openai_api_key" not in assignment
+
+
+def test_assignment_reports_ai_tutor_available_without_revealing_key(tmp_path):
+    secret = "sk-test-not-a-real-key-123456"
+    settings = Settings(
+        database_url="sqlite://",
+        admin_api_token="test-admin",
+        openai_api_key=secret,
+        study_accounts_file=tmp_path / "study_accounts.json",
+    )
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as value:
+        token = value.post(
+            "/auth/login", json={"login_id": "student", "password": "student"}
+        ).json()["token"]
+        response = value.get(
+            "/assignments/1", headers={"Authorization": f"Bearer {token}"}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["ai_tutor_available"] is True
+    assert secret not in response.text
+
+
 def test_ros_assignment_exposes_one_editable_file_without_private_grader_data(client):
     response = client.get("/assignments/5")
 

@@ -557,6 +557,146 @@ void main() {
     expect(submitted.single, contains('print(1)'));
   });
 
+  MockClient workspaceClient({
+    required List<String> submitted,
+    bool? aiTutorAvailable,
+    String language = 'python',
+    Completer<http.Response>? submitResponse,
+  }) {
+    return MockClient((request) async {
+      if (request.method == 'GET' && request.url.path == '/assignments/1') {
+        return http.Response(
+          jsonEncode({
+            'id': 1,
+            'title': 'Assignment 1: Navigation',
+            'description': 'Route distances.',
+            'assignment_html': '<p>Route distances.</p>',
+            'starter_code': 'print(1)',
+            'language': language,
+            'vals': <String, dynamic>{},
+            if (aiTutorAvailable != null)
+              'ai_tutor_available': aiTutorAvailable,
+          }),
+          200,
+        );
+      }
+      if (request.url.path == '/assignments/1/submit') {
+        submitted.add(request.body);
+        if (submitResponse != null) return submitResponse.future;
+      }
+      return http.Response('{}', 404);
+    });
+  }
+
+  testWidgets('AI tutoring switch is disabled when the server has no AI', (
+    WidgetTester tester,
+  ) async {
+    final submitted = <String>[];
+    final client = workspaceClient(submitted: submitted);
+    addTearDown(client.close);
+    addTearDown(clearLearningProgress);
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(assignmentWorkspaceApp());
+      await tester.pumpAndSettle();
+
+      final headerSwitch = tester.widget<Switch>(
+        find.byKey(const Key('header-ai-toggle')),
+      );
+      expect(headerSwitch.value, isFalse);
+      expect(headerSwitch.onChanged, isNull);
+      expect(
+        find.byTooltip(
+            'Not enabled for this course. Built-in hints still work.'),
+        findsOneWidget,
+      );
+
+      await pressControlEnter(tester);
+    }, () => client);
+
+    final resultsSwitch = tester.widget<SwitchListTile>(
+      find.byKey(const Key('results-ai-toggle')),
+    );
+    expect(resultsSwitch.value, isFalse);
+    expect(resultsSwitch.onChanged, isNull);
+    expect(
+      find.text('Not enabled for this course. Built-in hints still work.'),
+      findsOneWidget,
+    );
+    expect(submitted, hasLength(1));
+    expect(jsonDecode(submitted.single)['use_ai_tutor'], isFalse);
+  });
+
+  testWidgets('AI tutoring switch works when the server offers AI', (
+    WidgetTester tester,
+  ) async {
+    final submitted = <String>[];
+    final client =
+        workspaceClient(submitted: submitted, aiTutorAvailable: true);
+    addTearDown(client.close);
+    addTearDown(clearLearningProgress);
+
+    await http.runWithClient(() async {
+      await tester.pumpWidget(assignmentWorkspaceApp());
+      await tester.pumpAndSettle();
+
+      final headerSwitch = tester.widget<Switch>(
+        find.byKey(const Key('header-ai-toggle')),
+      );
+      expect(headerSwitch.value, isFalse);
+      expect(headerSwitch.onChanged, isNotNull);
+      headerSwitch.onChanged!(true);
+      await tester.pump();
+      expect(
+        tester.widget<Switch>(find.byKey(const Key('header-ai-toggle'))).value,
+        isTrue,
+      );
+
+      await pressControlEnter(tester);
+    }, () => client);
+
+    expect(submitted, hasLength(1));
+    expect(jsonDecode(submitted.single)['use_ai_tutor'], isTrue);
+  });
+
+  for (final (language, expectNote) in [
+    ('python-ros2', true),
+    ('python', false),
+  ]) {
+    testWidgets('running note for $language assignments shows: $expectNote', (
+      WidgetTester tester,
+    ) async {
+      final submitted = <String>[];
+      final pending = Completer<http.Response>();
+      final client = workspaceClient(
+        submitted: submitted,
+        language: language,
+        submitResponse: pending,
+      );
+      addTearDown(client.close);
+      addTearDown(clearLearningProgress);
+
+      await http.runWithClient(() async {
+        await tester.pumpWidget(assignmentWorkspaceApp());
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('ros2-running-note')), findsNothing);
+
+        await tester.tap(find.byKey(const Key('run-tests-button')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        final matcher = expectNote ? findsOneWidget : findsNothing;
+        expect(submitted, hasLength(1));
+        expect(find.byKey(const Key('ros2-running-note')), matcher);
+        expect(find.byKey(const Key('ros2-grader-loading-note')), matcher);
+
+        pending.complete(http.Response('{}', 404));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('ros2-running-note')), findsNothing);
+      }, () => client);
+    });
+  }
+
   testWidgets('editor keyboard actions open tools and change appearance', (
     WidgetTester tester,
   ) async {

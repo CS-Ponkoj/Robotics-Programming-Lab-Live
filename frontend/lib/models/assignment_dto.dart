@@ -43,6 +43,10 @@ class AssignmentDto {
   /// True when this student has saved work for this version on the server.
   final bool hasSavedDraft;
 
+  /// True only when the server has AI tutoring configured. When false the
+  /// workspace keeps the AI switch disabled and never requests AI feedback.
+  final bool aiTutorAvailable;
+
   const AssignmentDto({
     required this.id,
     this.stableId = '',
@@ -63,6 +67,7 @@ class AssignmentDto {
     required this.vals,
     this.playgroundFunction,
     this.hasSavedDraft = false,
+    this.aiTutorAvailable = false,
   });
 
   factory AssignmentDto.fromJson(Map<String, dynamic> json) {
@@ -127,6 +132,7 @@ class AssignmentDto {
               ? json['playground_function'] as String
               : null,
           hasSavedDraft: json['has_saved_draft'] == true,
+          aiTutorAvailable: json['ai_tutor_available'] == true,
         ),
       _ => throw const FormatException('Failed to load assignment.'),
     };
