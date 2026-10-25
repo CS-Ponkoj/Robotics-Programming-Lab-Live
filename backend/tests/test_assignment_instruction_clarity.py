@@ -1,5 +1,6 @@
 """Keep student instructions consistent with the assessed mathematical contract."""
 import json
+import re
 from pathlib import Path
 
 
@@ -102,9 +103,19 @@ def test_tutor_review_versions_match_current_assignment_contracts():
 
 
 def test_python_assignments_describe_the_current_sandbox_allowlist():
+    from submission_worker import ALLOWED_MODULE_ATTRIBUTES
+
+    modules = {"math": "math", "np": "numpy"}
     for number in (1, 2, 3, 4):
         instructions = source(number)["assignment_html"]
-        assert "np.deg2rad" in instructions and "np.argmin" in instructions
+        # Every math/numpy function the text names must really be allowed;
+        # np.linalg is only ever mentioned as unavailable.
+        named = re.findall(r"<code>(math|np)\.([a-z0-9_]+)", instructions)
+        assert named, number
+        for prefix, name in named:
+            if prefix == "np" and name == "linalg":
+                continue
+            assert name in ALLOWED_MODULE_ATTRIBUTES[modules[prefix]], (number, prefix, name)
         # These now run, so instructions must not call them unavailable.
         assert "<code>dict.update</code>" not in instructions
         assert "<code>math.pow</code>" not in instructions
