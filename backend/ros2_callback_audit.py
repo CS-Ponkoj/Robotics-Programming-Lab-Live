@@ -7,6 +7,7 @@ boundary for untrusted code; no student code is imported by the application API.
 from contextvars import ContextVar
 from functools import wraps
 import importlib.metadata
+import inspect
 import os
 import re
 import subprocess
@@ -93,6 +94,21 @@ def instrument(node_class, publisher_class, report_fd, kind, topic, scan_topic):
         return original_publish(publisher, message)
 
     def audited(callback):
+        if inspect.iscoroutinefunction(callback):
+            # rclpy awaits coroutine callbacks only when it can see they are
+            # coroutine functions, so the wrapper must stay async and count
+            # publications after the awaited body completes.
+            @wraps(callback)
+            async def invoke_async(*args, **kwargs):
+                count = [0]
+                token = active.set(count)
+                try:
+                    return await callback(*args, **kwargs)
+                finally:
+                    active.reset(token)
+                    report(count[0] == 1)
+            return invoke_async
+
         @wraps(callback)
         def invoke(*args, **kwargs):
             count = [0]

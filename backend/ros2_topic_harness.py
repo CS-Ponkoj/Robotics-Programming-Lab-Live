@@ -19,8 +19,24 @@ from ros2_callback_audit import (
 )
 
 
+STOP_TOLERANCE = 0.001
+UNUSED_AXES_MESSAGE = "Keep linear.y, linear.z, angular.x and angular.y at 0.0."
+
+
 def result(test_id: str, passed: bool, message: str) -> dict:
     return {"id": test_id, "passed": passed, "message": message}
+
+
+def unused_axes_zero(item) -> bool:
+    """linear.y, linear.z, angular.x and angular.y (item[3:]) must stay 0.0."""
+    return all(math.isfinite(value) and abs(value) <= STOP_TOLERANCE
+               for value in item[3:])
+
+
+def is_stop(item) -> bool:
+    """A stop command has all six Twist fields at zero."""
+    return (abs(item[1]) <= STOP_TOLERANCE and abs(item[2]) <= STOP_TOLERANCE
+            and unused_axes_zero(item))
 
 
 def motion_checks(messages, expected_linear, linear_tolerance,
@@ -28,11 +44,10 @@ def motion_checks(messages, expected_linear, linear_tolerance,
                   minimum_rate=5.0, observation_end=None):
     """Separate node-launch latency from the observed command timeline."""
     origin = messages[0][0] if messages else 0.0
-    samples = [(stamp - origin, linear, angular)
-               for stamp, linear, angular in messages]
+    samples = [(item[0] - origin, *item[1:]) for item in messages]
     moving = [item for item in samples if item[0] < move_seconds - stop_tolerance]
-    stopped = [item for item in samples
-               if abs(item[1]) <= 0.001 and abs(item[2]) <= 0.001]
+    stopped = [item for item in samples if is_stop(item)]
+    unused_ok = all(unused_axes_zero(item) for item in samples)
     first_stop = stopped[0][0] if stopped else None
     stop_ok = first_stop is not None and (
         move_seconds - stop_tolerance <= first_stop <= move_seconds + stop_tolerance
@@ -51,16 +66,17 @@ def motion_checks(messages, expected_linear, linear_tolerance,
         "forward-motion": forward_ok,
         # Straight driving is only evidence when the robot actually drives;
         # a node that never moves must not earn this credit.
-        "straight-motion": forward_ok and all(
+        # The unused components must stay zero in every command, moving or stopped.
+        "straight-motion": forward_ok and unused_ok and all(
             abs(item[2]) <= angular_tolerance for item in samples
         ),
         "safe-stop": stop_ok,
         "hold-stop": stop_ok and len(stopped) >= 3
         and stopped_rate >= minimum_rate and observed_to_end and not any(
-            item[0] > first_stop + 0.1
-            and (abs(item[1]) > 0.001 or abs(item[2]) > 0.001)
+            item[0] > first_stop + 0.1 and not is_stop(item)
             for item in samples
         ),
+        "unused-axes-zero": unused_ok,
     }
 
 
@@ -78,7 +94,7 @@ def main() -> None:
     minimum_rate = float(config.get("minimum_publish_rate_hz", 5.0))
     observation_seconds = move_seconds + startup_grace + stop_tolerance + 0.8
 
-    messages: list[tuple[float, float, float]] = []
+    messages: list[tuple[float, ...]] = []
     student_started_at: float | None = None
 
     rclpy.init(args=None)
@@ -93,6 +109,10 @@ def main() -> None:
                 now - student_started_at,
                 float(message.linear.x),
                 float(message.angular.z),
+                float(message.linear.y),
+                float(message.linear.z),
+                float(message.angular.x),
+                float(message.angular.y),
             )
         )
 
@@ -134,6 +154,8 @@ def main() -> None:
     straight_ok = checks["straight-motion"]
     stop_ok = checks["safe-stop"]
     held_stop = checks["hold-stop"]
+    unused_ok = checks["unused-axes-zero"]
+    unused_hint = "" if unused_ok else " " + UNUSED_AXES_MESSAGE
     runtime_error = (
         ""
         if alive_at_end
@@ -172,17 +194,17 @@ def main() -> None:
         result(
             "straight-motion",
             straight_ok,
-            "Angular velocity remains zero while driving forward." if straight_ok else "Drive forward at 0.20 m/s and keep angular.z at zero.",
+            "Angular velocity remains zero while driving forward." if straight_ok else "Drive forward at 0.20 m/s and keep angular.z at zero." + unused_hint,
         ),
         result(
             "safe-stop",
             stop_ok,
-            "The robot stops after approximately five seconds." if stop_ok else "Publish a zero-velocity command after approximately five seconds.",
+            "The robot stops after approximately five seconds." if stop_ok else "Publish a zero-velocity command after approximately five seconds." + unused_hint,
         ),
         result(
             "hold-stop",
             held_stop,
-            "The stopped state continues to be published." if held_stop else "Continue publishing zero velocity after stopping.",
+            "The stopped state continues to be published." if held_stop else "Continue publishing zero velocity after stopping." + unused_hint,
         ),
     ]
     print(

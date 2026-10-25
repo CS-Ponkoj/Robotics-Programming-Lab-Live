@@ -2,7 +2,7 @@
   "dataset_schema_version": 1,
   "assignment_id": 5,
   "assignment_stable_id": "ros2-drive-forward",
-  "assignment_version": 10,
+  "assignment_version": 11,
   "authored_by_role": "instructor",
   "review_status": "draft",
   "policy": {"never_reveal_official_solution": true, "never_reveal_hidden_tests": true, "runtime_use_enabled": false},

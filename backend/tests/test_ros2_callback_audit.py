@@ -54,6 +54,51 @@ def test_callback_counts_real_publications_not_source_calls(kind, count, depth, 
     )
 
 
+@pytest.mark.parametrize("kind", ["timer", "scan"])
+@pytest.mark.parametrize("count", [0, 1, 2])
+def test_async_callbacks_stay_coroutines_and_are_counted_after_await(kind, count):
+    import asyncio
+    import inspect
+
+    class Publisher:
+        topic_name = "/cmd_vel"
+
+        def publish(self, message):
+            return message
+
+    class Node:
+        def create_timer(self, period, callback):
+            return callback
+
+        def create_subscription(self, message_type, topic, callback, qos):
+            return callback
+
+        def create_publisher(self, message_type, topic, qos):
+            return Publisher()
+
+    read_fd, write_fd = os.pipe()
+    instrument(Node, Publisher, write_fd, kind, "/cmd_vel", "/scan")
+    publisher = Node().create_publisher(object, "/cmd_vel", 10)
+
+    async def callback(*args):
+        await asyncio.sleep(0)
+        for _ in range(count):
+            publisher.publish(object())
+
+    node = Node()
+    audited = (node.create_timer(0.1, callback) if kind == "timer"
+               else node.create_subscription(object, "/scan", callback, 10))
+    try:
+        # rclpy's executor awaits a callback only when it is a coroutine function.
+        assert inspect.iscoroutinefunction(audited)
+        assert audited.__name__ == "callback"
+        asyncio.run(audited())
+        asyncio.run(audited())
+    finally:
+        os.close(write_fd)
+    assert exactly_one_per_callback(read_fd) is (count == 1)
+
+
 def test_no_callback_evidence_cannot_pass():
     read_fd, write_fd = os.pipe()
     os.close(write_fd)

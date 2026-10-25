@@ -20,8 +20,18 @@ from ros2_callback_audit import (
 )
 
 
+STOP_TOLERANCE = 0.001
+UNUSED_AXES_MESSAGE = "Keep linear.y, linear.z, angular.x and angular.y at 0.0."
+
+
 def result(test_id: str, passed: bool, message: str) -> dict:
     return {"id": test_id, "passed": passed, "message": message}
+
+
+def unused_axes_zero(item) -> bool:
+    """linear.y, linear.z, angular.x and angular.y (item[4:]) must stay 0.0."""
+    return all(math.isfinite(value) and abs(value) <= STOP_TOLERANCE
+               for value in item[4:])
 
 
 def main() -> None:
@@ -36,7 +46,7 @@ def main() -> None:
     stop_distance = float(config.get("stop_distance", 0.75))
     minimum_rate = float(config.get("minimum_publish_rate_hz", 3.0))
 
-    messages: list[tuple[str, float, float, float]] = []
+    messages: list[tuple] = []
     current_phase = "startup"
     phase_started_at = time.monotonic()
 
@@ -50,6 +60,10 @@ def main() -> None:
                 time.monotonic() - phase_started_at,
                 float(message.linear.x),
                 float(message.angular.z),
+                float(message.linear.y),
+                float(message.linear.z),
+                float(message.angular.x),
+                float(message.angular.y),
             )
         )
 
@@ -161,12 +175,18 @@ def main() -> None:
         samples = by_phase[phase]
         return bool(samples) and all(
             math.isclose(item[2], expected_linear, abs_tol=linear_tolerance)
+            and unused_axes_zero(item)
             for item in samples
         )
 
     def stopped_ok(phase: str) -> bool:
+        # Stopping means all six Twist fields are zero.
         samples = by_phase[phase]
-        return bool(samples) and all(abs(item[2]) <= 0.001 for item in samples)
+        return bool(samples) and all(
+            abs(item[2]) <= STOP_TOLERANCE and abs(item[3]) <= STOP_TOLERANCE
+            and unused_axes_zero(item)
+            for item in samples
+        )
 
     responds_to_each_scan_state = all(by_phase.values()) and one_command
     command_topic_ok = bool(settled) and publish_rate >= minimum_rate
@@ -181,10 +201,15 @@ def main() -> None:
     invalid_ok = moves_when_clear and all(
         stopped_ok(phase) for phase in ("invalid", "empty")
     )
-    straight_ok = moves_when_clear and all(
+    unused_ok = all(unused_axes_zero(item) for item in settled)
+    unused_hint = "" if unused_ok else " " + UNUSED_AXES_MESSAGE
+    straight_ok = moves_when_clear and unused_ok and all(
         abs(item[3]) <= angular_tolerance for item in settled
     )
-    resume_ok = forward_ok("resume")
+    # Recovery is only evidence when the controller first stopped for the
+    # obstacle; an always-forward node must not earn resume credit.
+    resumed_forward = forward_ok("resume")
+    resume_ok = resumed_forward and obstacle_ok
     node_started = controller_ready and (alive_at_end or bool(messages))
     runtime_error = (
         ""
@@ -219,35 +244,39 @@ def main() -> None:
             clear_ok,
             "Clear-path forward velocity is correct."
             if clear_ok
-            else "Set linear.x to 0.20 m/s when every usable obstacle distance is greater than the stop threshold.",
+            else "Set linear.x to 0.20 m/s when every usable obstacle distance is greater than the stop threshold." + unused_hint,
         ),
         result(
             "obstacle-stop",
             obstacle_ok,
             f"The robot stops when an obstacle is within {stop_distance:.2f} m."
             if obstacle_ok
-            else f"Move forward on a clear scan, and publish zero linear velocity when an obstacle is at or within {stop_distance:.2f} m.",
+            else f"Move forward on a clear scan, and publish zero velocity when an obstacle is at or within {stop_distance:.2f} m." + unused_hint,
         ),
         result(
             "invalid-scan-stop",
             invalid_ok,
             "The robot stops when the scan has no usable distance."
             if invalid_ok
-            else "Move forward on a clear scan, and stop (publish zero velocity) when the scan has no usable distance: no finite reading greater than zero.",
+            else "Move forward on a clear scan, and stop (publish zero velocity) when the scan has no usable distance: no finite reading greater than zero." + unused_hint,
         ),
         result(
             "straight-motion",
             straight_ok,
             "Angular velocity remains zero."
             if straight_ok
-            else "Move forward on a clear scan and keep angular.z at zero for this straight-line controller.",
+            else "Move forward on a clear scan and keep angular.z at zero for this straight-line controller." + unused_hint,
         ),
         result(
             "resume-motion",
             resume_ok,
             "Forward motion resumes after the path clears."
             if resume_ok
-            else "Reevaluate every scan and resume 0.20 m/s motion after the path clears.",
+            else (
+                "Recovery credit requires stopping for the obstacle first; then resume 0.20 m/s motion after the path clears."
+                if resumed_forward
+                else "Reevaluate every scan and resume 0.20 m/s motion after the path clears."
+            ) + unused_hint,
         ),
     ]
     print(

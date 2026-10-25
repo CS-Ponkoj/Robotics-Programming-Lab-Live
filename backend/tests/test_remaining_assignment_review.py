@@ -137,9 +137,15 @@ def test_all_ros_weight_combinations(i):
 def motion_checks():
     # Extract the pure function without requiring host ROS installation.
     tree = ast.parse((ROOT / 'backend/ros2_topic_harness.py').read_text(encoding='utf-8'))
-    node = next(item for item in tree.body if isinstance(item, ast.FunctionDef) and item.name == 'motion_checks')
+    wanted = {'motion_checks', 'unused_axes_zero', 'is_stop', 'STOP_TOLERANCE'}
+    nodes = [
+        item for item in tree.body
+        if (isinstance(item, ast.FunctionDef) and item.name in wanted)
+        or (isinstance(item, ast.Assign)
+            and any(getattr(target, 'id', None) in wanted for target in item.targets))
+    ]
     scope = {'math': math}
-    exec(compile(ast.Module(body=[node], type_ignores=[]), '<motion-checks>', 'exec'), scope)
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), '<motion-checks>', 'exec'), scope)
     return scope['motion_checks']
 
 
@@ -166,6 +172,35 @@ def test_ros_sparse_stop_messages_do_not_meet_the_publication_rate():
     samples = [(n / 10, 0.2, 0.0) for n in range(50)]
     samples += [(5.0, 0.0, 0.0), (5.1, 0.0, 0.0), (8.3, 0.0, 0.0)]
     assert not motion_checks()(samples, 0.2, 0.02, 0.01, 5, 0.5, 5, 8.3)['hold-stop']
+
+
+@pytest.mark.parametrize('field', range(4))
+@pytest.mark.parametrize('value', [0.1, -0.1, math.nan, math.inf])
+def test_ros_unused_twist_fields_must_stay_zero(field, value):
+    def sample(n):
+        extras = [0.0, 0.0, 0.0, 0.0]
+        extras[field] = value
+        return (n / 10, 0.2 if n < 50 else 0.0, 0.0, *extras)
+    checks = motion_checks()([sample(n) for n in range(80)], 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
+    assert checks['forward-motion']
+    assert not checks['straight-motion']
+    assert not checks['safe-stop']
+    assert not checks['hold-stop']
+
+
+def test_ros_unused_twist_fields_while_stopped_break_the_hold():
+    samples = [(n / 10, 0.2 if n < 50 else 0.0, 0.0, 0.0, 0.0, 0.0, 0.1 if n > 60 else 0.0)
+               for n in range(80)]
+    checks = motion_checks()(samples, 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
+    assert checks['safe-stop']
+    assert not checks['straight-motion']
+    assert not checks['hold-stop']
+
+
+def test_ros_clean_six_field_commands_pass_every_motion_check():
+    samples = [(n / 10, 0.2 if n < 50 else 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) for n in range(80)]
+    checks = motion_checks()(samples, 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
+    assert all(checks.values())
 
 
 @pytest.mark.parametrize('i', [5, 6])
