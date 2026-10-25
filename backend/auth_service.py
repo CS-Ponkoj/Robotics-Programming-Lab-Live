@@ -124,14 +124,38 @@ def authenticate_user(session: Session, login_id: str, password: str) -> User | 
     return user
 
 
+def device_category(user_agent: str | None) -> str | None:
+    """Reduce a browser User-Agent to phone, tablet, or computer.
+
+    Only the category is stored, never the full User-Agent string.
+    """
+    if not user_agent:
+        return None
+    agent = user_agent.lower()
+    if "ipad" in agent or "tablet" in agent or (
+        "android" in agent and "mobile" not in agent
+    ):
+        return "tablet"
+    if any(word in agent for word in ("iphone", "ipod", "android", "mobile")):
+        return "phone"
+    if any(word in agent for word in ("windows", "macintosh", "mac os", "linux", "cros")):
+        return "computer"
+    return None
+
+
 def create_session(
-    session: Session, user: User, *, duration_hours: int
+    session: Session,
+    user: User,
+    *,
+    duration_hours: int,
+    device: str | None = None,
 ) -> tuple[str, AuthSession]:
     raw_token = secrets.token_urlsafe(32)
     auth_session = AuthSession(
         token_hash=hash_token(raw_token),
         user_id=user.id,
         expires_at=utc_now() + timedelta(hours=max(1, duration_hours)),
+        device=device,
     )
     session.add(auth_session)
     session.commit()

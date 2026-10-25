@@ -79,3 +79,36 @@ def test_history_never_exposes_session_tokens(client):
     login(client, "student", "student")
     item = client.get("/admin/sign-in-history", headers=ADMIN).json()["items"][0]
     assert "token" not in item and "token_hash" not in item
+
+
+@pytest.mark.parametrize(
+    ("user_agent", "expected"),
+    [
+        ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148", "phone"),
+        ("Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/120 Mobile Safari/537.36", "phone"),
+        ("Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)", "tablet"),
+        ("Mozilla/5.0 (Linux; Android 14; SM-X710) Chrome/120 Safari/537.36", "tablet"),
+        ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120", "computer"),
+        ("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Safari/605", "computer"),
+        ("python-httpx/0.27", None),
+        (None, None),
+    ],
+)
+def test_device_category(user_agent, expected):
+    from auth_service import device_category
+
+    assert device_category(user_agent) == expected
+
+
+def test_history_shows_the_sign_in_device_category(client):
+    response = client.post(
+        "/auth/login",
+        json={"login_id": "student", "password": "student"},
+        headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile"},
+    )
+    assert response.status_code == 200
+
+    item = client.get("/admin/sign-in-history", headers=ADMIN).json()["items"][0]
+    assert item["device"] == "phone"
+    # Only the category is stored, never the browser string itself.
+    assert "iPhone" not in str(item)

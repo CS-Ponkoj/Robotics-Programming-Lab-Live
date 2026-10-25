@@ -423,6 +423,8 @@ class AuthSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # phone, tablet, or computer from the sign-in browser; empty when unknown.
+    device: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="sessions")
 

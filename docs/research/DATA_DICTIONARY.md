@@ -290,7 +290,7 @@ of the research exports or the Phase 1 analytics metrics.
 
 One row stores one bug report or suggestion sent from the **Feedback** button
 shown on every signed-in page. Instructors read and resolve it from
-**Instructor studio → Feedback** (`GET /admin/feedback`,
+**Instructor Studio → Feedback** (`GET /admin/feedback`,
 `PATCH /admin/feedback/{id}`).
 
 | Field | Meaning |
@@ -333,6 +333,12 @@ configuration explicitly. All assignment files declare
   table without changing coding-assignment submissions.
 - Alembic migration `0007_page_feedback` adds the page-feedback table without
   changing any existing table.
+- Alembic migration `0008_session_device` adds a nullable `device` column
+  (`phone`, `tablet`, or `computer`) to `auth_sessions`. Only that category is
+  derived from the sign-in browser; the full User-Agent is never stored.
+  Instructors see it, with sign-in and sign-out times, by selecting an account
+  in Manage accounts. Sessions created before this migration show "Not
+  recorded".
 
 ## Phase 1 analytics interfaces
 

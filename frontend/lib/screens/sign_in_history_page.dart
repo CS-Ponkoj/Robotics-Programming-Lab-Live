@@ -5,14 +5,17 @@ import 'package:http/http.dart' as http;
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 
-/// Admin-only list of when accounts signed in and out.
-///
-/// With [userId] it shows one account; otherwise every account.
+/// Instructor-only table of one account's sign-ins, opened from
+/// Manage accounts by clicking the account.
 class SignInHistoryPage extends StatefulWidget {
-  const SignInHistoryPage({super.key, this.userId, this.loginId});
+  const SignInHistoryPage({
+    super.key,
+    required this.userId,
+    required this.loginId,
+  });
 
-  final String? userId;
-  final String? loginId;
+  final String userId;
+  final String loginId;
 
   @override
   State<SignInHistoryPage> createState() => _SignInHistoryPageState();
@@ -43,9 +46,9 @@ class _SignInHistoryPageState extends State<SignInHistoryPage> {
           .get(
             Uri.parse('$apiBaseUrl/admin/sign-in-history').replace(
               queryParameters: {
+                'user_id': widget.userId,
                 'page': '$_page',
                 'page_size': '$_pageSize',
-                if (widget.userId != null) 'user_id': widget.userId!,
               },
             ),
             headers: AuthApi.authorizedHeaders(),
@@ -84,12 +87,9 @@ class _SignInHistoryPageState extends State<SignInHistoryPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final pages = (_total / _pageSize).ceil();
-    final title = widget.loginId == null
-        ? 'Sign-in history'
-        : 'Sign-in history: ${widget.loginId}';
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Text('${widget.loginId}: sign-ins'),
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -98,132 +98,101 @@ class _SignInHistoryPageState extends State<SignInHistoryPage> {
           ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 80),
-            children: [
-              Text(
-                'Each row is one sign-in. Times are shown in your local time. '
-                'Demo visitors are not recorded.',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 16),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_error != null)
-                Column(
-                  children: [
-                    Text(_error!,
-                        style: TextStyle(color: theme.colorScheme.error)),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                        onPressed: _load, child: const Text('Try again')),
-                  ],
-                )
-              else if (_items.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: Text('No sign-ins recorded yet.')),
-                )
-              else ...[
-                for (final item in _items)
-                  _SessionCard(item: item, showLogin: widget.userId == null),
-                if (pages > 1)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        tooltip: 'Previous page',
-                        onPressed: _page > 1 ? () => _goTo(_page - 1) : null,
-                        icon: const Icon(Icons.chevron_left_rounded),
-                      ),
-                      Text('Page $_page of $pages'),
-                      IconButton(
-                        tooltip: 'Next page',
-                        onPressed:
-                            _page < pages ? () => _goTo(_page + 1) : null,
-                        icon: const Icon(Icons.chevron_right_rounded),
-                      ),
-                    ],
-                  ),
-              ],
-            ],
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 80),
+        children: [
+          Text(
+            'Newest first. Times are in your local time.',
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SessionCard extends StatelessWidget {
-  const _SessionCard({required this.item, required this.showLogin});
-
-  final Map<String, dynamic> item;
-  final bool showLogin;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final state = item['state'] as String;
-    final (label, color) = switch (state) {
-      'active' => ('Active', Colors.green.shade700),
-      'expired' => ('Expired', theme.colorScheme.onSurfaceVariant),
-      _ => ('Signed out', theme.colorScheme.primary),
-    };
-    final signedOut = state == 'signed_out'
-        ? formatSignInTime(item['signed_out_at'] as String?)
-        : state == 'expired'
-            ? 'Session expired ${formatSignInTime(item['expires_at'] as String?)}'
-            : 'Still signed in';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+          const SizedBox(height: 12),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            Column(
               children: [
-                if (showLogin)
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(children: [
-                        const TextSpan(text: 'Login ID: '),
-                        TextSpan(
-                          text: item['login_id'] as String,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        TextSpan(text: '  ·  ${item['role']}'),
-                      ]),
-                    ),
-                  )
-                else
-                  const Spacer(),
-                Text(label,
-                    style: theme.textTheme.labelLarge?.copyWith(color: color)),
+                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                    onPressed: _load, child: const Text('Try again')),
               ],
+            )
+          else if (_items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: Text('This account has not signed in yet.')),
+            )
+          else ...[
+            Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  key: const Key('sign-in-table'),
+                  headingTextStyle: theme.textTheme.titleSmall,
+                  columns: const [
+                    DataColumn(label: Text('Session'), numeric: true),
+                    DataColumn(label: Text('Sign in')),
+                    DataColumn(label: Text('Sign out')),
+                    DataColumn(label: Text('Device')),
+                  ],
+                  rows: [
+                    for (final (index, item) in _items.indexed)
+                      DataRow(cells: [
+                        // Sessions are numbered from the first ever sign-in.
+                        DataCell(Text(
+                            '${_total - (_page - 1) * _pageSize - index}')),
+                        DataCell(Text(
+                            formatSignInTime(item['signed_in_at'] as String?))),
+                        DataCell(Text(_signOutText(item))),
+                        DataCell(Text(deviceLabel(item['device'] as String?))),
+                      ]),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-                'Signed in: ${formatSignInTime(item['signed_in_at'] as String?)}'),
-            Text('Signed out: $signedOut'),
-            Text(
-              'Last active: ${formatSignInTime(item['last_active_at'] as String?)}',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
+            if (pages > 1)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    tooltip: 'Newer',
+                    onPressed: _page > 1 ? () => _goTo(_page - 1) : null,
+                    icon: const Icon(Icons.chevron_left_rounded),
+                  ),
+                  Text('Page $_page of $pages'),
+                  IconButton(
+                    tooltip: 'Older',
+                    onPressed: _page < pages ? () => _goTo(_page + 1) : null,
+                    icon: const Icon(Icons.chevron_right_rounded),
+                  ),
+                ],
+              ),
           ],
-        ),
+        ],
       ),
     );
   }
 }
+
+String _signOutText(Map<String, dynamic> item) => switch (item['state']) {
+      'active' => 'Still signed in',
+      'expired' =>
+        'Not signed out (expired ${formatSignInTime(item['expires_at'] as String?)})',
+      _ => formatSignInTime(item['signed_out_at'] as String?),
+    };
+
+String deviceLabel(String? device) => switch (device) {
+      'phone' => 'Mobile',
+      'tablet' => 'Tablet',
+      'computer' => 'Computer',
+      _ => 'Not recorded',
+    };
 
 /// Local date and time such as `2026-10-23 14:05`.
 String formatSignInTime(String? value) {

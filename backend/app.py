@@ -29,6 +29,7 @@ from assignment_repository import (
     to_student_assignment,
 )
 from auth_service import (
+    device_category,
     authenticate_user,
     change_password,
     consume_password_reset_token,
@@ -941,6 +942,7 @@ def create_app(
             session,
             user,
             duration_hours=request.app.state.settings.auth_session_hours,
+            device=device_category(request.headers.get("user-agent")),
         )
         record_audit(
             session,
@@ -1446,6 +1448,7 @@ def create_app(
                         else None
                     ),
                     "expires_at": as_utc(auth_session.expires_at),
+                    "device": auth_session.device,
                     "state": state,
                 }
             )
