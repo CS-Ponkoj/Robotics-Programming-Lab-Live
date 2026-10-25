@@ -159,7 +159,7 @@ def test_assignment_two_screenshot_global_points_and_genuine_partial_credit(use_
     target = Assignment(id=2, stable_id=data["stable_id"], version=data["version"],
                         title=data["title"], grader_type=data["grader_type"], grader_config=data["grader_config"])
     code = data["starter_code"].replace(
-        "distance_to_obstacle = 0.0", "distance_to_obstacle = calculate_distance(start_point, hit_point)"
+        "distance_to_hit = 0.0", "distance_to_hit = calculate_distance(start_point, hit_point)"
     ).replace(
         "distance_along_obstacle = 0.0",
         "distance_along_obstacle = (calculate_distance(hit_point, corner_a) + "
@@ -170,10 +170,17 @@ def test_assignment_two_screenshot_global_points_and_genuine_partial_credit(use_
         code = code.replace("calculate_distance(hit_point, corner_a)", "calculate_distance(hit, corner_a)")
         code = code.replace("calculate_distance(corner_b, leave_point)", "calculate_distance(corner_b, leave)")
     result = PythonFunctionGrader(SubprocessSandbox()).grade(target, code)
+    assert result.score == expected_score
+    if not use_parameters:
+        # The example points live inside main(), so reading them from the
+        # route function fails immediately and names the missing variable.
+        assert result.execution_succeeded is False
+        assert "NameError" in result.execution_error
+        assert "start_point" in result.execution_error
+        return
     assert result.execution_succeeded is True
     assert result.code_output.strip() == "4.0 4.0 0.0 0.0"
-    assert result.score == expected_score
-    assert [item.passed for item in result.evidence] == ([True, True, False, False] if use_parameters else [False] * 4)
+    assert [item.passed for item in result.evidence] == [True, True, False, False]
     for item in result.evidence:
         if not item.passed:
             assert "every input scenario" in item.message

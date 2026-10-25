@@ -567,7 +567,7 @@ def test_assignment_attempt_and_instructor_action_are_persisted_for_audit(
             select(AuditEvent).where(AuditEvent.action == "student.created")
         )
         assert submission.student_id == "audit-attempt-student"
-        assert submission.assignment_version == 15
+        assert submission.assignment_version == 16
         assert submission.evidence["tests"]
         assert audit_event.actor_user_id == instructor["user"]["id"]
 

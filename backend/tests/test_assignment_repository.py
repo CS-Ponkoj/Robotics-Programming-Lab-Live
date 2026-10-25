@@ -30,7 +30,7 @@ def test_newer_seed_versions_upgrade_existing_local_assignments():
         AssignmentRepository(session).sync_seed_assignments()
 
         assignments = AssignmentRepository(session).list_all()
-        assert [item.version for item in assignments] == [15, 15, 16, 15, 10, 10]
+        assert [item.version for item in assignments] == [16, 16, 17, 15, 10, 10]
         for assignment in assignments:
             assert assignment.data_schema_version == 1
             assert assignment.execution_settings["runtime"]
@@ -60,7 +60,12 @@ def test_assignment_2_explains_euclidean_distance_and_only_defined_route_points(
     namespace = {}
     exec(compile(payload["starter_code"], "assignment-2-starter", "exec"), namespace)
     assert namespace["calculate_distance"]((0, 0), (3, 4)) == pytest.approx(5)
-    assert namespace["results"] == (0.0, 0.0, 0.0, 0.0)
+    assert namespace["calculate_bug_route"](
+        (0, 0), (4, 0), (4, -1), (6, -1), (6, 0), (10, 0)
+    ) == (0.0, 0.0, 0.0, 0.0)
+    # Example values live inside main(), so the route function cannot
+    # accidentally read them instead of its parameters.
+    assert "start_point" not in namespace and "hit_point" not in namespace
 
 
 def test_assignments_1_through_4_use_instructor_authored_learning_metadata():

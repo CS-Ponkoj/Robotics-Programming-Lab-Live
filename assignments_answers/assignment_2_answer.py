@@ -6,23 +6,23 @@ def calculate_distance(point_1, point_2):
 
 
 def calculate_bug_route(start, hit, corner_a, corner_b, leave, goal):
-    distance_to_obstacle = calculate_distance(start, hit)
+    distance_to_hit = calculate_distance(start, hit)
     distance_along_obstacle = (
         calculate_distance(hit, corner_a)
         + calculate_distance(corner_a, corner_b)
         + calculate_distance(corner_b, leave)
     )
-    distance_from_obstacle_to_goal = calculate_distance(leave, goal)
-    total_path_length = (
-        distance_to_obstacle
+    distance_leave_to_goal = calculate_distance(leave, goal)
+    total_distance = (
+        distance_to_hit
         + distance_along_obstacle
-        + distance_from_obstacle_to_goal
+        + distance_leave_to_goal
     )
     return (
-        distance_to_obstacle,
+        distance_to_hit,
         distance_along_obstacle,
-        distance_from_obstacle_to_goal,
-        total_path_length,
+        distance_leave_to_goal,
+        total_distance,
     )
 
 
