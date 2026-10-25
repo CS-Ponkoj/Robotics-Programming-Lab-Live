@@ -365,7 +365,7 @@ class AssignmentCollection extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -617,7 +617,7 @@ class ProgressSummary extends StatelessWidget {
           );
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       // About 5% shorter than uniform padding, for a less bulky card.
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.lg,
