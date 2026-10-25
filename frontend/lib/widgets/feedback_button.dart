@@ -140,7 +140,8 @@ class _FeedbackDialogState extends State<FeedbackDialog> {
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           key: const Key('feedback-category'),
-          initialValue: _category,
+          // `value` works on CI's Flutter 3.32.8 (`initialValue` needs 3.33+).
+          value: _category,
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Type'),
           items: [
