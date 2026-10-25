@@ -389,4 +389,133 @@ void main() {
     expect(find.textContaining('Score: 100%'), findsOneWidget);
     expect(find.textContaining('Score saved.'), findsOneWidget);
   });
+
+  test('quiz result marks read only per-question correctness flags', () {
+    expect(
+        quizResultMarks({
+          'results': [
+            {'question_id': 'q1', 'correct': true},
+            {'question_id': 'q2', 'correct': false},
+          ],
+        }),
+        {'q1': true, 'q2': false});
+    expect(quizResultMarks({'score_percent': 50}), isEmpty);
+  });
+
+  testWidgets(
+      'submitted quiz marks each question and a changed answer clears its mark',
+      (tester) async {
+    final submissions = <Map<String, dynamic>>[];
+    final shared = client;
+    final quizClient = MockClient((request) async {
+      final path = request.url.path;
+      if (path.endsWith('/sections/quiz')) {
+        return http.Response(
+            jsonEncode({
+              'id': 'quiz',
+              'title': 'Quiz',
+              'kind': 'quiz',
+              'version': 'test-version',
+              'html': '',
+              'questions': [
+                for (final (id, prompt) in [
+                  ('q1', 'Which direction?'),
+                  ('q2', 'Which sensor?'),
+                ])
+                  {
+                    'id': id,
+                    'prompt': prompt,
+                    'options': [
+                      {'id': 'A', 'text': '$id first'},
+                      {'id': 'B', 'text': '$id second'},
+                    ],
+                  },
+              ],
+            }),
+            200);
+      }
+      if (path.endsWith('/quiz/submit')) {
+        final choices = Map<String, dynamic>.from(
+            (jsonDecode(request.body) as Map)['choices'] as Map);
+        submissions.add(choices);
+        // Server key for this test: q1 = A, q2 = A.
+        final results = [
+          for (final id in ['q1', 'q2'])
+            {'question_id': id, 'correct': choices[id] == 'A'},
+        ];
+        final correct = results.where((r) => r['correct'] == true).length;
+        return http.Response(
+            jsonEncode({
+              'score_percent': correct * 50,
+              'correct_count': correct,
+              'total_questions': 2,
+              'saved': true,
+              'results': results,
+            }),
+            200);
+      }
+      return shared.get(request.url);
+    });
+    CourseContentApi.testClient = quizClient;
+    addTearDown(quizClient.close);
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: CourseTopicPage(
+            topicId: 'obstacle-avoidance', user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Quiz'));
+    await tester.pumpAndSettle();
+
+    Future<void> tapVisible(Finder finder) async {
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+      await tester.tap(finder);
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.byKey(const Key('quiz-mark-1')), findsNothing);
+    await tapVisible(find.text('A. q1 first'));
+    await tapVisible(find.text('B. q2 second'));
+    await tapVisible(find.text('Submit quiz'));
+
+    expect(submissions.single, {'q1': 'A', 'q2': 'B'});
+    expect(find.textContaining('Score: 50%'), findsOneWidget);
+    expect(find.text('Review the questions marked Incorrect, then try again.'),
+        findsOneWidget);
+    expect(find.text('Correct'), findsOneWidget);
+    expect(find.text('Incorrect'), findsOneWidget);
+    expect(find.bySemanticsLabel('Question 1: correct'), findsOneWidget);
+    expect(find.bySemanticsLabel('Question 2: incorrect'), findsOneWidget);
+    // The student's choices stay selected, and the right option is not shown.
+    final radios = tester
+        .widgetList<RadioListTile<String>>(find.byType(RadioListTile<String>))
+        .toList();
+    // ignore: deprecated_member_use
+    expect(radios.map((r) => r.groupValue), ['A', 'A', 'B', 'B']);
+    // ignore: deprecated_member_use
+    expect(radios.every((r) => r.onChanged != null), isTrue);
+
+    await tapVisible(find.text('A. q2 first'));
+    expect(find.byKey(const Key('quiz-mark-2')), findsNothing);
+    expect(find.byKey(const Key('quiz-mark-1')), findsOneWidget);
+    expect(find.textContaining('Score:'), findsNothing);
+    expect(find.text('Review the questions marked Incorrect, then try again.'),
+        findsNothing);
+
+    await tapVisible(find.text('Submit quiz'));
+    expect(submissions.last, {'q1': 'A', 'q2': 'A'});
+    expect(find.textContaining('Score: 100%'), findsOneWidget);
+    expect(find.text('Correct'), findsNWidgets(2));
+    expect(find.text('Incorrect'), findsNothing);
+    expect(find.text('Review the questions marked Incorrect, then try again.'),
+        findsNothing);
+
+    await tapVisible(find.text('Try again'));
+    expect(find.byKey(const Key('quiz-mark-1')), findsNothing);
+    expect(find.byKey(const Key('quiz-mark-2')), findsNothing);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
 }

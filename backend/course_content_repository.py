@@ -46,7 +46,13 @@ class CourseContentRepository:
             if choices[question["id"]] not in valid:
                 raise ValueError("The quiz contains an invalid choice.")
         answers = self._read(self.root / "quiz_answers.json")[f"{topic_id}/quiz"]
-        correct = sum(choices[question_id] == answer for question_id, answer in answers.items())
+        # Per-question flags in quiz order; never the correct option itself.
+        results = [
+            {"question_id": question["id"],
+             "correct": choices[question["id"]] == answers.get(question["id"])}
+            for question in questions
+        ]
+        correct = sum(result["correct"] for result in results)
         total = len(questions)
         return {
             "topic_id": topic_id,
@@ -54,6 +60,7 @@ class CourseContentRepository:
             "correct_count": correct,
             "total_questions": total,
             "score_percent": round(correct * 100 / total),
+            "results": results,
         }
 
     def asset(self, name: str) -> Path | None:

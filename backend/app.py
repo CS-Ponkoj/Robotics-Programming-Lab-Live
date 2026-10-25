@@ -2230,7 +2230,8 @@ def create_app(
             return {**result, "saved": False}
         if user.role == "instructor":
             return {**result, "saved": False}
-        attempt = CourseQuizAttempt(user_id=user.id, **result)
+        stored = {key: value for key, value in result.items() if key != "results"}
+        attempt = CourseQuizAttempt(user_id=user.id, **stored)
         session.add(attempt)
         session.commit()
         return {**result, "saved": True, "attempt_id": attempt.id}

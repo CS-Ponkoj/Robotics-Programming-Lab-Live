@@ -609,6 +609,8 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
   // Lets an incomplete submission scroll to the first unanswered question.
   final Map<String, GlobalKey> _questionKeys = {};
   Map<String, dynamic>? _result;
+  // Per-question marks from the last submit: true = correct. Never the key.
+  final Map<String, bool> _marks = {};
   bool _submitting = false;
   String? _quizError;
   Future<List<Map<String, dynamic>>>? _attempts;
@@ -669,6 +671,9 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
       if (mounted) {
         setState(() {
           _result = result;
+          _marks
+            ..clear()
+            ..addAll(quizResultMarks(result));
           _attempts = CourseContentApi.quizAttempts(widget.topicId);
         });
       }
@@ -859,6 +864,14 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
           ],
         )
       else ...[
+        if (_marks.containsValue(false)) ...[
+          Text(
+            'Review the questions marked Incorrect, then try again.',
+            key: const Key('course-quiz-review-hint'),
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 4),
+        ],
         Text(
           'Score: ${_result!['score_percent']}% '
           '(${_result!['correct_count']}/${_result!['total_questions']} correct)',
@@ -876,6 +889,7 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
           child: OutlinedButton(
             onPressed: () => setState(() {
               _choices.clear();
+              _marks.clear();
               _result = null;
               _quizError = null;
             }),
@@ -972,6 +986,7 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
     final options = (question['options'] as List).cast<Map>();
     final theme = Theme.of(context);
     final answered = _choices.containsKey(id);
+    final mark = _marks[id];
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       decoration: BoxDecoration(
@@ -985,13 +1000,20 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'QUESTION $number OF $total',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: AppColors.brand,
-              letterSpacing: 1.0,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'QUESTION $number OF $total',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.brand,
+                    letterSpacing: 1.0,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (mark != null) _QuizMark(number: number, correct: mark),
+            ],
           ),
           const SizedBox(height: 6),
           Text(
@@ -1005,13 +1027,53 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
               title: Text('${option['id']}. ${option['text']}'),
               value: option['id'] as String,
               groupValue: _choices[id],
-              onChanged: _result != null || _submitting
+              onChanged: _submitting
                   ? null
                   : (value) => setState(() {
                         _choices[id] = value!;
                         _quizError = null;
+                        // A changed answer needs a fresh submit to be graded.
+                        _marks.remove(id);
+                        _result = null;
                       }),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Correct/Incorrect status for one submitted question. It never shows
+/// which option is right.
+class _QuizMark extends StatelessWidget {
+  const _QuizMark({required this.number, required this.correct});
+  final int number;
+  final bool correct;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = correct ? AppColors.success : AppColors.performanceLow;
+    return Semantics(
+      key: Key('quiz-mark-$number'),
+      container: true,
+      label: 'Question $number: ${correct ? 'correct' : 'incorrect'}',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            correct ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            correct ? 'Correct' : 'Incorrect',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
         ],
       ),
     );

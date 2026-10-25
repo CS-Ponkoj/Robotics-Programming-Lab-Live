@@ -200,6 +200,64 @@ def test_every_quiz_has_exactly_one_correct_choice_and_demo_is_not_saved(client)
         assert len(session.scalars(select(CourseQuizAttempt)).all()) == 18
 
 
+def test_quiz_returns_per_question_flags_without_answer_key(client):
+    repository = CourseContentRepository()
+    answers = repository._read(repository.root / "quiz_answers.json")["path-planning/quiz"]
+
+    def check(response, quiz, choices, saved):
+        assert response.status_code == 200
+        body = response.json()
+        assert body["saved"] is saved
+        results = body["results"]
+        assert [r["question_id"] for r in results] == [q["id"] for q in quiz["questions"]]
+        assert all(set(r) == {"question_id", "correct"} for r in results)
+        assert [r["correct"] for r in results] == [
+            choices[q["id"]] == answers[q["id"]] for q in quiz["questions"]
+        ]
+        assert body["correct_count"] == sum(r["correct"] for r in results)
+        assert set(body) <= {
+            "topic_id", "quiz_version", "correct_count", "total_questions",
+            "score_percent", "results", "saved", "attempt_id",
+        }
+        # Wrongly answered questions must not leak the correct option's text.
+        for question in quiz["questions"]:
+            if choices[question["id"]] != answers[question["id"]]:
+                key_text = next(o["text"] for o in question["options"]
+                                if o["id"] == answers[question["id"]])
+                assert key_text not in response.text
+
+    def mixed_choices(quiz):
+        choices = {
+            q["id"]: next(o["id"] for o in q["options"] if o["id"] != answers[q["id"]])
+            for q in quiz["questions"]
+        }
+        for question in quiz["questions"][::2]:
+            choices[question["id"]] = answers[question["id"]]
+        return choices
+
+    login(client)
+    quiz = client.get("/contents/path-planning/sections/quiz").json()
+    choices = mixed_choices(quiz)
+    check(client.post("/contents/path-planning/quiz/submit", json={
+        "quiz_version": quiz["version"], "choices": choices,
+    }), quiz, choices, True)
+    with client.app.state.SessionLocal() as session:
+        assert len(session.scalars(select(CourseQuizAttempt)).all()) == 1
+
+    login(client, "instructor", "instructor")
+    check(client.post("/contents/path-planning/quiz/submit", json={
+        "quiz_version": quiz["version"], "choices": choices,
+    }), quiz, choices, False)
+
+    client.headers.clear()
+    client.headers.update({"Authorization": f"Bearer {client.post('/auth/demo').json()['token']}"})
+    check(client.post("/contents/path-planning/quiz/submit", json={
+        "quiz_version": quiz["version"], "choices": choices,
+    }), quiz, choices, False)
+    with client.app.state.SessionLocal() as session:
+        assert len(session.scalars(select(CourseQuizAttempt)).all()) == 1
+
+
 def test_quiz_history_is_student_private_and_scores_survive_restart(tmp_path):
     database_url = f"sqlite:///{(tmp_path / 'quiz.sqlite').as_posix()}"
     settings = Settings(

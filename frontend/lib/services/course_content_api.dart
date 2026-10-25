@@ -70,3 +70,18 @@ class CourseContentApi {
         .toList();
   }
 }
+
+/// Per-question flags from a graded quiz submit, keyed by question ID.
+/// The server sends only whether each answer was correct, never the key;
+/// an older server without `results` yields an empty map.
+Map<String, bool> quizResultMarks(Map<String, dynamic> result) {
+  final results = result['results'];
+  if (results is! List) return const {};
+  return {
+    for (final item in results)
+      if (item is Map &&
+          item['question_id'] is String &&
+          item['correct'] is bool)
+        item['question_id'] as String: item['correct'] as bool,
+  };
+}
