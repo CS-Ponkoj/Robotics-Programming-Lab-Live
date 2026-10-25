@@ -742,9 +742,43 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('playground-use-example')), findsNothing);
+      await tester.ensureVisible(find.byKey(const Key('playground-run-button')));
       await tester.tap(find.byKey(const Key('playground-run-button')));
       await tester.pumpAndSettle();
       expect(calls, [sample]);
+    });
+
+    testWidgets('fractions are allowed and a changed input marks the result '
+        'stale', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(dialog());
+      expect(find.byKey(const Key('playground-input-rules')), findsOneWidget);
+      expect(find.textContaining('fractions such as 11/3'), findsOneWidget);
+
+      final run = find.byKey(const Key('playground-run-button'));
+      await tester.ensureVisible(run);
+      await tester.tap(run);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('playground-result')), findsOneWidget);
+      expect(find.byKey(const Key('playground-stale-result')), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('playground-arguments')),
+        '(2, 1), (4, 11/3), (4, 6), (23/4, 6), (8, 9)',
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('playground-stale-result')), findsOneWidget);
+      // The warning is announced, not only drawn.
+      expect(
+        find.bySemanticsLabel(RegExp('from your previous inputs')),
+        findsOneWidget,
+      );
+
+      await tester.ensureVisible(run);
+      await tester.tap(run);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('playground-stale-result')), findsNothing);
     });
 
     testWidgets('earlier inputs are kept and the example can be restored', (

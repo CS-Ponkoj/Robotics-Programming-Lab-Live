@@ -98,7 +98,9 @@ List<PlaygroundScenarioSpec> playgroundScenarios(
       .toList();
 }
 
-const _number = r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?';
+const _decimal = r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?';
+// The server also accepts a simple fraction such as 11/3.
+const _number = '$_decimal(?:\\s*/\\s*$_decimal)?';
 const _integer = r'[+-]?\d+';
 const _point = '[([]\\s*$_number\\s*,\\s*$_number\\s*,?\\s*[)\\]]';
 

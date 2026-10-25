@@ -108,6 +108,8 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
   bool _oneLine = false;
   bool _running = false;
   PlaygroundResultDto? _result;
+  // The inputs the shown result was produced from.
+  String? _resultArguments;
   String? _requestError;
   String? _modeNote;
   Map<int, String> _fieldErrors = const {};
@@ -322,15 +324,17 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
       _requestError = null;
       _fieldErrors = const {};
     });
+    final arguments = _currentArguments;
     try {
       final result = await widget.runner(
         widget.assignmentId,
         widget.code,
-        _currentArguments,
+        arguments,
       );
       if (!mounted) return;
       setState(() {
         _result = result;
+        _resultArguments = arguments;
         _recordRun(result);
       });
     } on PlaygroundInputException catch (error) {
@@ -547,6 +551,17 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                       ),
                     ),
                   ),
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: Text(
+                    'Enter Python values. Simple fractions such as 11/3 work; '
+                    'other arithmetic such as 2 * 3 does not.',
+                    key: const Key('playground-input-rules'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.md),
                 if (hasScenarioPicker) ...[
                   _scenarioPicker(theme),
@@ -625,6 +640,14 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                   ),
                 ] else if (_result != null) ...[
                   const SizedBox(height: AppSpacing.md),
+                  if (_resultArguments?.trim() != _currentArguments.trim())
+                    _PlaygroundMessage(
+                      key: const Key('playground-stale-result'),
+                      icon: Icons.update_rounded,
+                      color: AppColors.performanceMid,
+                      text: 'These results are from your previous inputs. '
+                          'Run again to see results for the inputs above.',
+                    ),
                   _PlaygroundResultView(
                     result: _result!,
                     diagram: buildPlaygroundDiagram(
@@ -749,6 +772,15 @@ class _PlaygroundResultView extends StatelessWidget {
         if (result.output.trim().isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
           Text('Printed output', style: theme.textTheme.labelMedium),
+          Text(
+            'Everything your file printed during this run, including any '
+            'example code outside the function. It may describe other inputs '
+            'than the ones you entered.',
+            key: const Key('playground-output-note'),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: AppSpacing.xs),
           Container(
             constraints: const BoxConstraints(maxHeight: 160),
@@ -789,20 +821,28 @@ class _PlaygroundMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: SelectableText(
-              text,
-              style: Theme.of(context).textTheme.bodySmall,
+    // Selectable text is not reliably read out on the web, so the message is
+    // also a live region that screen readers announce when it appears.
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: text,
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: SelectableText(
+                text,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

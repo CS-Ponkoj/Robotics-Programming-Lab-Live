@@ -39,15 +39,51 @@ def parse_playground_arguments(text: str) -> list:
             f"Use at most {MAX_PLAYGROUND_ARGUMENTS} inputs."
         )
     try:
-        arguments = [ast.literal_eval(item) for item in call.args]
-    except (ValueError, TypeError, SyntaxError, RecursionError) as error:
+        arguments = [
+            ast.literal_eval(_FractionFolder().visit(item)) for item in call.args
+        ]
+    except ZeroDivisionError as error:
+        raise PlaygroundInputError("A fraction cannot divide by zero.") from error
+    except (
+        ValueError, TypeError, SyntaxError, RecursionError, OverflowError
+    ) as error:
         raise PlaygroundInputError(
-            "Inputs can contain only numbers, text, True, False, None, "
-            "tuples, lists, and dictionaries."
+            "Inputs can contain only numbers, simple fractions such as 11/3, "
+            "text, True, False, None, tuples, lists, and dictionaries. Other "
+            "arithmetic is not supported."
         ) from error
     if not _finite_literals(arguments):
         raise PlaygroundInputError("Inputs must use finite numbers.")
     return arguments
+
+
+def _number_node(node) -> bool:
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+        node = node.operand
+    return (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, (int, float))
+        and not isinstance(node.value, bool)
+    )
+
+
+class _FractionFolder(ast.NodeTransformer):
+    """Turn number/number (as in 11/3 from the instructions) into one number.
+
+    Nothing is evaluated except the division of two numeric constants; any
+    other expression is left for literal_eval to reject.
+    """
+
+    def visit_BinOp(self, node):
+        if (
+            isinstance(node.op, ast.Div)
+            and _number_node(node.left)
+            and _number_node(node.right)
+        ):
+            numerator = ast.literal_eval(node.left)
+            denominator = ast.literal_eval(node.right)
+            return ast.copy_location(ast.Constant(numerator / denominator), node)
+        return node
 
 
 def _finite_literals(value) -> bool:

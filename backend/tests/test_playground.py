@@ -72,12 +72,26 @@ def test_playground_arguments_accept_only_literal_values():
     ]
 
 
+def test_playground_arguments_accept_simple_fractions_from_the_instructions():
+    assert parse_playground_arguments("(11/3, 23/4), -1/2, {0: 3/4}") == [
+        (11 / 3, 23 / 4),
+        -0.5,
+        {0: 0.75},
+    ]
+
+
 @pytest.mark.parametrize(
     "text",
     [
         "__import__('os').system('echo unsafe')",
         "open('secret.txt')",
         "1 + 1",
+        "1/0",
+        "(1/2)/3",
+        "2 * 3",
+        "x/2",
+        "'a'/2",
+        "1" + "0" * 400 + "/3",
         "x",
         "*[1, 2]",
         "first=1",
