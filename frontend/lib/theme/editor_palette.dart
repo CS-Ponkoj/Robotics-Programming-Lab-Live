@@ -12,7 +12,23 @@ class EditorPalette {
     required this.symbol,
     required this.lineNumber,
     required this.selection,
+    this.thickenStrokes = false,
   });
+
+  /// Courier New's thin strokes look grey on a light background; a
+  /// half-pixel shadow in the same color makes them read as solid text.
+  final bool thickenStrokes;
+
+  TextStyle _style(Color color,
+          {FontStyle? fontStyle, FontWeight? fontWeight}) =>
+      TextStyle(
+        color: color,
+        fontStyle: fontStyle,
+        fontWeight: fontWeight,
+        shadows: thickenStrokes
+            ? [Shadow(color: color, offset: const Offset(0.5, 0))]
+            : null,
+      );
 
   final Color background;
   final Color foreground;
@@ -46,23 +62,24 @@ class EditorPalette {
     symbol: Color(0xFF734B97),
     lineNumber: Color(0xFF4C5E70),
     selection: Color(0xFFC7DDF0),
+    thickenStrokes: true,
   );
 
   Map<String, TextStyle> get styles => {
-        'root': TextStyle(color: foreground, backgroundColor: background),
+        'root': _style(foreground).copyWith(backgroundColor: background),
         for (final token in ['comment', 'quote', 'meta', 'deletion'])
-          token: TextStyle(color: comment, fontStyle: FontStyle.italic),
+          token: _style(comment, fontStyle: FontStyle.italic),
         for (final token in ['keyword', 'selector-tag', 'section'])
-          token: TextStyle(color: keyword, fontWeight: FontWeight.w600),
+          token: _style(keyword, fontWeight: FontWeight.w600),
         for (final token in ['string', 'regexp', 'link', 'addition', 'doctag'])
-          token: TextStyle(color: string),
+          token: _style(string),
         for (final token in [
           'number',
           'literal',
           'variable',
           'template-variable'
         ])
-          token: TextStyle(color: number),
+          token: _style(number),
         for (final token in [
           'title',
           'type',
@@ -76,10 +93,10 @@ class EditorPalette {
           'code',
           'selector-class',
         ])
-          token: TextStyle(color: symbol),
+          token: _style(symbol),
         for (final token in ['attribute', 'name', 'params', 'subst', 'bullet'])
-          token: TextStyle(color: foreground),
-        'emphasis': TextStyle(color: foreground, fontStyle: FontStyle.italic),
-        'strong': TextStyle(color: foreground, fontWeight: FontWeight.bold),
+          token: _style(foreground),
+        'emphasis': _style(foreground, fontStyle: FontStyle.italic),
+        'strong': _style(foreground, fontWeight: FontWeight.bold),
       };
 }

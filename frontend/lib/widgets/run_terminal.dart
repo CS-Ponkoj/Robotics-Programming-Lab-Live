@@ -219,9 +219,13 @@ class RunTerminalPanel extends StatelessWidget {
     this.onClear,
     this.onOpenLine,
     this.requestError,
+    this.codeChanged = false,
   });
 
   final bool expanded;
+
+  /// The code was edited or replaced after the shown run.
+  final bool codeChanged;
   final double height;
   final bool running;
 
@@ -243,6 +247,11 @@ class RunTerminalPanel extends StatelessWidget {
     if (running) return 'Running…';
     if (requestError != null) return 'Not run';
     if (lines.isEmpty) return '';
+    if (codeChanged) return '${_runStatus()} · code changed since';
+    return _runStatus();
+  }
+
+  String _runStatus() {
     if (lines.any((line) => line.kind == TerminalLineKind.error)) {
       return 'Error';
     }

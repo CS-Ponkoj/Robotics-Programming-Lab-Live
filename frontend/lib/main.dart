@@ -41,9 +41,13 @@ class _MyAppState extends State<MyApp> {
   AuthenticatedUser? _user;
   bool _restoringSession = true;
 
+  // Also covers the sign-out that follows, whose own requests may fail.
+  bool _expiryDialogOpen = false;
+
   @override
   void initState() {
     super.initState();
+    AuthApi.sessionExpired.addListener(_onSessionExpired);
     final forceFreshLogin =
         widget.forceFreshLoginOnStart ?? shouldStartWithFreshLogin(Uri.base);
     if (forceFreshLogin) {
@@ -79,6 +83,8 @@ class _MyAppState extends State<MyApp> {
         _user = user;
         _restoringSession = false;
       });
+      // A request rejected while restoring is handled once the app shows.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onSessionExpired());
     }
   }
 
@@ -92,6 +98,56 @@ class _MyAppState extends State<MyApp> {
     if (mounted) {
       markLoggedOutBrowserEntry();
       setState(() => _user = null);
+    }
+  }
+
+  @override
+  void dispose() {
+    AuthApi.sessionExpired.removeListener(_onSessionExpired);
+    super.dispose();
+  }
+
+  /// An expired sign-in is explained once, instead of leaving pages open
+  /// whose every request fails. Code is already kept on this device and
+  /// returns after signing in again.
+  Future<void> _onSessionExpired() async {
+    final navigatorContext = _navigatorKey.currentContext;
+    if (!AuthApi.sessionExpired.value ||
+        _user == null ||
+        _expiryDialogOpen ||
+        navigatorContext == null) {
+      return;
+    }
+    _expiryDialogOpen = true;
+    final demo = _user!.isDemo;
+    await showDialog<void>(
+      context: navigatorContext,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        key: const Key('session-expired-dialog'),
+        title: const Text('Please sign in again'),
+        content: Text(
+          demo
+              ? 'The demo session has ended. Start a new demo from the '
+                  'sign-in page.'
+              : 'Your sign-in has expired, so nothing more can be graded or '
+                  'saved until you sign in again. Your latest code is kept on '
+                  'this device and returns when you open the assignment again.',
+        ),
+        actions: [
+          FilledButton(
+            key: const Key('session-expired-sign-in'),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Sign in again'),
+          ),
+        ],
+      ),
+    );
+    _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    try {
+      await _logout();
+    } finally {
+      _expiryDialogOpen = false;
     }
   }
 

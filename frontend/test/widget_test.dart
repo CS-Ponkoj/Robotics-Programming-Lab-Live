@@ -862,7 +862,7 @@ void main() {
       ('restore', 'Restore starter code (Ctrl+Alt+R)'),
       ('font-down', 'Decrease editor font (Ctrl+- / Ctrl+Alt+1)'),
       ('font-up', 'Increase editor font (Ctrl+= / Ctrl+Alt+2)'),
-      ('reference', 'Python names and APIs (Ctrl+Alt+A)'),
+      ('reference', 'Names in the starter code (Ctrl+Alt+A)'),
       ('shortcuts', 'Keyboard shortcuts (F1 / Ctrl+Alt+K)'),
       ('theme', 'Switch editor to light mode (Ctrl+Alt+T)'),
     ]) {

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
@@ -20,6 +21,10 @@ class AuthSession {
 
 class AuthApi {
   static String? _token;
+
+  /// Turns true when the server rejects this browser's sign-in (for example
+  /// after it expired), so the app can ask the student to sign in again.
+  static final sessionExpired = ValueNotifier<bool>(false);
 
   static String? get token => _token;
 
@@ -74,6 +79,7 @@ class AuthApi {
     required bool persist,
   }) async {
     _token = session.token;
+    sessionExpired.value = false;
     final preferences = await SharedPreferences.getInstance();
     if (persist) {
       await preferences.setString(_tokenStorageKey, session.token);
@@ -141,6 +147,7 @@ class AuthApi {
 
   static Future<void> clearLocalSession() async {
     _token = null;
+    sessionExpired.value = false;
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_tokenStorageKey);
   }
@@ -203,6 +210,9 @@ class AuthApi {
   }
 
   static String errorMessage(http.Response response) {
+    if (response.statusCode == 401 && _token != null) {
+      sessionExpired.value = true;
+    }
     try {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return data['detail']?.toString() ??

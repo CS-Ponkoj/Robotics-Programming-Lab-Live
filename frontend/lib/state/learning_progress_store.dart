@@ -14,6 +14,7 @@ class LearningProgressStore {
   static const _revealedSolutionsKey = 'learning.revealed_solutions.v1';
   static const _submissionIdsKey = 'learning.submission_ids.v1';
   static const _unsyncedDraftsKey = 'learning.unsynced_drafts.v1';
+  static const _earlierDraftsKey = 'learning.earlier_version_drafts.v1';
 
   final Map<int, int> latestScores = {};
   final Map<int, int> bestScores = {};
@@ -23,6 +24,9 @@ class LearningProgressStore {
   final Set<int> revealedSolutions = {};
   final Map<int, String> submissionIds = {};
   final Set<int> unsyncedDrafts = {};
+  // Code written for an older assignment version. It is never loaded into the
+  // new version's editor, but the student can still view and copy it.
+  final Map<int, String> earlierDrafts = {};
 
   ProgressStorage? _storage;
   String? _userScope;
@@ -81,6 +85,35 @@ class LearningProgressStore {
     return codeDrafts[assignmentId];
   }
 
+  /// Code this device kept from an older version of the assignment.
+  String? earlierDraftFor(int assignmentId, int assignmentVersion) {
+    final draftVersion = codeDraftVersions[assignmentId];
+    if (draftVersion != null && draftVersion < assignmentVersion) {
+      return codeDrafts[assignmentId];
+    }
+    return earlierDrafts[assignmentId];
+  }
+
+  Future<void> dismissEarlierDraft(
+    int assignmentId,
+    int assignmentVersion,
+  ) async {
+    final draftVersion = codeDraftVersions[assignmentId];
+    if (draftVersion != null && draftVersion < assignmentVersion) {
+      await clearDraft(assignmentId);
+    }
+    if (earlierDrafts.remove(assignmentId) != null) {
+      await _storeEarlierDrafts();
+    }
+  }
+
+  Future<void> _storeEarlierDrafts() async {
+    await _storage?.setString(
+      _scopedKey(_earlierDraftsKey),
+      _encodeMap(earlierDrafts),
+    );
+  }
+
   Future<void> load({ProgressStorage? storage}) async {
     _storage = storage ?? createProgressStorage();
     await _storage!.initialize();
@@ -126,6 +159,7 @@ class LearningProgressStore {
           .map(int.tryParse)
           .whereType<int>(),
     );
+    earlierDrafts.addAll(_decodeStringMap(_getStringSafely(_earlierDraftsKey)));
   }
 
   Future<void> _copyLegacyProgress() async {
@@ -154,6 +188,7 @@ class LearningProgressStore {
     revealedSolutions.clear();
     submissionIds.clear();
     unsyncedDrafts.clear();
+    earlierDrafts.clear();
   }
 
   Future<void> saveDraft(
@@ -161,6 +196,16 @@ class LearningProgressStore {
     int assignmentVersion,
     String code,
   ) async {
+    final previousVersion = codeDraftVersions[assignmentId];
+    final previousCode = codeDrafts[assignmentId];
+    // Keep older-version work aside instead of overwriting it.
+    if (previousVersion != null &&
+        previousVersion < assignmentVersion &&
+        previousCode != null &&
+        previousCode.trim().isNotEmpty) {
+      earlierDrafts[assignmentId] = previousCode;
+      await _storeEarlierDrafts();
+    }
     codeDrafts[assignmentId] = code;
     codeDraftVersions[assignmentId] = assignmentVersion;
     await Future.wait([

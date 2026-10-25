@@ -14,6 +14,7 @@ import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/theme/editor_palette.dart';
+import 'package:iuse_demo/widgets/earlier_draft_banner.dart';
 import 'package:iuse_demo/widgets/playground_dialog.dart';
 import 'package:iuse_demo/widgets/run_terminal.dart';
 import 'package:highlight/languages/python.dart';
@@ -28,7 +29,7 @@ class MyHomePage extends StatefulWidget {
 
 enum AssignmentWorkspaceFocus { none, editor, instructions, results }
 
-enum DraftSaveState { idle, saving, saved, sessionSaved, failed }
+enum DraftSaveState { idle, saving, saved, sessionSaved, failed, outdated }
 
 void setAssignmentEditorContent(
   CodeController controller,
@@ -73,6 +74,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Timer? _draftSaveTimer;
   Future<void> _draftWriteQueue = Future<void>.value();
   DraftSaveState _draftSaveState = DraftSaveState.idle;
+  // Code kept from an older version of this assignment, offered to copy.
+  String? _earlierDraft;
   double _editorFontSize = 16;
   bool _editorDarkMode = true;
   int? _diagnosticLine;
@@ -223,6 +226,11 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() => _draftSaveState = savedState);
       }
       return savedState;
+    } on AssignmentChangedException {
+      if (mounted && code == _code) {
+        setState(() => _draftSaveState = DraftSaveState.outdated);
+      }
+      return DraftSaveState.outdated;
     } on Object {
       if (mounted && code == _code) {
         setState(() => _draftSaveState = DraftSaveState.failed);
@@ -249,7 +257,12 @@ class _MyHomePageState extends State<MyHomePage> {
           DraftSaveState.saved => 'Draft saved.',
           DraftSaveState.sessionSaved =>
             'Draft saved for this session. It resets on refresh.',
-          _ => 'Cloud save failed. Check your connection and try Ctrl+S again.',
+          DraftSaveState.outdated => 'This assignment was updated while it '
+              'was open, so the cloud copy was not saved. Your code is kept '
+              'on this device: reopen the assignment to see the new version '
+              'and copy your code across.',
+          _ => 'Cloud save failed. Your code is kept on this device; check '
+              'your connection and try Ctrl+S again.',
         }),
       ),
     );
@@ -500,7 +513,8 @@ class _MyHomePageState extends State<MyHomePage> {
       _code = assignment.code;
       _submitted = false;
       _emptyCodeAttempted = false;
-      _hasUnrunChanges = false;
+      // Earlier results belong to the replaced code, as after any edit.
+      _hasUnrunChanges = true;
       _diagnosticLine = null;
       _draftSaveState = DraftSaveState.idle;
     });
@@ -625,7 +639,7 @@ class _MyHomePageState extends State<MyHomePage> {
           'Shift+Alt+F  Format Python (Ctrl+Shift+I on Linux)\n'
           'Ctrl+Alt+R  Restore starter code\n'
           'Ctrl+- / Ctrl+=  Editor font (Ctrl+Alt+1 / Ctrl+Alt+2 fallback)\n'
-          'Ctrl+Alt+A  Python names and APIs\n'
+          'Ctrl+Alt+A  Names in the starter code\n'
           'F1  Keyboard shortcuts (Ctrl+Alt+K browser fallback)\n'
           'Ctrl+Alt+T  Switch editor theme\n'
           'Ctrl+Alt+E  Focus or restore code editor\n'
@@ -653,13 +667,14 @@ class _MyHomePageState extends State<MyHomePage> {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Available Python names'),
+        title: const Text('Names in the starter code'),
         content: SizedBox(
           width: 520,
           child: SelectableText(
-            items.isEmpty
-                ? 'Use the names provided in the starter code and instructions.'
-                : items.join('\n'),
+            '${items.isEmpty ? 'Use the names provided in the starter code '
+                'and instructions.' : items.join('\n')}\n\n'
+            'These are the functions, classes, and imports in the starter '
+            'files. The instructions say which imports are allowed.',
           ),
         ),
       ),
@@ -1078,6 +1093,17 @@ class _MyHomePageState extends State<MyHomePage> {
                                           _playgroundFunction =
                                               snap.data!.playgroundFunction;
                                           _starterCode = snap.data!.code;
+                                          final earlier = learningProgress
+                                              .earlierDraftFor(
+                                            widget.id,
+                                            snap.data!.version,
+                                          );
+                                          _earlierDraft = earlier != null &&
+                                                  earlier.trim().isNotEmpty &&
+                                                  earlier != _starterCode &&
+                                                  earlier != _code
+                                              ? earlier
+                                              : null;
                                           _terminalFileName = snap
                                                   .data!.editableFilePath
                                                   ?.split('/')
@@ -1100,7 +1126,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                             if (mounted) setState(() {});
                                           });
                                         }
-                                        return AssignmentProjectWorkspace(
+                                        final earlierDraft = _earlierDraft;
+                                        final version = snap.data!.version;
+                                        final workspace =
+                                            AssignmentProjectWorkspace(
                                           files: snap.data!.projectFiles,
                                           selectedPath:
                                               _selectedProjectFilePath,
@@ -1117,6 +1146,27 @@ class _MyHomePageState extends State<MyHomePage> {
                                               _handleEditableCodeChanged();
                                             }
                                           },
+                                        );
+                                        if (earlierDraft == null) {
+                                          return workspace;
+                                        }
+                                        return Column(
+                                          children: [
+                                            EarlierVersionDraftBanner(
+                                              code: earlierDraft,
+                                              onDismiss: () {
+                                                unawaited(learningProgress
+                                                    .dismissEarlierDraft(
+                                                  widget.id,
+                                                  version,
+                                                ));
+                                                setState(
+                                                  () => _earlierDraft = null,
+                                                );
+                                              },
+                                            ),
+                                            Expanded(child: workspace),
+                                          ],
                                         );
                                       }
                                       if (snap.hasError) {
@@ -1138,6 +1188,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                   running: _isRunning,
                                   lines: _terminalLines,
                                   requestError: _terminalRequestError,
+                                  codeChanged: _hasUnrunChanges,
                                   onToggle: () => setState(
                                     () => _terminalExpanded =
                                         !_terminalExpanded,
@@ -2047,6 +2098,9 @@ class AssignmentEditorToolbar extends StatelessWidget {
                       'Draft saved for this session; refresh resets it',
                     DraftSaveState.failed =>
                       'Cloud save failed. A local fallback remains available.',
+                    DraftSaveState.outdated =>
+                      'Assignment updated. Reopen it; your code is kept on '
+                      'this device to copy across.',
                     DraftSaveState.idle => '',
                   },
                   child: Padding(
@@ -2059,11 +2113,13 @@ class AssignmentEditorToolbar extends StatelessWidget {
                         DraftSaveState.saved => Icons.cloud_done_outlined,
                         DraftSaveState.sessionSaved => Icons.save_outlined,
                         DraftSaveState.failed => Icons.cloud_off_outlined,
+                        DraftSaveState.outdated => Icons.update_rounded,
                         DraftSaveState.idle => Icons.cloud_outlined,
                       },
                       key: const Key('draft-save-state-icon'),
                       size: 20,
-                      color: saveState == DraftSaveState.failed
+                      color: saveState == DraftSaveState.failed ||
+                              saveState == DraftSaveState.outdated
                           ? theme.colorScheme.error
                           : theme.colorScheme.onSurfaceVariant,
                     ),
@@ -2144,7 +2200,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
                         toolButton(
                           keyName: 'reference',
                           icon: Icons.integration_instructions_outlined,
-                          label: 'Python names and APIs',
+                          label: 'Names in the starter code',
                           shortcut: 'Ctrl+Alt+A',
                           onPressed: onShowApiReference,
                         ),
@@ -2304,8 +2360,18 @@ class AssignmentProjectWorkspace extends StatelessWidget {
                     selectionColor: palette.selection,
                     selectionHandleColor: palette.symbol,
                   ),
-                  textStyle:
-                      TextStyle(fontFamily: 'Courier-New', fontSize: fontSize),
+                  textStyle: TextStyle(
+                    fontFamily: 'Courier-New',
+                    fontSize: fontSize,
+                    shadows: palette.thickenStrokes
+                        ? [
+                            Shadow(
+                              color: palette.foreground,
+                              offset: const Offset(0.5, 0),
+                            ),
+                          ]
+                        : null,
+                  ),
                   expands: true,
                   minLines: null,
                   readOnly: !selectedFileEditable,
@@ -2351,7 +2417,13 @@ class AssignmentProjectWorkspace extends StatelessWidget {
         if (constraints.maxWidth < 620) {
           return Column(
             children: [
-              SizedBox(height: 180, child: explorer),
+              // A one-line picker leaves room to edit on a phone; the full
+              // list took most of the height above the terminal.
+              ProjectFilePicker(
+                files: files,
+                selectedPath: selectedPath,
+                onFileSelected: onFileSelected,
+              ),
               Expanded(child: editor),
             ],
           );
@@ -2367,6 +2439,74 @@ class AssignmentProjectWorkspace extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Narrow-screen file chooser with every project file, marked editable or
+/// read only.
+class ProjectFilePicker extends StatelessWidget {
+  const ProjectFilePicker({
+    super.key,
+    required this.files,
+    required this.selectedPath,
+    required this.onFileSelected,
+  });
+
+  final List<AssignmentProjectFile> files;
+  final String? selectedPath;
+  final ValueChanged<AssignmentProjectFile> onFileSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final current = files.any((file) => file.path == selectedPath)
+        ? selectedPath
+        : files.first.path;
+    return ColoredBox(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            key: const Key('project-file-picker'),
+            value: current,
+            isExpanded: true,
+            icon: const Icon(Icons.unfold_more_rounded),
+            items: [
+              for (final file in files)
+                DropdownMenuItem(
+                  value: file.path,
+                  child: Row(
+                    children: [
+                      Icon(
+                        file.editable
+                            ? Icons.edit_outlined
+                            : Icons.lock_outline,
+                        size: 16,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          file.path,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+            onChanged: (path) {
+              if (path == null || path == current) return;
+              onFileSelected(files.firstWhere((file) => file.path == path));
+            },
+          ),
+        ),
+      ),
     );
   }
 }
@@ -4016,7 +4156,10 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Ask about your latest attempt. The tutor explains and guides, but does not provide completed code.',
+            widget.useAiTutor
+                ? 'Ask about your latest attempt. The tutor explains and guides, but does not provide completed code.'
+                : 'AI tutoring is off, so the built-in tutor answers with general guidance based on your latest results. It does not provide completed code.',
+            key: const Key('ask-tutor-intro'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: AppSpacing.sm),

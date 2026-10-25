@@ -12,7 +12,7 @@ class FeedbackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    return Tooltip(
+    return _HoverHint(
       message: 'Report a problem or send feedback about this page',
       child: Material(
         color: colors.primary,
@@ -49,6 +49,23 @@ class FeedbackButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// The button floats above the app's navigator, where there is no overlay
+/// for a hover tooltip; screen readers still get the description.
+class _HoverHint extends StatelessWidget {
+  const _HoverHint({required this.message, required this.child});
+
+  final String message;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (Overlay.maybeOf(context) == null) {
+      return Semantics(tooltip: message, child: child);
+    }
+    return Tooltip(message: message, child: child);
   }
 }
 

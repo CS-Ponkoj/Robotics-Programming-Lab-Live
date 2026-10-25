@@ -41,6 +41,9 @@ Future<AssignmentDto> fetchAssignment(int id) async {
   if (response.statusCode == 200) {
     return AssignmentDto.fromJson(jsonDecode(response.body));
   }
+  if (response.statusCode == 401) {
+    throw Exception(AuthApi.errorMessage(response));
+  }
   throw Exception('Failed to load assignment $id');
 }
 
@@ -98,12 +101,24 @@ Future<CodeDraftDto> saveCodeDraft(
         }),
       )
       .timeout(_requestTimeout);
+  if (response.statusCode == 409) {
+    throw AssignmentChangedException(AuthApi.errorMessage(response));
+  }
   if (response.statusCode != 200) {
     throw Exception(AuthApi.errorMessage(response));
   }
   return CodeDraftDto.fromJson(
     Map<String, dynamic>.from(jsonDecode(response.body) as Map),
   );
+}
+
+/// The server has a newer version of the assignment than the open page.
+class AssignmentChangedException implements Exception {
+  const AssignmentChangedException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 Future<void> deleteCodeDraft(
