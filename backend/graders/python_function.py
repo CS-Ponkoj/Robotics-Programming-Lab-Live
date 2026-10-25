@@ -148,6 +148,20 @@ class PythonFunctionGrader:
             or not cases
         ):
             raise ValueError("Invalid python_function grader configuration.")
+        # Opt-in: a criterion may list positional arguments the function must
+        # leave unchanged (for example a dict it should copy before editing).
+        unchanged_by_criterion = [
+            item.get("unchanged_arguments", []) for item in criteria
+        ]
+        if any(
+            not isinstance(indexes, list)
+            or any(not isinstance(index, int) or index < 0 for index in indexes)
+            for indexes in unchanged_by_criterion
+        ):
+            raise ValueError("Invalid python_function grader configuration.")
+        unchanged_indexes = sorted(
+            {index for indexes in unchanged_by_criterion for index in indexes}
+        )
 
         base_result = self.sandbox.execute(code, [])
         if base_result.get("success") is not True:
@@ -155,6 +169,8 @@ class PythonFunctionGrader:
 
         criterion_passes = [True] * len(criteria)
         failed_case_counts = [0] * len(criteria)
+        changed_argument = [False] * len(criteria)
+        value_failed = [False] * len(criteria)
         unsupported_values = [False] * len(criteria)
         hidden_execution_failed = False
         hidden_error_type = ""
@@ -172,6 +188,7 @@ class PythonFunctionGrader:
                     not isinstance(index, int) or not 0 <= index < len(arguments)
                     for index in dict_arguments
                 )
+                or any(index >= len(arguments) for index in unchanged_indexes)
             ):
                 raise ValueError("Invalid python_function test case configuration.")
             # JSON cannot hold integer-keyed dicts, so configured arguments are
@@ -179,11 +196,31 @@ class PythonFunctionGrader:
             literals = [repr(value) for value in arguments]
             for index in dict_arguments:
                 literals[index] = f"dict({literals[index]})"
+            # A watched argument is passed as a named object, then compared with
+            # a fresh copy built from the same literal after the call.
+            call_arguments = list(literals)
+            setup_lines = []
+            check_lines = []
+            for index in unchanged_indexes:
+                setup_lines.append(f"grader_argument_{index} = {literals[index]}")
+                call_arguments[index] = f"grader_argument_{index}"
+                check_lines.extend(
+                    [
+                        "try:",
+                        f"    grader_unchanged_{index} = True if "
+                        f"grader_argument_{index} == {literals[index]} else False",
+                        "except:",
+                        f"    grader_unchanged_{index} = False",
+                    ]
+                )
+            unchanged_names = [f"grader_unchanged_{index}" for index in unchanged_indexes]
             result_names = [f"grader_value_{index}" for index in range(len(criteria))]
             harness_lines = [
                 code,
                 "",
-                f"grader_values = {function_name}({', '.join(literals)})",
+                *setup_lines,
+                f"grader_values = {function_name}({', '.join(call_arguments)})",
+                *check_lines,
                 "grader_return_count = len(grader_values)",
                 *[
                     f"{name} = grader_values[{index}]"
@@ -191,7 +228,8 @@ class PythonFunctionGrader:
                 ],
             ]
             result = self.sandbox.execute(
-                "\n".join(harness_lines), [*result_names, "grader_return_count"]
+                "\n".join(harness_lines),
+                [*result_names, "grader_return_count", *unchanged_names],
             )
             if result.get("success") is not True:
                 hidden_execution_failed = True
@@ -211,10 +249,19 @@ class PythonFunctionGrader:
                 })
             for index, name in enumerate(result_names):
                 actual = actual_values.get(name)
-                if self._matches(actual, expected[index]):
+                value_matches = self._matches(actual, expected[index])
+                argument_changed = any(
+                    actual_values.get(f"grader_unchanged_{argument}") is not True
+                    for argument in unchanged_by_criterion[index]
+                )
+                if argument_changed:
+                    changed_argument[index] = True
+                if value_matches and not argument_changed:
                     continue
                 criterion_passes[index] = False
                 failed_case_counts[index] += 1
+                if not value_matches:
+                    value_failed[index] = True
                 if isinstance(actual, dict) and "unsupported_type" in actual:
                     unsupported_values[index] = True
 
@@ -228,9 +275,18 @@ class PythonFunctionGrader:
             if passed:
                 earned_weight += weight
             label = str(criterion.get("label", criterion.get("id", "Criterion")))
+            # A changed input is reported on its own when the values were right.
+            only_changed_argument = (
+                not passed
+                and not hidden_execution_failed
+                and changed_argument[index]
+                and not value_failed[index]
+            )
             message = (
                 str(criterion.get("success_feedback", f"{label} is correct."))
                 if passed
+                else ""
+                if only_changed_argument
                 else str(
                     criterion.get(
                         "failure_feedback",
@@ -238,10 +294,25 @@ class PythonFunctionGrader:
                     )
                 )
             )
-            if not passed:
+            if not passed and not only_changed_argument:
                 message += (
                     " This check must work for every input scenario. Use the function "
                     "parameters; correct output for the printed example alone is not enough."
+                )
+            if not passed and changed_argument[index] and not hidden_execution_failed:
+                message = " ".join(
+                    part
+                    for part in (
+                        message,
+                        str(
+                            criterion.get(
+                                "unchanged_feedback",
+                                "Your function changed an input it was given. "
+                                "Copy the input first and change the copy.",
+                            )
+                        ),
+                    )
+                    if part
                 )
             reason = self._failure_reason(
                 passed=passed,
@@ -264,7 +335,9 @@ class PythonFunctionGrader:
                     weight=weight,
                     misconception_tag=(
                         tag
-                        if tag and reason in {"wrong_all_inputs", "wrong_some_inputs"}
+                        if tag
+                        and value_failed[index]
+                        and reason in {"wrong_all_inputs", "wrong_some_inputs"}
                         else None
                     ),
                 )

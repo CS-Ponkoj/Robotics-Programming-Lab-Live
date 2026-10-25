@@ -134,7 +134,7 @@ def test_assignment_4_exposes_the_complete_deterministic_lidar_model(tmp_path):
     assert "3 through 357" in instructions
     assert "80 through 100" in instructions
     assert "smallest density, not the smallest distance" in instructions
-    assert assignment["version"] == 15
+    assert assignment["version"] == 16
     assert 'src="/images/4"' in instructions
     assert "analyze_vfh" in assignment["starter_code"]
 
@@ -244,7 +244,7 @@ def test_assignment_3_includes_the_complete_floor_to_floor_route(tmp_path):
     instructions = assignment["assignment_html"]
     assert "S -&gt; M1 -&gt; M2 -&gt; E_m" in instructions
     assert "floor-10 path / speed" in instructions
-    assert assignment["version"] == 17
+    assert assignment["version"] == 18
     assert 'src="/images/3"' in instructions
     assert "path_from_E_m_to_goal" in assignment["starter_code"]
     assert "path_from_E_s_to_goal" in assignment["starter_code"]
@@ -291,7 +291,7 @@ def test_assignment_1_uses_valid_bug2_m_line_intersections(tmp_path):
     assert "H = (4, 11/3)" in instructions
     assert "L = (23/4, 6)" in instructions
     assert "H and L both lie on the m-line" in instructions
-    assert assignment["version"] == 16
+    assert assignment["version"] == 17
     assert 'src="/images/1"' in instructions
     assert "Coordinate diagram showing the cleaning robot route" in instructions
     assert "calculate_bug2_route" in assignment["starter_code"]

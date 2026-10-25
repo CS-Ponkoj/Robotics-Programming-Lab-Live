@@ -118,6 +118,84 @@ def test_function_grader_passes_configured_dict_arguments_as_dicts():
     assert result.score == 100
 
 
+def unchanged_argument_assignment() -> Assignment:
+    target = assignment()
+    target.grader_config = {
+        "function_name": "fill",
+        "criteria": [
+            {
+                "id": "count",
+                "label": "Count",
+                "weight": 50,
+                "failure_feedback": "Recheck the count.",
+                "unchanged_arguments": [0],
+                "unchanged_feedback": "Your function changed the readings it was given.",
+            },
+            {"id": "extra", "label": "Extra", "weight": 50},
+        ],
+        "cases": [
+            {"dict_arguments": [0], "arguments": [[[0, 10], [5, 2]], 3], "expected": [3, 3]},
+            {"dict_arguments": [0], "arguments": [[[7, 1]], 8], "expected": [2, 8]},
+        ],
+    }
+    return target
+
+
+def test_function_grader_accepts_copied_unchanged_argument():
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(
+        unchanged_argument_assignment(),
+        "def fill(readings, extra):\n"
+        "    copied = dict(readings)\n"
+        "    copied[extra] = 1\n"
+        "    return len(copied), extra\n",
+    )
+
+    assert result.score == 100
+    assert result.passed is True
+
+
+def test_function_grader_fails_only_the_flagged_criterion_when_argument_changes():
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(
+        unchanged_argument_assignment(),
+        "def fill(readings, extra):\n"
+        "    readings[extra] = 1\n"
+        "    return len(readings), extra\n",
+    )
+
+    assert result.execution_succeeded is True
+    assert result.score == 50
+    assert [item.passed for item in result.evidence] == [False, True]
+    message = result.evidence[0].message
+    assert message == "Your function changed the readings it was given."
+    assert result.evidence[0].reason == "wrong_all_inputs"
+    # Hidden inputs never appear in the feedback.
+    assert "10" not in message and "7" not in message
+
+
+def test_function_grader_reports_wrong_value_and_changed_argument_together():
+    result = PythonFunctionGrader(SubprocessSandbox()).grade(
+        unchanged_argument_assignment(),
+        "def fill(readings, extra):\n"
+        "    readings.clear()\n"
+        "    return 0, extra\n",
+    )
+
+    message = result.evidence[0].message
+    assert message.startswith("Recheck the count.")
+    assert message.endswith("Your function changed the readings it was given.")
+
+
+@pytest.mark.parametrize("unchanged", [[2], [-1], ["0"], 0])
+def test_function_grader_rejects_invalid_unchanged_argument_configuration(unchanged):
+    target = unchanged_argument_assignment()
+    target.grader_config["criteria"][0]["unchanged_arguments"] = unchanged
+
+    with pytest.raises(ValueError, match="configuration"):
+        PythonFunctionGrader(SubprocessSandbox()).grade(
+            target, "def fill(readings, extra):\n    return 1, 1\n"
+        )
+
+
 @pytest.mark.parametrize("dict_arguments", [[1], [-1], ["0"], 0])
 def test_function_grader_rejects_invalid_dict_argument_configuration(dict_arguments):
     target = assignment()
