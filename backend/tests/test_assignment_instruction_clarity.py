@@ -51,9 +51,46 @@ def test_ros_explains_exact_one_and_mixed_scan_behavior():
         assert "Queue depth 10" in instructions
         assert "callback" in instructions
     instructions = source(6)["assignment_html"]
-    assert "Ignore invalid entries, not the whole mixed scan" in instructions
+    assert "Skip only the entries with no usable distance, not the whole mixed scan" in instructions
     assert "2.0 m" in instructions
     assert "Invalid sensor data must never cause forward motion" not in instructions
+
+
+def test_ros_states_import_allowlist_shutdown_and_measured_numbers():
+    for number in (5, 6):
+        data = source(number)
+        instructions = data["assignment_html"]
+        assert ("may import only <code>rclpy</code>, <code>geometry_msgs</code>, "
+                "<code>sensor_msgs</code>, and <code>math</code>") in instructions
+        assert "TwistStamped" in instructions
+        starter = data["starter_code"]
+        assert "from rclpy.executors import ExternalShutdownException" in starter
+        assert "except (KeyboardInterrupt, ExternalShutdownException):" in starter
+        assert "rclpy.try_shutdown()" in starter
+        assert "rclpy.shutdown()" not in starter
+        package_xml = next(item["content"] for item in data["asset_manifest"]
+                           if item["path"].endswith("package.xml"))
+        assert "ament_pytest" not in package_xml
+        for dependency in ("<exec_depend>launch</exec_depend>",
+                           "<exec_depend>launch_ros</exec_depend>",
+                           "<test_depend>python3-pytest</test_depend>"):
+            assert dependency in package_xml
+    drive = source(5)["assignment_html"]
+    assert "do not import <code>time</code>" in drive
+    for number_text in ("about 8 seconds", "at least 5 commands per second",
+                        "0.20 &plusmn; 0.02 m/s", "&plusmn;0.01 rad/s", "&plusmn;0.001",
+                        "between 4.5 and 5.5 seconds", "do not add extra timers",
+                        "passing the integer 10"):
+        assert number_text in drive
+    obstacle = source(6)["assignment_html"]
+    assert "and one Twist decision per scan" in obstacle
+    assert "and timing" not in obstacle
+    for number_text in ("about 0.8 seconds", "about 0.25 seconds",
+                        "at least 3 commands per second", "do not filter beams by angle"):
+        assert number_text in obstacle
+    # Positive infinity is a conservative "no usable distance" rule, not "invalid".
+    assert "no usable distance" in obstacle
+    assert "nothing was detected within range" in obstacle
 
 
 def test_tutor_review_versions_match_current_assignment_contracts():

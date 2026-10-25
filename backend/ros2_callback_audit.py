@@ -65,8 +65,16 @@ def summarize_student_failure(stderr, returncode):
     return "\n".join([summary, *other]) if other else summary
 
 
+def absolute_topic(name):
+    """Compare relative and absolute names alike; the student node has no namespace."""
+    name = str(name)
+    return name if name.startswith("/") else "/" + name
+
+
 def instrument(node_class, publisher_class, report_fd, kind, topic, scan_topic):
     active = ContextVar("command_callback", default=None)
+    topic = absolute_topic(topic)
+    scan_topic = absolute_topic(scan_topic)
     original_publish = publisher_class.publish
     original_timer = node_class.create_timer
     original_subscription = node_class.create_subscription
@@ -80,7 +88,7 @@ def instrument(node_class, publisher_class, report_fd, kind, topic, scan_topic):
 
     def publish(publisher, message):
         counter = active.get()
-        if counter is not None and publisher.topic_name == topic:
+        if counter is not None and absolute_topic(publisher.topic_name) == topic:
             counter[0] += 1
         return original_publish(publisher, message)
 
@@ -106,12 +114,12 @@ def instrument(node_class, publisher_class, report_fd, kind, topic, scan_topic):
         return original_timer(node, timer_period_sec, callback, *args, **kwargs)
 
     def subscription(node, msg_type, topic_name, callback, *args, **kwargs):
-        if kind == "scan" and topic_name == scan_topic:
+        if kind == "scan" and absolute_topic(topic_name) == scan_topic:
             callback = audited(callback)
         return original_subscription(node, msg_type, topic_name, callback, *args, **kwargs)
 
     def create_publisher(node, msg_type, topic_name, qos_profile, *args, **kwargs):
-        if topic_name == topic:
+        if absolute_topic(topic_name) == topic:
             depth = qos_profile if isinstance(qos_profile, int) else qos_profile.depth
             if depth != 10:
                 report(False)

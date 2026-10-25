@@ -240,6 +240,56 @@ def test_ros2_controller_validation_allows_ros_imports_and_blocks_os():
         validate_controller("import os")
 
 
+def test_ros2_starters_and_answers_pass_import_validation():
+    root = Path(__file__).resolve().parents[2]
+    for number in (5, 6):
+        source = json.loads(
+            (root / "backend" / "assignments" / f"assignment_{number}.json").read_text(encoding="utf-8")
+        )
+        validate_controller(source["starter_code"])
+        validate_controller((root / source["reference_solution_path"]).read_text(encoding="utf-8"))
+
+
+def test_callback_audit_treats_relative_topic_names_as_absolute():
+    import os
+    from ros2_callback_audit import instrument
+
+    class FakePublisher:
+        def __init__(self, topic_name):
+            self.topic_name = topic_name
+
+        def publish(self, message):
+            return None
+
+    class FakeNode:
+        def create_timer(self, period, callback, *args, **kwargs):
+            return callback
+
+        def create_subscription(self, msg_type, topic_name, callback, *args, **kwargs):
+            return callback
+
+        def create_publisher(self, msg_type, topic_name, qos_profile, *args, **kwargs):
+            return FakePublisher("/" + topic_name.lstrip("/"))
+
+    read_fd, write_fd = os.pipe()
+    try:
+        instrument(FakeNode, FakePublisher, write_fd, "scan", "/cmd_vel", "/scan")
+        node = FakeNode()
+        publisher = node.create_publisher(object, "cmd_vel", 10)
+        callback = node.create_subscription(
+            object, "scan", lambda _scan: publisher.publish(object()), 10
+        )
+        callback(None)
+        # A relative name is audited, and depth 10 on a relative name is not flagged.
+        assert os.read(read_fd, 64) == b"1\n"
+        wrong_depth = node.create_publisher(object, "cmd_vel", 5)
+        assert wrong_depth.topic_name == "/cmd_vel"
+        assert os.read(read_fd, 64) == b"0\n"
+    finally:
+        os.close(read_fd)
+        os.close(write_fd)
+
+
 def test_ros2_worker_selects_only_known_behavior_harnesses():
     assert select_harness({}) == "/grader/ros2_topic_harness.py"
     assert select_harness({"harness": "obstacle_stop"}) == (
@@ -510,7 +560,7 @@ def test_ros2_assignment_submission_uses_injected_executor(tmp_path):
 
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
-    assert assignment_body["version"] == 9
+    assert assignment_body["version"] == 10
     assert 'src="/images/5"' in assignment_body["assignment_html"]
     assert "src/robot_motion/robot_motion/controller.py" in assignment_body["assignment_html"]
     assert response.status_code == 200
@@ -555,7 +605,7 @@ def test_ros2_obstacle_assignment_submission_uses_behavior_harness(tmp_path):
     assert assignment_response.status_code == 200
     assignment_body = assignment_response.json()
     assert assignment_body["stable_id"] == "ros2-obstacle-stop"
-    assert assignment_body["version"] == 9
+    assert assignment_body["version"] == 10
     assert 'src="/images/6"' in assignment_body["assignment_html"]
     assert "src/reactive_navigation/reactive_navigation/controller.py" in assignment_body["assignment_html"]
     assert assignment_body["editable_file_path"].endswith("controller.py")

@@ -30,7 +30,7 @@ def test_newer_seed_versions_upgrade_existing_local_assignments():
         AssignmentRepository(session).sync_seed_assignments()
 
         assignments = AssignmentRepository(session).list_all()
-        assert [item.version for item in assignments] == [14, 14, 15, 14, 9, 9]
+        assert [item.version for item in assignments] == [15, 15, 16, 15, 10, 10]
         for assignment in assignments:
             assert assignment.data_schema_version == 1
             assert assignment.execution_settings["runtime"]

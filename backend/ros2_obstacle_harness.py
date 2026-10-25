@@ -63,9 +63,16 @@ def main() -> None:
         scan = LaserScan()
         scan.header.stamp = monitor.get_clock().now().to_msg()
         scan.header.frame_id = "laser"
-        scan.angle_min = -0.5
-        scan.angle_max = 0.5
-        scan.angle_increment = 1.0 / max(len(ranges) - 1, 1)
+        # Keep the angle metadata consistent with the beam count: one beam
+        # points straight ahead; several beams span [-0.5, 0.5] evenly.
+        if len(ranges) > 1:
+            scan.angle_min = -0.5
+            scan.angle_increment = 1.0 / (len(ranges) - 1)
+            scan.angle_max = scan.angle_min + scan.angle_increment * (len(ranges) - 1)
+        else:
+            scan.angle_min = 0.0
+            scan.angle_max = 0.0
+            scan.angle_increment = 0.0
         scan.range_min = 0.05
         scan.range_max = 10.0
         scan.ranges = ranges
@@ -212,7 +219,7 @@ def main() -> None:
             clear_ok,
             "Clear-path forward velocity is correct."
             if clear_ok
-            else "Set linear.x to 0.20 m/s when every valid obstacle distance is greater than the stop threshold.",
+            else "Set linear.x to 0.20 m/s when every usable obstacle distance is greater than the stop threshold.",
         ),
         result(
             "obstacle-stop",
@@ -224,9 +231,9 @@ def main() -> None:
         result(
             "invalid-scan-stop",
             invalid_ok,
-            "The robot stops when the scan has no valid positive distance."
+            "The robot stops when the scan has no usable distance."
             if invalid_ok
-            else "Move forward on a clear scan, and treat a scan with no finite positive distance as unsafe by publishing zero velocity.",
+            else "Move forward on a clear scan, and stop (publish zero velocity) when the scan has no usable distance: no finite reading greater than zero.",
         ),
         result(
             "straight-motion",
