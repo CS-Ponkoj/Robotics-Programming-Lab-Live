@@ -1048,7 +1048,7 @@ void main() {
     await tester.tap(find.byKey(const Key('reveal-solution-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Reveal worked solution?'), findsOneWidget);
+    expect(find.text('Show solution approach?'), findsOneWidget);
     expect(solutionRevealed, isFalse);
 
     await tester.tap(find.byKey(const Key('confirm-solution-reveal-button')));

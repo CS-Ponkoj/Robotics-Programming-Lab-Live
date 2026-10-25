@@ -1699,9 +1699,9 @@ class _SolutionSection extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const Icon(Icons.visibility_outlined),
-        title: const Text('Reveal worked solution?'),
+        title: const Text('Show solution approach?'),
         content: const Text(
-          'A worked explanation will be shown and this assignment will be '
+          'The solution approach will be shown and this assignment will be '
           'marked as Solution viewed.',
         ),
         actions: [
@@ -1712,7 +1712,7 @@ class _SolutionSection extends StatelessWidget {
           FilledButton(
             key: const Key('confirm-solution-reveal-button'),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Reveal solution'),
+            child: const Text('Show solution approach'),
           ),
         ],
       ),
@@ -1751,7 +1751,7 @@ class _SolutionSection extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Worked solution',
+                            'Solution approach',
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w800,
                             ),
@@ -1793,14 +1793,14 @@ class _SolutionSection extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Worked solution',
+                            'Solution approach',
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           Text(
                             canReveal
-                                ? 'Hidden until you choose to reveal it'
+                                ? 'Hidden until you choose to show it'
                                 : 'Run the tests once to unlock the solution',
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
@@ -1820,7 +1820,7 @@ class _SolutionSection extends StatelessWidget {
                   ),
                   label: Text(
                     canReveal
-                        ? 'Reveal worked solution'
+                        ? 'Show solution approach'
                         : 'Complete one test run first',
                   ),
                 ),
