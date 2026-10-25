@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iuse_demo/widgets/lesson_reader.dart';
@@ -347,6 +348,55 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Which direction?'), findsOneWidget);
     expect(find.byKey(const Key('next-section')), findsNothing);
+  });
+
+  testWidgets('a long lesson scrolls smoothly to its end without jumping',
+      (tester) async {
+    final longHtml = [
+      for (var i = 0; i < 120; i++) '<p>Lesson paragraph $i about sensors.</p>'
+    ].join();
+    CourseContentApi.testClient = MockClient((request) async {
+      if (request.url.path.endsWith('/sections/lesson')) {
+        return http.Response(
+            jsonEncode({
+              'id': 'lesson',
+              'title': 'Lesson',
+              'kind': 'lesson',
+              'html': longHtml,
+              'questions': [],
+            }),
+            200);
+      }
+      return client.get(request.url, headers: request.headers);
+    });
+    await tester.pumpWidget(MaterialApp(
+        home: CourseTopicPage(
+            topicId: 'obstacle-avoidance', user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    final list = find.byType(Scrollable).first;
+    final position = tester.state<ScrollableState>(list).position;
+    // The page height is known exactly from the start. An estimate that
+    // shrank once the pager was built made the reader jump to the bottom.
+    final pageEnd = position.maxScrollExtent;
+    expect(pageEnd, greaterThan(3000));
+    expect(find.byKey(const Key('back-to-top')), findsNothing);
+    // Mouse-wheel steps, as on the web.
+    final mouse = TestPointer(1, PointerDeviceKind.mouse)
+      ..hover(tester.getCenter(list));
+    var previous = 0.0;
+    for (var step = 0; step < 200 && position.pixels < pageEnd; step++) {
+      await tester.sendEventToBinding(mouse.scroll(const Offset(0, 300)));
+      await tester.pump();
+      expect(position.maxScrollExtent, pageEnd);
+      expect(position.pixels - previous, lessThanOrEqualTo(300));
+      previous = position.pixels;
+    }
+    expect(position.pixels, pageEnd);
+    expect(find.byKey(const Key('back-to-top')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('back-to-top')));
+    await tester.pumpAndSettle();
+    expect(position.pixels, 0);
+    expect(find.byKey(const Key('back-to-top')), findsNothing);
   });
 
   testWidgets(

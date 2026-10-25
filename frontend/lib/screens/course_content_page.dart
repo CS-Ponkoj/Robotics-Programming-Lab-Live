@@ -133,7 +133,9 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
                                             onTap: () async {
                                               await Navigator.of(context).push(
                                                 MaterialPageRoute<void>(
-                                                  settings: RouteSettings(arguments: FeedbackPage('Course topic: ${topics[i]['title'] ?? topics[i]['id']}'),
+                                                  settings: RouteSettings(
+                                                    arguments: FeedbackPage(
+                                                        'Course topic: ${topics[i]['title'] ?? topics[i]['id']}'),
                                                   ),
                                                   builder: (_) =>
                                                       CourseTopicPage(
@@ -711,7 +713,10 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
             } else {
               body = _content(context, snapshot.data!, narrow);
             }
-            return ListView(
+            // Not a lazy ListView: with one very tall lesson child it only
+            // estimated the page height, so the scrollbar showed the middle
+            // and then jumped to the bottom once the pager was laid out.
+            return SingleChildScrollView(
               controller: _scroll,
               padding: EdgeInsets.fromLTRB(
                 narrow ? 16 : 24,
@@ -720,15 +725,18 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
                 // Room below the pager for the back-to-top button.
                 88,
               ),
-              children: [
-                _readingWidth(widget.header),
-                const SizedBox(height: 16),
-                _readingWidth(body),
-                if (snapshot.hasData) ...[
-                  const SizedBox(height: 20),
-                  _readingWidth(_pager(context)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _readingWidth(widget.header),
+                  const SizedBox(height: 16),
+                  _readingWidth(body),
+                  if (snapshot.hasData) ...[
+                    const SizedBox(height: 20),
+                    _readingWidth(_pager(context)),
+                  ],
                 ],
-              ],
+              ),
             );
           },
         ),
