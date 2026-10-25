@@ -597,6 +597,16 @@ def test_phase1_records_oversized_attempt_and_instructor_safe_aggregates(
     assert body["data_health"]["demo_data_contamination"] == 0
     assert "login_id" not in dashboard.text
     assert "password" not in dashboard.text.lower()
+    for summary_row in body["assignment_summaries"]:
+        # Drill-down lists use participant codes and match the counts.
+        assert len(summary_row["started_participant_codes"]) == summary_row["students_started"]
+        assert len(summary_row["completed_participant_codes"]) == summary_row["students_completed"]
+    export = research_client.get(
+        "/admin/research/export?dataset_name=class_assignment_summary&format=csv",
+        headers=_bearer(instructor),
+    )
+    assert export.status_code == 200
+    assert "participant_codes" not in export.text
     assignment_data = research_client.get(
         "/admin/research/assignments?assignment_id=1",
         headers=_bearer(instructor),

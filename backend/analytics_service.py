@@ -431,7 +431,9 @@ def classroom_analytics_payload(session: Session) -> dict[str, Any]:
     return {
         "overview": overview,
         "participants": participants,
-        "assignment_summaries": assignment_catalog(session, participant_payloads),
+        "assignment_summaries": assignment_catalog(
+            session, participant_payloads, include_participant_codes=True
+        ),
         "data_health": data_health(session),
     }
 
@@ -439,6 +441,8 @@ def classroom_analytics_payload(session: Session) -> dict[str, Any]:
 def assignment_catalog(
     session: Session,
     participant_payloads: list[dict[str, Any]] | None = None,
+    *,
+    include_participant_codes: bool = False,
 ) -> list[dict[str, Any]]:
     if participant_payloads is None:
         students = session.scalars(
@@ -510,6 +514,14 @@ def assignment_catalog(
                 ),
             }
         )
+        if include_participant_codes:
+            # Dashboard drill-down only; exports keep their existing columns.
+            rows[-1]["started_participant_codes"] = sorted(
+                code for code, item in participant_rows if item["status"] != "not_started"
+            )
+            rows[-1]["completed_participant_codes"] = sorted(
+                code for code, item in participant_rows if item["status"] == "completed"
+            )
     return rows
 
 

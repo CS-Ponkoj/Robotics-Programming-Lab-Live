@@ -159,6 +159,58 @@ void main() {
     expect(find.text('Participant detail'), findsOneWidget);
     expect(find.text('P-042'), findsOneWidget);
     expect(find.text('Assignment analytics'), findsOneWidget);
-    expect(find.textContaining('Obstacle avoidance'), findsOneWidget);
+    expect(find.textContaining('Obstacle avoidance'), findsWidgets);
+  });
+
+  testWidgets('classroom number cards open the participants they count',
+      (tester) async {
+    tester.view.physicalSize = const Size(1200, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _app(
+        InstructorResearchDashboard(
+          initialParticipants: [
+            {
+              'participant_code': 'P-001',
+              'student_id': 'a',
+              'attempts': 4,
+              'assignments_started': 1,
+              'assignments_completed': 1,
+              'active_seconds': 600,
+              'best_score': 100,
+            },
+            {
+              'participant_code': 'P-002',
+              'student_id': 'b',
+              'attempts': 0,
+              'assignments_started': 0,
+              'assignments_completed': 0,
+              'active_seconds': 0,
+              'best_score': 0,
+            },
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('metric-Active participants')));
+    await tester.pumpAndSettle();
+    final sheet = find.byKey(const Key('participant-list-sheet'));
+    expect(sheet, findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text('P-001')),
+        findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text('P-002')),
+        findsOneWidget);
+    Navigator.of(tester.element(sheet)).pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('metric-Students completed')));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: sheet, matching: find.text('P-001')),
+        findsOneWidget);
+    expect(
+        find.descendant(of: sheet, matching: find.text('P-002')), findsNothing);
   });
 }

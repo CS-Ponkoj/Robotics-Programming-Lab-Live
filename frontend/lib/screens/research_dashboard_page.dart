@@ -220,7 +220,11 @@ class _InstructorResearchDashboardState
                     'Research-safe summaries use participant codes, never login IDs.',
               ),
               const SizedBox(height: AppSpacing.md),
-              _ClassroomMetricGrid(summary: overview),
+              _ClassroomMetricGrid(
+                summary: overview,
+                participants: participants,
+                onShowList: _showParticipantList,
+              ),
               const SizedBox(height: AppSpacing.xl),
               _SectionTitle(
                 title: 'Participant catalog',
@@ -267,8 +271,41 @@ class _InstructorResearchDashboardState
     );
   }
 
+  void _showParticipantList(String title, List<Map<String, dynamic>> rows) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        maxChildSize: 0.95,
+        builder: (context, controller) => ListView(
+          key: const Key('participant-list-sheet'),
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md, 0, AppSpacing.md, AppSpacing.xl),
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '${rows.length} participant${rows.length == 1 ? '' : 's'} · '
+              'select one to see details',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            if (rows.isEmpty)
+              const _EmptyResearchState(message: 'No participants yet.')
+            else
+              ...rows.map(_participantCard),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _participantCard(Map<String, dynamic> participant) {
     final participantCode = participant['participant_code'].toString();
+    final canOpen = participant['student_id'] != null;
     return Card(
       key: Key('research-participant-$participantCode'),
       child: ListTile(
@@ -293,15 +330,18 @@ class _InstructorResearchDashboardState
                   .titleMedium
                   ?.copyWith(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            const Icon(Icons.chevron_right_rounded),
+            if (canOpen) ...[
+              const SizedBox(width: AppSpacing.sm),
+              const Icon(Icons.chevron_right_rounded),
+            ],
           ],
         ),
-        onTap: participant['student_id'] == null
+        onTap: !canOpen
             ? null
             : () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    settings: const RouteSettings(arguments: FeedbackPage('Research study: student detail'),
+                    settings: const RouteSettings(
+                      arguments: FeedbackPage('Research study: student detail'),
                     ),
                     builder: (_) => ResearchStudentDetailPage(
                       studentId: participant['student_id'].toString(),
@@ -330,6 +370,16 @@ class ResearchStudentDetailPage extends StatefulWidget {
 
 class _ResearchStudentDetailPageState extends State<ResearchStudentDetailPage> {
   late Future<Map<String, dynamic>> _data;
+  final _assignmentsKey = GlobalKey();
+  final _attemptsKey = GlobalKey();
+
+  void _scrollTo(GlobalKey key) {
+    final target = key.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(target,
+          duration: const Duration(milliseconds: 300));
+    }
+  }
 
   @override
   void initState() {
@@ -367,9 +417,14 @@ class _ResearchStudentDetailPageState extends State<ResearchStudentDetailPage> {
                 'This is the same progress information available to the student.',
               ),
               const SizedBox(height: AppSpacing.lg),
-              ResearchMetricGrid(summary: summary),
+              ResearchMetricGrid(
+                summary: summary,
+                onShowAssignments: () => _scrollTo(_assignmentsKey),
+                onShowAttempts: () => _scrollTo(_attemptsKey),
+              ),
               const SizedBox(height: AppSpacing.xl),
-              const _SectionTitle(
+              _SectionTitle(
+                key: _assignmentsKey,
                 title: 'Assignment analytics',
                 subtitle: 'Results are separated by exact version.',
               ),
@@ -378,12 +433,20 @@ class _ResearchStudentDetailPageState extends State<ResearchStudentDetailPage> {
                 rows: _listOfMaps(data['assignment_summaries']),
               ),
               const SizedBox(height: AppSpacing.xl),
-              const _SectionTitle(
+              _SectionTitle(
+                key: _attemptsKey,
                 title: 'Attempt history',
                 subtitle: 'Safe execution labels; source code is excluded.',
               ),
               const SizedBox(height: AppSpacing.sm),
-              _AttemptHistory(rows: _listOfMaps(data['attempts'])),
+              _AttemptHistory(
+                rows: _listOfMaps(data['attempts']),
+                titles: {
+                  for (final row in _listOfMaps(data['assignment_summaries']))
+                    _intValue(row['assignment_id']):
+                        row['assignment_title']?.toString() ?? '',
+                },
+              ),
               const SizedBox(height: AppSpacing.xl),
               _MetricCatalogCard(catalog: _map(data['metric_catalog'])),
             ],
@@ -395,7 +458,7 @@ class _ResearchStudentDetailPageState extends State<ResearchStudentDetailPage> {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, required this.subtitle});
+  const _SectionTitle({super.key, required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
@@ -414,9 +477,16 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class ResearchMetricGrid extends StatelessWidget {
-  const ResearchMetricGrid({super.key, required this.summary});
+  const ResearchMetricGrid({
+    super.key,
+    required this.summary,
+    this.onShowAssignments,
+    this.onShowAttempts,
+  });
 
   final Map<String, dynamic> summary;
+  final VoidCallback? onShowAssignments;
+  final VoidCallback? onShowAttempts;
 
   @override
   Widget build(BuildContext context) {
@@ -425,22 +495,26 @@ class ResearchMetricGrid extends StatelessWidget {
         (
           'Assignments completed',
           '${summary['assignments_completed'] ?? 0}',
-          Icons.verified_rounded
+          Icons.verified_rounded,
+          onShowAssignments,
         ),
         (
           'Total attempts',
           '${summary['attempts'] ?? 0}',
-          Icons.playlist_add_check_rounded
+          Icons.playlist_add_check_rounded,
+          onShowAttempts,
         ),
         (
           'Best score',
           '${summary['best_score'] ?? 0}%',
-          Icons.insights_rounded
+          Icons.insights_rounded,
+          onShowAssignments,
         ),
         (
           'Total app active time',
           _formatDuration(_intValue(summary['active_seconds'])),
-          Icons.schedule_rounded
+          Icons.schedule_rounded,
+          onShowAssignments,
         ),
       ],
     );
@@ -448,59 +522,93 @@ class ResearchMetricGrid extends StatelessWidget {
 }
 
 class _ClassroomMetricGrid extends StatelessWidget {
-  const _ClassroomMetricGrid({required this.summary});
+  const _ClassroomMetricGrid({
+    required this.summary,
+    required this.participants,
+    required this.onShowList,
+  });
 
   final Map<String, dynamic> summary;
+  final List<Map<String, dynamic>> participants;
+
+  /// Shows the participants behind a number, in the given order.
+  final void Function(String title, List<Map<String, dynamic>> rows) onShowList;
+
+  List<Map<String, dynamic>> _where(String field) =>
+      participants.where((item) => _intValue(item[field]) > 0).toList();
+
+  List<Map<String, dynamic>> _sortedBy(String field) => [...participants]..sort(
+      (left, right) => _intValue(right[field]).compareTo(
+        _intValue(left[field]),
+      ),
+    );
 
   @override
   Widget build(BuildContext context) {
+    final started = _where('assignments_started');
+    final completed = _where('assignments_completed');
     return _MetricGrid(
       metrics: [
         (
           'Active participants',
           '${summary['active_participants'] ?? summary['participants'] ?? 0}',
-          Icons.groups_rounded
+          Icons.groups_rounded,
+          () => onShowList('Active participants', participants),
         ),
         (
           'Students started',
           '${summary['students_started'] ?? 0}',
-          Icons.start_rounded
+          Icons.start_rounded,
+          () => onShowList('Students who started an assignment', started),
         ),
         (
           'Students completed',
           '${summary['students_completed'] ?? 0}',
-          Icons.verified_rounded
+          Icons.verified_rounded,
+          () => onShowList('Students who completed an assignment', completed),
         ),
         (
           'Participation rate',
           _formatPercent(summary['participation_rate']),
-          Icons.pie_chart_rounded
+          Icons.pie_chart_rounded,
+          () => onShowList(
+              'Participating: ${started.length} of ${participants.length}',
+              started),
         ),
         (
           'Completion rate',
           _formatPercent(summary['completion_rate']),
-          Icons.task_alt_rounded
+          Icons.task_alt_rounded,
+          () => onShowList(
+              'Completed: ${completed.length} of ${started.length} who started',
+              completed),
         ),
         (
           'Total attempts',
           '${summary['total_attempts'] ?? summary['attempts'] ?? 0}',
-          Icons.playlist_add_check_rounded
+          Icons.playlist_add_check_rounded,
+          () => onShowList('Attempts by participant', _sortedBy('attempts')),
         ),
         (
           'Total active time',
           _formatDuration(_intValue(
               summary['total_active_seconds'] ?? summary['active_seconds'])),
-          Icons.schedule_rounded
+          Icons.schedule_rounded,
+          () => onShowList(
+              'Active time by participant', _sortedBy('active_seconds')),
         ),
       ],
     );
   }
 }
 
+/// Label, value, icon, and an optional action that shows what is counted.
+typedef _Metric = (String, String, IconData, VoidCallback?);
+
 class _MetricGrid extends StatelessWidget {
   const _MetricGrid({required this.metrics});
 
-  final List<(String, String, IconData)> metrics;
+  final List<_Metric> metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -526,6 +634,7 @@ class _MetricGrid extends StatelessWidget {
                     label: metric.$1,
                     value: metric.$2,
                     icon: metric.$3,
+                    onTap: metric.$4,
                   ),
                 ),
               )
@@ -626,9 +735,17 @@ class _AssignmentAnalyticsList extends StatelessWidget {
 }
 
 class _AttemptHistory extends StatelessWidget {
-  const _AttemptHistory({required this.rows});
+  const _AttemptHistory({required this.rows, this.titles = const {}});
 
   final List<Map<String, dynamic>> rows;
+
+  /// Assignment titles by ID, so rows name the assignment.
+  final Map<int, String> titles;
+
+  String _title(Object? id) {
+    final title = titles[_intValue(id)];
+    return title == null || title.isEmpty ? 'Assignment $id' : title;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -649,11 +766,11 @@ class _AttemptHistory extends StatelessWidget {
         return Card(
           child: Semantics(
             label:
-                'Assignment ${row['assignment_id']} attempt ${row['attempt_number']}, ${row['score']} percent, ${row['execution_status_label'] ?? row['execution_status']}',
+                '${_title(row['assignment_id'])} attempt ${row['attempt_number']}, ${row['score']} percent, ${row['execution_status_label'] ?? row['execution_status']}',
             child: ListTile(
               leading: CircleAvatar(child: Text('${row['assignment_id']}')),
               title: Text(
-                'Attempt #${row['attempt_number']} · Assignment ${row['assignment_id']} · ${row['score']}%',
+                'Attempt #${row['attempt_number']} · ${_title(row['assignment_id'])} · ${row['score']}%',
               ),
               subtitle: Text(
                 'v${row['assignment_version']} · ${_modeLabel(row['mode'])} · ${row['execution_status_label'] ?? _safeStatus(row['execution_status'])} · ${_shortTimestamp(row['created_at'])}',
@@ -691,6 +808,12 @@ class _InstructorAssignmentList extends StatelessWidget {
         final hidden = _map(row['hidden_test_aggregate']);
         final errors = _listOfMaps(row['most_common_errors']);
         final tests = _listOfMaps(row['most_failed_public_tests']);
+        String codes(String field) {
+          final values = (row[field] as List?)?.map((e) => '$e').toList();
+          if (values == null) return 'Not available';
+          return values.isEmpty ? 'None yet' : values.join(', ');
+        }
+
         return Card(
           child: ExpansionTile(
             title: Text(
@@ -707,6 +830,14 @@ class _InstructorAssignmentList extends StatelessWidget {
             children: [
               _DetailWrap(
                 items: [
+                  (
+                    'Started (participant codes)',
+                    codes('started_participant_codes')
+                  ),
+                  (
+                    'Completed (participant codes)',
+                    codes('completed_participant_codes')
+                  ),
                   ('Total attempts', '${row['total_attempts']}'),
                   ('Median final score', _score(row['median_final_score'])),
                   (
@@ -794,7 +925,8 @@ class _DataHealthCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (values.isEmpty) {
       return const _EmptyResearchState(
-        message: 'Data-health checks are not available in this preview.',
+        message:
+            'Data-health checks could not be loaded. Refresh to try again.',
       );
     }
     final items = [
@@ -866,18 +998,52 @@ class _DetailWrap extends StatelessWidget {
 }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard(
-      {required this.label, required this.value, required this.icon});
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.onTap,
+  });
 
   final String label;
   final String value;
   final IconData icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final card = _metricCardBody(context);
+    if (onTap == null) {
+      return Semantics(label: '$label: $value', child: card);
+    }
     return Semantics(
-      label: '$label: $value',
-      child: Container(
+      button: true,
+      label: '$label: $value. Show the list.',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: Key('metric-$label'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          child: Stack(
+            children: [
+              card,
+              const Positioned(
+                right: 8,
+                top: 8,
+                child: Icon(Icons.chevron_right_rounded,
+                    size: 20, color: AppColors.inkMuted),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _metricCardBody(BuildContext context) {
+    return Builder(
+      builder: (context) => Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
