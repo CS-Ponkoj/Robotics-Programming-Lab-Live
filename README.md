@@ -30,7 +30,7 @@ repository first.
 - **Course content:** six topics with lessons, diagrams, exercises, and one
   10-question quiz each. Quizzes are graded on the server and stored
   separately from assignment scores.
-- **Instructor studio:** assignment publishing, account management,
+- **Instructor Studio:** assignment management and publishing, account management with per-account sign-in history,
   assignment-version analytics, data-health checks, and CSV/Excel research
   exports that use participant codes instead of login IDs.
 - **Student demo:** a **Try the student demo** button opens a temporary,

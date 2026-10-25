@@ -89,7 +89,7 @@ def test_student_demo_runs_and_submits_an_assignment(page: Page):
     starts = page.get_by_role("button", name="Start assignment")
     expect(starts.first).to_be_visible()
     # Student and instructor capabilities stay separate.
-    expect(page.get_by_role("button", name="Instructor studio")).to_have_count(0)
+    expect(page.get_by_role("button", name="Instructor Studio")).to_have_count(0)
     starts.first.click()
 
     # Run tests stays disabled until the assignment code is in the editor.
@@ -160,13 +160,15 @@ def test_instructor_signs_in_reviews_studio_and_signs_out(page: Page):
     type_into(page, "Password", password)
     page.keyboard.press("Enter")
 
-    page.get_by_role("button", name="Instructor studio").click()
-    expect(page.get_by_role("button", name="Create assignment")).to_be_visible()
+    page.get_by_role("button", name="Instructor Studio").click()
     expect(page.get_by_role("button", name="Manage accounts")).to_be_visible()
+    page.get_by_role("button", name="Assignment management").click()
+    expect(page.get_by_role("button", name="Create assignment")).to_be_visible()
     for assignment_number in range(1, 5):
         expect(
             page.get_by_role("button", name=f"Assignment {assignment_number}:")
         ).to_be_visible()
+    page.get_by_role("button", name="Back").first.click()
 
     page.get_by_role("button", name="Research study dashboard").click()
     expect(page.get_by_role("button", name="Export research data")).to_be_visible(
@@ -176,7 +178,7 @@ def test_instructor_signs_in_reviews_studio_and_signs_out(page: Page):
 
     # Dashboard -> studio -> home, where the account menu lives.
     page.get_by_role("button", name="Back").first.click()
-    expect(page.get_by_role("button", name="Create assignment")).to_be_visible()
+    expect(page.get_by_role("button", name="Assignment management")).to_be_visible()
     page.get_by_role("button", name="Back").first.click()
     page.get_by_role("button", name="Account menu").click()
     page.get_by_role("menuitem", name="Sign out").click()

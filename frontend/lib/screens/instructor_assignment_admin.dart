@@ -3,22 +3,106 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/screens/feedback_inbox_page.dart';
-import 'package:iuse_demo/screens/sign_in_history_page.dart';
 import 'package:iuse_demo/screens/student_accounts_page.dart';
 import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 
-class InstructorAssignmentAdmin extends StatefulWidget {
+/// Instructor Studio home: one card per instructor tool.
+class InstructorAssignmentAdmin extends StatelessWidget {
   const InstructorAssignmentAdmin({super.key});
 
   @override
-  State<InstructorAssignmentAdmin> createState() =>
-      _InstructorAssignmentAdminState();
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    void open(Widget page, String name) => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            settings: RouteSettings(arguments: FeedbackPage(name)),
+            builder: (_) => page,
+          ),
+        );
+    final cards = [
+      _StudioLinkCard(
+        key: const Key('studio-assignments-card'),
+        icon: Icons.assignment_outlined,
+        title: 'Assignment management',
+        detail: 'Create, edit, validate, and publish versioned assignments.',
+        onTap: () =>
+            open(const AssignmentManagementPage(), 'Assignment management'),
+      ),
+      _StudioLinkCard(
+        icon: Icons.manage_accounts_outlined,
+        title: 'Manage accounts',
+        detail:
+            'Create logins, reset access, and see each account\'s sign-ins.',
+        onTap: () => open(const StudentAccountsPage(), 'Manage accounts'),
+      ),
+      _StudioLinkCard(
+        icon: Icons.insights_rounded,
+        title: 'Research study dashboard',
+        detail: 'Participation, attempts, and privacy-safe research exports.',
+        onTap: () => open(
+            const InstructorResearchDashboard(), 'Research study dashboard'),
+      ),
+      _StudioLinkCard(
+        key: const Key('studio-feedback-card'),
+        icon: Icons.feedback_outlined,
+        title: 'Feedback',
+        detail: 'Bug reports and suggestions sent from any page.',
+        onTap: () => open(const FeedbackInboxPage(), 'Feedback inbox'),
+      ),
+    ];
+    return Scaffold(
+      appBar: AppBar(title: const Text('Instructor Studio')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1100),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+            children: [
+              Text('Instructor Studio', style: theme.textTheme.headlineSmall),
+              const SizedBox(height: 6),
+              Text(
+                'Choose a tool. Your instructor login authorizes assignment, '
+                'account, research, and feedback management.',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 24),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 720 ? 2 : 1;
+                  final width =
+                      (constraints.maxWidth - (columns - 1) * 16) / columns;
+                  return Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    children: [
+                      for (final card in cards)
+                        SizedBox(width: width, child: card),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
+/// Lists every assignment version and opens the editor.
+class AssignmentManagementPage extends StatefulWidget {
+  const AssignmentManagementPage({super.key});
+
+  @override
+  State<AssignmentManagementPage> createState() =>
+      _AssignmentManagementPageState();
+}
+
+class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
   List<Map<String, dynamic>> _assignments = [];
   bool _loading = true;
   String? _error;
@@ -71,12 +155,6 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
     final theme = Theme.of(context);
     final published =
         _assignments.where((a) => a['status'] == 'published').length;
-    void open(Widget page, String name) => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            settings: RouteSettings(arguments: FeedbackPage(name)),
-            builder: (_) => page,
-          ),
-        );
 
     final createButton = FilledButton.icon(
       key: const Key('create-assignment-button'),
@@ -87,21 +165,10 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
     final intro = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'INSTRUCTOR STUDIO',
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: AppColors.brand,
-            letterSpacing: 1.1,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 6),
         Text('Manage versioned assignments',
             style: theme.textTheme.headlineSmall),
         const SizedBox(height: 6),
         Text(
-          'Your instructor login authorizes assignment and account '
-          'management. '
           'Publishing is blocked until the reference solution passes '
           'the hidden grader.',
           style: theme.textTheme.bodyMedium
@@ -112,7 +179,7 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Instructor assignment studio'),
+        title: const Text('Assignment management'),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -138,62 +205,6 @@ class _InstructorAssignmentAdminState extends State<InstructorAssignmentAdmin> {
                           createButton
                         ],
                       ),
-              ),
-              const SizedBox(height: 24),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final cards = [
-                    _StudioLinkCard(
-                      icon: Icons.manage_accounts_outlined,
-                      title: 'Manage accounts',
-                      detail:
-                          'Create student logins, reset access, and link participant codes.',
-                      onTap: () =>
-                          open(const StudentAccountsPage(), 'Manage accounts'),
-                    ),
-                    _StudioLinkCard(
-                      icon: Icons.insights_rounded,
-                      title: 'Research study dashboard',
-                      detail:
-                          'Participation, attempts, and privacy-safe research exports.',
-                      onTap: () => open(const InstructorResearchDashboard(),
-                          'Research study dashboard'),
-                    ),
-                    _StudioLinkCard(
-                      key: const Key('studio-feedback-card'),
-                      icon: Icons.feedback_outlined,
-                      title: 'Feedback',
-                      detail: 'Bug reports and suggestions sent from any page.',
-                      onTap: () =>
-                          open(const FeedbackInboxPage(), 'Feedback inbox'),
-                    ),
-                    _StudioLinkCard(
-                      key: const Key('studio-sign-in-history-card'),
-                      icon: Icons.history_rounded,
-                      title: 'Sign-in history',
-                      detail: 'When each account signed in and out.',
-                      onTap: () =>
-                          open(const SignInHistoryPage(), 'Sign-in history'),
-                    ),
-                  ];
-                  if (constraints.maxWidth < 1000) {
-                    return Column(children: [
-                      for (var i = 0; i < cards.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 12),
-                        cards[i],
-                      ],
-                    ]);
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < cards.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 16),
-                        Expanded(child: cards[i]),
-                      ],
-                    ],
-                  );
-                },
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),

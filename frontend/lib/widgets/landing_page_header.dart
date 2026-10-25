@@ -108,11 +108,12 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
           ),
         if (user.isInstructor)
           IconButton(
-            tooltip: 'Instructor studio',
+            tooltip: 'Instructor Studio',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  settings: const RouteSettings(arguments: FeedbackPage('Instructor studio')),
+                  settings: const RouteSettings(
+                      arguments: FeedbackPage('Instructor Studio')),
                   builder: (_) => const InstructorAssignmentAdmin(),
                 ),
               );
@@ -127,7 +128,8 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
               if (value == 'my-account' && context.mounted) {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
-                    settings: const RouteSettings(arguments: FeedbackPage('My account')),
+                    settings: const RouteSettings(
+                        arguments: FeedbackPage('My account')),
                     builder: (_) =>
                         MyAccountPage(user: user, onSignedOut: onLogout),
                   ),
@@ -136,7 +138,8 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
               if (value == 'study-data' && context.mounted) {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
-                    settings: const RouteSettings(arguments: FeedbackPage('Study data')),
+                    settings: const RouteSettings(
+                        arguments: FeedbackPage('Study data')),
                     builder: (_) => user.isInstructor
                         ? const InstructorResearchDashboard()
                         : const StudentResearchPage(),
