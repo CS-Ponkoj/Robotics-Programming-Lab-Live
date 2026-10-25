@@ -618,7 +618,11 @@ class ProgressSummary extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      // About 5% shorter than uniform padding, for a less bulky card.
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.lg - 5,
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadii.lg),
