@@ -43,9 +43,17 @@ def motion_checks(messages, expected_linear, linear_tolerance,
                   angular_tolerance, move_seconds, stop_tolerance,
                   minimum_rate=5.0, observation_end=None):
     """Separate node-launch latency from the observed command timeline."""
+    return motion_evidence(messages, expected_linear, linear_tolerance,
+                           angular_tolerance, move_seconds, stop_tolerance,
+                           minimum_rate, observation_end)["checks"]
+
+
+def motion_evidence(messages, expected_linear, linear_tolerance,
+                    angular_tolerance, move_seconds, stop_tolerance,
+                    minimum_rate=5.0, observation_end=None):
+    """Return the motion checks plus the reason forward motion failed."""
     origin = messages[0][0] if messages else 0.0
     samples = [(item[0] - origin, *item[1:]) for item in messages]
-    moving = [item for item in samples if item[0] < move_seconds - stop_tolerance]
     stopped = [item for item in samples if is_stop(item)]
     unused_ok = all(unused_axes_zero(item) for item in samples)
     first_stop = stopped[0][0] if stopped else None
@@ -58,14 +66,32 @@ def motion_checks(messages, expected_linear, linear_tolerance,
         bool(messages) and
         (observation_end is None or messages[-1][0] >= observation_end - 0.3)
     )
-    forward_ok = bool(moving) and all(
-        math.isclose(item[1], expected_linear, abs_tol=linear_tolerance)
-        for item in moving
+    # Every command before the first stop is part of the drive, including
+    # the commands just before the switch, so none may use another speed.
+    driving = [item for item in samples
+               if first_stop is None or item[0] < first_stop]
+    wrong_speed = next(
+        (item for item in driving
+         if not math.isclose(item[1], expected_linear, abs_tol=linear_tolerance)),
+        None,
     )
-    return {
+    # Driving forward is only credited for a drive that ends in a stop:
+    # a robot that never stops has not completed the motion it was given.
+    if not driving:
+        forward_problem = "no-drive"
+    elif wrong_speed is not None:
+        forward_problem = "wrong-speed"
+    elif first_stop is None:
+        forward_problem = "never-stopped"
+    elif first_stop < move_seconds - stop_tolerance:
+        forward_problem = "stopped-early"
+    else:
+        forward_problem = ""
+    forward_ok = not forward_problem
+    checks = {
         "forward-motion": forward_ok,
-        # Straight driving is only evidence when the robot actually drives;
-        # a node that never moves must not earn this credit.
+        # Straight driving is only evidence when the robot actually drives
+        # and then stops; a node that never moves or never stops earns none.
         # The unused components must stay zero in every command, moving or stopped.
         "straight-motion": forward_ok and unused_ok and all(
             abs(item[2]) <= angular_tolerance for item in samples
@@ -78,6 +104,36 @@ def motion_checks(messages, expected_linear, linear_tolerance,
         ),
         "unused-axes-zero": unused_ok,
     }
+    return {
+        "checks": checks,
+        "forward_problem": forward_problem,
+        "wrong_speed": wrong_speed,
+        "first_stop": first_stop,
+    }
+
+
+def forward_message(evidence, expected_linear: float) -> str:
+    problem = evidence["forward_problem"]
+    if not problem:
+        return "Forward velocity is correct, and the drive ends with a stop."
+    if problem == "wrong-speed":
+        item = evidence["wrong_speed"]
+        return (
+            f"At {item[0]:.1f} s after the first command, linear.x was {item[1]:.2f} m/s. "
+            f"Every command before the stop must use linear.x = {expected_linear:.2f} m/s; "
+            "then switch directly to a full stop."
+        )
+    if problem == "never-stopped":
+        return (
+            "The robot never stopped. Forward-motion credit requires driving at "
+            f"{expected_linear:.2f} m/s and then publishing zero velocity after about five seconds."
+        )
+    if problem == "stopped-early":
+        return (
+            f"The robot stopped {evidence['first_stop']:.1f} s after the first command. "
+            f"Keep linear.x at {expected_linear:.2f} m/s for about five seconds before stopping."
+        )
+    return f"Set linear.x to {expected_linear:.2f} m/s during the movement period."
 
 
 def main() -> None:
@@ -147,9 +203,10 @@ def main() -> None:
 
     duration = messages[-1][0] - messages[0][0] if len(messages) > 1 else 0.0
     publish_rate = (len(messages) - 1) / duration if duration > 0 else 0.0
-    checks = motion_checks(messages, expected_linear, linear_tolerance,
-                           angular_tolerance, move_seconds, stop_tolerance,
-                           minimum_rate, observation_seconds)
+    evidence = motion_evidence(messages, expected_linear, linear_tolerance,
+                               angular_tolerance, move_seconds, stop_tolerance,
+                               minimum_rate, observation_seconds)
+    checks = evidence["checks"]
     forward_ok = checks["forward-motion"]
     straight_ok = checks["straight-motion"]
     stop_ok = checks["safe-stop"]
@@ -189,12 +246,12 @@ def main() -> None:
         result(
             "forward-motion",
             forward_ok,
-            "Forward velocity is correct." if forward_ok else "Set linear.x to 0.20 m/s during the movement period.",
+            forward_message(evidence, expected_linear),
         ),
         result(
             "straight-motion",
             straight_ok,
-            "Angular velocity remains zero while driving forward." if straight_ok else "Drive forward at 0.20 m/s and keep angular.z at zero." + unused_hint,
+            "Angular velocity remains zero while driving forward." if straight_ok else "Drive forward at 0.20 m/s, keep angular.z at zero, and then stop." + unused_hint,
         ),
         result(
             "safe-stop",

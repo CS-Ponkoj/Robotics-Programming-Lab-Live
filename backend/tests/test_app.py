@@ -334,7 +334,7 @@ def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
     assert response.status_code == 200
     assignments = response.json()["assignments"]
     assert [assignment["id"] for assignment in assignments] == [1, 2, 3, 4, 5, 6]
-    assert [assignment["version"] for assignment in assignments] == [17, 16, 18, 16, 11, 11]
+    assert [assignment["version"] for assignment in assignments] == [17, 16, 18, 16, 12, 12]
     assert all(assignment["stable_id"] for assignment in assignments)
     assert all(assignment["solution_html"] == "" for assignment in assignments)
     assert all(assignment["vals"] == {} for assignment in assignments)

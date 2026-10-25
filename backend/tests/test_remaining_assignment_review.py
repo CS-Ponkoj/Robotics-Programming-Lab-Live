@@ -137,7 +137,8 @@ def test_all_ros_weight_combinations(i):
 def motion_checks():
     # Extract the pure function without requiring host ROS installation.
     tree = ast.parse((ROOT / 'backend/ros2_topic_harness.py').read_text(encoding='utf-8'))
-    wanted = {'motion_checks', 'unused_axes_zero', 'is_stop', 'STOP_TOLERANCE'}
+    wanted = {'motion_checks', 'motion_evidence', 'unused_axes_zero', 'is_stop',
+              'STOP_TOLERANCE'}
     nodes = [
         item for item in tree.body
         if (isinstance(item, ast.FunctionDef) and item.name in wanted)
@@ -182,7 +183,9 @@ def test_ros_unused_twist_fields_must_stay_zero(field, value):
         extras[field] = value
         return (n / 10, 0.2 if n < 50 else 0.0, 0.0, *extras)
     checks = motion_checks()([sample(n) for n in range(80)], 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
-    assert checks['forward-motion']
+    # A nonzero unused field means the robot never fully stops, so the drive
+    # never ends and earns no forward credit either.
+    assert not checks['forward-motion']
     assert not checks['straight-motion']
     assert not checks['safe-stop']
     assert not checks['hold-stop']
@@ -201,6 +204,123 @@ def test_ros_clean_six_field_commands_pass_every_motion_check():
     samples = [(n / 10, 0.2 if n < 50 else 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) for n in range(80)]
     checks = motion_checks()(samples, 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
     assert all(checks.values())
+
+
+def forward_samples(stop_at, speed=lambda t: 0.2, count=80):
+    return [(n / 10, speed(n / 10) if n / 10 < stop_at else 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            for n in range(count)]
+
+
+def test_ros_never_stopping_robot_earns_no_motion_credit():
+    checks = motion_checks()(forward_samples(99), 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
+    assert not any(checks[name] for name in
+                   ('forward-motion', 'straight-motion', 'safe-stop', 'hold-stop'))
+
+
+@pytest.mark.parametrize('stop_at', [5.6, 6.0, 7.0])
+def test_ros_late_stop_keeps_forward_credit_but_not_stop_credit(stop_at):
+    checks = motion_checks()(forward_samples(stop_at), 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
+    assert checks['forward-motion'] and checks['straight-motion']
+    assert not checks['safe-stop'] and not checks['hold-stop']
+
+
+def test_ros_early_stop_earns_no_forward_credit():
+    checks = motion_checks()(forward_samples(4.0), 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
+    assert not checks['forward-motion'] and not checks['safe-stop']
+
+
+@pytest.mark.parametrize('stop_at', [4.6, 5.0, 5.4])
+def test_ros_switch_time_may_vary_inside_the_stop_window(stop_at):
+    checks = motion_checks()(forward_samples(stop_at), 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
+    assert all(checks.values())
+
+
+@pytest.mark.parametrize('wrong', [0.9, 0.1, 0.0, -0.2])
+@pytest.mark.parametrize('from_time', [4.4, 4.6, 4.9])
+def test_ros_wrong_speed_just_before_the_stop_fails_forward_motion(wrong, from_time):
+    def speed(t):
+        return 0.2 if t < from_time - 1e-9 else wrong
+    samples = [list(item) for item in forward_samples(5.0, speed)]
+    if wrong == 0.0:
+        # linear.x = 0 with a turn is not a stop and not a forward command.
+        for item in samples:
+            if from_time - 1e-9 <= item[0] < 5.0:
+                item[2] = 0.005
+    checks = motion_checks()([tuple(item) for item in samples], 0.2, 0.02, 0.01, 5, 0.5, 5, 7.9)
+    assert not checks['forward-motion']
+    assert not checks['straight-motion']
+
+
+def test_ros_forward_failure_reasons_are_specific():
+    scope = motion_checks().__globals__
+    evidence = scope['motion_evidence']
+    fast = forward_samples(5.0, lambda t: 0.9 if t >= 4.6 else 0.2)
+    assert evidence(fast, 0.2, 0.02, 0.01, 5, 0.5)['forward_problem'] == 'wrong-speed'
+    assert evidence(forward_samples(99), 0.2, 0.02, 0.01, 5, 0.5)['forward_problem'] == 'never-stopped'
+    assert evidence(forward_samples(4.0), 0.2, 0.02, 0.01, 5, 0.5)['forward_problem'] == 'stopped-early'
+    assert evidence(forward_samples(5.0), 0.2, 0.02, 0.01, 5, 0.5)['forward_problem'] == ''
+
+
+def attribute_commands():
+    tree = ast.parse((ROOT / 'backend/ros2_obstacle_harness.py').read_text(encoding='utf-8'))
+    nodes = [item for item in tree.body
+             if isinstance(item, ast.FunctionDef) and item.name == 'attribute_commands']
+    scope = {}
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), '<attribute>', 'exec'), scope)
+    return scope['attribute_commands']
+
+
+def phase_scans(phases=('clear', 'obstacle', 'resume'), per_phase=10, period=0.08):
+    return [(index * period, phase)
+            for index, phase in enumerate(p for p in phases for _ in range(per_phase))]
+
+
+def test_obstacle_commands_pair_with_their_scan_despite_transport_delay():
+    scans = phase_scans()
+    # Replies arrive up to 1.5 scan periods late; order still identifies them.
+    commands = [(time + 0.12, 0.0 if phase == 'obstacle' else 0.2) for time, phase in scans]
+    paired, exact = attribute_commands()(scans, commands)
+    assert exact
+    assert all((phase == 'obstacle') == (command[1] == 0.0) for phase, command in paired)
+
+
+@pytest.mark.parametrize('lag', [1, 2, 3])
+def test_obstacle_lagging_replies_are_judged_against_the_newer_scan(lag):
+    scans = phase_scans()
+    decisions = [0.0 if phase == 'obstacle' else 0.2 for _time, phase in scans]
+    lagged = [decisions[max(0, index - lag)] for index in range(len(decisions))]
+    commands = [(time + 0.002, value) for (time, _phase), value in zip(scans, lagged)]
+    paired, exact = attribute_commands()(scans, commands)
+    assert exact
+    wrong = [phase for phase, command in paired
+             if (phase == 'obstacle') != (command[1] == 0.0)]
+    assert wrong.count('obstacle') == lag and wrong.count('resume') == lag
+
+
+def test_obstacle_fallback_excuses_only_one_in_flight_command_per_phase():
+    scans = phase_scans()
+    decisions = [0.0 if phase == 'obstacle' else 0.2 for _time, phase in scans]
+    # An extra command breaks one-to-one pairing, so arrival time decides.
+    commands = [(time + 0.002, value) for (time, _phase), value in zip(scans, decisions)]
+    commands.insert(0, (0.001, 0.2))
+    in_flight = [(time + 0.002, decisions[max(0, index - 1)])
+                 for index, (time, _phase) in enumerate(scans)] + [(2.5, 0.2)]
+    for sample in (commands, in_flight):
+        paired, exact = attribute_commands()(scans, sample)
+        assert not exact
+        assert all((phase == 'obstacle') == (command[1] == 0.0) for phase, command in paired)
+    lag_two = [(time + 0.002, decisions[max(0, index - 2)])
+               for index, (time, _phase) in enumerate(scans)] + [(2.5, 0.2)]
+    paired, _exact = attribute_commands()(scans, lag_two)
+    assert any((phase == 'obstacle') != (command[1] == 0.0) for phase, command in paired)
+
+
+def test_obstacle_command_before_any_scored_scan_is_not_paired():
+    scans = phase_scans()
+    commands = [(time - 0.01, 0.2) for time, _phase in scans]
+    paired, exact = attribute_commands()(scans, commands)
+    assert not exact
+    assert len(paired) < len(commands)
 
 
 @pytest.mark.parametrize('i', [5, 6])

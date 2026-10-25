@@ -81,12 +81,14 @@ def test_ros_states_import_allowlist_shutdown_and_measured_numbers():
     for number_text in ("about 8 seconds", "at least 5 commands per second",
                         "0.20 &plusmn; 0.02 m/s", "&plusmn;0.01 rad/s", "&plusmn;0.001",
                         "between 4.5 and 5.5 seconds", "do not add extra timers",
-                        "passing the integer 10"):
+                        "passing the integer 10", "Every command before the first stop",
+                        "at most 40%"):
         assert number_text in drive
     obstacle = source(6)["assignment_html"]
     assert "and one Twist decision per scan" in obstacle
     assert "and timing" not in obstacle
-    for number_text in ("about 0.8 seconds", "about 0.25 seconds",
+    assert "about 0.25 seconds" not in obstacle
+    for number_text in ("about 0.8 seconds", "checked against the scan that triggered its callback",
                         "at least 3 commands per second", "do not filter beams by angle"):
         assert number_text in obstacle
     # Positive infinity is a conservative "no usable distance" rule, not "invalid".

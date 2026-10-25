@@ -34,6 +34,44 @@ def unused_axes_zero(item) -> bool:
                for value in item[4:])
 
 
+def attribute_commands(scans, commands):
+    """Pair each received command with the scan it answers.
+
+    ``scans`` holds ``(published_at, phase)`` for every scored scan and
+    ``commands`` holds ``(received_at, *twist_fields)``. The audit already
+    requires exactly one command per scan callback and both topics are
+    reliable and ordered, so when the counts match, the n-th command answers
+    the n-th scan regardless of transport delay. A command can never answer a
+    scan that had not been published yet; if that happens, or the counts
+    differ, each command is paired with the latest scan published before it
+    arrived, and the first command of each later phase is excused because it
+    may have been in flight when the phase changed.
+
+    Returns ``(phase, command)`` pairs and whether exact pairing was used.
+    """
+    if not scans:
+        return [], True
+    if len(commands) == len(scans) and all(
+        command[0] >= scan[0] for command, scan in zip(commands, scans)
+    ):
+        return [(scan[1], command) for scan, command in zip(scans, commands)], True
+    paired = []
+    previous_phase = None
+    for command in commands:
+        earlier = [scan for scan in scans if scan[0] <= command[0]]
+        if not earlier:
+            continue
+        phase = earlier[-1][1]
+        if previous_phase is not None and phase != previous_phase and not any(
+            item[0] == phase for item in paired
+        ):
+            previous_phase = phase
+            continue
+        previous_phase = phase
+        paired.append((phase, command))
+    return paired, False
+
+
 def main() -> None:
     config = json.loads(os.environ.get("ROS_GRADER_CONFIG", "{}"))
     package = str(config.get("package_name", "reactive_navigation"))
@@ -47,8 +85,7 @@ def main() -> None:
     minimum_rate = float(config.get("minimum_publish_rate_hz", 3.0))
 
     messages: list[tuple] = []
-    current_phase = "startup"
-    phase_started_at = time.monotonic()
+    scans: list[tuple[float, str]] = []
 
     rclpy.init(args=None)
     monitor = Node(f"grader_obstacle_monitor_{os.getpid()}")
@@ -56,8 +93,7 @@ def main() -> None:
     def receive(message: Twist) -> None:
         messages.append(
             (
-                current_phase,
-                time.monotonic() - phase_started_at,
+                time.monotonic(),
                 float(message.linear.x),
                 float(message.angular.z),
                 float(message.linear.y),
@@ -94,11 +130,9 @@ def main() -> None:
 
     def wait_for_controller(timeout: float = 5.0) -> bool:
         """Wait for ROS discovery and one end-to-end scan response."""
-        nonlocal current_phase, phase_started_at
-        current_phase = "readiness"
-        phase_started_at = time.monotonic()
-        deadline = phase_started_at + timeout
-        next_publish = phase_started_at
+        started = time.monotonic()
+        deadline = started + timeout
+        next_publish = started
         while time.monotonic() < deadline:
             if student.poll() is not None:
                 return False
@@ -115,14 +149,29 @@ def main() -> None:
                 return True
         return False
 
+    def drain(expected: int, limit: float, quiet: float) -> None:
+        """Spin without publishing until replies stop or all are counted."""
+        started = time.monotonic()
+        last_count, last_change = len(messages), started
+        while time.monotonic() - started < limit:
+            rclpy.spin_once(monitor, timeout_sec=0.02)
+            now = time.monotonic()
+            if len(messages) != last_count:
+                last_count, last_change = len(messages), now
+            if expected and len(messages) >= expected:
+                return
+            if now - last_change >= quiet:
+                return
+            if student.poll() is not None:
+                return
+
     def run_phase(name: str, ranges: list[float], duration: float) -> None:
-        nonlocal current_phase, phase_started_at
-        current_phase = name
         phase_started_at = time.monotonic()
         next_publish = phase_started_at
         while time.monotonic() - phase_started_at < duration:
             now = time.monotonic()
             if now >= next_publish:
+                scans.append((time.monotonic(), name))
                 scan_publisher.publish(scan_message(ranges))
                 next_publish = now + 0.08
             rclpy.spin_once(monitor, timeout_sec=0.03)
@@ -145,11 +194,17 @@ def main() -> None:
     phase_duration = 0.8
     try:
         controller_ready = wait_for_controller()
+        if controller_ready:
+            # Let replies to readiness scans arrive so none is mistaken for
+            # a reply to a scored scan.
+            drain(0, 2.0, 0.3)
         # Readiness traffic must never count as scored student evidence.
         messages.clear()
         if controller_ready:
             for phase, ranges in phases:
                 run_phase(phase, ranges, phase_duration)
+            # Collect the reply to the final scan before judging.
+            drain(len(scans), 1.0, 0.5)
     finally:
         alive_at_end = student.poll() is None
         if alive_at_end:
@@ -163,13 +218,16 @@ def main() -> None:
     student_stdout, student_stderr = student.communicate(timeout=1)
     one_command = exactly_one_per_callback(audit_fd)
 
-    settled = [item for item in messages if item[1] >= 0.25]
+    # Every command is judged against the scan it answers, so a controller
+    # that reacts to an older scan fails as soon as the scan state changes.
+    paired, _exact = attribute_commands(scans, messages)
+    settled = [(phase, *command) for phase, command in paired]
     by_phase = {
         phase: [item for item in settled if item[0] == phase]
         for phase, _ranges in phases
     }
     observed_duration = len(phases) * phase_duration
-    publish_rate = len(settled) / observed_duration
+    publish_rate = len(messages) / observed_duration
 
     def forward_ok(phase: str) -> bool:
         samples = by_phase[phase]
@@ -203,6 +261,7 @@ def main() -> None:
     )
     unused_ok = all(unused_axes_zero(item) for item in settled)
     unused_hint = "" if unused_ok else " " + UNUSED_AXES_MESSAGE
+    scan_hint = " Each command is checked against the scan that triggered its callback."
     straight_ok = moves_when_clear and unused_ok and all(
         abs(item[3]) <= angular_tolerance for item in settled
     )
@@ -244,21 +303,21 @@ def main() -> None:
             clear_ok,
             "Clear-path forward velocity is correct."
             if clear_ok
-            else "Set linear.x to 0.20 m/s when every usable obstacle distance is greater than the stop threshold." + unused_hint,
+            else "Set linear.x to 0.20 m/s when every usable obstacle distance is greater than the stop threshold." + scan_hint + unused_hint,
         ),
         result(
             "obstacle-stop",
             obstacle_ok,
             f"The robot stops when an obstacle is within {stop_distance:.2f} m."
             if obstacle_ok
-            else f"Move forward on a clear scan, and publish zero velocity when an obstacle is at or within {stop_distance:.2f} m." + unused_hint,
+            else f"Move forward on a clear scan, and publish zero velocity when an obstacle is at or within {stop_distance:.2f} m." + scan_hint + unused_hint,
         ),
         result(
             "invalid-scan-stop",
             invalid_ok,
             "The robot stops when the scan has no usable distance."
             if invalid_ok
-            else "Move forward on a clear scan, and stop (publish zero velocity) when the scan has no usable distance: no finite reading greater than zero." + unused_hint,
+            else "Move forward on a clear scan, and stop (publish zero velocity) when the scan has no usable distance: no finite reading greater than zero." + scan_hint + unused_hint,
         ),
         result(
             "straight-motion",
@@ -290,7 +349,7 @@ def main() -> None:
                 ),
                 "runtime_error": runtime_error,
                 "output": (
-                    f"Observed {len(settled)} settled Twist messages at approximately {publish_rate:.1f} Hz."
+                    f"Observed {len(messages)} Twist messages for {len(scans)} scans at approximately {publish_rate:.1f} Hz."
                     + (
                         f"\nNode stdout: {student_stdout.strip()[-1000:]}"
                         if student_stdout.strip()
