@@ -67,6 +67,12 @@ GRADED_ASSIGNMENTS = {
     ("obstacle-avoidance", "assignment-vfh"): 4,
 }
 
+# Readable titles where a folder name is only an abbreviation.
+SECTION_TITLES = {
+    ("obstacle-avoidance", "assignment-oa"): "Multi-Floor Office Navigation",
+    ("obstacle-avoidance", "assignment-vfh"): "Simplified VFH",
+}
+
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
 ANSWER_START = re.compile(
     r"^(?:(?:answer|solution|solutions)\s*(?::|$)|solution outline\b|instructor notes?\b)",
@@ -522,9 +528,14 @@ def build() -> None:
                 exercise_files[path.parent].append(path)
         for directory, files in sorted(exercise_files.items()):
             section_id = slug(str(directory.relative_to(topic_root)))
-            name = label_for_group(directory, topic_root)
+            name = SECTION_TITLES.get(
+                (topic_id, section_id), label_for_group(directory, topic_root)
+            )
             pieces = []
             assignment_number = GRADED_ASSIGNMENTS.get((topic_id, section_id))
+            if assignment_number is not None:
+                # Tie the practice page to the graded assignment by number.
+                name = f"{name} (practice for Assignment {assignment_number})"
             if assignment_number is not None:
                 pieces.append(
                     "<p><strong>Note:</strong> This is the original practice version of "
