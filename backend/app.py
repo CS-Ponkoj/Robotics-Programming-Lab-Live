@@ -268,6 +268,10 @@ def create_app(
                     content={"error": "Request body is too large."},
                 )
         response = await call_next(request)
+        # Without a charset, browser clients decode JSON as Latin-1 and show
+        # printed text such as "→" as mojibake.
+        if response.headers.get("content-type") == "application/json":
+            response.headers["content-type"] = "application/json; charset=utf-8"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"

@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 from pathlib import Path
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -10,6 +12,7 @@ from typing import Protocol
 import httpx
 
 
+logger = logging.getLogger(__name__)
 WORKER_PATH = Path(__file__).with_name("submission_worker.py")
 REMOTE_RETRY_DELAYS_SECONDS = (2.0, 4.0, 8.0, 12.0, 16.0, 20.0)
 REMOTE_RETRYABLE_STATUS_CODES = {429, 502, 503, 504}
@@ -47,7 +50,8 @@ class SubprocessSandbox:
                     [sys.executable, "-I", str(WORKER_PATH)],
                     input=request_data,
                     capture_output=True,
-                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=self.timeout_seconds,
                     check=False,
                     cwd=workdir,
@@ -103,11 +107,16 @@ class DockerSandbox:
 
     def execute(self, code: str, result_names: list[str]) -> dict:
         request_data = json.dumps({"code": code, "result_names": result_names})
+        # A known name lets the API remove the container itself; killing only
+        # the docker CLI client leaves an endless loop running in it.
+        container_name = f"rpl-python-{secrets.token_hex(8)}"
         command = [
             "docker",
             "run",
             "--rm",
             "-i",
+            "--name",
+            container_name,
             "--network",
             "none",
             "--memory",
@@ -123,11 +132,23 @@ class DockerSandbox:
                 command,
                 input=request_data,
                 capture_output=True,
-                text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.timeout_seconds + 3,
                 check=False,
             )
-        except (FileNotFoundError, subprocess.TimeoutExpired) as error:
+        except subprocess.TimeoutExpired:
+            _remove_container(container_name)
+            return {
+                "success": False,
+                "error": (
+                    "TimeoutError in submission: execution exceeded "
+                    f"{self.timeout_seconds:g} seconds"
+                ),
+                "output": "",
+                "values": {},
+            }
+        except FileNotFoundError as error:
             return {
                 "success": False,
                 "error": f"Docker sandbox unavailable: {error}",
@@ -150,6 +171,18 @@ class DockerSandbox:
                 "output": "",
                 "values": {},
             }
+
+
+def _remove_container(name: str) -> None:
+    try:
+        subprocess.run(
+            ["docker", "rm", "--force", name],
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        logger.warning("Could not remove sandbox container %s", name)
 
 
 class RemoteSandbox:

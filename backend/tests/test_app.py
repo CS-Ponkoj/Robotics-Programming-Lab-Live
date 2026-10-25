@@ -85,6 +85,11 @@ def test_health_reports_fastapi_platform(client):
     }
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
+    # Browsers decode JSON without a charset as Latin-1.
+    assert response.headers["content-type"] == "application/json; charset=utf-8"
+    assert client.get("/missing").headers["content-type"] == (
+        "application/json; charset=utf-8"
+    )
 
 
 def test_production_configuration_rejects_ephemeral_or_open_defaults(tmp_path):
