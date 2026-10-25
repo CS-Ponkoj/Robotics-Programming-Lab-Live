@@ -4,6 +4,12 @@
 {
 	admin off
 	auto_https off
+	servers {
+		# cloudflared on this PC reports the visitor's real scheme (https) and
+		# address; keep them so the API builds correct redirect URLs and
+		# rate-limits per visitor instead of treating everyone as 127.0.0.1.
+		trusted_proxies static 127.0.0.1/32 ::1/128
+	}
 }
 
 # Any Host header (the tunnel sends rpl.ponkoj.com), but only on localhost.

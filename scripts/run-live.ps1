@@ -78,7 +78,7 @@ $release = (git -C $repositoryRoot rev-parse HEAD).Trim()
 $env:RENDER_GIT_COMMIT = $release
 
 Start-Process -FilePath $python -WindowStyle Hidden -WorkingDirectory $backendRoot `
-    -ArgumentList @("-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "$BackendPort", "--proxy-headers", "--no-server-header") `
+    -ArgumentList @("-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "$BackendPort", "--proxy-headers", "--root-path", "/api", "--no-server-header") `
     -RedirectStandardOutput (Join-Path $logs "api.out.log") -RedirectStandardError (Join-Path $logs "api.err.log")
 
 Start-Process -FilePath $python -WindowStyle Hidden `
