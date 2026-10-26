@@ -7,6 +7,13 @@ and verification records.
 ## Architecture and planning
 
 - [Project vision, architecture, and delivery plan](architecture/PROJECT_VISION_ARCHITECTURE_AND_DELIVERY_PLAN.md)
+- System architecture blueprint (owner-editable, describes the live app):
+  [PRD](system-architecture/PRD.md) ·
+  [AppFlow](system-architecture/AppFlow.md) ·
+  [UI_Spec](system-architecture/UI_Spec.md) ·
+  [TRD](system-architecture/TRD.md) ·
+  [Schema](system-architecture/Schema.md) ·
+  [Plan](system-architecture/Plan.md)
 
 ## Local operation
 
