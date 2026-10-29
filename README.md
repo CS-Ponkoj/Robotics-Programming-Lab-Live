@@ -1,6 +1,5 @@
 # Robotics Programming Lab
 
-[![CI](https://github.com/CS-Ponkoj/Robotics-Programming-Lab-Live/actions/workflows/ci.yml/badge.svg)](https://github.com/CS-Ponkoj/Robotics-Programming-Lab-Live/actions/workflows/ci.yml)
 [![Live](https://img.shields.io/badge/live-rpl.ponkoj.com-19778C)](https://rpl.ponkoj.com/app)
 
 A classroom and research platform for robotics programming. Students read
