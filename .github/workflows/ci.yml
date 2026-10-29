@@ -103,7 +103,7 @@ jobs:
           test "$status" = "401"
 
   ros2-grader-image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Build pinned ROS 2 grader image
