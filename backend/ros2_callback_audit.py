@@ -12,6 +12,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 
 _ROS_LOG_LINE = re.compile(r"^\[(?:DEBUG|INFO|WARN|WARNING)\]")
@@ -139,7 +140,15 @@ def instrument(node_class, publisher_class, report_fd, kind, topic, scan_topic):
             depth = qos_profile if isinstance(qos_profile, int) else qos_profile.depth
             if depth != 10:
                 report(False)
-        return original_publisher(node, msg_type, topic_name, qos_profile, *args, **kwargs)
+        publisher = original_publisher(node, msg_type, topic_name, qos_profile, *args, **kwargs)
+        subscribers = getattr(publisher, "get_subscription_count", None)
+        if absolute_topic(topic_name) == topic and subscribers is not None:
+            # On slow hosts DDS discovery can take seconds; without this wait the
+            # grader misses the first commands and a full drive looks short.
+            deadline = time.monotonic() + 5.0
+            while subscribers() == 0 and time.monotonic() < deadline:
+                time.sleep(0.05)
+        return publisher
 
     publisher_class.publish = publish
     node_class.create_timer = timer
