@@ -1,5 +1,8 @@
 # Robotics Programming Lab
 
+[![CI](https://github.com/CS-Ponkoj/Robotics-Programming-Lab-Live/actions/workflows/ci.yml/badge.svg)](https://github.com/CS-Ponkoj/Robotics-Programming-Lab-Live/actions/workflows/ci.yml)
+[![Live](https://img.shields.io/badge/live-rpl.ponkoj.com-19778C)](https://rpl.ponkoj.com/app)
+
 A classroom and research platform for robotics programming. Students read
 short lessons, take topic quizzes, and complete versioned Python and ROS 2
 assignments in the browser. Every submission is graded by test cases on the
@@ -11,6 +14,26 @@ research analytics. AI tutoring is optional and off by default.
 This is the **live repository**: `main` is the release currently running at
 the address above. New work is developed and checked in a separate staging
 repository first.
+
+![Assignment workspace after a test run](docs/images/readme/workspace.png)
+
+## Tour
+
+Screenshots are from the live site using **Try the student demo**.
+
+| | |
+|---|---|
+| ![Sign-in page](docs/images/readme/login.png) | ![Home page with assignment cards](docs/images/readme/home.png) |
+| **Sign in or try the demo.** No account needed for the demo, and nothing is saved. | **Home.** A learning path, progress, and the six assignments. |
+| ![Instructions with a scenario diagram](docs/images/readme/instructions.png) | ![Try your own inputs dialog](docs/images/readme/try_inputs.png) |
+| **Instructions beside the code.** Scenario, task, and rules with to-scale diagrams. | **Try inputs.** Call your own function with chosen values. Not graded or saved. |
+| ![Course contents with six topics](docs/images/readme/contents.png) | ![Obstacle Avoidance lesson page](docs/images/readme/topic.png) |
+| **Course contents.** Six topics, each with a lesson, exercises, and a quiz. | **Lessons.** Readable pages with a jump-to-section menu. |
+
+<p align="center">
+  <img src="docs/images/readme/phone_workspace.png" alt="Workspace on a phone" width="260"><br>
+  <em>The same workspace on a phone: Code and Instructions tabs, terminal under the editor.</em>
+</p>
 
 ## What it does
 
@@ -117,6 +140,8 @@ docs/                 Architecture, deployment, research, and QA records
 scripts/              Setup, run, stop, live hosting, and verification scripts
 ```
 
-More detail: [documentation index](docs/README.md),
+More detail: the [system architecture blueprint](docs/system-architecture/PRD.md)
+(PRD, app flow, UI spec, technical requirements, data schema, and plan),
+the [documentation index](docs/README.md),
 [backend notes](backend/README.md), and the engineering rules in
 [AGENTS.md](AGENTS.md).
