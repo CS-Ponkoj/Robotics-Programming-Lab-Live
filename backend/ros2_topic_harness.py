@@ -235,8 +235,15 @@ def main() -> None:
     student_started_at = time.monotonic()
     student, audit_fd = launch_student(package, executable, "timer", topic)
     started_at = time.monotonic()
+    observation_end = observation_seconds
     try:
-        while time.monotonic() - started_at < observation_seconds:
+        while time.monotonic() - started_at < observation_end:
+            if messages:
+                # A slow DDS discovery delays the first command; keep the full
+                # drive-and-hold window after it, but never extend more than 5 s.
+                observation_end = max(observation_seconds, min(
+                    messages[0][0] + move_seconds + stop_tolerance + 0.8,
+                    observation_seconds + 5.0))
             rclpy.spin_once(monitor, timeout_sec=0.05)
             if student.poll() is not None:
                 break
@@ -257,7 +264,7 @@ def main() -> None:
     publish_rate = (len(messages) - 1) / duration if duration > 0 else 0.0
     evidence = motion_evidence(messages, expected_linear, linear_tolerance,
                                angular_tolerance, move_seconds, stop_tolerance,
-                               minimum_rate, observation_seconds)
+                               minimum_rate, observation_end)
     checks = evidence["checks"]
     forward_ok = checks["forward-motion"]
     straight_ok = checks["straight-motion"]
@@ -276,7 +283,7 @@ def main() -> None:
     # A node that is alive but went quiet (for example, a cancelled timer)
     # needs that fact first, not a generic queue-depth reminder.
     last_message = messages[-1][0] if messages else 0.0
-    went_quiet = alive_at_end and bool(messages) and last_message < observation_seconds - 1.0
+    went_quiet = alive_at_end and bool(messages) and last_message < observation_end - 1.0
     if publishing_ok:
         publishing_message = "Exactly one Twist command was published per timer callback on /cmd_vel."
     elif went_quiet:
