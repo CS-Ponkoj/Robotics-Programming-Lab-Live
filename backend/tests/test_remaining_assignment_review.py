@@ -158,6 +158,18 @@ def test_ros_timing_does_not_reward_late_stops(launch_delay, stop_at, valid):
     assert motion_checks()(samples, 0.2, 0.02, 0.01, 5, 0.5)['safe-stop'] == valid
 
 
+@pytest.mark.parametrize('stop_at,valid', [(5.0, True), (2.0, False)])
+def test_ros_late_first_command_keeps_full_drive_and_hold(stop_at, valid):
+    # Slow DDS discovery: the first command arrives 3 s after launch, and the
+    # harness extends the window to 3 + 5 + 0.5 + 0.8 = 9.3 s.
+    samples = [(3.0 + n / 10, 0.2 if n / 10 < stop_at else 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+               for n in range(64)]
+    checks = motion_checks()(samples, 0.2, 0.02, 0.01, 5, 0.5, 5, 9.3)
+    assert checks['forward-motion'] == valid
+    assert checks['safe-stop'] == valid
+    assert checks['hold-stop'] == valid
+
+
 def test_ros_resuming_rotation_is_not_holding_a_safe_stop():
     samples = [(n / 10, 0.2 if n < 50 else 0.0, 0.1 if n > 60 else 0.0) for n in range(80)]
     assert not motion_checks()(samples, 0.2, 0.02, 0.01, 5, 0.5)['hold-stop']

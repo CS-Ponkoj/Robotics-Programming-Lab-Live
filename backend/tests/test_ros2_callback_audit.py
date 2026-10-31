@@ -164,3 +164,46 @@ def test_failure_summary_never_echoes_grader_paths():
 
     assert "/grader/" not in summary
     assert "RuntimeError: boom" in summary
+
+
+@pytest.mark.parametrize("counts,expected_polls", [([0, 0, 0, 1], 4), ([0] * 1000, None)])
+def test_cmd_vel_publisher_waits_for_the_grader_listener(monkeypatch, counts, expected_polls):
+    import ros2_callback_audit as audit
+
+    clock = [0.0]
+    monkeypatch.setattr(audit.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(audit.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    polls = []
+
+    class Publisher:
+        topic_name = "/cmd_vel"
+
+        def publish(self, message):
+            return message
+
+        def get_subscription_count(self):
+            polls.append(clock[0])
+            return counts[len(polls) - 1]
+
+    class Node:
+        def create_timer(self, period, callback):
+            return callback
+
+        def create_subscription(self, message_type, topic, callback, qos):
+            return callback
+
+        def create_publisher(self, message_type, topic, qos):
+            return Publisher()
+
+    read_fd, write_fd = os.pipe()
+    try:
+        instrument(Node, Publisher, write_fd, "timer", "/cmd_vel", "/scan")
+        assert isinstance(Node().create_publisher(object, "/cmd_vel", 10), Publisher)
+    finally:
+        os.close(write_fd)
+        os.close(read_fd)
+    if expected_polls is None:
+        # A listener that never appears must not hang the student's node.
+        assert 5.0 <= clock[0] < 5.2
+    else:
+        assert len(polls) == expected_polls
