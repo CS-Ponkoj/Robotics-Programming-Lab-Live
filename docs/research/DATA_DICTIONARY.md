@@ -169,6 +169,17 @@ function-assignment check that returned a wrong value (null when the check
 passed, crashed, or has no tag). Older records omit these fields; analyses
 must treat a missing value as not collected.
 
+For a ROS 2 assignment whose `grader_config` lists `gate_tests` and
+`pass_tests` (Assignment 7 onward), `score` is 0 whenever any gate check
+fails, and `passed` means every gate check and every listed pass check passed;
+other checks (code contract and code quality) add to `score` but do not decide
+`passed`. For every other assignment, `passed` still means every check passed.
+Assignment 7 also records read-only source checks of the submitted code
+(allowed imports, `build_node()` present, reads `scan.ranges`, no blocking
+loop or `sleep()`, unchanged `main()`, named constants, no unused imports) as
+ordinary `evidence.tests` items. They are computed in the grader container and
+store only the pass/fail result and a fixed message, never source text.
+
 | `reason` value | Simple meaning |
 |---|---|
 | `passed` | The check passed for every grading scenario |

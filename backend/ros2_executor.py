@@ -234,6 +234,9 @@ def _safe_config(config: dict) -> dict:
         "stop_tolerance_seconds",
         "minimum_publish_rate_hz",
         "test_weights",
+        "code_checks",
+        "skeleton_main",
+        "skeleton_imports",
     }
     return {key: value for key, value in config.items() if key in allowed}
 

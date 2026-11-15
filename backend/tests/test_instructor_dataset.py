@@ -122,7 +122,7 @@ def test_review_queue_lists_every_draft_case():
 def test_repository_instructor_dataset_is_complete_and_draft():
     datasets = load_instructor_datasets()
     inventory = summarize_instructor_datasets(datasets)
-    assert inventory.assignment_count == 6
+    assert inventory.assignment_count == 7
     assert inventory.case_count >= 27
     assert inventory.case_count == inventory.draft_count
     assert inventory.approved_count == 0

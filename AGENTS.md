@@ -69,7 +69,7 @@ functionality and must never depend on OpenAI.
 |---|---|---|
 | `C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging` | Canonical Windows staging checkout | Run ordinary local development, local execution, SQA, and staging Git work from this folder. It must track `CS-Ponkoj/Robotics-Programming-Lab-Staging`; do not treat temporary worktrees or `IUSE_Project-2026` as the canonical staging checkout. |
 | `CS-Ponkoj/Robotics-Programming-Lab-Staging` | Development, local execution, SQA, and release candidates | Make changes on focused branches and merge into staging `main` only after verification. |
-| `CS-Ponkoj/Robotics-Programming-Lab-Live`, checked out at `C:\RPL-Live` on the lab PC | RPL Live: the self-hosted classroom instance at `rpl.ponkoj.com` (Caddy, Cloudflare Tunnel, local PostgreSQL in Docker; see `docs/system-architecture/TRD.md`) | Its `main` receives only an approved, tested staging commit. In this checkout `origin` is the live repository, so any push to it is a live promotion and needs explicit owner approval. Start and stop the stack only with `scripts/run-live.ps1` and `scripts/stop-live.ps1`. It already serves Assignments 1-6, including the ROS Assignments 5 and 6. |
+| `CS-Ponkoj/Robotics-Programming-Lab-Live`, checked out at `C:\RPL-Live` on the lab PC | RPL Live: the self-hosted classroom instance at `rpl.ponkoj.com` (Caddy, Cloudflare Tunnel, local PostgreSQL in Docker; see `docs/system-architecture/TRD.md`) | Its `main` receives only an approved, tested staging commit. In this checkout `origin` is the live repository, so any push to it is a live promotion and needs explicit owner approval. Start and stop the stack only with `scripts/run-live.ps1` and `scripts/stop-live.ps1`. It serves Assignments 1-7, including the ROS Assignments 5, 6, and 7. |
 | `CS-Ponkoj/Robotics-Programming-Lab` | Earlier hosted deployment on Vercel and Render; `scripts/promote-release.ps1` still targets it through the `production` remote | Production `main` receives only an approved, tested staging commit. Do not patch it directly. |
 | Secondary Windows or Ubuntu laptop/lab checkout | Temporary local clone outside OneDrive | Clone or fast-forward from staging Git. Never copy generated environments or build caches between computers. |
 | Repository-root `.env` | Ignored private local configuration | Contains Neon and optional AI settings; it does not contain accounts or the active database. Never commit or publicly share it. |
@@ -80,7 +80,7 @@ functionality and must never depend on OpenAI.
 
 Promote production-ready changes by reviewed Git commits, never by copying files
 between repositories. RPL Live runs the ROS 2 grader on the lab PC and serves
-the ROS Assignments 5 and 6. New assignments reach it only after they pass on
+the ROS Assignments 5, 6, and 7. New assignments reach it only after they pass on
 staging and the owner approves the live promotion.
 
 The Vercel and Render deployment intentionally remains on Assignments 1-4,

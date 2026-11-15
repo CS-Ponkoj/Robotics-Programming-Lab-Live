@@ -72,11 +72,25 @@ class Ros2TopicGrader:
             ]
         score = round((passed_weight / total_weight) * 100) if total_weight else 0
         execution_succeeded = result.get("success") is True
+        # Open-structure tasks: a failed gate test (imports, entry point,
+        # build, start) scores 0, and passing is decided by the listed tests
+        # only, so style points never decide whether the task is passed.
+        outcome = {item.test_id: item.passed for item in evidence}
+        gate = [str(test_id) for test_id in config.get("gate_tests", [])]
+        if gate and not all(outcome.get(test_id, False) for test_id in gate):
+            score = 0
+        required = [str(test_id) for test_id in config.get("pass_tests", [])]
+        if required:
+            passed = execution_succeeded and all(
+                outcome.get(test_id, False) for test_id in gate + required
+            )
+        else:
+            passed = execution_succeeded and bool(evidence) and all(
+                item.passed for item in evidence
+            )
         return GradeResult(
             execution_succeeded=execution_succeeded,
-            passed=execution_succeeded and bool(evidence) and all(
-                item.passed for item in evidence
-            ),
+            passed=passed,
             score=score,
             code_output=result.get("output", ""),
             execution_error="" if execution_succeeded else result.get("error", ""),

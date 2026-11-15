@@ -1,0 +1,285 @@
+{
+  "id": 7,
+  "stable_id": "ros2-wall-stop",
+  "version": 1,
+  "data_schema_version": 1,
+  "title": "Assignment 7: Stop Before the Wall with ROS 2",
+  "description": "Write a complete ROS 2 node in build_node() that drives forward and stops before a wall, using the readings straight ahead in a 270-degree scan.",
+  "assignment_html": "<p><strong>Scenario</strong></p><p><strong>Purpose:</strong> Write a complete ROS 2 node that drives a robot forward and stops it before it reaches a wall. You decide how to read the scan and how to structure the node.</p><p>The robot has a laser scanner on <code>/scan</code> and takes velocity commands on <code>/cmd_vel</code>. Unlike Assignment 6, this scan covers the sides as well as the front, so you need the readings that point straight ahead.</p><p><strong>File and editing rule</strong></p><p>Read the complete project tree, but edit only:</p><p><code>src/wall_stop/wall_stop/controller.py</code></p><p>Write your node inside <code>build_node()</code> and return it. Do not change <code>main()</code>, and do not rename the package, executable, topics, or <code>build_node()</code>.</p><p><code>controller.py</code> may import only <code>rclpy</code>, <code>geometry_msgs</code>, <code>sensor_msgs</code>, and <code>math</code>.</p><p><img src=\"/images/7\" alt=\"Top view of a robot driving toward a wall. The middle reading of the scan measures the distance straight ahead. Farther than 1.0 m: drive at 0.1 to 0.3 m/s. Between 0.3 m and 1.0 m: your choice. 0.3 m or closer: stop.\"></p><p><strong>New ideas in this assignment</strong></p><ul><li><code>build_node()</code> is yours to design. Either define a class that extends <code>Node</code> (add <code>from rclpy.node import Node</code>) and return an instance, or call <code>rclpy.create_node('wall_stop')</code> and attach your publisher and callback to it. Both are accepted.</li><li>This scan is symmetric. It starts at &minus;135&deg; (right) and ends at +135&deg; (left), so its middle reading, <code>scan.ranges[len(scan.ranges) // 2]</code>, points straight ahead. Reading <code>i</code> points at <code>scan.angle_min + i * scan.angle_increment</code> radians.</li><li>A reading of positive infinity means nothing was detected within range, so the way is clear. <strong>This is different from Assignment 6</strong>, where the lab treated infinity as unusable. Here the usual ROS convention (REP 117) applies.</li></ul><p><strong>Task</strong></p><ol><li>Create a Twist publisher on <code>/cmd_vel</code> and subscribe to <code>sensor_msgs/msg/LaserScan</code> on <code>/scan</code>.</li><li>When nothing is close in front of the robot, publish a forward speed between 0.1 and 0.3 m/s.</li><li>When the wall in front is 0.3 m away or closer, publish <code>linear.x = 0.0</code>. Choose your own stop distance, but do not stop while the wall is more than 1.0 m away.</li><li>When the wall moves away again, drive forward again.</li><li>Never turn: keep <code>angular.z = 0.0</code>.</li><li>Publish at least 5 commands per second. One command per scan is enough, because scans arrive about 12 times per second.</li><li>Keep the speed and the stop distance in named constants, such as <code>FORWARD_SPEED</code> and <code>STOP_DISTANCE</code>.</li></ol><p><strong>What Run Tests checks</strong></p><ul><li><strong>Before anything is scored:</strong> only allowed imports; <code>build_node()</code> exists and <code>main()</code> is still there; the package builds; the node starts and publishes on <code>/cmd_vel</code>; <code>build_node()</code> returns a ROS node. If one of these fails, the score is 0.</li><li><strong>Behaviour:</strong> the grader publishes synthetic scans of a flat wall straight ahead and watches <code>/cmd_vel</code>. Each situation lasts 1 second (about 12 scans), and the first 0.3 s is not checked so your node has time to react. The situations, in order, are: nothing in range; wall at 1.2 m; wall at 0.3 m; wall at 0.2 m; wall still at 0.2 m; wall back at 1.2 m. Forward means <code>linear.x</code> between 0.1 and 0.3 m/s. Stopped means <code>linear.x</code> within &plusmn;0.001 m/s. <code>angular.z</code> must stay within &plusmn;0.001 rad/s in every command. Distances between 0.3 m and 1.0 m are not tested. Stopping only earns credit when the robot also drives when the way is clear.</li><li><strong>Code checks:</strong> a Twist publisher on <code>/cmd_vel</code> and a LaserScan subscription on <code>/scan</code> exist while the node runs; the code reads <code>scan.ranges</code>; there is no <code>while True</code> loop or <code>sleep()</code>; <code>main()</code> is unchanged; the speed and the stop distance are named constants; and there are no unused imports that you added.</li></ul><p>The grader publishes synthetic scans and observes velocity commands. No robot simulator is used, and it is not a real-robot safety certification.</p><p><strong>How scoring works</strong></p><p>Behaviour is worth 70% (eight checks), code checks 20% (five checks), and code quality 10% (two checks). The untouched starter earns 0% because <code>build_node()</code> returns nothing. The task counts as <strong>passed</strong> when everything before scoring passes and all eight behaviour checks pass. Code and quality points add to the score but do not decide passing.</p>",
+  "starter_code": "import math\n\nimport rclpy\nfrom geometry_msgs.msg import Twist\nfrom rclpy.executors import ExternalShutdownException\nfrom sensor_msgs.msg import LaserScan\n\n\ndef build_node():\n    \"\"\"Create your node, connect /scan and /cmd_vel, and return the node.\n\n    Use a class (class WallStop(Node): ...) or plain functions with\n    rclpy.create_node('wall_stop'). Both are accepted.\n    \"\"\"\n    # Write your code here.\n    return None\n\n\ndef main(args=None):  # Do not change main().\n    rclpy.init(args=args)\n    node = build_node()\n    try:\n        rclpy.spin(node)\n    except (KeyboardInterrupt, ExternalShutdownException):\n        pass\n    finally:\n        node.destroy_node()\n        rclpy.try_shutdown()\n\n\nif __name__ == '__main__':\n    main()\n",
+  "language": "python-ros2",
+  "status": "published",
+  "learning_objectives": [
+    "Design and return a complete ROS 2 node inside build_node(), as a class or with plain functions.",
+    "Find the readings that point straight ahead in a symmetric LaserScan.",
+    "Turn a front distance into a safe stop decision with a self-chosen threshold.",
+    "Treat positive infinity as nothing in range, following the ROS convention."
+  ],
+  "execution_settings": {
+    "runtime": "ros2-jazzy-python",
+    "timeout_seconds": 30,
+    "editable_file": "src/wall_stop/wall_stop/controller.py",
+    "network_enabled": false,
+    "simulation_enabled": false
+  },
+  "public_tests": [
+    {
+      "id": "imports-allowed",
+      "label": "Imports only rclpy, math, geometry_msgs and sensor_msgs"
+    },
+    {
+      "id": "build-node-defined",
+      "label": "Defines build_node() and keeps main()"
+    },
+    {
+      "id": "package-build",
+      "label": "ROS 2 package builds successfully"
+    },
+    {
+      "id": "node-start",
+      "label": "wall_stop starts and publishes on /cmd_vel"
+    },
+    {
+      "id": "returns-node",
+      "label": "build_node() returns a ROS node"
+    },
+    {
+      "id": "drive-open-floor",
+      "label": "Drives at 0.1 to 0.3 m/s when nothing is in range"
+    },
+    {
+      "id": "drive-wall-far",
+      "label": "Drives when the wall is 1.2 m away"
+    },
+    {
+      "id": "stop-wall-0-3",
+      "label": "Stopped when the wall is 0.3 m away"
+    },
+    {
+      "id": "stop-wall-0-2",
+      "label": "Stopped when the wall is 0.2 m away"
+    },
+    {
+      "id": "stay-stopped",
+      "label": "Stays stopped while the wall is close"
+    },
+    {
+      "id": "resume-motion",
+      "label": "Drives again when the wall moves away"
+    },
+    {
+      "id": "straight-motion",
+      "label": "Never turns"
+    },
+    {
+      "id": "publish-rate",
+      "label": "Publishes at least 5 commands per second"
+    },
+    {
+      "id": "cmd-vel-publisher",
+      "label": "Creates a Twist publisher on /cmd_vel"
+    },
+    {
+      "id": "scan-subscription",
+      "label": "Subscribes to LaserScan on /scan"
+    },
+    {
+      "id": "reads-ranges",
+      "label": "Reads the scan data (.ranges)"
+    },
+    {
+      "id": "no-blocking",
+      "label": "No while True loop or sleep()"
+    },
+    {
+      "id": "main-unchanged",
+      "label": "main() is unchanged"
+    },
+    {
+      "id": "named-constants",
+      "label": "Speed and stop distance are named constants"
+    },
+    {
+      "id": "no-unused-imports",
+      "label": "No unused imports"
+    }
+  ],
+  "rubric": [
+    {
+      "criterion": "Moves when the way is clear",
+      "description": "Drives forward at 0.1 to 0.3 m/s with nothing in range and with the wall at 1.2 m.",
+      "weight": 17.5
+    },
+    {
+      "criterion": "Stops before the wall",
+      "description": "Stopped with the wall at 0.3 m and 0.2 m, and stays stopped while it is close.",
+      "weight": 26.25
+    },
+    {
+      "criterion": "Recovery",
+      "description": "Drives again when the wall moves away.",
+      "weight": 8.75
+    },
+    {
+      "criterion": "Steady, straight commands",
+      "description": "Never turns and publishes at least 5 commands per second.",
+      "weight": 17.5
+    },
+    {
+      "criterion": "ROS interfaces and safe code",
+      "description": "Twist publisher on /cmd_vel, LaserScan subscription on /scan, reads scan.ranges, no blocking code, main() unchanged.",
+      "weight": 20
+    },
+    {
+      "criterion": "Code quality",
+      "description": "Named constants for speed and stop distance; no unused imports.",
+      "weight": 10
+    }
+  ],
+  "common_misconceptions": [
+    {
+      "tag": "build-node-returns-none",
+      "description": "build_node() creates the node but does not return it, so main() has nothing to spin."
+    },
+    {
+      "tag": "infinity-treated-as-obstacle",
+      "description": "Treats positive infinity as unusable or as an obstacle (the Assignment 6 rule), so the robot never moves in open space."
+    },
+    {
+      "tag": "stops-too-early",
+      "description": "The stop distance is more than 1.0 m, so the robot stops while the wall is still far away."
+    },
+    {
+      "tag": "wrong-threshold-direction",
+      "description": "The comparison drives when the wall is near and stops when the way is clear."
+    },
+    {
+      "tag": "sensor-ignored",
+      "description": "Motion is timed instead of decided from scan.ranges."
+    },
+    {
+      "tag": "turns-while-driving",
+      "description": "Publishes a non-zero angular.z."
+    },
+    {
+      "tag": "main-modified",
+      "description": "main() was changed, so the grader cannot rely on how the node starts."
+    }
+  ],
+  "tutoring_rules": {
+    "max_hint_level": 4,
+    "start_with_question": true,
+    "never_reveal_solution": true,
+    "never_reveal_hidden_tests": true,
+    "ai_enabled_by_default": false
+  },
+  "simulation_config": {
+    "enabled": false,
+    "provider": null,
+    "scenario": null
+  },
+  "asset_manifest": [
+    {
+      "kind": "project_file",
+      "path": "src/wall_stop/package.xml",
+      "editable": false,
+      "content": "<?xml version='1.0'?>\n<package format='3'>\n  <name>wall_stop</name>\n  <version>0.0.1</version>\n  <description>Stop-before-the-wall ROS 2 learning package</description>\n  <maintainer email='instructor@example.invalid'>Robotics Programming Lab</maintainer>\n  <license>Apache-2.0</license>\n  <exec_depend>rclpy</exec_depend>\n  <exec_depend>geometry_msgs</exec_depend>\n  <exec_depend>sensor_msgs</exec_depend>\n  <exec_depend>launch</exec_depend>\n  <exec_depend>launch_ros</exec_depend>\n  <test_depend>ament_copyright</test_depend>\n  <test_depend>ament_flake8</test_depend>\n  <test_depend>ament_pep257</test_depend>\n  <test_depend>python3-pytest</test_depend>\n  <export><build_type>ament_python</build_type></export>\n</package>\n"
+    },
+    {
+      "kind": "project_file",
+      "path": "src/wall_stop/setup.py",
+      "editable": false,
+      "content": "from setuptools import find_packages, setup\n\npackage_name = 'wall_stop'\n\nsetup(\n    name=package_name,\n    version='0.0.1',\n    packages=find_packages(exclude=['test']),\n    data_files=[\n        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),\n        ('share/' + package_name, ['package.xml']),\n        ('share/' + package_name + '/launch', ['launch/controller.launch.py']),\n    ],\n    install_requires=['setuptools'],\n    zip_safe=True,\n    maintainer='Robotics Programming Lab',\n    maintainer_email='instructor@example.invalid',\n    description='Stop-before-the-wall ROS 2 learning package',\n    license='Apache-2.0',\n    entry_points={'console_scripts': ['controller = wall_stop.controller:main']},\n)\n"
+    },
+    {
+      "kind": "project_file",
+      "path": "src/wall_stop/setup.cfg",
+      "editable": false,
+      "content": "[develop]\nscript_dir=$base/lib/wall_stop\n[install]\ninstall_scripts=$base/lib/wall_stop\n"
+    },
+    {
+      "kind": "project_file",
+      "path": "src/wall_stop/resource/wall_stop",
+      "editable": false,
+      "content": ""
+    },
+    {
+      "kind": "project_file",
+      "path": "src/wall_stop/wall_stop/__init__.py",
+      "editable": false,
+      "content": ""
+    },
+    {
+      "kind": "project_file",
+      "path": "src/wall_stop/wall_stop/controller.py",
+      "editable": true,
+      "content": ""
+    },
+    {
+      "kind": "project_file",
+      "path": "src/wall_stop/launch/controller.launch.py",
+      "editable": false,
+      "content": "from launch import LaunchDescription\nfrom launch_ros.actions import Node\n\n\ndef generate_launch_description():\n    return LaunchDescription([\n        Node(\n            package='wall_stop',\n            executable='controller',\n            name='wall_stop',\n            output='screen',\n        )\n    ])\n"
+    }
+  ],
+  "grader_type": "ros2_topic",
+  "grader_config": {
+    "harness": "wall_stop_open",
+    "package_name": "wall_stop",
+    "executable": "controller",
+    "topic": "/cmd_vel",
+    "message_type": "geometry_msgs/msg/Twist",
+    "scan_topic": "/scan",
+    "scan_message_type": "sensor_msgs/msg/LaserScan",
+    "code_checks": true,
+    "skeleton_main": "def main(args=None):  # Do not change main().\n    rclpy.init(args=args)\n    node = build_node()\n    try:\n        rclpy.spin(node)\n    except (KeyboardInterrupt, ExternalShutdownException):\n        pass\n    finally:\n        node.destroy_node()\n        rclpy.try_shutdown()\n",
+    "skeleton_imports": [
+      "math",
+      "rclpy",
+      "Twist",
+      "ExternalShutdownException",
+      "LaserScan"
+    ],
+    "gate_tests": [
+      "imports-allowed",
+      "build-node-defined",
+      "package-build",
+      "node-start",
+      "returns-node"
+    ],
+    "pass_tests": [
+      "drive-open-floor",
+      "drive-wall-far",
+      "stop-wall-0-3",
+      "stop-wall-0-2",
+      "stay-stopped",
+      "resume-motion",
+      "straight-motion",
+      "publish-rate"
+    ],
+    "test_weights": {
+      "imports-allowed": 0,
+      "build-node-defined": 0,
+      "package-build": 0,
+      "node-start": 0,
+      "returns-node": 0,
+      "drive-open-floor": 8.75,
+      "drive-wall-far": 8.75,
+      "stop-wall-0-3": 8.75,
+      "stop-wall-0-2": 8.75,
+      "stay-stopped": 8.75,
+      "resume-motion": 8.75,
+      "straight-motion": 8.75,
+      "publish-rate": 8.75,
+      "cmd-vel-publisher": 4,
+      "scan-subscription": 4,
+      "reads-ranges": 4,
+      "no-blocking": 4,
+      "main-unchanged": 4,
+      "named-constants": 5,
+      "no-unused-imports": 5
+    }
+  },
+  "solution_html": "<p><strong>Approach</strong></p><ol><li>Inside <code>build_node()</code>, create the node, a Twist publisher on <code>/cmd_vel</code> and a LaserScan subscription on <code>/scan</code>, and return the node.</li><li>In the scan callback, take a few readings around the middle of <code>scan.ranges</code> (the middle one points straight ahead) and skip NaN.</li><li>Publish <code>FORWARD_SPEED</code> when the nearest of those readings is greater than <code>STOP_DISTANCE</code>; positive infinity counts as clear. Otherwise publish zero.</li><li>Leave <code>angular.z</code> at 0.0 and publish once per scan, so motion resumes on the first clear scan.</li></ol>",
+  "reference_solution_path": "assignments_answers/assignment_7_ros2_wall_stop/controller.py"
+}

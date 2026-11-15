@@ -17,4 +17,4 @@ pages that the API serves. Edit the documents here, then rebuild it with
 Do not copy solution files, answer keys, or hidden grading details into the
 Flutter frontend, student API responses, research exports, or AI tutor context.
 Do not delete course content merely because it is not referenced by the current
-six assignments; it may be research or future-assignment source material.
+assignments; it may be research or future-assignment source material.

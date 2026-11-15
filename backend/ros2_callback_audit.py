@@ -185,12 +185,30 @@ def exactly_one_per_callback(read_fd):
     return bool(lines) and all(line == b"1" for line in lines)
 
 
+def report_non_node_spin(rclpy_module, node_class, report_fd):
+    """Record when main() spins something that is not a node (open tasks)."""
+    original_spin = rclpy_module.spin
+
+    def spin(node, *args, **kwargs):
+        if not isinstance(node, node_class):
+            try:
+                os.write(report_fd, b"N\n")
+            except (BlockingIOError, BrokenPipeError):
+                pass
+        return original_spin(node, *args, **kwargs)
+
+    rclpy_module.spin = spin
+
+
 def main():
+    import rclpy
     from rclpy.node import Node
     from rclpy.publisher import Publisher
 
     package, executable, kind, topic, scan_topic, fd = sys.argv[1:]
     instrument(Node, Publisher, int(fd), kind, topic, scan_topic)
+    if kind == "open":
+        report_non_node_spin(rclpy, Node, int(fd))
     entries = [entry for entry in importlib.metadata.distribution(package).entry_points
                if entry.group == "console_scripts" and entry.name == executable]
     if len(entries) != 1:

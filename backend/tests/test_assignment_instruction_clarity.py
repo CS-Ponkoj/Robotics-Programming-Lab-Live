@@ -98,7 +98,7 @@ def test_ros_states_import_allowlist_shutdown_and_measured_numbers():
 
 def test_tutor_review_versions_match_current_assignment_contracts():
     root = Path(__file__).parents[1]
-    for number in range(1, 7):
+    for number in range(1, 8):
         review = json.loads((root / "ai_evaluation_cases" /
                              f"assignment_{number}.json").read_text())
         assert review["assignment_version"] == source(number)["version"]

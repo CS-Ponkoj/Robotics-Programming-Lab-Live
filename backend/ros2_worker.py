@@ -19,6 +19,7 @@ ALLOWED_IMPORT_ROOTS = frozenset(
 ROS2_HARNESSES = {
     "drive_forward": "/grader/ros2_topic_harness.py",
     "obstacle_stop": "/grader/ros2_obstacle_harness.py",
+    "wall_stop_open": "/grader/ros2_wall_stop_harness.py",
 }
 
 
@@ -88,11 +89,27 @@ def select_harness(config: dict) -> str:
         raise ValueError(f"Unsupported ROS 2 harness: {harness_name}") from error
 
 
+def static_code_tests(request: dict) -> list[dict]:
+    """Source checks for assignments whose structure the student designs."""
+    config = request.get("config", {})
+    if not isinstance(config, dict) or not config.get("code_checks"):
+        return []
+    from ros2_code_checks import run_code_checks
+
+    return run_code_checks(str(request.get("code", "")), config)
+
+
 def evaluate(request: dict) -> dict:
     try:
         prepare_workspace(request)
     except (SyntaxError, ImportError, ValueError) as error:
-        return failure(f"{error.__class__.__name__}: {error}")
+        response = failure(f"{error.__class__.__name__}: {error}")
+        if isinstance(error, ImportError) and request.get("config", {}).get("code_checks"):
+            response["tests"] = [
+                test_result("imports-allowed", False, f"{error}. Use only rclpy, math, geometry_msgs and sensor_msgs.")
+            ]
+        return response
+    code_tests = static_code_tests(request)
 
     build = run_command(
         [
@@ -118,7 +135,8 @@ def evaluate(request: dict) -> dict:
                     "package-build",
                     False,
                     "The ROS 2 package did not build. Review controller.py for syntax or import errors.",
-                )
+                ),
+                *code_tests,
             ],
         }
 
@@ -160,6 +178,7 @@ def evaluate(request: dict) -> dict:
     runtime_error = str(runtime.get("runtime_error", ""))
     tests = [
         test_result("package-build", True, "The ROS 2 package built successfully."),
+        *code_tests,
         *runtime_tests,
     ]
     return {

@@ -60,10 +60,10 @@ try {
     }
 
     $assignmentFiles = @($tracked | Where-Object {
-        $_ -match '^backend/assignments/assignment_[1-6]\.json$'
+        $_ -match '^backend/assignments/assignment_[1-7]\.json$'
     })
-    if ($assignmentFiles.Count -ne 6) {
-        throw "A fresh clone must contain exactly the six current assignment JSON files; found $($assignmentFiles.Count)."
+    if ($assignmentFiles.Count -ne 7) {
+        throw "A fresh clone must contain exactly the seven current assignment JSON files; found $($assignmentFiles.Count)."
     }
     foreach ($assignmentFile in $assignmentFiles) {
         $assignment = Get-Content -LiteralPath (Join-Path $repositoryRoot $assignmentFile) -Raw |
@@ -99,7 +99,7 @@ try {
 
     $sha = git rev-parse HEAD
     Write-Output "Release source check passed."
-    Write-Output "Fresh-clone completeness check passed for setup, six assignments, solutions, and migrations."
+    Write-Output "Fresh-clone completeness check passed for setup, seven assignments, solutions, and migrations."
     Write-Output "Approved candidate SHA: $sha"
 } finally {
     Pop-Location

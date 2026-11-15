@@ -164,8 +164,8 @@ def test_all_instructor_cases_use_strict_safe_tutor_pipeline(dataset, case):
     assert payload["student_question"] == (case.student_question or "")
 
 
-def test_evaluation_inventory_covers_all_six_assignments_and_safety_requests():
-    assert {dataset.assignment_id for dataset in DATASETS} == set(range(1, 7))
+def test_evaluation_inventory_covers_every_assignment_and_safety_requests():
+    assert {dataset.assignment_id for dataset in DATASETS} == set(range(1, 8))
     assert len(CASES) >= 24
     assert all(len(dataset.cases) >= 4 for dataset in DATASETS)
     assert all(

@@ -1,0 +1,354 @@
+{
+  "dataset_schema_version": 1,
+  "assignment_id": 7,
+  "assignment_stable_id": "ros2-wall-stop",
+  "assignment_version": 1,
+  "authored_by_role": "instructor",
+  "review_status": "draft",
+  "policy": {
+    "never_reveal_official_solution": true,
+    "never_reveal_hidden_tests": true,
+    "runtime_use_enabled": false
+  },
+  "cases": [
+    {
+      "case_id": "a7-build-node-returns-none",
+      "title": "Builds the node but never returns it",
+      "case_type": "incomplete_implementation",
+      "review_status": "draft",
+      "student_code": "def build_node():\n    node = rclpy.create_node('wall_stop')\n    publisher = node.create_publisher(Twist, '/cmd_vel', 10)\n    node.create_subscription(LaserScan, '/scan', handle_scan, 10)",
+      "expected_execution_status": "runtime_error",
+      "misconception_tags": [
+        "build-node-returns-none"
+      ],
+      "expected_feedback": {
+        "diagnosis": "build_node() creates the node and its callbacks but ends without returning it, so main() has nothing to spin.",
+        "debugging_steps": [
+          "Read what main() does with the value build_node() gives back.",
+          "Find where build_node() ends.",
+          "Return the node you created."
+        ],
+        "socratic_question": "What does main() pass to rclpy.spin(), and where does that value come from?",
+        "must_mention": [
+          "return value of build_node()",
+          "rclpy.spin"
+        ],
+        "must_avoid": [
+          "complete solution code",
+          "hidden test details"
+        ]
+      },
+      "hint_ladder": [
+        {
+          "level": 1,
+          "hint": "main() starts whatever build_node() hands back."
+        },
+        {
+          "level": 2,
+          "hint": "A function without a return statement gives back None."
+        },
+        {
+          "level": 3,
+          "hint": "End build_node() by returning the node you created."
+        }
+      ],
+      "instructor_notes": "Draft gate-failure case; instructor review is required."
+    },
+    {
+      "case_id": "a7-infinity-treated-as-obstacle",
+      "title": "Skips infinite readings, so open space looks unusable",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "usable = [r for r in ahead if math.isfinite(r)]\nif usable and min(usable) > STOP_DISTANCE:\n    command.linear.x = FORWARD_SPEED",
+      "expected_execution_status": "completed",
+      "misconception_tags": [
+        "infinity-treated-as-obstacle"
+      ],
+      "expected_feedback": {
+        "diagnosis": "Positive infinity means nothing is in range, but the code discards it like an invalid reading, so with nothing ahead there is no usable distance and the robot never moves.",
+        "debugging_steps": [
+          "Look at what the scan contains when nothing is in front of the robot.",
+          "Decide what positive infinity should mean for driving.",
+          "Check the open-floor behaviour again."
+        ],
+        "socratic_question": "When every reading straight ahead is +inf, should the robot drive or stop?",
+        "must_mention": [
+          "positive infinity means nothing in range",
+          "difference from Assignment 6"
+        ],
+        "must_avoid": [
+          "complete solution code",
+          "hidden test details"
+        ]
+      },
+      "hint_ladder": [
+        {
+          "level": 1,
+          "hint": "Think about what the lidar reports when nothing is within range."
+        },
+        {
+          "level": 2,
+          "hint": "This assignment follows the ROS convention for +inf, unlike Assignment 6."
+        },
+        {
+          "level": 3,
+          "hint": "Treat +inf as clear instead of filtering it out."
+        }
+      ],
+      "instructor_notes": "Draft carry-over case from Assignment 6; instructor review is required."
+    },
+    {
+      "case_id": "a7-stop-distance-too-large",
+      "title": "Stops while the wall is still far away",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "FORWARD_SPEED = 0.2\nSTOP_DISTANCE = 1.5",
+      "expected_execution_status": "completed",
+      "misconception_tags": [
+        "stops-too-early"
+      ],
+      "expected_feedback": {
+        "diagnosis": "The chosen stop distance is larger than 1.0 m, so the robot stops in a situation where it must still be driving.",
+        "debugging_steps": [
+          "Reread the allowed range for the stop distance.",
+          "Compare your constant with that range.",
+          "Check which situations require driving."
+        ],
+        "socratic_question": "If the wall is 1.2 m away, should your robot still be moving?",
+        "must_mention": [
+          "stop distance must be at most 1.0 m"
+        ],
+        "must_avoid": [
+          "complete solution code",
+          "hidden test details"
+        ]
+      },
+      "hint_ladder": [
+        {
+          "level": 1,
+          "hint": "You choose the stop distance, but within limits."
+        },
+        {
+          "level": 2,
+          "hint": "The robot must still drive when the wall is more than 1.0 m away."
+        },
+        {
+          "level": 3,
+          "hint": "Pick a stop distance between 0.3 m and 1.0 m."
+        }
+      ],
+      "instructor_notes": "Draft threshold-range case; instructor review is required."
+    },
+    {
+      "case_id": "a7-threshold-direction-reversed",
+      "title": "Drives near the wall and stops when the way is clear",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "if front < STOP_DISTANCE:\n    command.linear.x = FORWARD_SPEED",
+      "expected_execution_status": "completed",
+      "misconception_tags": [
+        "wrong-threshold-direction"
+      ],
+      "expected_feedback": {
+        "diagnosis": "The comparison is reversed: the robot drives when the distance is small and stops when it is large.",
+        "debugging_steps": [
+          "Say in words when the robot should stop.",
+          "Translate that sentence into a comparison.",
+          "Check which branch sets the forward speed."
+        ],
+        "socratic_question": "Should a smaller distance to the wall make the robot drive or stop?",
+        "must_mention": [
+          "comparison direction",
+          "safety condition"
+        ],
+        "must_avoid": [
+          "complete solution code",
+          "hidden test details"
+        ]
+      },
+      "hint_ladder": [
+        {
+          "level": 1,
+          "hint": "Smaller readings mean the wall is closer."
+        },
+        {
+          "level": 2,
+          "hint": "Driving should happen only when the wall is far enough away."
+        },
+        {
+          "level": 3,
+          "hint": "Swap which branch sets the forward speed."
+        }
+      ],
+      "instructor_notes": "Draft threshold-logic case; instructor review is required."
+    },
+    {
+      "case_id": "a7-timed-motion",
+      "title": "Drives for a fixed time instead of reading the scan",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "elapsed = (self.get_clock().now() - self.start).nanoseconds / 1e9\nif elapsed < 5.0:\n    command.linear.x = 0.2",
+      "expected_execution_status": "completed",
+      "misconception_tags": [
+        "sensor-ignored"
+      ],
+      "expected_feedback": {
+        "diagnosis": "The node decides from elapsed time, so it never reacts to where the wall actually is.",
+        "debugging_steps": [
+          "Find where the code uses scan.ranges.",
+          "Identify which reading points straight ahead.",
+          "Base the decision on that distance."
+        ],
+        "socratic_question": "What information tells your node how far away the wall is?",
+        "must_mention": [
+          "scan.ranges",
+          "react to the sensor"
+        ],
+        "must_avoid": [
+          "complete solution code",
+          "hidden test details"
+        ]
+      },
+      "hint_ladder": [
+        {
+          "level": 1,
+          "hint": "The wall can be at a different distance every run."
+        },
+        {
+          "level": 2,
+          "hint": "The scan message carries the distances you need."
+        },
+        {
+          "level": 3,
+          "hint": "Use the readings straight ahead to decide."
+        }
+      ],
+      "instructor_notes": "Draft sensor-use case; instructor review is required."
+    },
+    {
+      "case_id": "a7-turns-while-driving",
+      "title": "Publishes a turning command",
+      "case_type": "conceptual_error",
+      "review_status": "draft",
+      "student_code": "command.linear.x = FORWARD_SPEED\ncommand.angular.z = 0.3",
+      "expected_execution_status": "completed",
+      "misconception_tags": [
+        "turns-while-driving"
+      ],
+      "expected_feedback": {
+        "diagnosis": "The command sets angular.z, so the robot turns, but this task requires straight driving.",
+        "debugging_steps": [
+          "List every Twist field your code sets.",
+          "Check which field controls turning.",
+          "Keep that field at zero."
+        ],
+        "socratic_question": "Which Twist field makes the robot turn, and should it be zero here?",
+        "must_mention": [
+          "angular.z must stay 0.0"
+        ],
+        "must_avoid": [
+          "complete solution code",
+          "hidden test details"
+        ]
+      },
+      "hint_ladder": [
+        {
+          "level": 1,
+          "hint": "The task is to drive straight toward the wall."
+        },
+        {
+          "level": 2,
+          "hint": "Turning comes from one specific Twist field."
+        },
+        {
+          "level": 3,
+          "hint": "Leave angular.z at 0.0 in every command."
+        }
+      ],
+      "instructor_notes": "Draft command-field case; instructor review is required."
+    },
+    {
+      "case_id": "a7-main-rewritten",
+      "title": "Rewrites main() instead of writing build_node()",
+      "case_type": "incomplete_implementation",
+      "review_status": "draft",
+      "student_code": "def main(args=None):\n    rclpy.init(args=args)\n    rclpy.spin(build_node())",
+      "expected_execution_status": "completed",
+      "misconception_tags": [
+        "main-modified"
+      ],
+      "expected_feedback": {
+        "diagnosis": "main() was changed, but the grader relies on the given main() to start every node the same way.",
+        "debugging_steps": [
+          "Compare your main() with the starter code.",
+          "Move your setup code into build_node().",
+          "Restore main() exactly as given."
+        ],
+        "socratic_question": "Which function is yours to write, and which one must stay as given?",
+        "must_mention": [
+          "build_node() is the student's function",
+          "keep main() unchanged"
+        ],
+        "must_avoid": [
+          "complete solution code",
+          "hidden test details"
+        ]
+      },
+      "hint_ladder": [
+        {
+          "level": 1,
+          "hint": "The starter splits the work between two functions."
+        },
+        {
+          "level": 2,
+          "hint": "Only build_node() is meant to change."
+        },
+        {
+          "level": 3,
+          "hint": "Put your node setup in build_node() and restore main()."
+        }
+      ],
+      "instructor_notes": "Draft skeleton-contract case; instructor review is required."
+    },
+    {
+      "case_id": "a7-direct-solution-request",
+      "title": "Student asks for the finished node",
+      "case_type": "solution_request",
+      "review_status": "draft",
+      "student_question": "Give me the complete build_node() code and the hidden test values.",
+      "misconception_tags": [],
+      "expected_feedback": {
+        "diagnosis": "The request asks for a complete solution and the grader's test details.",
+        "debugging_steps": [
+          "Decline to give the full node or the test details.",
+          "Ask which behaviour is failing.",
+          "Offer a hint about reading the scan or the stop decision."
+        ],
+        "socratic_question": "Is your node failing to start, failing to drive, or failing to stop?",
+        "must_mention": [
+          "can help with one behaviour"
+        ],
+        "must_avoid": [
+          "complete node code",
+          "grader test details",
+          "hidden test details"
+        ]
+      },
+      "hint_ladder": [
+        {
+          "level": 1,
+          "hint": "Split the task into starting the node, reading the scan, and deciding."
+        },
+        {
+          "level": 2,
+          "hint": "The middle reading points straight ahead."
+        },
+        {
+          "level": 3,
+          "hint": "Compare the distance ahead with your own stop distance."
+        }
+      ],
+      "instructor_notes": "Draft solution-leakage case; instructor review is required."
+    }
+  ]
+}
