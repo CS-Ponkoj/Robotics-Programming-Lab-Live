@@ -69,25 +69,29 @@ functionality and must never depend on OpenAI.
 |---|---|---|
 | `C:\Users\cspon\OneDrive - University of Nevada, Reno\Robotics-Programming-Lab-Staging` | Canonical Windows staging checkout | Run ordinary local development, local execution, SQA, and staging Git work from this folder. It must track `CS-Ponkoj/Robotics-Programming-Lab-Staging`; do not treat temporary worktrees or `IUSE_Project-2026` as the canonical staging checkout. |
 | `CS-Ponkoj/Robotics-Programming-Lab-Staging` | Development, local execution, SQA, and release candidates | Make changes on focused branches and merge into staging `main` only after verification. |
-| `CS-Ponkoj/Robotics-Programming-Lab` | Live Vercel and Render deployment | Production `main` receives only an approved, tested staging commit. Do not patch production directly. |
+| `CS-Ponkoj/Robotics-Programming-Lab-Live`, checked out at `C:\RPL-Live` on the lab PC | RPL Live: the self-hosted classroom instance at `rpl.ponkoj.com` (Caddy, Cloudflare Tunnel, local PostgreSQL in Docker; see `docs/system-architecture/TRD.md`) | Its `main` receives only an approved, tested staging commit. In this checkout `origin` is the live repository, so any push to it is a live promotion and needs explicit owner approval. Start and stop the stack only with `scripts/run-live.ps1` and `scripts/stop-live.ps1`. It already serves Assignments 1-6, including the ROS Assignments 5 and 6. |
+| `CS-Ponkoj/Robotics-Programming-Lab` | Earlier hosted deployment on Vercel and Render; `scripts/promote-release.ps1` still targets it through the `production` remote | Production `main` receives only an approved, tested staging commit. Do not patch it directly. |
 | Secondary Windows or Ubuntu laptop/lab checkout | Temporary local clone outside OneDrive | Clone or fast-forward from staging Git. Never copy generated environments or build caches between computers. |
 | Repository-root `.env` | Ignored private local configuration | Contains Neon and optional AI settings; it does not contain accounts or the active database. Never commit or publicly share it. |
 | Neon `robotics_lab_staging` database | Default staging application data | Shared across authorized devices through ignored private configuration; keep it separate from production `neondb`. |
 | Staging PostgreSQL | Production-parity SQA | Must be separate from production and contain no live research records. |
-| Production Neon PostgreSQL | Live mutable data | Schema changes require Alembic migrations and recovery planning. |
+| Production Neon PostgreSQL | Mutable data of the Vercel and Render deployment | Schema changes require Alembic migrations and recovery planning. |
+| RPL Live PostgreSQL (Docker `rpl-live-postgres` on the lab PC) | Live classroom data | Dump it before every live deploy. Schema changes require Alembic migrations and recovery planning; it needs off-machine backups. |
 
 Promote production-ready changes by reviewed Git commits, never by copying files
-between repositories. Staging may contain unreleased features such as ROS
-Assignments 5 and 6 while production intentionally remains on Assignments 1-4. While
-that difference exists, do not merge staging wholesale into production. Apply
-only the reviewed common change to a production branch, verify the production
-assignment inventory contains exactly 1-4 and no ROS artifacts, then run the
-same complete gate on both resulting commits. Promote ROS only after its hosted
-sandbox architecture and release are explicitly approved.
+between repositories. RPL Live runs the ROS 2 grader on the lab PC and serves
+the ROS Assignments 5 and 6. New assignments reach it only after they pass on
+staging and the owner approves the live promotion.
 
-The production repository `main` branch is the live branch watched by Vercel and
-Render. Publication, production promotion, tags, releases, and destructive
-operations require explicit project-owner approval.
+The Vercel and Render deployment intentionally remains on Assignments 1-4,
+because ROS hosting there has not been approved. Never merge staging
+wholesale into it. Apply only the reviewed common change to a production branch,
+verify its assignment inventory contains exactly 1-4 and no ROS artifacts, then
+run the same complete gate on both resulting commits. Promote ROS there only
+after its hosted sandbox architecture and release are explicitly approved.
+
+Publication, live promotion to either deployment, tags, releases, and
+destructive operations require explicit project-owner approval.
 
 Before every repository action, verify the checkout with
 `git rev-parse --show-toplevel`, the current branch, `git remote -v`, and
@@ -95,7 +99,8 @@ Before every repository action, verify the checkout with
 repository must resolve to the intended matching commit before handoff. Preserve
 unrelated local work with a named, recoverable stash when a clean synchronized
 checkout is required. Never fetch, merge, push, or deploy the `production`
-remote unless the project owner explicitly authorizes a live promotion.
+remote, or push `origin` in the RPL Live checkout, unless the project owner
+explicitly authorizes a live promotion.
 
 ## Architecture map
 
@@ -609,10 +614,16 @@ Before promotion:
 - record the tested commit SHA; and
 - obtain explicit approval for production and the release tag.
 
-After promotion, verify that Vercel and both Render services deploy from
-production `main`, the API health release matches the approved SHA, and the live
-student/instructor smoke tests pass from a clean browser. Perform an external
-device/network check for classroom releases.
+After promotion, verify the deployment you promoted:
+
+- RPL Live: the lab PC checkout is at the approved SHA, the stack restarted with
+  `scripts/run-live.ps1`, `https://rpl.ponkoj.com/api/health` reports that
+  release, and the database was dumped before the deploy.
+- Vercel and Render: both Render services and Vercel deploy from production
+  `main`, and the API health release matches the approved SHA.
+
+In both cases the live student/instructor smoke tests must pass from a clean
+browser. Perform an external device/network check for classroom releases.
 
 If live validation fails, redeploy the previous known-good immutable tag. Fix
 the problem in staging, rerun the complete gate, and promote a new release. Do
