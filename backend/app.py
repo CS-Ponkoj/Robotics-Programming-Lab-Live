@@ -78,6 +78,7 @@ from research_service import (
     xlsx_bytes,
 )
 from sandbox import build_sandbox
+from simulation_service import run_simulation, simulation_world
 from ros2_executor import DockerRos2Executor
 from schemas import (
     PageFeedbackCreate,
@@ -111,6 +112,7 @@ from schemas import (
     StudySessionResponse,
     StudySessionStartRequest,
     SubmissionRequest,
+    SimulationResponse,
     SubmissionResponse,
     TutorQuestionRequest,
 )
@@ -1790,6 +1792,56 @@ def create_app(
             ai_tutor_requested=body.use_ai_tutor,
         )
         return response_for(assignment, submission)
+
+    @application.post(
+        "/assignments/{assignment_id}/simulate", response_model=SimulationResponse
+    )
+    def simulate_assignment(
+        assignment_id: int,
+        body: SubmissionRequest,
+        request: Request,
+        session: Session = Depends(session_dependency),
+        user: User = Depends(current_user),
+    ):
+        """Replay the node in a 2D world; visual only, so no submission is stored."""
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="execution",
+            requests_per_minute=request.app.state.settings.execution_requests_per_minute,
+        )
+        require_code(body, request)
+        assignment = get_assignment_or_404(session, assignment_id)
+        world = simulation_world(assignment)
+        if world is None:
+            raise HTTPException(409, "This assignment has no robot simulation.")
+        if len(body.code) > request.app.state.settings.max_submission_chars:
+            raise HTTPException(413, "The submitted code is too large.")
+        study_session = study_session_for_submission(request, session, body, user)
+        timeout = float(
+            (assignment.execution_settings or {}).get(
+                "timeout_seconds", request.app.state.settings.execution_timeout_seconds
+            )
+        )
+        executor = request.app.state.ros2_executor_factory(timeout)
+        result = execute_with_capacity(
+            request, lambda: run_simulation(assignment, body.code, executor, world)
+        )
+        if study_session is not None:
+            replay = result["simulation"]
+            record_learning_event(
+                session,
+                study_session=study_session,
+                user=user,
+                event_type="simulation_run",
+                assignment_id=assignment.id,
+                assignment_version=assignment.version,
+                event_data={
+                    "outcome": replay["outcome"] if replay else "error",
+                    "duration_seconds": replay["duration_seconds"] if replay else 0.0,
+                },
+            )
+        return result
 
     def playground_input_error(problems: list[dict], error_type: str) -> JSONResponse:
         """Use the API's standard validation shape; parameter_index is additive."""

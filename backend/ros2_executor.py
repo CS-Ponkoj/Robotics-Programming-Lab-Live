@@ -237,6 +237,8 @@ def _safe_config(config: dict) -> dict:
         "code_checks",
         "skeleton_main",
         "skeleton_imports",
+        "mode",
+        "simulation",
     }
     return {key: value for key, value in config.items() if key in allowed}
 
@@ -248,6 +250,7 @@ def _valid_result(result: object) -> bool:
         and isinstance(result.get("error"), str)
         and isinstance(result.get("output"), str)
         and isinstance(result.get("tests"), list)
+        and isinstance(result.get("simulation", {}) or {}, dict)
     )
 
 

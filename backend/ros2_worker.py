@@ -21,6 +21,9 @@ ROS2_HARNESSES = {
     "obstacle_stop": "/grader/ros2_obstacle_harness.py",
     "wall_stop_open": "/grader/ros2_wall_stop_harness.py",
 }
+SIMULATION_HARNESS = "/grader/ros2_sim_harness.py"
+HARNESS_TIMEOUT_SECONDS = 12
+SIMULATION_TIMEOUT_SECONDS = 16
 
 
 def validate_controller(code: str) -> None:
@@ -81,7 +84,15 @@ def run_command(command: list[str], timeout: float) -> subprocess.CompletedProce
     )
 
 
+def simulating(config: dict) -> bool:
+    return isinstance(config, dict) and config.get("mode") == "simulate"
+
+
 def select_harness(config: dict) -> str:
+    if simulating(config):
+        if not isinstance(config.get("simulation"), dict):
+            raise ValueError("This assignment has no simulation scenario.")
+        return SIMULATION_HARNESS
     harness_name = str(config.get("harness", "drive_forward"))
     try:
         return ROS2_HARNESSES[harness_name]
@@ -92,7 +103,7 @@ def select_harness(config: dict) -> str:
 def static_code_tests(request: dict) -> list[dict]:
     """Source checks for assignments whose structure the student designs."""
     config = request.get("config", {})
-    if not isinstance(config, dict) or not config.get("code_checks"):
+    if not isinstance(config, dict) or not config.get("code_checks") or simulating(config):
         return []
     from ros2_code_checks import run_code_checks
 
@@ -159,7 +170,7 @@ def evaluate(request: dict) -> dict:
             cwd=WORKSPACE,
             capture_output=True,
             text=True,
-            timeout=12,
+            timeout=SIMULATION_TIMEOUT_SECONDS if simulating(config) else HARNESS_TIMEOUT_SECONDS,
             check=False,
             env=environment,
         )
@@ -181,12 +192,17 @@ def evaluate(request: dict) -> dict:
         *code_tests,
         *runtime_tests,
     ]
-    return {
+    response = {
         "success": not bool(runtime_error),
         "error": runtime_error,
         "output": runtime.get("output", ""),
         "tests": tests,
     }
+    if simulating(config):
+        replay = runtime.get("simulation")
+        response["simulation"] = replay if isinstance(replay, dict) else None
+        response["tests"] = []
+    return response
 
 
 def redact_grader_frames(text: str) -> str:

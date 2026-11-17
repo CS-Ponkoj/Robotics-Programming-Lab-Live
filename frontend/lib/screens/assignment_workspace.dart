@@ -8,6 +8,7 @@ import 'package:iuse_demo/editor/editor_tools.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/playground_parameter.dart';
+import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
@@ -16,6 +17,7 @@ import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/theme/editor_palette.dart';
 import 'package:iuse_demo/widgets/earlier_draft_banner.dart';
 import 'package:iuse_demo/widgets/playground_dialog.dart';
+import 'package:iuse_demo/widgets/robot_sim_view.dart';
 import 'package:iuse_demo/widgets/run_terminal.dart';
 import 'package:highlight/languages/python.dart';
 
@@ -91,6 +93,12 @@ class _MyHomePageState extends State<MyHomePage> {
   String _terminalFileName = 'your_code.py';
   bool _terminalPython = true;
   Map<String, dynamic> _simulationConfig = const {};
+  // Robot replay (visual only): the last simulation and which results tab shows.
+  Future<SimulationResultDto>? _simulation;
+  bool _isSimulating = false;
+  // The code the terminal's simulation lines describe, when it shows one.
+  String? _terminalSimulatedCode;
+  int _resultsTab = 0;
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
   // Playground runs for the current code only; memory only, never sent.
@@ -351,6 +359,8 @@ class _MyHomePageState extends State<MyHomePage> {
       _submitted = true;
       _emptyCodeAttempted = false;
       _isRunning = true;
+      _resultsTab = 0;
+      _terminalSimulatedCode = null;
       _hasUnrunChanges = false;
       _diagnosticLine = null;
       _feedback = fetchUnittestFeedback(
@@ -397,6 +407,100 @@ class _MyHomePageState extends State<MyHomePage> {
                     'and try again.';
           });
         }
+      },
+    );
+  }
+
+  bool get _hasRobotSimulation =>
+      _simulationConfig['enabled'] == true &&
+      _simulationConfig['provider'] == 'ros2_2d';
+
+  void _runSimulation() {
+    if (_init || _isSimulating || _isRunning) return;
+    if (!hasNonWhitespaceCode(_code)) {
+      setState(() {
+        _emptyCodeAttempted = true;
+        _resultsTab = 0;
+      });
+      _openResultsPanel();
+      return;
+    }
+    final simulatedCode = _code;
+    final simulation = runSimulation(widget.id, simulatedCode);
+    setState(() {
+      _isSimulating = true;
+      _simulation = simulation;
+      _resultsTab = 1;
+      _emptyCodeAttempted = false;
+    });
+    _openResultsPanel();
+    simulation.then(
+      (result) {
+        if (!mounted) return;
+        setState(() {
+          _isSimulating = false;
+          _terminalExpanded = true;
+          _terminalRequestError = null;
+          _terminalLines =
+              buildSimulationTerminalLines(result, _terminalFileName);
+          _terminalSimulatedCode = simulatedCode;
+        });
+      },
+      onError: (Object error) {
+        if (!mounted) return;
+        setState(() => _isSimulating = false);
+      },
+    );
+  }
+
+  Widget _simulationResults() {
+    final simulation = _simulation;
+    if (simulation == null) {
+      return const _EmptySimulationState();
+    }
+    return FutureBuilder<SimulationResultDto>(
+      future: simulation,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const SecureGraderLoadingState(ros2Package: true);
+        }
+        if (snap.hasError) {
+          final error = snap.error;
+          return TestRunErrorState(
+            onRetry: _runSimulation,
+            message: error is ApiRequestException ? error.message : null,
+          );
+        }
+        final result = snap.data;
+        if (result == null) return const SizedBox.shrink();
+        final replay = result.replay;
+        return ListView(
+          key: const Key('simulation-results'),
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (replay != null)
+              RobotSimView(replay: replay)
+            else
+              Card(
+                key: const Key('simulation-error'),
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('The simulation could not start',
+                          style: Theme.of(context).textTheme.titleSmall),
+                      const SizedBox(height: 8),
+                      SelectableText(result.error.isEmpty
+                          ? 'Your node did not drive the robot.'
+                          : result.error),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        );
       },
     );
   }
@@ -801,7 +905,30 @@ class _MyHomePageState extends State<MyHomePage> {
                     }
                   : null,
             ),
-            Expanded(
+            if (_hasRobotSimulation)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: SegmentedButton<int>(
+                  key: const Key('results-tab-switch'),
+                  segments: const [
+                    ButtonSegment(
+                        value: 0,
+                        icon: Icon(Icons.fact_check_outlined),
+                        label: Text('Tests')),
+                    ButtonSegment(
+                        value: 1,
+                        icon: Icon(Icons.smart_toy_outlined),
+                        label: Text('Simulation')),
+                  ],
+                  selected: {_resultsTab},
+                  onSelectionChanged: (value) =>
+                      setState(() => _resultsTab = value.first),
+                ),
+              ),
+            if (_hasRobotSimulation && _resultsTab == 1)
+              Expanded(child: _simulationResults())
+            else
+              Expanded(
                 child: _emptyCodeAttempted
                     ? EmptyCodeTestRunState(onRestore: _resetStarterCode)
                     : _submitted
@@ -1020,6 +1147,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                       _init || _playgroundFunction == null
                                           ? null
                                           : () => unawaited(_openPlayground()),
+                                  onSimulate: _init || !_hasRobotSimulation
+                                      ? null
+                                      : _runSimulation,
+                                  isSimulating: _isSimulating,
                                   onSave: _selectedProjectFileEditable
                                       ? () => unawaited(_saveDraftNow())
                                       : null,
@@ -1188,7 +1319,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                   running: _isRunning,
                                   lines: _terminalLines,
                                   requestError: _terminalRequestError,
-                                  codeChanged: _hasUnrunChanges,
+                                  codeChanged: _terminalSimulatedCode == null
+                                      ? _hasUnrunChanges
+                                      : _terminalSimulatedCode != _code,
                                   onToggle: () => setState(
                                     () => _terminalExpanded =
                                         !_terminalExpanded,
@@ -1975,6 +2108,9 @@ class AssignmentEditorToolbar extends StatelessWidget {
   final VoidCallback? onRun;
   // Null when the assignment has no ungraded input playground.
   final VoidCallback? onTryInputs;
+  /// Replay the node in the 2D robot world; null when the assignment has none.
+  final VoidCallback? onSimulate;
+  final bool isSimulating;
   final VoidCallback? onSave;
   final bool isFocused;
   final VoidCallback? onFocusToggle;
@@ -1996,6 +2132,8 @@ class AssignmentEditorToolbar extends StatelessWidget {
     required this.isRunning,
     required this.onRun,
     this.onTryInputs,
+    this.onSimulate,
+    this.isSimulating = false,
     this.onSave,
     this.isFocused = false,
     this.onFocusToggle,
@@ -2128,7 +2266,11 @@ class AssignmentEditorToolbar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
-          Row(
+          // A narrow editor panel keeps room for the tools with an icon-only
+          // Simulate button.
+          LayoutBuilder(builder: (context, constraints) {
+            final compactSimulate = constraints.maxWidth < 560;
+            return Row(
             children: [
               Expanded(
                 // Fade the trailing edge so a clipped row reads as scrollable.
@@ -2264,6 +2406,41 @@ class AssignmentEditorToolbar extends StatelessWidget {
                     ),
                   ),
               ],
+              if (onSimulate != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                if (compactSimulate)
+                  IconButton.outlined(
+                    key: const Key('simulate-button'),
+                    tooltip: isSimulating
+                        ? 'Simulating…'
+                        : 'Simulate: watch your node drive the robot. Not graded.',
+                    onPressed: isRunning || isSimulating ? null : onSimulate,
+                    icon: isSimulating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.smart_toy_outlined, size: 20),
+                  )
+                else
+                  Tooltip(
+                    message: 'Watch your node drive the robot in a 2D world. '
+                        'Not graded.',
+                    child: OutlinedButton.icon(
+                      key: const Key('simulate-button'),
+                      onPressed: isRunning || isSimulating ? null : onSimulate,
+                      icon: isSimulating
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.smart_toy_outlined, size: 18),
+                      label: Text(isSimulating ? 'Simulating…' : 'Simulate'),
+                    ),
+                  ),
+              ],
               const SizedBox(width: AppSpacing.sm),
               Semantics(
                 label: isRunning
@@ -2288,7 +2465,8 @@ class AssignmentEditorToolbar extends StatelessWidget {
                 ),
               ),
             ],
-          ),
+          );
+          }),
         ],
       ),
     );
@@ -2944,6 +3122,43 @@ class AssignmentWorkspaceNavigation extends StatelessWidget {
           label: 'Instructions',
         ),
       ],
+    );
+  }
+}
+
+class _EmptySimulationState extends StatelessWidget {
+  const _EmptySimulationState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      container: true,
+      label:
+          'No simulation yet. Press Simulate to watch your node drive the robot.',
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.smart_toy_outlined,
+                  size: 40, color: theme.colorScheme.primary),
+              const SizedBox(height: AppSpacing.sm),
+              Text('Watch your robot',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Press Simulate to run your node in a small 2D world and '
+                'replay how it drives the robot. It is not graded.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

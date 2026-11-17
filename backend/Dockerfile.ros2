@@ -12,6 +12,8 @@ COPY ros2_obstacle_harness.py /grader/ros2_obstacle_harness.py
 COPY ros2_callback_audit.py /grader/ros2_callback_audit.py
 COPY ros2_wall_stop_harness.py /grader/ros2_wall_stop_harness.py
 COPY ros2_code_checks.py /grader/ros2_code_checks.py
+COPY ros2_sim_world.py /grader/ros2_sim_world.py
+COPY ros2_sim_harness.py /grader/ros2_sim_harness.py
 
 USER 10001:10001
 ENTRYPOINT ["/ros_entrypoint.sh", "python3", "/grader/ros2_worker.py"]

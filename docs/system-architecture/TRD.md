@@ -101,7 +101,7 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 |---|---|
 | **Health** | `GET /health` |
 | **Auth** | `POST /auth/login` · `POST /auth/demo` · 🔐 `GET /auth/me` · 🔐 `POST /auth/logout` · 🔐 `POST /auth/change-password` · `POST /auth/forgot-password`* · `POST /auth/reset-password`* |
-| **Assignments** 🔐 | `GET /assignments` · `GET /assignments/{id}` · `GET/PUT/DELETE /assignments/{id}/draft` · `POST …/format` · `POST …/run` · `POST …/submit` · `POST …/playground` · `POST …/hint` · `POST …/tutor` · `POST …/solution` · legacy `POST /grade/{id}` |
+| **Assignments** 🔐 | `GET /assignments` · `GET /assignments/{id}` · `GET/PUT/DELETE /assignments/{id}/draft` · `POST …/format` · `POST …/run` · `POST …/submit` · `POST …/playground` · `POST …/simulate` (ROS 2D replay, visual only) · `POST …/hint` · `POST …/tutor` · `POST …/solution` · legacy `POST /grade/{id}` |
 | **Progress** 🔐 | `GET /me/assignment-progress` |
 | **Course content** 🔐 | `GET /contents` · `GET /contents/{topic}` · `GET /contents/{topic}/sections/{section}` · `POST /contents/{topic}/quiz/submit` · `GET /contents/{topic}/quiz/attempts` · `GET /content-assets/{name}` · `GET /images/{id}` |
 | **Research** 🔐 | `POST /research/sessions` · `POST …/{sid}/heartbeat` · `POST …/{sid}/events` · `POST …/{sid}/end` · `GET /research/me` · `GET /research/me/attempts` · `GET /research/metrics` |

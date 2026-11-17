@@ -125,6 +125,7 @@ backend/                          FastAPI application
   sandbox_service.py              Dedicated execution service
   ros2_worker.py / ros2_*_harness.py  Isolated ROS package build and behavior checks
   ros2_callback_audit.py           Container-only callback publication instrumentation
+  simulation_service.py / ros2_sim_world.py  Visual-only 2D robot replay (never graded)
   tutor.py / hinter.py            Deterministic and optional AI tutoring
   research_service.py             Study sessions, events, summaries, and exports
   instructor_dataset.py           Offline instructor AI-evaluation contract and validator

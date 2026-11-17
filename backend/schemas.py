@@ -159,6 +159,51 @@ class SubmissionResponse(BaseModel):
     tutor_feedback: TutorFeedback | None = None
 
 
+class SimulationScan(BaseModel):
+    angle_min_deg: float
+    angle_increment_deg: float
+    range_max: float
+
+
+class SimulationFrame(BaseModel):
+    t: float
+    x: float
+    y: float
+    theta: float
+    linear: float
+    angular: float
+    # None means nothing in range (positive infinity on the robot's scan).
+    front: float | None = None
+    ranges: list[float | None] = Field(default_factory=list, max_length=31)
+
+
+class SimulationEvent(BaseModel):
+    t: float
+    type: Literal["started", "stopped", "wall_moved", "resumed", "collided", "finished"]
+    front: float | None = None
+    walls: list[list[float]] | None = None
+
+
+class SimulationReplay(BaseModel):
+    scan: SimulationScan
+    robot_radius: float
+    walls: list[list[float]] = Field(max_length=20)
+    frames: list[SimulationFrame] = Field(max_length=200)
+    events: list[SimulationEvent] = Field(max_length=50)
+    outcome: Literal["collided", "never_moved", "stopped", "stopped_and_resumed", "kept_driving"]
+    duration_seconds: float
+
+
+class SimulationResponse(BaseModel):
+    """A visual replay only: no submission, score, or test evidence."""
+
+    assignment_version: int
+    success: bool
+    error: str = ""
+    output: str = ""
+    simulation: SimulationReplay | None = None
+
+
 class PlaygroundRequest(BaseModel):
     code: str = Field(min_length=1)
     arguments: str = Field(default="", max_length=2_000)

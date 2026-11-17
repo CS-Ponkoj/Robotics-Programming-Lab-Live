@@ -6,6 +6,7 @@ import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/code_draft_dto.dart';
 import 'package:iuse_demo/models/playground_result_dto.dart';
 import 'package:iuse_demo/models/server_progress_dto.dart';
+import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
@@ -194,6 +195,31 @@ Future<UnittestFeedbackDto> fetchUnittestFeedback(int id, String code,
   }
   if (response.statusCode >= 500) {
     throw Exception('Failed to load feedback for $id');
+  }
+  throw ApiRequestException(AuthApi.errorMessage(response));
+}
+
+/// Replay the student's ROS 2 node in a small 2D world. Visual only: the
+/// server stores no submission or score for a simulation.
+Future<SimulationResultDto> runSimulation(int id, String code) async {
+  final response = await http
+      .post(
+        Uri.parse('$apiBaseUrl/assignments/$id/simulate'),
+        headers: AuthApi.authorizedHeaders(json: true),
+        body: jsonEncode({
+          'code': code,
+          if (researchTracker.studySessionId != null)
+            'study_session_id': researchTracker.studySessionId,
+        }),
+      )
+      .timeout(_executionTimeout);
+  if (response.statusCode == 200) {
+    return SimulationResultDto.fromJson(
+      Map<String, dynamic>.from(jsonDecode(response.body) as Map),
+    );
+  }
+  if (response.statusCode >= 500 && response.statusCode != 503) {
+    throw Exception('The simulation could not run. Please try again.');
   }
   throw ApiRequestException(AuthApi.errorMessage(response));
 }

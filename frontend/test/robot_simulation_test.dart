@@ -1,0 +1,347 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:iuse_demo/main.dart' as app;
+import 'package:iuse_demo/models/simulation_trace.dart';
+import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/robot_sim_view.dart';
+import 'package:iuse_demo/widgets/run_terminal.dart';
+
+/// A small replay: drive 0.7 m toward a wall at 1.2 m, stop, the wall slides
+/// away, and the robot drives again.
+Map<String, dynamic> replayJson() {
+  final frames = <Map<String, dynamic>>[];
+  for (var i = 0; i <= 40; i++) {
+    final t = i * 0.2;
+    final x = t < 3.5 ? 0.2 * t : (t < 4.6 ? 0.7 : 0.7 + 0.2 * (t - 4.6));
+    final wall = t < 4.5 ? 1.2 : 2.7;
+    frames.add({
+      't': t,
+      'x': x,
+      'y': 0.0,
+      'theta': 0.0,
+      'linear': (t >= 3.5 && t < 4.6) ? 0.0 : 0.2,
+      'angular': 0.0,
+      'front': wall - x,
+      'ranges': [
+        for (var beam = 0; beam < 31; beam++) beam == 15 ? wall - x : null,
+      ],
+    });
+  }
+  return {
+    'scan': {
+      'angle_min_deg': -135.0,
+      'angle_increment_deg': 9.0,
+      'range_max': 10.0
+    },
+    'robot_radius': 0.15,
+    'walls': [
+      [1.2, -3.0, 1.2, 3.0],
+    ],
+    'frames': frames,
+    'events': [
+      {'t': 0.0, 'type': 'started'},
+      {'t': 3.5, 'type': 'stopped', 'front': 0.5},
+      {
+        't': 4.5,
+        'type': 'wall_moved',
+        'walls': [
+          [2.7, -3.0, 2.7, 3.0],
+        ],
+      },
+      {'t': 4.6, 'type': 'resumed'},
+      {'t': 8.0, 'type': 'finished'},
+    ],
+    'outcome': 'stopped_and_resumed',
+    'duration_seconds': 8.0,
+  };
+}
+
+Map<String, dynamic> resultJson(
+        {Map<String, dynamic>? replay, String error = ''}) =>
+    {
+      'assignment_version': 3,
+      'success': replay != null,
+      'error': error,
+      'output': 'Simulated 8.0 s: stopped and resumed.',
+      'simulation': replay,
+    };
+
+Widget host(Widget child,
+    {Size size = const Size(520, 900), bool reduceMotion = false}) {
+  return MaterialApp(
+    theme: buildAppTheme(),
+    home: MediaQuery(
+      data: MediaQueryData(size: size, disableAnimations: reduceMotion),
+      child: Scaffold(body: SingleChildScrollView(child: child)),
+    ),
+  );
+}
+
+void main() {
+  group('simulation model', () {
+    test('parses a replay and follows the wall as it moves', () {
+      final result =
+          SimulationResultDto.fromJson(resultJson(replay: replayJson()));
+      final replay = result.replay!;
+      expect(result.success, isTrue);
+      expect(replay.frames, hasLength(41));
+      expect(replay.frames.first.ranges.first, isNull);
+      expect(replay.frameAt(3.55).t, closeTo(3.4, 1e-9));
+      expect(replay.wallsAt(1.0).single.first, 1.2);
+      expect(replay.wallsAt(5.0).single.first, 2.7);
+      expect(replay.summary, contains('stopped 0.50 m from the wall at 3.5 s'));
+      expect(replay.summary, contains('drove again'));
+    });
+
+    test('a failed node has no replay and keeps its error', () {
+      final result = SimulationResultDto.fromJson(
+          resultJson(error: 'Your node stopped with an error:\nNameError'));
+      expect(result.success, isFalse);
+      expect(result.replay, isNull);
+      expect(result.error, contains('NameError'));
+      expect(() => SimulationResultDto.fromJson({'success': true}),
+          throwsFormatException);
+    });
+
+    test('each outcome is explained in plain words', () {
+      String summary(String outcome) =>
+          SimulationReplay.fromJson({...replayJson(), 'outcome': outcome})!
+              .summary;
+      expect(summary('collided'), contains('hit the wall'));
+      expect(summary('never_moved'), contains('never moved'));
+      expect(summary('kept_driving'), contains('still driving'));
+    });
+
+    test('terminal shows the error with the student line and a summary', () {
+      final failed = buildSimulationTerminalLines(
+        SimulationResultDto.fromJson(resultJson(
+          error:
+              'Your node stopped with an error:\ncontroller.py, line 27, in build_node\n'
+              '    undefined_name\nNameError: name is not defined',
+        )),
+        'controller.py',
+      );
+      expect(failed.first.kind, TerminalLineKind.command);
+      expect(failed.where((line) => line.line == 27), hasLength(1));
+      expect(failed.last.text, contains('NameError'));
+      final passed = buildSimulationTerminalLines(
+        SimulationResultDto.fromJson(resultJson(replay: replayJson())),
+        'controller.py',
+      );
+      expect(passed.last.kind, TerminalLineKind.info);
+      expect(passed.last.text, contains('drove again'));
+    });
+  });
+
+  group('replay view', () {
+    testWidgets('plays, pauses, scrubs, and reports what the robot did',
+        (tester) async {
+      tester.view.physicalSize = const Size(520, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final replay = SimulationReplay.fromJson(replayJson())!;
+      await tester.pumpWidget(host(RobotSimView(replay: replay)));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byTooltip('Pause replay'), findsOneWidget);
+      expect(find.textContaining('linear.x 0.20 m/s'), findsOneWidget);
+      expect(find.byKey(const ValueKey('robot-sim-summary')), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(
+            RegExp('Robot simulation replay. The robot stopped')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('robot-sim-play')));
+      await tester.pump();
+      expect(find.byTooltip('Play replay'), findsOneWidget);
+
+      // Drag the slider most of the way: the robot is stopped there.
+      final slider = find.byKey(const ValueKey('robot-sim-scrub'));
+      await tester.drag(slider, Offset(tester.getSize(slider).width * 0.4, 0));
+      await tester.pump();
+      expect(find.byTooltip('Play replay'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('robot-sim-restart')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('t 8.0 s'), findsOneWidget);
+      expect(find.textContaining('Drove again'), findsOneWidget);
+    });
+
+    testWidgets('reduced motion shows the final position without playing',
+        (tester) async {
+      tester.view.physicalSize = const Size(520, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final replay = SimulationReplay.fromJson(replayJson())!;
+      await tester
+          .pumpWidget(host(RobotSimView(replay: replay), reduceMotion: true));
+      await tester.pump();
+      expect(find.byTooltip('Play replay'), findsOneWidget);
+      expect(find.textContaining('t 8.0 s'), findsOneWidget);
+    });
+
+    testWidgets('fits a 320 px phone without overflow', (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final replay = SimulationReplay.fromJson(replayJson())!;
+      await tester.pumpWidget(
+          host(RobotSimView(replay: replay), size: const Size(320, 800)));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('robot-sim-canvas')), findsOneWidget);
+    });
+  });
+
+  group('workspace', () {
+    MockClient client({
+      required Map<String, dynamic> simulationConfig,
+      required List<String> simulated,
+      Completer<http.Response>? simulateResponse,
+    }) {
+      return MockClient((request) async {
+        if (request.method == 'GET' && request.url.path == '/assignments/7') {
+          return http.Response(
+            jsonEncode({
+              'id': 7,
+              'title': 'Assignment 7: Stop Before the Wall',
+              'description': 'Wall stop.',
+              'assignment_html': '<p>Stop before the wall.</p>',
+              'starter_code': 'def build_node():\n    return None\n',
+              'language': 'python-ros2',
+              'vals': <String, dynamic>{},
+              'simulation_config': simulationConfig,
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/assignments/7/simulate') {
+          simulated.add(request.body);
+          if (simulateResponse != null) return simulateResponse.future;
+          return http.Response(
+              jsonEncode(resultJson(replay: replayJson())), 200);
+        }
+        return http.Response('{}', 404);
+      });
+    }
+
+    Widget workspace() => MaterialApp(
+          theme: buildAppTheme(),
+          home: const MediaQuery(
+            data: MediaQueryData(size: Size(1200, 900)),
+            child: app.MyHomePage(title: 'Assignment 7', id: 7),
+          ),
+        );
+
+    void clearProgress() {
+      final progress = app.learningProgress;
+      progress.latestScores.clear();
+      progress.bestScores.clear();
+      progress.attemptCounts.clear();
+      progress.codeDrafts.clear();
+      progress.codeDraftVersions.clear();
+      progress.submissionIds.clear();
+      progress.unsyncedDrafts.clear();
+      progress.revealedSolutions.clear();
+    }
+
+    testWidgets('Simulate appears only for a ros2_2d simulation',
+        (tester) async {
+      final simulated = <String>[];
+      final mock =
+          client(simulationConfig: {'enabled': false}, simulated: simulated);
+      addTearDown(mock.close);
+      addTearDown(clearProgress);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(workspace());
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('simulate-button')), findsNothing);
+        expect(find.byKey(const Key('run-tests-button')), findsOneWidget);
+      }, () => mock);
+    });
+
+    testWidgets('Simulate replays the robot in the Simulation tab',
+        (tester) async {
+      final simulated = <String>[];
+      final pending = Completer<http.Response>();
+      final mock = client(
+        simulationConfig: {'enabled': true, 'provider': 'ros2_2d'},
+        simulated: simulated,
+        simulateResponse: pending,
+      );
+      addTearDown(mock.close);
+      addTearDown(clearProgress);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(workspace());
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('simulate-button')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(simulated, hasLength(1));
+        expect(jsonDecode(simulated.single)['code'], contains('build_node'));
+        expect(find.byKey(const Key('results-tab-switch')), findsOneWidget);
+        expect(
+          find.text('Simulating…').evaluate().length +
+              find.byTooltip('Simulating…').evaluate().length,
+          1,
+        );
+        // The button is disabled while the replay runs (no double requests).
+        final button = tester.widget(find.byKey(const Key('simulate-button')));
+        expect(
+          button is IconButton
+              ? button.onPressed
+              : (button as ButtonStyleButton).onPressed,
+          isNull,
+        );
+        expect(simulated, hasLength(1));
+
+        pending.complete(
+            http.Response(jsonEncode(resultJson(replay: replayJson())), 200));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('robot-sim-view')), findsOneWidget);
+        expect(find.textContaining('drove again after the wall moved away'),
+            findsWidgets);
+
+        await tester.tap(find.text('Tests'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('robot-sim-view')), findsNothing);
+        await tester.tap(find.text('Simulation'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('robot-sim-view')), findsOneWidget);
+      }, () => mock);
+    });
+
+    testWidgets('a node that fails shows its error instead of a replay',
+        (tester) async {
+      final simulated = <String>[];
+      final pending = Completer<http.Response>();
+      final mock = client(
+        simulationConfig: {'enabled': true, 'provider': 'ros2_2d'},
+        simulated: simulated,
+        simulateResponse: pending,
+      );
+      addTearDown(mock.close);
+      addTearDown(clearProgress);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(workspace());
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('simulate-button')));
+        await tester.pump();
+        pending.complete(http.Response(
+            jsonEncode(resultJson(
+                error:
+                    'build_node() returned None or something that is not a ROS node.')),
+            200));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('simulation-error')), findsOneWidget);
+        expect(find.textContaining('build_node() returned None'), findsWidgets);
+      }, () => mock);
+    });
+  });
+}

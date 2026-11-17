@@ -82,9 +82,45 @@ def verify_open_assignment(assignment_id: int, image: str) -> None:
     print(f"Assignment {assignment_id}: PASS +inf-as-obstacle rejection (drive-open-floor).")
 
 
+def verify_simulation(assignment_id: int, image: str) -> None:
+    """Visual replay: the answer stops and resumes; a node that never stops collides."""
+    source = json.loads(
+        (ASSIGNMENTS_DIRECTORY / f"assignment_{assignment_id}.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    world = (source.get("simulation_config") or {}).get("world")
+    if (source.get("simulation_config") or {}).get("provider") != "ros2_2d" or not world:
+        return
+    reference = (REPOSITORY_ROOT / source["reference_solution_path"]).read_text(
+        encoding="utf-8"
+    )
+    config = {**source.get("grader_config", {}), "mode": "simulate", "simulation": world}
+
+    def outcome(code: str) -> str | None:
+        project_files = [
+            item for item in source.get("asset_manifest", [])
+            if isinstance(item, dict) and item.get("kind") == "project_file"
+        ]
+        timeout = float(source.get("execution_settings", {}).get("timeout_seconds", 20))
+        result = DockerRos2Executor(image, timeout).execute(code, project_files, config)
+        replay = result.get("simulation")
+        return replay.get("outcome") if isinstance(replay, dict) else None
+
+    if outcome(reference) != "stopped_and_resumed":
+        raise RuntimeError(f"Assignment {assignment_id}: the answer did not stop and resume in the replay.")
+    never_stops = reference.replace("if usable and min(usable) > STOP_DISTANCE:", "if True:")
+    if never_stops == reference:
+        raise RuntimeError(f"Assignment {assignment_id}: reference answer changed shape.")
+    if outcome(never_stops) != "collided":
+        raise RuntimeError(f"Assignment {assignment_id}: a node that never stops did not collide in the replay.")
+    print(f"Assignment {assignment_id}: PASS simulation replay (answer stops and resumes; never-stop collides).")
+
+
 def verify_assignment(assignment_id: int, image: str) -> None:
     if assignment_id in OPEN_ASSIGNMENT_IDS:
         verify_open_assignment(assignment_id, image)
+        verify_simulation(assignment_id, image)
         return
     source = json.loads(
         (ASSIGNMENTS_DIRECTORY / f"assignment_{assignment_id}.json").read_text(

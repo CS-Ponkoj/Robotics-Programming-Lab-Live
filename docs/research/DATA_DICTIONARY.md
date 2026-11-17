@@ -80,7 +80,7 @@ One row describes the current form of an assignment.
 | `rubric` | Criteria, descriptions, and weights |
 | `misconceptions` | Known misunderstanding tags and descriptions |
 | `tutoring_rules` | Hint limits and solution-protection rules |
-| `simulation_config` | Optional simulation settings; `diagram` describes the playground drawing |
+| `simulation_config` | Optional simulation settings; `diagram` describes the playground drawing, and `provider: ros2_2d` with a `world` (walls, robot start, duration, optional `wall_move`) enables the ROS 2 robot replay |
 | `asset_manifest` | Project files and which file may be edited |
 | `grader_type`, `grader_config` | Server-side grader selection and protected settings |
 
@@ -250,6 +250,7 @@ Standard event types are:
 - `ai_tutor_toggled`
 - `workspace_tab_changed`
 - `workspace_file_selected`
+- `simulation_run`
 
 Each event type has a small approved metadata shape. Extra fields are rejected,
 which prevents passwords, source code, or arbitrary browser data from being
@@ -259,6 +260,13 @@ For `hint_requested`, `interaction_type` distinguishes a progressive hint from
 a `student_question`. Question events store only the question length, hint
 level, and tutor source. The student's question text is not written to the
 learning-event record.
+
+`simulation_run` is recorded when a signed-in student in a study session presses
+Simulate on an assignment with a `ros2_2d` simulation. It stores only `outcome`
+(`collided`, `never_moved`, `stopped`, `stopped_and_resumed`, `kept_driving`, or
+`error`) and `duration_seconds`. The replay is visual only: it creates no
+submission, score, or test evidence, and the trace and source code are not stored.
+Demo sessions record nothing.
 
 ### `hint_interactions`
 

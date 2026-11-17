@@ -315,18 +315,61 @@ class PlaygroundConfig(ContractModel):
         return self
 
 
+Coordinate = Annotated[float, Field(ge=-20, le=20)]
+
+
+class SimulationRobot(ContractModel):
+    x: Coordinate = 0.0
+    y: Coordinate = 0.0
+    theta: float = Field(default=0.0, ge=-3.1416, le=3.1416)
+    radius: float = Field(default=0.15, gt=0, le=1)
+
+
+class SimulationWallMove(ContractModel):
+    """Slide one wall after the robot has been stopped for a while."""
+
+    wall: int = Field(ge=0, lt=20)
+    after_stopped_seconds: float = Field(default=1.0, gt=0, le=5)
+    dx: Coordinate = 0.0
+    dy: Coordinate = 0.0
+
+
+class SimulationWorld(ContractModel):
+    """A flat 2D world for the ros2_2d replay; walls are [x1, y1, x2, y2] in metres."""
+
+    walls: list[Annotated[list[Coordinate], Field(min_length=4, max_length=4)]] = Field(
+        min_length=1, max_length=20
+    )
+    robot: SimulationRobot = Field(default_factory=SimulationRobot)
+    duration_seconds: float = Field(default=7.0, gt=0, le=8)
+    wall_move: SimulationWallMove | None = None
+
+    @model_validator(mode="after")
+    def wall_move_names_a_wall(self):
+        if self.wall_move is not None and self.wall_move.wall >= len(self.walls):
+            raise ValueError("wall_move names a wall that does not exist")
+        return self
+
+
 class SimulationConfig(ContractModel):
     enabled: bool = False
     provider: str | None = Field(default=None, max_length=120)
     scenario: str | None = Field(default=None, max_length=300)
     diagram: DiagramConfig | None = None
     playground: PlaygroundConfig | None = None
+    world: SimulationWorld | None = None
+
+    @model_validator(mode="after")
+    def robot_replay_needs_a_world(self):
+        if self.provider == "ros2_2d" and self.world is None:
+            raise ValueError("A ros2_2d simulation needs a world")
+        return self
 
     @model_serializer(mode="wrap")
     def omit_missing_optional_blocks(self, handler):
         # Configurations without these blocks keep their original stored shape.
         data = handler(self)
-        for key in ("diagram", "playground"):
+        for key in ("diagram", "playground", "world"):
             if data.get(key) is None:
                 data.pop(key, None)
         return data
@@ -387,6 +430,7 @@ class LearningEventType(StrEnum):
     ASSIGNMENT_SUBMITTED = "assignment_submitted"
     HINT_REQUESTED = "hint_requested"
     SOLUTION_REVEALED = "solution_revealed"
+    SIMULATION_RUN = "simulation_run"
 
 
 class ClientLearningEventType(StrEnum):
@@ -402,6 +446,7 @@ AUTOMATIC_LEARNING_EVENT_TYPES = frozenset(
         LearningEventType.ASSIGNMENT_SUBMITTED.value,
         LearningEventType.HINT_REQUESTED.value,
         LearningEventType.SOLUTION_REVEALED.value,
+        LearningEventType.SIMULATION_RUN.value,
     }
 )
 
@@ -458,6 +503,15 @@ class SolutionRevealedEventData(ContractModel):
     submission_id: str = Field(min_length=1, max_length=36)
 
 
+class SimulationRunEventData(ContractModel):
+    """Visual-only replay; it has no submission, score, or code."""
+
+    outcome: Literal[
+        "collided", "never_moved", "stopped", "stopped_and_resumed", "kept_driving", "error"
+    ]
+    duration_seconds: float = Field(ge=0, le=10)
+
+
 EVENT_DATA_ADAPTERS = {
     LearningEventType.ASSIGNMENT_OPENED.value: TypeAdapter(AssignmentOpenedEventData),
     LearningEventType.AI_TUTOR_TOGGLED.value: TypeAdapter(AiTutorToggledEventData),
@@ -471,6 +525,7 @@ EVENT_DATA_ADAPTERS = {
     LearningEventType.ASSIGNMENT_SUBMITTED.value: TypeAdapter(SubmissionEventData),
     LearningEventType.HINT_REQUESTED.value: TypeAdapter(HintRequestedEventData),
     LearningEventType.SOLUTION_REVEALED.value: TypeAdapter(SolutionRevealedEventData),
+    LearningEventType.SIMULATION_RUN.value: TypeAdapter(SimulationRunEventData),
 }
 
 

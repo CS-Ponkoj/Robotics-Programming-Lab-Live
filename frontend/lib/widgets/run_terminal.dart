@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 
 enum TerminalLineKind {
@@ -493,4 +494,46 @@ class _HeaderButton extends StatelessWidget {
       padding: EdgeInsets.zero,
     );
   }
+}
+
+/// Terminal lines for a robot replay: what the node printed, any error with
+/// the student's own line, and a one-line account of what the robot did.
+/// Built only from the simulation result; it is never graded.
+List<TerminalLine> buildSimulationTerminalLines(
+  SimulationResultDto result,
+  String fileName,
+) {
+  final lines = <TerminalLine>[
+    const TerminalLine(
+      '\$ simulate  (2D replay, not graded)',
+      TerminalLineKind.command,
+    ),
+  ];
+  for (final text in result.output.trimRight().split('\n')) {
+    if (text.trim().isEmpty || text.startsWith('Simulated ')) continue;
+    lines.add(TerminalLine(text, TerminalLineKind.output));
+  }
+  if (result.error.trim().isNotEmpty) {
+    for (final text in result.error.trim().split('\n')) {
+      final frame = _textFramePattern.firstMatch(text);
+      if (frame != null && frame.group(1) == fileName) {
+        lines.add(TerminalLine(
+          '  File "$fileName", line ${frame.group(2)}, in ${frame.group(3)}',
+          TerminalLineKind.location,
+          line: int.tryParse(frame.group(2)!),
+        ));
+      } else {
+        lines.add(TerminalLine(text, TerminalLineKind.error));
+      }
+    }
+  }
+  final replay = result.replay;
+  if (replay != null) {
+    lines.add(TerminalLine(
+      replay.summary,
+      // Info, not success: a replay is never a passed check.
+      TerminalLineKind.info,
+    ));
+  }
+  return lines;
 }
