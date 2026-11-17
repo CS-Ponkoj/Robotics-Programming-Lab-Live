@@ -539,6 +539,10 @@ Treat every submission as hostile input.
   own line, and a test summary, like the VS Code terminal. It adds to the
   Results overlay and never replaces it; build its lines only from the run
   result and the student's code, never from protected tests.
+- A square Simulation panel (owner-approved 2026-11-17) shows the visual-only
+  robot replay for assignments with a `ros2_2d` simulation. It docks above
+  the instructions, can pop out into a movable window, open full screen, or
+  collapse, and is its own tab on phones. Results stays for test results.
 
 - Keep networking in `lib/services`, shared state in `lib/state`, transport data
   in `lib/models`, and screens focused on presentation and interaction.

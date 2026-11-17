@@ -6,9 +6,20 @@ import 'package:iuse_demo/widgets/playground_diagram.dart' show niceDiagramStep;
 
 /// Top-down replay of the student's node driving the robot. Visual only.
 class RobotSimView extends StatefulWidget {
-  const RobotSimView({super.key, required this.replay});
+  const RobotSimView({
+    super.key,
+    required this.replay,
+    this.compact = false,
+    this.canvasSide,
+  });
 
   final SimulationReplay replay;
+
+  /// Panel mode: a square picture, controls, and a one-line summary only.
+  final bool compact;
+
+  /// Side of the square picture in compact mode; null keeps a 4:3 picture.
+  final double? canvasSide;
 
   @override
   State<RobotSimView> createState() => _RobotSimViewState();
@@ -113,8 +124,7 @@ class _RobotSimViewState extends State<RobotSimView>
           Semantics(
             label: 'Robot simulation replay. ${replay.summary}',
             image: true,
-            child: AspectRatio(
-              aspectRatio: 4 / 3,
+            child: _canvasFrame(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: ColoredBox(
@@ -205,32 +215,43 @@ class _RobotSimViewState extends State<RobotSimView>
                     ))
                 .toList(),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: widget.compact ? 6 : 12),
           Text(replay.summary,
               key: const ValueKey('robot-sim-summary'),
+              maxLines: widget.compact ? 2 : null,
+              overflow: widget.compact ? TextOverflow.ellipsis : null,
               style: theme.textTheme.bodyMedium
                   ?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          for (final event in replay.events)
-            if (_eventText(event) case final text?)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text('${event.t.toStringAsFixed(1)} s  $text',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: event.t <= _time
-                          ? theme.colorScheme.onSurface
-                          : theme.colorScheme.onSurfaceVariant,
-                    )),
-              ),
-          const SizedBox(height: 8),
-          Text(
-            'This replay only shows what your node did. It does not change your score.',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
+          if (!widget.compact) ...[
+            const SizedBox(height: 8),
+            for (final event in replay.events)
+              if (_eventText(event) case final text?)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('${event.t.toStringAsFixed(1)} s  $text',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: event.t <= _time
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurfaceVariant,
+                      )),
+                ),
+            const SizedBox(height: 8),
+            Text(
+              'This replay only shows what your node did. It does not change your score.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// A square of [RobotSimView.canvasSide] in panels, otherwise 4:3.
+  Widget _canvasFrame({required Widget child}) {
+    final side = widget.canvasSide;
+    if (side == null) return AspectRatio(aspectRatio: 4 / 3, child: child);
+    return Center(child: SizedBox.square(dimension: side, child: child));
   }
 
   static String _formatSpeed(double speed) => speed == speed.roundToDouble()

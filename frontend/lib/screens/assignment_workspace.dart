@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
@@ -17,7 +18,7 @@ import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/theme/editor_palette.dart';
 import 'package:iuse_demo/widgets/earlier_draft_banner.dart';
 import 'package:iuse_demo/widgets/playground_dialog.dart';
-import 'package:iuse_demo/widgets/robot_sim_view.dart';
+import 'package:iuse_demo/widgets/robot_sim_panel.dart';
 import 'package:iuse_demo/widgets/run_terminal.dart';
 import 'package:highlight/languages/python.dart';
 
@@ -98,7 +99,11 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isSimulating = false;
   // The code the terminal's simulation lines describe, when it shows one.
   String? _terminalSimulatedCode;
-  int _resultsTab = 0;
+  // The square Simulation panel: docked above the instructions or floating.
+  SimPanelMode _simMode = SimPanelMode.docked;
+  bool _simCollapsed = false;
+  Offset _simOffset = const Offset(96, 140);
+  double _simSize = 440;
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
   // Playground runs for the current code only; memory only, never sent.
@@ -359,7 +364,6 @@ class _MyHomePageState extends State<MyHomePage> {
       _submitted = true;
       _emptyCodeAttempted = false;
       _isRunning = true;
-      _resultsTab = 0;
       _terminalSimulatedCode = null;
       _hasUnrunChanges = false;
       _diagnosticLine = null;
@@ -420,8 +424,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (!hasNonWhitespaceCode(_code)) {
       setState(() {
         _emptyCodeAttempted = true;
-        _resultsTab = 0;
-      });
+        });
       _openResultsPanel();
       return;
     }
@@ -430,10 +433,16 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _isSimulating = true;
       _simulation = simulation;
-      _resultsTab = 1;
+      _simCollapsed = false;
       _emptyCodeAttempted = false;
+      if (MediaQuery.sizeOf(context).width < 900) {
+        _selectedWorkspaceTab = 2;
+      } else if (_simMode == SimPanelMode.docked &&
+          _workspaceFocus == AssignmentWorkspaceFocus.editor) {
+        // A docked panel lives in the right column; bring it back.
+        _workspaceFocus = AssignmentWorkspaceFocus.none;
+      }
     });
-    _openResultsPanel();
     simulation.then(
       (result) {
         if (!mounted) return;
@@ -453,55 +462,96 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Widget _simulationResults() {
-    final simulation = _simulation;
-    if (simulation == null) {
-      return const _EmptySimulationState();
-    }
-    return FutureBuilder<SimulationResultDto>(
-      future: simulation,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const SecureGraderLoadingState(ros2Package: true);
-        }
-        if (snap.hasError) {
-          final error = snap.error;
-          return TestRunErrorState(
-            onRetry: _runSimulation,
-            message: error is ApiRequestException ? error.message : null,
-          );
-        }
-        final result = snap.data;
-        if (result == null) return const SizedBox.shrink();
-        final replay = result.replay;
-        return ListView(
-          key: const Key('simulation-results'),
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (replay != null)
-              RobotSimView(replay: replay)
-            else
-              Card(
-                key: const Key('simulation-error'),
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('The simulation could not start',
-                          style: Theme.of(context).textTheme.titleSmall),
-                      const SizedBox(height: 8),
-                      SelectableText(result.error.isEmpty
-                          ? 'Your node did not drive the robot.'
-                          : result.error),
-                    ],
+  void _toggleSimMode() {
+    setState(() {
+      _simMode = _simMode == SimPanelMode.docked
+          ? SimPanelMode.floating
+          : SimPanelMode.docked;
+      _simCollapsed = false;
+    });
+  }
+
+  void _openSimFullScreen() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog.fullscreen(
+        child: RobotSimPanel(
+          simulation: _simulation,
+          isSimulating: _isSimulating,
+          onSimulate: null,
+          onClose: () => Navigator.pop(dialogContext),
+        ),
+      ),
+    );
+  }
+
+  /// The docked panel or the phone Simulation tab.
+  Widget _simPanel({required bool phone}) => RobotSimPanel(
+        simulation: _simulation,
+        isSimulating: _isSimulating,
+        onSimulate: _init ? null : _runSimulation,
+        collapsed: !phone && _simCollapsed,
+        onToggleCollapsed:
+            phone ? null : () => setState(() => _simCollapsed = !_simCollapsed),
+        onToggleMode: phone ? null : _toggleSimMode,
+        onFullScreen: _openSimFullScreen,
+      );
+
+  /// The panel as its own window over the workspace: drag the header to
+  /// move it and the corner to resize it.
+  Widget _floatingSimPanel(BoxConstraints area) {
+    final size =
+        _simSize.clamp(280.0, math.max(280.0, area.maxWidth - 32)).toDouble();
+    final height = _simCollapsed ? 48.0 : size + 48;
+    final left =
+        _simOffset.dx.clamp(0.0, math.max(0.0, area.maxWidth - size)).toDouble();
+    final top =
+        _simOffset.dy.clamp(0.0, math.max(0.0, area.maxHeight - 48)).toDouble();
+    return Positioned(
+      left: left,
+      top: top,
+      width: size,
+      height: height,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: RobotSimPanel(
+              simulation: _simulation,
+              isSimulating: _isSimulating,
+              onSimulate: _init ? null : _runSimulation,
+              mode: SimPanelMode.floating,
+              collapsed: _simCollapsed,
+              onToggleCollapsed: () =>
+                  setState(() => _simCollapsed = !_simCollapsed),
+              onToggleMode: _toggleSimMode,
+              onFullScreen: _openSimFullScreen,
+              onHeaderDrag: (details) => setState(
+                  () => _simOffset = Offset(left, top) + details.delta),
+            ),
+          ),
+          if (!_simCollapsed)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeDownRight,
+                child: GestureDetector(
+                  key: const Key('robot-sim-resize'),
+                  onPanUpdate: (details) => setState(() => _simSize =
+                      (size + math.max(details.delta.dx, details.delta.dy))
+                          .clamp(280.0, 900.0)
+                          .toDouble()),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(Icons.open_in_full_rounded,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.outline),
                   ),
                 ),
               ),
-          ],
-        );
-      },
+            ),
+        ],
+      ),
     );
   }
 
@@ -905,29 +955,6 @@ class _MyHomePageState extends State<MyHomePage> {
                     }
                   : null,
             ),
-            if (_hasRobotSimulation)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: SegmentedButton<int>(
-                  key: const Key('results-tab-switch'),
-                  segments: const [
-                    ButtonSegment(
-                        value: 0,
-                        icon: Icon(Icons.fact_check_outlined),
-                        label: Text('Tests')),
-                    ButtonSegment(
-                        value: 1,
-                        icon: Icon(Icons.smart_toy_outlined),
-                        label: Text('Simulation')),
-                  ],
-                  selected: {_resultsTab},
-                  onSelectionChanged: (value) =>
-                      setState(() => _resultsTab = value.first),
-                ),
-              ),
-            if (_hasRobotSimulation && _resultsTab == 1)
-              Expanded(child: _simulationResults())
-            else
               Expanded(
                 child: _emptyCodeAttempted
                     ? EmptyCodeTestRunState(onRestore: _resetStarterCode)
@@ -968,10 +995,19 @@ class _MyHomePageState extends State<MyHomePage> {
         ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
             _workspaceFocus == AssignmentWorkspaceFocus.editor
         : _selectedWorkspaceTab == 0;
+    final showSimTab = !useDesktopLayout &&
+        _hasRobotSimulation &&
+        _selectedWorkspaceTab == 2;
+    final showDockedSim = useDesktopLayout &&
+        _hasRobotSimulation &&
+        _simMode == SimPanelMode.docked;
+    final showFloatingSim = useDesktopLayout &&
+        _hasRobotSimulation &&
+        _simMode == SimPanelMode.floating;
     final showInstructions = useDesktopLayout
         ? _workspaceFocus == AssignmentWorkspaceFocus.none ||
             _workspaceFocus == AssignmentWorkspaceFocus.instructions
-        : _selectedWorkspaceTab == 1;
+        : _selectedWorkspaceTab == 1 || showSimTab;
     final showResizeHandle =
         useDesktopLayout && _workspaceFocus == AssignmentWorkspaceFocus.none;
     // Saved work shows as in progress, whether it is on this device or
@@ -1110,10 +1146,15 @@ class _MyHomePageState extends State<MyHomePage> {
               backgroundColor: AppColors.resultsSurface,
               child: _resultsPanel(),
             ),
-            body: Column(
+            body: LayoutBuilder(
+              builder: (context, bodyArea) => Stack(
+                children: [
+                  Positioned.fill(
+                    child: Column(
               children: [
                 if (!useDesktopLayout)
                   AssignmentWorkspaceNavigation(
+                    showSimulation: _hasRobotSimulation,
                     selectedIndex: _selectedWorkspaceTab,
                     onDestinationSelected: (index) {
                       setState(() => _selectedWorkspaceTab = index);
@@ -1353,8 +1394,39 @@ class _MyHomePageState extends State<MyHomePage> {
                           child: LayoutBuilder(
                               builder: (context, rightConstraints) => Column(
                                     children: [
-                                      // Instructions fill the right workspace panel.
-                                      if (showInstructions)
+                                      // Phones: the Simulation tab fills the panel.
+                                      if (showSimTab)
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(
+                                                AppSpacing.sm),
+                                            child: _simPanel(phone: true),
+                                          ),
+                                        ),
+                                      // Desktop: a square panel above the
+                                      // instructions, like a dashboard tile.
+                                      if (showDockedSim)
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                              AppSpacing.sm,
+                                              AppSpacing.sm,
+                                              AppSpacing.sm,
+                                              0),
+                                          child: _simCollapsed
+                                              ? _simPanel(phone: false)
+                                              : SizedBox(
+                                                  height: math.min(
+                                                    rightConstraints.maxHeight *
+                                                        0.58,
+                                                    rightConstraints.maxWidth +
+                                                        130,
+                                                  ),
+                                                  child:
+                                                      _simPanel(phone: false),
+                                                ),
+                                        ),
+                                      // Instructions fill the rest of the panel.
+                                      if (!showSimTab)
                                         Expanded(
                                           child: Column(
                                             children: [
@@ -1451,6 +1523,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
               ],
+            ),
+                  ),
+                  if (showFloatingSim) _floatingSimPanel(bodyArea),
+                ],
+              ),
             ),
           ),
         ),
@@ -3107,7 +3184,11 @@ class AssignmentWorkspaceNavigation extends StatelessWidget {
     super.key,
     required this.selectedIndex,
     required this.onDestinationSelected,
+    this.showSimulation = false,
   });
+
+  /// Adds a Simulation tab for assignments with a robot replay.
+  final bool showSimulation;
 
   @override
   Widget build(BuildContext context) {
@@ -3115,50 +3196,19 @@ class AssignmentWorkspaceNavigation extends StatelessWidget {
       key: const Key('assignment-workspace-navigation'),
       selectedIndex: selectedIndex,
       onDestinationSelected: onDestinationSelected,
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.code_rounded), label: 'Code'),
-        NavigationDestination(
+      destinations: [
+        const NavigationDestination(
+            icon: Icon(Icons.code_rounded), label: 'Code'),
+        const NavigationDestination(
           icon: Icon(Icons.menu_book_rounded),
           label: 'Instructions',
         ),
-      ],
-    );
-  }
-}
-
-class _EmptySimulationState extends StatelessWidget {
-  const _EmptySimulationState();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Semantics(
-      container: true,
-      label:
-          'No simulation yet. Press Simulate to watch your node drive the robot.',
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.smart_toy_outlined,
-                  size: 40, color: theme.colorScheme.primary),
-              const SizedBox(height: AppSpacing.sm),
-              Text('Watch your robot',
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Press Simulate to run your node in a small 2D world and '
-                'replay how it drives the robot. It is not graded.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium,
-              ),
-            ],
+        if (showSimulation)
+          const NavigationDestination(
+            icon: Icon(Icons.smart_toy_outlined),
+            label: 'Simulation',
           ),
-        ),
-      ),
+      ],
     );
   }
 }

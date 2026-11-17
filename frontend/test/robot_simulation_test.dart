@@ -230,13 +230,19 @@ void main() {
       });
     }
 
-    Widget workspace() => MaterialApp(
+    Widget workspace({Size size = const Size(1400, 1000)}) => MaterialApp(
           theme: buildAppTheme(),
-          home: const MediaQuery(
-            data: MediaQueryData(size: Size(1200, 900)),
-            child: app.MyHomePage(title: 'Assignment 7', id: 7),
+          home: MediaQuery(
+            data: MediaQueryData(size: size),
+            child: const app.MyHomePage(title: 'Assignment 7', id: 7),
           ),
         );
+
+    void useScreen(WidgetTester tester, Size size) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+    }
 
     void clearProgress() {
       final progress = app.learningProgress;
@@ -261,12 +267,14 @@ void main() {
         await tester.pumpWidget(workspace());
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('simulate-button')), findsNothing);
+        expect(find.byKey(const Key('robot-sim-panel')), findsNothing);
         expect(find.byKey(const Key('run-tests-button')), findsOneWidget);
       }, () => mock);
     });
 
-    testWidgets('Simulate replays the robot in the Simulation tab',
+    testWidgets('the square panel sits above the instructions and replays',
         (tester) async {
+      useScreen(tester, const Size(1400, 1000));
       final simulated = <String>[];
       final pending = Completer<http.Response>();
       final mock = client(
@@ -279,19 +287,25 @@ void main() {
       await http.runWithClient(() async {
         await tester.pumpWidget(workspace());
         await tester.pumpAndSettle();
+        final panel = find.byKey(const Key('robot-sim-panel'));
+        expect(panel, findsOneWidget);
+        expect(find.text('Watch your robot'), findsOneWidget);
+        // Docked above the instructions in the right column.
+        final instructions =
+            find.byKey(const Key('assignment-instructions-panel'));
+        expect(tester.getRect(panel).bottom,
+            lessThanOrEqualTo(tester.getRect(instructions).top + 1));
+        expect(tester.getRect(panel).left,
+            closeTo(tester.getRect(instructions).left, 24));
+
         await tester.tap(find.byKey(const Key('simulate-button')));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
-
         expect(simulated, hasLength(1));
         expect(jsonDecode(simulated.single)['code'], contains('build_node'));
-        expect(find.byKey(const Key('results-tab-switch')), findsOneWidget);
-        expect(
-          find.text('Simulating…').evaluate().length +
-              find.byTooltip('Simulating…').evaluate().length,
-          1,
-        );
-        // The button is disabled while the replay runs (no double requests).
+        expect(find.text('Running your node on the robot…'), findsOneWidget);
+        // Results stays closed: it holds test results only.
+        expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
         final button = tester.widget(find.byKey(const Key('simulate-button')));
         expect(
           button is IconButton
@@ -299,26 +313,117 @@ void main() {
               : (button as ButtonStyleButton).onPressed,
           isNull,
         );
-        expect(simulated, hasLength(1));
 
         pending.complete(
             http.Response(jsonEncode(resultJson(replay: replayJson())), 200));
         await tester.pumpAndSettle();
-        expect(find.byKey(const ValueKey('robot-sim-view')), findsOneWidget);
+        expect(
+            find.descendant(
+                of: panel,
+                matching: find.byKey(const ValueKey('robot-sim-view'))),
+            findsOneWidget);
+        final canvas =
+            tester.getSize(find.byKey(const ValueKey('robot-sim-canvas')));
+        expect(canvas.width, closeTo(canvas.height, 1)); // square
         expect(find.textContaining('drove again after the wall moved away'),
             findsWidgets);
 
-        await tester.tap(find.text('Tests'));
+        // Collapse to the header, then expand again.
+        await tester.tap(find.byKey(const Key('robot-sim-collapse')));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('robot-sim-view')), findsNothing);
-        await tester.tap(find.text('Simulation'));
+        await tester.tap(find.byKey(const Key('robot-sim-collapse')));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('robot-sim-view')), findsOneWidget);
       }, () => mock);
     });
 
+    testWidgets('the panel pops out, moves, docks, and opens full screen',
+        (tester) async {
+      useScreen(tester, const Size(1400, 1000));
+      final simulated = <String>[];
+      final mock = client(
+        simulationConfig: {'enabled': true, 'provider': 'ros2_2d'},
+        simulated: simulated,
+      );
+      addTearDown(mock.close);
+      addTearDown(clearProgress);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(workspace());
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('simulate-button')));
+        await tester.pumpAndSettle();
+        final panel = find.byKey(const Key('robot-sim-panel'));
+        final instructions =
+            find.byKey(const Key('assignment-instructions-panel'));
+        final dockedInstructionsTop = tester.getRect(instructions).top;
+
+        await tester.tap(find.byKey(const Key('robot-sim-pop-out')));
+        await tester.pumpAndSettle();
+        expect(panel, findsOneWidget);
+        // Popped out: the instructions take the whole column again.
+        expect(
+            tester.getRect(instructions).top, lessThan(dockedInstructionsTop));
+        final before = tester.getRect(panel).topLeft;
+        await tester.drag(find.text('Simulation').first, const Offset(120, 60));
+        await tester.pumpAndSettle();
+        // The drag moves the window (less Flutter's small drag threshold).
+        final moved = tester.getRect(panel).topLeft - before;
+        expect(moved.dx, greaterThan(60));
+        expect(moved.dy, greaterThan(30));
+        final width = tester.getSize(panel).width;
+        await tester.drag(
+            find.byKey(const Key('robot-sim-resize')), const Offset(80, 80));
+        await tester.pumpAndSettle();
+        expect(tester.getSize(panel).width, greaterThan(width));
+
+        await tester.tap(find.byKey(const Key('robot-sim-fullscreen')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('robot-sim-close')), findsOneWidget);
+        expect(find.byKey(const ValueKey('robot-sim-summary')), findsWidgets);
+        await tester.tap(find.byKey(const Key('robot-sim-close')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('robot-sim-close')), findsNothing);
+
+        await tester.tap(find.byKey(const Key('robot-sim-pop-out')));
+        await tester.pumpAndSettle();
+        expect(tester.getRect(instructions).top,
+            closeTo(dockedInstructionsTop, 1));
+      }, () => mock);
+    });
+
+    testWidgets('phones get a Simulation tab', (tester) async {
+      useScreen(tester, const Size(390, 844));
+      final simulated = <String>[];
+      final mock = client(
+        simulationConfig: {'enabled': true, 'provider': 'ros2_2d'},
+        simulated: simulated,
+      );
+      addTearDown(mock.close);
+      addTearDown(clearProgress);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(workspace(size: const Size(390, 844)));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('robot-sim-panel')), findsNothing);
+        await tester.tap(find.byKey(const Key('simulate-button')));
+        await tester.pumpAndSettle();
+        // Simulate jumps to the Simulation tab and shows the replay.
+        expect(find.byKey(const Key('robot-sim-panel')), findsOneWidget);
+        expect(find.byKey(const ValueKey('robot-sim-view')), findsOneWidget);
+        expect(find.byKey(const Key('robot-sim-pop-out')), findsNothing);
+        await tester.tap(find.text('Code'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('robot-sim-panel')), findsNothing);
+        await tester.tap(find.text('Simulation').last);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('robot-sim-view')), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }, () => mock);
+    });
+
     testWidgets('a node that fails shows its error instead of a replay',
         (tester) async {
+      useScreen(tester, const Size(1400, 1000));
       final simulated = <String>[];
       final pending = Completer<http.Response>();
       final mock = client(
