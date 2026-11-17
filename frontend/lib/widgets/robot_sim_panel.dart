@@ -56,6 +56,7 @@ class RobotSimPanel extends StatelessWidget {
       onToggleMode: onToggleMode,
       onFullScreen: onFullScreen,
       onClose: onClose,
+      draggable: onHeaderDrag != null,
     );
     return Material(
       key: const Key('robot-sim-panel'),
@@ -102,8 +103,11 @@ class _PanelHeader extends StatelessWidget {
     required this.onToggleMode,
     required this.onFullScreen,
     required this.onClose,
+    this.draggable = false,
   });
 
+  /// Shows a grip: the header moves the floating window.
+  final bool draggable;
   final bool isSimulating;
   final Future<SimulationResultDto>? simulation;
   final VoidCallback? onSimulate;
@@ -127,6 +131,16 @@ class _PanelHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
       child: Row(
         children: [
+          if (draggable) ...[
+            Tooltip(
+              message: 'Drag the header to move this window',
+              child: Icon(Icons.drag_indicator_rounded,
+                  key: const Key('robot-sim-grip'),
+                  size: 20,
+                  color: theme.colorScheme.outline),
+            ),
+            const SizedBox(width: 4),
+          ],
           Icon(Icons.smart_toy_outlined,
               size: 20, color: theme.colorScheme.primary),
           const SizedBox(width: 8),

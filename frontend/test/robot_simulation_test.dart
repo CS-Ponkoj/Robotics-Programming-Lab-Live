@@ -272,7 +272,7 @@ void main() {
       }, () => mock);
     });
 
-    testWidgets('the square panel sits above the instructions and replays',
+    testWidgets('the square panel opens as its own window and replays',
         (tester) async {
       useScreen(tester, const Size(1400, 1000));
       final simulated = <String>[];
@@ -290,13 +290,11 @@ void main() {
         final panel = find.byKey(const Key('robot-sim-panel'));
         expect(panel, findsOneWidget);
         expect(find.text('Watch your robot'), findsOneWidget);
-        // Docked above the instructions in the right column.
-        final instructions =
-            find.byKey(const Key('assignment-instructions-panel'));
-        expect(tester.getRect(panel).bottom,
-            lessThanOrEqualTo(tester.getRect(instructions).top + 1));
-        expect(tester.getRect(panel).left,
-            closeTo(tester.getRect(instructions).left, 24));
+        // Its own window by default, at the top right, with a drag grip.
+        expect(find.byKey(const Key('robot-sim-grip')), findsOneWidget);
+        expect(tester.getRect(panel).right, closeTo(1400 - 24, 2));
+        expect(tester.getSize(panel).width,
+            closeTo(tester.getSize(panel).height - 48, 1));
 
         await tester.tap(find.byKey(const Key('simulate-button')));
         await tester.pump();
@@ -338,7 +336,7 @@ void main() {
       }, () => mock);
     });
 
-    testWidgets('the panel pops out, moves, docks, and opens full screen',
+    testWidgets('the window moves, resizes, docks, and opens full screen',
         (tester) async {
       useScreen(tester, const Size(1400, 1000));
       final simulated = <String>[];
@@ -356,20 +354,14 @@ void main() {
         final panel = find.byKey(const Key('robot-sim-panel'));
         final instructions =
             find.byKey(const Key('assignment-instructions-panel'));
-        final dockedInstructionsTop = tester.getRect(instructions).top;
-
-        await tester.tap(find.byKey(const Key('robot-sim-pop-out')));
-        await tester.pumpAndSettle();
-        expect(panel, findsOneWidget);
-        // Popped out: the instructions take the whole column again.
-        expect(
-            tester.getRect(instructions).top, lessThan(dockedInstructionsTop));
+        final floatingInstructionsTop = tester.getRect(instructions).top;
         final before = tester.getRect(panel).topLeft;
-        await tester.drag(find.text('Simulation').first, const Offset(120, 60));
+        await tester.drag(
+            find.byKey(const Key('robot-sim-grip')), const Offset(-160, 60));
         await tester.pumpAndSettle();
         // The drag moves the window (less Flutter's small drag threshold).
         final moved = tester.getRect(panel).topLeft - before;
-        expect(moved.dx, greaterThan(60));
+        expect(moved.dx, lessThan(-100));
         expect(moved.dy, greaterThan(30));
         final width = tester.getSize(panel).width;
         await tester.drag(
@@ -385,10 +377,19 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('robot-sim-close')), findsNothing);
 
+        // Dock above the instructions, then pop out again.
         await tester.tap(find.byKey(const Key('robot-sim-pop-out')));
         await tester.pumpAndSettle();
+        expect(find.byKey(const Key('robot-sim-grip')), findsNothing);
+        expect(tester.getRect(panel).bottom,
+            lessThanOrEqualTo(tester.getRect(instructions).top + 1));
         expect(tester.getRect(instructions).top,
-            closeTo(dockedInstructionsTop, 1));
+            greaterThan(floatingInstructionsTop));
+        await tester.tap(find.byKey(const Key('robot-sim-pop-out')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('robot-sim-grip')), findsOneWidget);
+        expect(tester.getRect(instructions).top,
+            closeTo(floatingInstructionsTop, 1));
       }, () => mock);
     });
 

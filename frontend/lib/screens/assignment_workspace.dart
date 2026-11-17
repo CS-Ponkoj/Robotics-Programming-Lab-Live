@@ -100,9 +100,11 @@ class _MyHomePageState extends State<MyHomePage> {
   // The code the terminal's simulation lines describe, when it shows one.
   String? _terminalSimulatedCode;
   // The square Simulation panel: docked above the instructions or floating.
-  SimPanelMode _simMode = SimPanelMode.docked;
+  // Its own floating window by default; it can dock above the instructions.
+  SimPanelMode _simMode = SimPanelMode.floating;
   bool _simCollapsed = false;
-  Offset _simOffset = const Offset(96, 140);
+  // Null until moved: the window starts at the top right of the workspace.
+  Offset? _simOffset;
   double _simSize = 440;
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
@@ -500,13 +502,16 @@ class _MyHomePageState extends State<MyHomePage> {
   /// The panel as its own window over the workspace: drag the header to
   /// move it and the corner to resize it.
   Widget _floatingSimPanel(BoxConstraints area) {
-    final size =
-        _simSize.clamp(280.0, math.max(280.0, area.maxWidth - 32)).toDouble();
+    final size = _simSize
+        .clamp(280.0,
+            math.max(280.0, math.min(area.maxWidth - 32, area.maxHeight - 64)))
+        .toDouble();
     final height = _simCollapsed ? 48.0 : size + 48;
+    final offset = _simOffset ?? Offset(area.maxWidth - size - 24, 16);
     final left =
-        _simOffset.dx.clamp(0.0, math.max(0.0, area.maxWidth - size)).toDouble();
+        offset.dx.clamp(0.0, math.max(0.0, area.maxWidth - size)).toDouble();
     final top =
-        _simOffset.dy.clamp(0.0, math.max(0.0, area.maxHeight - 48)).toDouble();
+        offset.dy.clamp(0.0, math.max(0.0, area.maxHeight - 48)).toDouble();
     return Positioned(
       left: left,
       top: top,
