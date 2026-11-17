@@ -1,0 +1,64 @@
+"""Old assignments: a home-page grouping that never changes access or grading."""
+
+import json
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app import create_app
+from assignment_repository import CATALOG_PATH, old_assignment_ids
+from config import Settings
+
+
+ASSIGNMENTS = Path(__file__).resolve().parents[1] / "assignments"
+OLD = {"robotics-assignment-1", "robotics-assignment-2", "robotics-assignment-3",
+       "robotics-assignment-4", "ros2-drive-forward", "ros2-obstacle-stop"}
+
+
+@pytest.fixture()
+def client(tmp_path):
+    settings = Settings(database_url="sqlite://", admin_api_token="test-admin",
+                        openai_api_key=None, study_accounts_file=tmp_path / "accounts.json")
+    with TestClient(create_app(settings=settings, database_url="sqlite://")) as test_client:
+        token = test_client.post(
+            "/auth/login", json={"login_id": "student", "password": "student"}
+        ).json()["token"]
+        test_client.headers.update({"Authorization": f"Bearer {token}"})
+        yield test_client
+
+
+def test_catalog_names_assignments_1_to_6_by_stable_id():
+    stable_ids = {
+        json.loads(path.read_text(encoding="utf-8"))["stable_id"]
+        for path in ASSIGNMENTS.glob("assignment_*.json")
+    }
+    assert old_assignment_ids() == OLD
+    assert OLD <= stable_ids
+    assert "ros2-wall-stop" not in old_assignment_ids()
+
+
+def test_student_list_groups_old_assignments_but_keeps_all_seven(client):
+    listed = client.get("/assignments").json()["assignments"]
+    assert [item["id"] for item in listed] == [1, 2, 3, 4, 5, 6, 7]
+    assert {item["id"]: item["collection"] for item in listed} == {
+        1: "old", 2: "old", 3: "old", 4: "old", 5: "old", 6: "old", 7: "current",
+    }
+    assert client.get("/assignments/7").json()["collection"] == "current"
+
+
+def test_old_assignments_stay_open_and_gradable(client):
+    detail = client.get("/assignments/1").json()
+    assert detail["collection"] == "old"
+    response = client.post("/assignments/1/run", json={"code": detail["starter_code"]})
+    assert response.status_code == 200
+    assert response.json()["assignment_version"] == detail["version"]
+
+
+def test_catalog_is_optional_and_validated(tmp_path):
+    assert old_assignment_ids(tmp_path / "missing.json") == frozenset()
+    broken = tmp_path / "catalog.json"
+    broken.write_text(json.dumps({"old_assignments": "robotics-assignment-1"}), encoding="utf-8")
+    with pytest.raises(ValueError):
+        old_assignment_ids(broken)
+    assert CATALOG_PATH.name == "catalog.json"  # not matched by the assignment_*.json seed glob

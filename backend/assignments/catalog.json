@@ -1,0 +1,11 @@
+{
+  "_comment": "Student home-page grouping only. Assignments listed here stay published, gradable, and unchanged; the app shows them under Old assignments instead of the main list. Use stable IDs.",
+  "old_assignments": [
+    "robotics-assignment-1",
+    "robotics-assignment-2",
+    "robotics-assignment-3",
+    "robotics-assignment-4",
+    "ros2-drive-forward",
+    "ros2-obstacle-stop"
+  ]
+}

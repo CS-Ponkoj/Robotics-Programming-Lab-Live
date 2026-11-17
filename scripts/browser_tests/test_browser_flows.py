@@ -61,6 +61,17 @@ def open_app(page: Page) -> None:
     expect(page.get_by_role("button", name="Sign in")).to_be_visible()
 
 
+def show_old_assignments(page: Page) -> None:
+    """Assignments 1-6 are listed under Old assignments; these flows use them."""
+    chip = page.get_by_role("button", name="Old assignments").or_(
+        page.get_by_role("checkbox", name="Old assignments")
+    )
+    chip.first.click()
+    expect(page.get_by_role("group", name=re.compile(r"^01 ")).first).to_be_visible(
+        timeout=30_000
+    )
+
+
 def type_into(page: Page, label: str, text: str) -> None:
     # Flutter listens for key events; Playwright's fill() bypasses them.
     page.get_by_label(label).click()
@@ -90,6 +101,7 @@ def test_student_demo_runs_and_submits_an_assignment(page: Page):
     expect(starts.first).to_be_visible()
     # Student and instructor capabilities stay separate.
     expect(page.get_by_role("button", name="Instructor Studio")).to_have_count(0)
+    show_old_assignments(page)
     starts.first.click()
 
     # Run tests stays disabled until the assignment code is in the editor.
@@ -115,6 +127,7 @@ def test_student_demo_runs_and_submits_an_assignment(page: Page):
 def test_student_demo_tries_inputs_and_reads_failure_guidance(page: Page):
     open_app(page)
     page.get_by_role("button", name="Try the student demo").click()
+    show_old_assignments(page)
     page.get_by_role("button", name="Start assignment").first.click()
 
     # The ungraded playground calls the starter function with chosen inputs.
@@ -222,6 +235,7 @@ def sign_in(page: Page, login: str, password: str) -> None:
 
 
 def open_first_assignment(page: Page) -> None:
+    show_old_assignments(page)
     page.get_by_role("button", name=ASSIGNMENT_BUTTON).first.click()
     expect(page.get_by_role("button", name="Run tests")).to_be_enabled(timeout=60_000)
 
@@ -249,6 +263,7 @@ def first_card_status(page: Page) -> str:
     expect(page.get_by_role("button", name=ASSIGNMENT_BUTTON).first).to_be_visible(
         timeout=60_000
     )
+    show_old_assignments(page)
     page.wait_for_timeout(1_000)
     match = CARD_STATUS.search(page.locator("flt-semantics-host").aria_snapshot())
     assert match, "first assignment card has no progress label"
@@ -402,6 +417,7 @@ def terminal_shows(page: Page, text: str, timeout: int = 30_000) -> None:
 def test_terminal_under_the_editor_shows_output_and_errors(page: Page):
     open_app(page)
     page.get_by_role("button", name="Try the student demo").click()
+    show_old_assignments(page)
     page.get_by_role("button", name="Start assignment").first.click()
     run_tests = page.get_by_role("button", name="Run tests")
     expect(run_tests).to_be_enabled(timeout=60_000)

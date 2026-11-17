@@ -34,6 +34,9 @@ class AssignmentStudent(BaseModel):
     project_files: list[AssignmentProjectFile] = Field(default_factory=list)
     editable_file_path: str | None = None
     has_solution: bool = False
+    # Home-page grouping: "old" assignments are earlier test tasks shown in
+    # their own panel. They stay fully usable; grading is unchanged.
+    collection: Literal["current", "old"] = "current"
     solution_html: str = ""
     vals: dict[str, Any] = Field(default_factory=dict)
     # Required function name when the ungraded input playground is available.

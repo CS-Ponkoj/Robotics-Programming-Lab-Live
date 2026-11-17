@@ -15,6 +15,21 @@ from schemas import AdminAssignmentPayload, AssignmentStudent
 
 BASE_DIR = Path(__file__).resolve().parent
 ASSIGNMENTS_DIR = BASE_DIR / "assignments"
+CATALOG_PATH = ASSIGNMENTS_DIR / "catalog.json"
+
+
+def old_assignment_ids(path: Path = CATALOG_PATH) -> frozenset[str]:
+    """Stable IDs the student home page groups under Old assignments.
+
+    Presentation only: these assignments stay published, gradable, and
+    versioned exactly as before. A missing catalog means nothing is old.
+    """
+    if not path.is_file():
+        return frozenset()
+    values = json.loads(path.read_text(encoding="utf-8")).get("old_assignments", [])
+    if not isinstance(values, list) or not all(isinstance(item, str) for item in values):
+        raise ValueError("catalog.json old_assignments must be a list of stable IDs")
+    return frozenset(values)
 COURSE_MATERIALS = BASE_DIR.parent / "course_materials"
 REFERENCE_SOLUTIONS = {
     1: COURSE_MATERIALS
@@ -293,6 +308,7 @@ def to_student_assignment(assignment: Assignment) -> AssignmentStudent:
         project_files=project_files,
         editable_file_path=editable_paths[0] if len(editable_paths) == 1 else None,
         has_solution=bool(assignment.solution_html),
+        collection="old" if assignment.stable_id in old_assignment_ids() else "current",
         solution_html="",
         vals={},
         playground_function=_playground_function(assignment),

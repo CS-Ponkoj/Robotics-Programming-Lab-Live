@@ -43,6 +43,12 @@ class AssignmentDto {
   /// True when this student has saved work for this version on the server.
   final bool hasSavedDraft;
 
+  /// Home-page group: 'old' for earlier test assignments shown under Old
+  /// assignments, otherwise 'current'. Old assignments stay fully usable.
+  final String collection;
+
+  bool get isOld => collection == 'old';
+
   /// True only when the server has AI tutoring configured. When false the
   /// workspace keeps the AI switch disabled and never requests AI feedback.
   final bool aiTutorAvailable;
@@ -67,6 +73,7 @@ class AssignmentDto {
     required this.vals,
     this.playgroundFunction,
     this.hasSavedDraft = false,
+    this.collection = 'current',
     this.aiTutorAvailable = false,
   });
 
@@ -132,6 +139,7 @@ class AssignmentDto {
               ? json['playground_function'] as String
               : null,
           hasSavedDraft: json['has_saved_draft'] == true,
+          collection: json['collection'] == 'old' ? 'old' : 'current',
           aiTutorAvailable: json['ai_tutor_available'] == true,
         ),
       _ => throw const FormatException('Failed to load assignment.'),

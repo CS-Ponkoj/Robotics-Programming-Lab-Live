@@ -47,9 +47,12 @@ Future<List<AssignmentDto>> fetchAssignments() async {
   }
 }
 
+/// The three home-page panels.
+enum HomePanel { assignments, oldAssignments, contents }
+
 class _AssignmentListPageState extends State<AssignmentListPage> {
   late Future<List<AssignmentDto>> assignments;
-  bool _showContents = false;
+  HomePanel _panel = HomePanel.assignments;
 
   @override
   void initState() {
@@ -66,13 +69,39 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    feedbackPages.homeLabel =
-        _showContents ? 'Home: Contents' : 'Home: Assignments';
+    feedbackPages.homeLabel = switch (_panel) {
+      HomePanel.assignments => 'Home: Assignments',
+      HomePanel.oldAssignments => 'Home: Old assignments',
+      HomePanel.contents => 'Home: Contents',
+    };
+
+    Widget panelChip(
+        HomePanel panel, String keyName, IconData icon, String label) {
+      final selected = _panel == panel;
+      return ChoiceChip(
+        key: Key(keyName),
+        selected: selected,
+        showCheckmark: false,
+        onSelected: (_) => setState(() => _panel = panel),
+        avatar: Icon(icon,
+            size: 18,
+            color: selected
+                ? theme.colorScheme.onPrimary
+                : theme.colorScheme.primary),
+        label: Text(label,
+            style: TextStyle(
+                color: selected
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.primary)),
+        selectedColor: theme.colorScheme.primary,
+        side: BorderSide.none,
+      );
+    }
 
     return LandingPageFrame(
       user: widget.user,
       onLogout: widget.onLogout,
-      onHome: () => setState(() => _showContents = false),
+      onHome: () => setState(() => _panel = HomePanel.assignments),
       body: Column(
         children: [
           Material(
@@ -83,48 +112,30 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  ChoiceChip(
-                    key: const Key('open-assignments'),
-                    selected: !_showContents,
-                    showCheckmark: false,
-                    onSelected: (_) => setState(() => _showContents = false),
-                    avatar: Icon(Icons.code_rounded,
-                        color: !_showContents
-                            ? theme.colorScheme.onPrimary
-                            : theme.colorScheme.primary,
-                        size: 18),
-                    label: Text('Assignments',
-                        style: TextStyle(
-                            color: !_showContents
-                                ? theme.colorScheme.onPrimary
-                                : theme.colorScheme.primary)),
-                    selectedColor: theme.colorScheme.primary,
-                    side: BorderSide.none,
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    key: const Key('open-course-contents'),
-                    selected: _showContents,
-                    showCheckmark: false,
-                    onSelected: (_) => setState(() => _showContents = true),
-                    avatar: Icon(Icons.menu_book_rounded,
-                        size: 18,
-                        color: _showContents
-                            ? theme.colorScheme.onPrimary
-                            : theme.colorScheme.primary),
-                    label: Text('Contents',
-                        style: TextStyle(
-                            color: _showContents
-                                ? theme.colorScheme.onPrimary
-                                : theme.colorScheme.primary)),
-                    selectedColor: theme.colorScheme.primary,
+                  Flexible(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        panelChip(HomePanel.assignments, 'open-assignments',
+                            Icons.code_rounded, 'Assignments'),
+                        panelChip(
+                            HomePanel.oldAssignments,
+                            'open-old-assignments',
+                            Icons.inventory_2_outlined,
+                            'Old assignments'),
+                        panelChip(HomePanel.contents, 'open-course-contents',
+                            Icons.menu_book_rounded, 'Contents'),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           Expanded(
-              child: _showContents
+              child: _panel == HomePanel.contents
                   ? CourseCatalogPage(
                       user: widget.user,
                       onLogout: widget.onLogout,
@@ -143,11 +154,15 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
                             child: AssignmentLoadingState(),
                           );
                         }
+                        final old = _panel == HomePanel.oldAssignments;
                         final list = snap.data!
+                            .where((a) => a.isOld == old)
+                            .toList()
                           ..sort((a, b) => a.id.compareTo(b.id));
                         return LandingPageContent(
                           child: AssignmentCollection(
                             assignments: list,
+                            oldAssignments: old,
                             theme: theme,
                             onReturn: () {
                               // Rebuild when coming back so progress and scores refresh.
@@ -322,11 +337,16 @@ class AssignmentCollection extends StatelessWidget {
   final ThemeData theme;
   final VoidCallback onReturn;
 
+  /// The Old assignments panel: earlier test assignments, still usable, but
+  /// outside the learning path and its progress.
+  final bool oldAssignments;
+
   const AssignmentCollection({
     super.key,
     required this.assignments,
     required this.theme,
     required this.onReturn,
+    this.oldAssignments = false,
   });
 
   @override
@@ -351,11 +371,18 @@ class AssignmentCollection extends StatelessWidget {
 
         return CustomScrollView(
           slivers: [
+            if (oldAssignments)
+              const SliverPadding(
+                padding: EdgeInsets.only(top: 28),
+                sliver: SliverToBoxAdapter(child: OldAssignmentsNote()),
+              )
+            else
             SliverPadding(
               padding: const EdgeInsets.only(top: 28),
               sliver: SliverToBoxAdapter(
                 child: ProgressSummary(
                   totalAssignments: assignments.length,
+                  assignmentIds: {for (final item in assignments) item.id},
                   nextAssignment: next,
                   onOpenNext: next == null
                       ? null
@@ -369,7 +396,10 @@ class AssignmentCollection extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Coding assignments',
+                    Text(
+                        oldAssignments
+                            ? 'Old assignments'
+                            : 'Coding assignments',
                         style: theme.textTheme.titleLarge),
                     const SizedBox(height: 4),
                     Text(
@@ -410,6 +440,42 @@ class AssignmentCollection extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Explains the Old assignments panel above its cards.
+class OldAssignmentsNote extends StatelessWidget {
+  const OldAssignmentsNote({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: Container(
+        key: const Key('old-assignments-note'),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadii.md),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.inventory_2_outlined, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'These are the earlier test assignments. You can still open, '
+                'run, and practise them; they are not part of your current '
+                'learning path.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -479,12 +545,17 @@ String assignmentDisplayTitle(AssignmentDto a) {
 
 class ProgressSummary extends StatelessWidget {
   final int totalAssignments;
+
+  /// When given, only these assignments count as completed, so finished old
+  /// assignments never inflate the current learning path.
+  final Set<int>? assignmentIds;
   final AssignmentDto? nextAssignment;
   final VoidCallback? onOpenNext;
 
   const ProgressSummary({
     super.key,
     required this.totalAssignments,
+    this.assignmentIds,
     this.nextAssignment,
     this.onOpenNext,
   });
@@ -492,8 +563,10 @@ class ProgressSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final completedAssignments = learningProgress.bestScores.values
-        .where((accuracy) => accuracy == 100)
+    final ids = assignmentIds;
+    final completedAssignments = learningProgress.bestScores.entries
+        .where((entry) =>
+            entry.value == 100 && (ids == null || ids.contains(entry.key)))
         .length
         .clamp(0, totalAssignments);
     final progress =
