@@ -297,9 +297,26 @@ def main() -> None:
             else f"Published about {rate:.1f} commands per second; publish at least 5 per second (one per scan is enough).",
         ),
     ]
+    def phase_summary(phase: str) -> dict:
+        """What the node published in one phase: the student's own output."""
+        items = samples(phase)
+        if not items:
+            return {"count": 0}
+        return {
+            "count": len(items),
+            "linear_min": round(min(item[1] for item in items), 3),
+            "linear_max": round(max(item[1] for item in items), 3),
+            "angular_max_abs": round(max(abs(item[2]) for item in items), 3),
+        }
+
     print(
         json.dumps(
             {
+                # Raw observations for the backend's feedback classifier.
+                "observations": {
+                    "phases": {phase: phase_summary(phase) for phase, _ in PHASES},
+                    "rate_hz": round(rate, 2),
+                },
                 "error": runtime_error
                 or ("" if all(item["passed"] for item in tests) else "One or more requirements need attention."),
                 "runtime_error": runtime_error,

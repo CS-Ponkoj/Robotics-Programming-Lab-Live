@@ -8,6 +8,7 @@ from openai import OpenAI
 
 from config import Settings
 from models import Assignment, Submission
+from ros2_feedback import HINT_LADDERS
 from pydantic import ValidationError
 
 from schemas import TutorFeedback, TutorGeneratedContent
@@ -319,7 +320,8 @@ class TutorService:
         # A hint level is not evidence of a misconception. Name only a tag
         # explicitly attached to the failing check by a grader.
         if failed:
-            misconception = str(failed.get("misconception_tag", ""))
+            # A stored null tag means no tag, not the text "None".
+            misconception = str(failed.get("misconception_tag") or "")
         if not evidence.get("execution_succeeded", False):
             diagnosis = "The program must execute before its calculations can be checked."
             guiding_question = "What is the first error message and line number?"
@@ -360,6 +362,16 @@ class TutorService:
                     4: "Trace one callback from input to exactly one published command, then rerun the checks.",
                 }[hint_level]
                 next_action = "Change one ROS 2 behavior, rerun the tests, and inspect the new evidence."
+        # An observed pattern on the failing check selects a targeted ladder;
+        # the check message already states what the robot actually did.
+        ladder = HINT_LADDERS.get(str(failed.get("hint_key") or "")) if failed else None
+        observed_step = ""
+        if ladder is not None:
+            diagnosis = ladder.diagnosis
+            guiding_question = ladder.guiding_question
+            hint = ladder.levels[min(max(hint_level, 1), len(ladder.levels)) - 1]
+            next_action = ladder.next_action
+            observed_step = str(failed.get("message", "")).strip()
         if failed is not None and evidence.get("execution_succeeded") and TutorService._code_observations(submission.code):
             diagnosis = "Some final returned fields are replaced by literal values after earlier calculations."
             guiding_question = "Does the last return preserve the calculated value for the failing field?"
@@ -375,7 +387,8 @@ class TutorService:
                 else ""
             ),
             debugging_steps=[
-                (
+                observed_step
+                or (
                     "Review the passed checks."
                     if failed is None and evidence.get("execution_succeeded") and evidence.get("tests")
                     else "Inspect the returned check results or execution error."

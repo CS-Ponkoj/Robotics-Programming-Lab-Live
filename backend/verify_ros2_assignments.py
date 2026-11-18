@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from ros2_executor import DockerRos2Executor
+from ros2_feedback import classify
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
@@ -81,6 +82,20 @@ def verify_open_assignment(assignment_id: int, image: str) -> None:
         )
     print(f"Assignment {assignment_id}: PASS +inf-as-obstacle rejection (drive-open-floor).")
 
+    # Feedback: real observations name the cause of the failed check.
+    if not isinstance((result.get("observations") or {}).get("phases"), dict):
+        raise RuntimeError(f"Assignment {assignment_id}: the harness reported no observations.")
+    findings = classify(
+        str(source["grader_config"].get("harness", "")), carried_outcome,
+        carried.get("observations"),
+    )
+    found = findings.get("drive-open-floor")
+    if found is None or found.hint_key != "infinity-treated-as-obstacle":
+        raise RuntimeError(
+            f"Assignment {assignment_id}: feedback missed +inf-as-obstacle: {findings}."
+        )
+    print(f"Assignment {assignment_id}: PASS feedback names infinity-treated-as-obstacle.")
+
 
 def verify_simulation(assignment_id: int, image: str) -> None:
     """Visual replay: the answer stops and resumes; a node that never stops collides."""
@@ -97,7 +112,7 @@ def verify_simulation(assignment_id: int, image: str) -> None:
     )
     config = {**source.get("grader_config", {}), "mode": "simulate", "simulation": world}
 
-    def outcome(code: str) -> str | None:
+    def replay_of(code: str) -> dict:
         project_files = [
             item for item in source.get("asset_manifest", [])
             if isinstance(item, dict) and item.get("kind") == "project_file"
@@ -105,10 +120,30 @@ def verify_simulation(assignment_id: int, image: str) -> None:
         timeout = float(source.get("execution_settings", {}).get("timeout_seconds", 20))
         result = DockerRos2Executor(image, timeout).execute(code, project_files, config)
         replay = result.get("simulation")
-        return replay.get("outcome") if isinstance(replay, dict) else None
+        return replay if isinstance(replay, dict) else {}
 
-    if outcome(reference) != "stopped_and_resumed":
+    def outcome(code: str) -> str | None:
+        return replay_of(code).get("outcome")
+
+    answer = replay_of(reference)
+    if answer.get("outcome") != "stopped_and_resumed":
         raise RuntimeError(f"Assignment {assignment_id}: the answer did not stop and resume in the replay.")
+    # Beam probe: the answer reacts to the beams straight ahead (drawn beam 15).
+    probe = answer.get("sensitivity") or {}
+    if probe.get("status") != "complete" or 15 not in probe.get("beams", []) or any(
+        abs(beam - 15) > 2 for beam in probe.get("beams", [])
+    ):
+        raise RuntimeError(f"Assignment {assignment_id}: beam probe did not find the beams ahead: {probe}.")
+    sideways = reference.replace("middle = len(scan.ranges) // 2", "middle = len(scan.ranges) // 4")
+    if sideways == reference:
+        raise RuntimeError(f"Assignment {assignment_id}: reference answer changed shape.")
+    side_probe = replay_of(sideways).get("sensitivity") or {}
+    if not side_probe.get("beams") or any(abs(beam - 7) > 2 for beam in side_probe["beams"]):
+        raise RuntimeError(f"Assignment {assignment_id}: beam probe missed a sideways reading: {side_probe}.")
+    print(
+        f"Assignment {assignment_id}: PASS beam probe (answer {probe['beams']}, "
+        f"len // 4 {side_probe['beams']})."
+    )
     never_stops = reference.replace("if usable and min(usable) > STOP_DISTANCE:", "if True:")
     if never_stops == reference:
         raise RuntimeError(f"Assignment {assignment_id}: reference answer changed shape.")

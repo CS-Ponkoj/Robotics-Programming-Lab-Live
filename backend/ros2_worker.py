@@ -202,6 +202,8 @@ def evaluate(request: dict) -> dict:
         replay = runtime.get("simulation")
         response["simulation"] = replay if isinstance(replay, dict) else None
         response["tests"] = []
+    elif isinstance(runtime.get("observations"), dict):
+        response["observations"] = runtime["observations"]
     return response
 
 

@@ -110,6 +110,9 @@ class _MyHomePageState extends State<MyHomePage> {
   double _simSize = 660;
   // Share of the right column the docked panel takes; kept for the session.
   double _simDockFraction = kSimDockDefault;
+  // The moment and view a failed check asked the replay to show.
+  SimFocus? _simFocus;
+  int _simFocusToken = 0;
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
   // Playground runs for the current code only; memory only, never sent.
@@ -425,8 +428,9 @@ class _MyHomePageState extends State<MyHomePage> {
       _simulationConfig['enabled'] == true &&
       _simulationConfig['provider'] == 'ros2_2d';
 
-  void _runSimulation() {
+  void _runSimulation({bool keepFocus = false}) {
     if (_init || _isSimulating || _isRunning) return;
+    if (!keepFocus) _simFocus = null;
     if (!hasNonWhitespaceCode(_code)) {
       setState(() {
         _emptyCodeAttempted = true;
@@ -468,6 +472,21 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  /// Opens the replay at the moment that shows a failed check, simulating the
+  /// current code first when there is no replay of it yet.
+  void _watchInSimulation(String hintKey) {
+    final focus = SimFocus.forHint(hintKey, ++_simFocusToken);
+    if (focus == null) return;
+    _scaffoldKey.currentState?.closeEndDrawer();
+    final needsRun = _simulation == null || _terminalSimulatedCode != _code;
+    setState(() {
+      _simFocus = focus;
+      _simCollapsed = false;
+      if (MediaQuery.sizeOf(context).width < 900) _selectedWorkspaceTab = 2;
+    });
+    if (needsRun) _runSimulation(keepFocus: true);
+  }
+
   void _toggleSimMode() {
     setState(() {
       _simMode = _simMode == SimPanelMode.docked
@@ -501,6 +520,7 @@ class _MyHomePageState extends State<MyHomePage> {
             phone ? null : () => setState(() => _simCollapsed = !_simCollapsed),
         onToggleMode: phone ? null : _toggleSimMode,
         onFullScreen: _openSimFullScreen,
+        focus: _simFocus,
       );
 
   /// The panel as its own window over the workspace: drag the header to
@@ -540,6 +560,7 @@ class _MyHomePageState extends State<MyHomePage> {
               onFullScreen: _openSimFullScreen,
               onHeaderDrag: (details) => setState(
                   () => _simOffset = Offset(left, top) + details.delta),
+              focus: _simFocus,
             ),
           ),
           if (!_simCollapsed)
@@ -992,7 +1013,10 @@ class _MyHomePageState extends State<MyHomePage> {
                               if (snap.hasData) {
                                 return Feedback(
                                     data: snap.data!,
-                                    aiTutorEnabled: _aiTutorOn);
+                                    aiTutorEnabled: _aiTutorOn,
+                                    onWatchInSimulation: _hasRobotSimulation
+                                        ? _watchInSimulation
+                                        : null);
                               }
                               return const SizedBox.shrink();
                             })
@@ -3489,11 +3513,15 @@ class Feedback extends StatelessWidget {
     required this.data,
     this.aiTutorEnabled = false,
     this.tutorQuestionRequester,
+    this.onWatchInSimulation,
   });
 
   final UnittestFeedbackDto data;
   final bool aiTutorEnabled;
   final TutorQuestionRequester? tutorQuestionRequester;
+
+  /// Opens the replay at the moment that shows a failed check's cause.
+  final ValueChanged<String>? onWatchInSimulation;
 
   @override
   Widget build(BuildContext context) {
@@ -3558,6 +3586,8 @@ class Feedback extends StatelessWidget {
         reason: detail?.reason,
         weight: detail?.weight,
         earnedWeight: detail?.earnedWeight,
+        hintKey: detail?.hintKey,
+        onWatch: onWatchInSimulation,
       );
     }).toList();
 
@@ -4704,7 +4734,12 @@ class _TestResultCard extends StatelessWidget {
     this.reason,
     this.weight,
     this.earnedWeight,
+    this.hintKey,
+    this.onWatch,
   });
+
+  final String? hintKey;
+  final ValueChanged<String>? onWatch;
 
   final int checkNumber;
   final bool passed;
@@ -4824,6 +4859,18 @@ class _TestResultCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (!passed &&
+                      onWatch != null &&
+                      SimFocus.forHint(hintKey, 0) != null)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        key: Key('test-result-watch-$checkNumber'),
+                        onPressed: () => onWatch!(hintKey!),
+                        icon: const Icon(Icons.smart_toy_outlined, size: 18),
+                        label: const Text('Watch it in the simulation'),
+                      ),
+                    ),
                 ],
               ),
             ),

@@ -153,6 +153,24 @@ def test_normalize_replay_drops_unexpected_or_unsafe_values():
     assert normalize_replay("nope") is None
 
 
+def test_beam_probe_result_is_bounded_and_optional():
+    replay = drive(reference)
+    assert "sensitivity" not in normalize_replay(replay)
+    replay["sensitivity"] = {"status": "complete", "beams": [16, 15, 15, 14, 99, -1, True, "7"]}
+    assert normalize_replay(replay)["sensitivity"] == {
+        "status": "complete", "beams": [14, 15, 16],
+    }
+    replay["sensitivity"] = {"status": "guessed", "beams": [15]}
+    assert "sensitivity" not in normalize_replay(replay)
+    assert _valid_result({
+        "success": True, "error": "", "output": "", "tests": [],
+        "observations": {"phases": {}, "rate_hz": 12.0},
+    })
+    assert not _valid_result({
+        "success": True, "error": "", "output": "", "tests": [], "observations": [1],
+    })
+
+
 def test_simulation_run_event_stores_only_outcome_and_duration():
     assert normalize_event_data("simulation_run", {"outcome": "collided", "duration_seconds": 5.2}) == {
         "outcome": "collided", "duration_seconds": 5.2,

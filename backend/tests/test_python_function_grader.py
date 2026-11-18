@@ -308,9 +308,10 @@ def test_function_grader_classifies_failure_reasons_with_weights(code, expected_
         # Reasons classify the outcome without exposing protected case data.
         assert set(dumped) == {
             "test_id", "label", "passed", "message", "visibility", "reason", "weight",
-            "earned_weight", "misconception_tag",
+            "earned_weight", "misconception_tag", "hint_key",
         }
         assert dumped["earned_weight"] is None
+        assert dumped["hint_key"] is None  # ROS 2 behavior checks only
         assert dumped["visibility"] == "hidden"
 
 

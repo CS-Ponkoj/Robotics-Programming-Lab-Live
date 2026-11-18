@@ -9,6 +9,7 @@ class TestEvidenceDto {
     this.reason,
     this.weight,
     this.earnedWeight,
+    this.hintKey,
   });
 
   final String testId;
@@ -22,6 +23,9 @@ class TestEvidenceDto {
   /// such as supplied-scaffold credit held back on a ROS assignment.
   final double? earnedWeight;
 
+  /// The observed pattern behind a failed check, such as `stops-too-late`.
+  final String? hintKey;
+
   factory TestEvidenceDto.fromJson(Map<String, dynamic> json) {
     return TestEvidenceDto(
       testId: json['test_id']?.toString() ?? '',
@@ -33,6 +37,7 @@ class TestEvidenceDto {
       earnedWeight: json['earned_weight'] is num
           ? (json['earned_weight'] as num).toDouble()
           : null,
+      hintKey: json['hint_key'] is String ? json['hint_key'] as String : null,
     );
   }
 }

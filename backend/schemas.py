@@ -106,6 +106,9 @@ class TestEvidence(BaseModel):
     earned_weight: float | None = None
     # The assignment's configured misconception tag for a failed check.
     misconception_tag: str | None = None
+    # The observed pattern behind a failed check; selects a built-in hint
+    # ladder. Not a research label unless it is also a configured tag.
+    hint_key: str | None = None
 
 
 class TutorFeedback(BaseModel):
@@ -187,7 +190,15 @@ class SimulationEvent(BaseModel):
     walls: list[list[float]] | None = None
 
 
+class SimulationSensitivity(BaseModel):
+    """Drawn beam indices the student's node stopped for in the beam probe."""
+
+    status: Literal["complete", "incomplete", "latched", "not_driving", "no_reply"]
+    beams: list[int] = Field(default_factory=list, max_length=31)
+
+
 class SimulationReplay(BaseModel):
+    sensitivity: SimulationSensitivity | None = None
     scan: SimulationScan
     robot_radius: float
     walls: list[list[float]] = Field(max_length=20)

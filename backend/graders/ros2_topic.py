@@ -1,6 +1,7 @@
 from graders.base import GradeResult
 from models import Assignment
 from ros2_executor import Ros2Executor
+from ros2_feedback import Finding, classify
 from schemas import TestEvidence
 
 
@@ -26,7 +27,9 @@ class Ros2TopicGrader:
             assignment.grader_config or {},
         )
         config = assignment.grader_config or {}
-        evidence = self._evidence(assignment, result)
+        evidence = self._with_findings(
+            assignment, self._evidence(assignment, result), result, config
+        )
         weights = config.get("test_weights", {})
         # Supplied scaffold (build/start) earns credit only once the student's
         # own code passes at least one behavior check; a starter earns 0%.
@@ -97,6 +100,56 @@ class Ros2TopicGrader:
             tested_names=[item.test_id for item in evidence],
             evidence=evidence,
         )
+
+    @staticmethod
+    def _with_findings(
+        assignment: Assignment,
+        evidence: list[TestEvidence],
+        result: dict,
+        config: dict,
+    ) -> list[TestEvidence]:
+        """Add what the robot did to each failed check, and its hint key.
+
+        Only a tag the assignment configures becomes a misconception label;
+        other observed patterns select hints but are not research labels.
+        """
+        passed = {item.test_id: item.passed for item in evidence}
+        findings = classify(
+            str(config.get("harness", "")), passed, result.get("observations")
+        )
+        configured = {
+            str(item.get("tag"))
+            for item in (assignment.misconceptions or [])
+            if isinstance(item, dict) and item.get("tag")
+        }
+        updated = []
+        for item in evidence:
+            finding = findings.get(item.test_id)
+            if (
+                finding is None
+                and item.test_id == "returns-node"
+                and not item.passed
+                and "returned None" in item.message
+            ):
+                finding = Finding("build-node-returns-none", "")
+            if item.passed or finding is None:
+                updated.append(item)
+                continue
+            message = item.message
+            if finding.observation:
+                message = f"{message} {finding.observation}"
+            updated.append(
+                item.model_copy(
+                    update={
+                        "message": message,
+                        "hint_key": finding.hint_key,
+                        "misconception_tag": (
+                            finding.hint_key if finding.hint_key in configured else None
+                        ),
+                    }
+                )
+            )
+        return updated
 
     @staticmethod
     def _evidence(assignment: Assignment, result: dict) -> list[TestEvidence]:

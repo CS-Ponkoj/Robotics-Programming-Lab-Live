@@ -73,6 +73,65 @@ class SimulationEvent {
   }
 }
 
+/// Which drawn beams the node stopped for in the grader's beam probe.
+class SimulationSensitivity {
+  const SimulationSensitivity({required this.status, required this.beams});
+
+  /// complete, incomplete, latched, not_driving, or no_reply.
+  final String status;
+  final List<int> beams;
+
+  /// The probe ran far enough to trust the beams it found.
+  bool get found => beams.isNotEmpty;
+
+  static SimulationSensitivity? fromJson(Object? json) {
+    if (json is! Map || json['status'] is! String) return null;
+    final beams = json['beams'];
+    return SimulationSensitivity(
+      status: json['status'] as String,
+      beams: [
+        if (beams is List)
+          for (final item in beams)
+            if (item is int && item >= 0) item,
+      ],
+    );
+  }
+}
+
+/// A request to show one moment of the replay in one view: from a failed
+/// check's "Watch it in the simulation". [token] changes for each request.
+class SimFocus {
+  const SimFocus({required this.token, required this.events, this.view});
+
+  final int token;
+
+  /// Event types to jump to, in order of preference.
+  final List<String> events;
+
+  /// arena, lidar, charts, or ranges; null keeps the current view.
+  final String? view;
+
+  /// The moment and view that best show a failed check's [hintKey], or null
+  /// when the replay cannot show it.
+  static SimFocus? forHint(String? hintKey, int token) => switch (hintKey) {
+        'stops-too-late' => SimFocus(
+            token: token, events: const ['collided', 'stopped'], view: 'lidar'),
+        'stops-too-early' =>
+          SimFocus(token: token, events: const ['stopped'], view: 'arena'),
+        'does-not-resume' =>
+          SimFocus(token: token, events: const ['wall_moved'], view: 'charts'),
+        'wrong-threshold-direction' ||
+        'infinity-treated-as-obstacle' ||
+        'must-drive-first' ||
+        'speed-too-high' ||
+        'speed-too-low' ||
+        'turns-while-driving' ||
+        'publishes-too-rarely' =>
+          SimFocus(token: token, events: const ['started'], view: 'charts'),
+        _ => null,
+      };
+}
+
 class SimulationReplay {
   const SimulationReplay({
     required this.walls,
@@ -83,7 +142,22 @@ class SimulationReplay {
     required this.angleMinDeg,
     required this.angleIncrementDeg,
     required this.durationSeconds,
+    this.sensitivity,
   });
+
+  /// Beams the node reacts to, from the grader's beam probe; null if the
+  /// probe did not run.
+  final SimulationSensitivity? sensitivity;
+
+  /// Time of the first event of any of [types], in that order of preference.
+  double? firstEventTime(List<String> types) {
+    for (final type in types) {
+      for (final event in events) {
+        if (event.type == type) return event.t;
+      }
+    }
+    return null;
+  }
 
   final List<List<double>> walls;
   final List<SimulationFrame> frames;
@@ -192,6 +266,7 @@ class SimulationReplay {
       angleMinDeg: _number(scan['angle_min_deg']) ?? -135,
       angleIncrementDeg: _number(scan['angle_increment_deg']) ?? 9,
       durationSeconds: _number(json['duration_seconds']) ?? frames.last.t,
+      sensitivity: SimulationSensitivity.fromJson(json['sensitivity']),
     );
   }
 }

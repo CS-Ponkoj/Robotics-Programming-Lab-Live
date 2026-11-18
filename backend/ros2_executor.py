@@ -251,6 +251,7 @@ def _valid_result(result: object) -> bool:
         and isinstance(result.get("output"), str)
         and isinstance(result.get("tests"), list)
         and isinstance(result.get("simulation", {}) or {}, dict)
+        and isinstance(result.get("observations", {}) or {}, dict)
     )
 
 

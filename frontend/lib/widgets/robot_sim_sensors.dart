@@ -39,6 +39,33 @@ String _degrees(double value) {
   return rounded > 0 ? '+$rounded°' : '$rounded°';
 }
 
+/// "[39]-[51], -18° to +18°": the scan indices and angles of the drawn beams
+/// the node reacts to, or null when there are none.
+String? readBeamsText(SimulationReplay replay, Set<int> beams) {
+  if (beams.isEmpty) return null;
+  final sorted = beams.toList()..sort();
+  final step = (replay.angleIncrementDeg / _sourceIncrementDeg).round();
+  final half = step ~/ 2;
+  final runs = <List<int>>[];
+  for (final beam in sorted) {
+    if (runs.isNotEmpty && runs.last.last == beam - 1) {
+      runs.last.add(beam);
+    } else {
+      runs.add([beam]);
+    }
+  }
+  final last = sourceIndex(replay, replay.frames.first.ranges.length - 1);
+  return runs.map((run) {
+    final first = math.max(0, sourceIndex(replay, run.first) - half);
+    final end = math.min(last, sourceIndex(replay, run.last) + half);
+    final from = _degrees(beamAngleDeg(replay, run.first));
+    final to = _degrees(beamAngleDeg(replay, run.last));
+    return from == to
+        ? '[$first]-[$end] at $from'
+        : '[$first]-[$end], $from to $to';
+  }).join('; ');
+}
+
 /// The nearest reading, and the nearest one to the right, ahead, and left.
 class ScanSummary {
   const ScanSummary({
@@ -106,10 +133,18 @@ const _value = TextStyle(
 
 /// The scan as one bar per beam, in list order: the robot's right first.
 class LidarBarsView extends StatelessWidget {
-  const LidarBarsView({super.key, required this.replay, required this.frame});
+  const LidarBarsView({
+    super.key,
+    required this.replay,
+    required this.frame,
+    this.readBeams = const {},
+  });
 
   final SimulationReplay replay;
   final SimulationFrame frame;
+
+  /// Drawn beams the node reacts to, from the beam probe.
+  final Set<int> readBeams;
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +164,8 @@ class LidarBarsView extends StatelessWidget {
           const SizedBox(height: 4),
           Expanded(
             child: CustomPaint(
-              painter: _LidarBarsPainter(replay: replay, frame: frame),
+              painter: _LidarBarsPainter(
+                  replay: replay, frame: frame, readBeams: readBeams),
               size: Size.infinite,
             ),
           ),
@@ -154,6 +190,17 @@ class LidarBarsView extends StatelessWidget {
               ],
             ),
           ),
+          if (readBeamsText(replay, readBeams) case final read?) ...[
+            const SizedBox(height: 6),
+            Text.rich(
+              key: const ValueKey('robot-sim-read-beams'),
+              TextSpan(children: [
+                const TextSpan(text: 'Your node stops for ', style: _caption),
+                TextSpan(
+                    text: read, style: _value.copyWith(color: SimPalette.read)),
+              ]),
+            ),
+          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: 14,
@@ -196,10 +243,15 @@ class _Reading extends StatelessWidget {
 }
 
 class _LidarBarsPainter extends CustomPainter {
-  _LidarBarsPainter({required this.replay, required this.frame});
+  _LidarBarsPainter({
+    required this.replay,
+    required this.frame,
+    this.readBeams = const {},
+  });
 
   final SimulationReplay replay;
   final SimulationFrame frame;
+  final Set<int> readBeams;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -240,13 +292,14 @@ class _LidarBarsPainter extends CustomPainter {
           ..color =
               rangeColor(value).withValues(alpha: value == null ? 0.18 : 0.9),
       );
-      if (index == middle) {
+      if (index == middle || readBeams.contains(index)) {
         canvas.drawRRect(
           RRect.fromRectAndRadius(bar.inflate(2), const Radius.circular(3)),
           Paint()
-            ..color = SimPalette.front
+            ..color =
+                readBeams.contains(index) ? SimPalette.read : SimPalette.front
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5,
+            ..strokeWidth = readBeams.contains(index) ? 2 : 1.5,
         );
       }
     }
@@ -262,7 +315,9 @@ class _LidarBarsPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_LidarBarsPainter oldDelegate) =>
-      oldDelegate.frame != frame || oldDelegate.replay != replay;
+      oldDelegate.frame != frame ||
+      oldDelegate.replay != replay ||
+      oldDelegate.readBeams.length != readBeams.length;
 }
 
 /// Distance ahead and the commanded speeds over the whole run, with the
@@ -418,10 +473,18 @@ class _ChartsPainter extends CustomPainter {
 
 /// Every kept beam as `scan.ranges[i]`, its angle, and its reading.
 class RangesTableView extends StatelessWidget {
-  const RangesTableView({super.key, required this.replay, required this.frame});
+  const RangesTableView({
+    super.key,
+    required this.replay,
+    required this.frame,
+    this.readBeams = const {},
+  });
 
   final SimulationReplay replay;
   final SimulationFrame frame;
+
+  /// Drawn beams the node reacts to; marked in the table.
+  final Set<int> readBeams;
 
   @override
   Widget build(BuildContext context) {
@@ -448,6 +511,7 @@ class RangesTableView extends StatelessWidget {
             itemBuilder: (context, index) {
               final value = frame.ranges[index];
               final highlight = index == middle;
+              final read = readBeams.contains(index);
               return Container(
                 color:
                     highlight ? SimPalette.front.withValues(alpha: 0.12) : null,
@@ -457,11 +521,15 @@ class RangesTableView extends StatelessWidget {
                     SizedBox(
                       width: 92,
                       child: Text(
-                        'ranges[${sourceIndex(replay, index)}]',
+                        '${read ? '● ' : ''}ranges[${sourceIndex(replay, index)}]',
                         style: _value.copyWith(
                           fontFamily: 'monospace',
                           fontSize: 11,
-                          color: highlight ? SimPalette.front : null,
+                          color: read
+                              ? SimPalette.read
+                              : highlight
+                                  ? SimPalette.front
+                                  : null,
                         ),
                       ),
                     ),

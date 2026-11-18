@@ -71,6 +71,23 @@ def _wall(value: Any) -> list[float] | None:
     return None if any(item is None for item in numbers) else numbers
 
 
+SENSITIVITY_STATUSES = {"complete", "incomplete", "latched", "not_driving", "no_reply"}
+
+
+def _sensitivity(value: Any) -> dict | None:
+    """The drawn beams the node reacted to in the beam probe, bounded."""
+    if not isinstance(value, dict) or value.get("status") not in SENSITIVITY_STATUSES:
+        return None
+    beams = value.get("beams", [])
+    if not isinstance(beams, list):
+        return None
+    valid = sorted({
+        item for item in beams
+        if isinstance(item, int) and not isinstance(item, bool) and 0 <= item < MAX_BEAMS
+    })
+    return {"status": value["status"], "beams": valid}
+
+
 def normalize_replay(replay: Any) -> dict | None:
     """Keep only bounded, finite, expected fields from the container's trace."""
     if not isinstance(replay, dict):
@@ -104,7 +121,9 @@ def normalize_replay(replay: Any) -> dict | None:
     outcome = replay.get("outcome")
     if not walls or not frames or outcome not in OUTCOMES:
         return None
+    sensitivity = _sensitivity(replay.get("sensitivity"))
     return {
+        **({"sensitivity": sensitivity} if sensitivity else {}),
         "scan": {
             "angle_min_deg": _number(scan.get("angle_min_deg"), 360.0) or -135.0,
             "angle_increment_deg": _number(scan.get("angle_increment_deg"), 360.0) or 9.0,

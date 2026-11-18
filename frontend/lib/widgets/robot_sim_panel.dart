@@ -110,6 +110,7 @@ class RobotSimPanel extends StatelessWidget {
     this.onFullScreen,
     this.onClose,
     this.onHeaderDrag,
+    this.focus,
   });
 
   final Future<SimulationResultDto>? simulation;
@@ -128,6 +129,9 @@ class RobotSimPanel extends StatelessWidget {
 
   /// Drags a floating window by its header.
   final GestureDragUpdateCallback? onHeaderDrag;
+
+  /// A moment and view to show, from a failed check's "Watch it".
+  final SimFocus? focus;
 
   @override
   Widget build(BuildContext context) {
@@ -170,6 +174,7 @@ class RobotSimPanel extends StatelessWidget {
                 simulation: simulation,
                 onRetry: onSimulate,
                 compact: onClose == null,
+                focus: focus,
               ),
             )
           // Collapsed: live readings once there is a run; before that, the
@@ -366,6 +371,7 @@ class SimulationBody extends StatelessWidget {
     required this.onRetry,
     this.compact = true,
     this.strip = false,
+    this.focus,
   });
 
   final Future<SimulationResultDto>? simulation;
@@ -374,6 +380,9 @@ class SimulationBody extends StatelessWidget {
 
   /// A collapsed panel: one line of live readings, or one line of status.
   final bool strip;
+
+  /// A moment and view to show, from a failed check's "Watch it".
+  final SimFocus? focus;
 
   @override
   Widget build(BuildContext context) {
@@ -485,6 +494,7 @@ class SimulationBody extends StatelessWidget {
             compact: true,
             canvasSide: side,
             layout: SimViewLayout.sideBySide,
+            focus: focus,
           ),
         );
       }
@@ -502,6 +512,7 @@ class SimulationBody extends StatelessWidget {
           replay: replay,
           compact: compact,
           canvasSide: side,
+          focus: focus,
         ),
       );
     });

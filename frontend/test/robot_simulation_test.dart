@@ -10,6 +10,7 @@ import 'package:iuse_demo/main.dart' as app;
 import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/robot_sim_panel.dart';
+import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/widgets/robot_sim_sensors.dart';
 import 'package:iuse_demo/widgets/robot_sim_view.dart';
 import 'package:iuse_demo/widgets/run_terminal.dart';
@@ -596,6 +597,108 @@ void main() {
         expect(find.text('No replay'), findsOneWidget);
         expect(find.text('Replay'), findsNothing);
       }, () => mock);
+    });
+  });
+  group('teaching feedback', () {
+    Map<String, dynamic> probed() => {
+          ...replayJson(),
+          'sensitivity': {
+            'status': 'complete',
+            'beams': [13, 14, 15, 16, 17],
+          },
+        };
+
+    testWidgets('LiDAR names the beams the node stops for', (tester) async {
+      tester.view.physicalSize = const Size(520, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final replay = SimulationReplay.fromJson(probed())!;
+      expect(replay.sensitivity!.beams, [13, 14, 15, 16, 17]);
+      expect(readBeamsText(replay, {13, 14, 15, 16, 17}),
+          '[38]-[52], -18° to +18°');
+      expect(readBeamsText(replay, {6, 7, 8}), '[17]-[25], -81° to -63°');
+      expect(readBeamsText(replay, {}), isNull);
+
+      await tester.pumpWidget(host(RobotSimView(replay: replay)));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('LiDAR'));
+      await tester.pump();
+      expect(
+          find.byKey(const ValueKey('robot-sim-read-beams')), findsOneWidget);
+      await tester.tap(find.text('Ranges'));
+      await tester.pump();
+      expect(find.text('● ranges[45]'), findsOneWidget);
+      expect(find.text('ranges[0]'), findsOneWidget);
+    });
+
+    testWidgets('a focus request jumps to the moment and view, paused',
+        (tester) async {
+      tester.view.physicalSize = const Size(520, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final replay = SimulationReplay.fromJson(probed())!;
+      final focus = SimFocus.forHint('stops-too-late', 1)!;
+      expect(focus.view, 'lidar');
+      await tester.pumpWidget(host(RobotSimView(replay: replay, focus: focus)));
+      await tester.pump();
+      // Just before the stop at 3.5 s, paused, in the LiDAR view.
+      expect(find.bySemanticsLabel('Time 3.0 seconds'), findsOneWidget);
+      expect(find.byTooltip('Play replay'), findsOneWidget);
+      expect(find.byKey(const ValueKey('robot-sim-lidar')), findsOneWidget);
+
+      // A new request with the same replay jumps again.
+      await tester.pumpWidget(host(RobotSimView(
+          replay: replay, focus: SimFocus.forHint('does-not-resume', 2))));
+      await tester.pump();
+      expect(find.bySemanticsLabel('Time 4.0 seconds'), findsOneWidget);
+      expect(find.byKey(const ValueKey('robot-sim-charts')), findsOneWidget);
+      expect(SimFocus.forHint('build-node-returns-none', 3), isNull);
+      expect(SimFocus.forHint(null, 3), isNull);
+    });
+
+    testWidgets('a failed check with a known cause offers the replay',
+        (tester) async {
+      final watched = <String>[];
+      final feedback = UnittestFeedbackDto(
+        id: 4,
+        score: 50,
+        testedVals: const [],
+        pass: false,
+        unittestFeedback: const ['Stops', 'Returns'],
+        unittestPassResults: const [false, false],
+        codeExecResult: '',
+        codeOutput: '',
+        execSuccess: true,
+        hint: '',
+        evidence: const [
+          TestEvidenceDto(
+              testId: 'stop-wall-0-3',
+              label: 'Stops',
+              passed: false,
+              hintKey: 'stops-too-late'),
+          TestEvidenceDto(
+              testId: 'returns-node',
+              label: 'Returns',
+              passed: false,
+              hintKey: 'build-node-returns-none'),
+        ],
+      );
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: app.Feedback(data: feedback, onWatchInSimulation: watched.add),
+        ),
+      ));
+      // Only the check the replay can show gets the button.
+      expect(find.text('Watch it in the simulation'), findsOneWidget);
+      await tester.tap(find.text('Watch it in the simulation'));
+      expect(watched, ['stops-too-late']);
+
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(body: app.Feedback(data: feedback)),
+      ));
+      expect(find.text('Watch it in the simulation'), findsNothing);
     });
   });
 }

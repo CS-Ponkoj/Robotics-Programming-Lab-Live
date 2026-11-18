@@ -28,6 +28,25 @@ PHYSICS_PERIOD = 0.02
 SCAN_PERIOD = 0.08
 READY_TIMEOUT = 5.0
 
+# Beam probe: which readings does the node react to?
+PROBE_BEAM_STEP = 3          # one probe group per drawn beam (91 beams -> 31)
+PROBE_CLEAR = 3.0            # beyond any allowed stop distance
+PROBE_NEAR = 0.15            # closer than any allowed stop distance
+PROBE_REPLY_TIMEOUT = 0.25
+PROBE_BUDGET_SECONDS = 2.5
+PROBE_LATEST_START = 11.0    # seconds after start; the harness limit is 16 s
+STOPPED = 0.001
+
+
+def probe_groups() -> list[list[int]]:
+    """Raw beam indices for each drawn beam: the beam and its neighbours."""
+    groups = []
+    for center in range(0, SCAN_BEAMS, PROBE_BEAM_STEP):
+        groups.append([
+            index for index in (center - 1, center, center + 1) if 0 <= index < SCAN_BEAMS
+        ])
+    return groups
+
 
 def read_spin_report(read_fd: int) -> bool:
     """True when main() passed something other than a node to rclpy.spin()."""
@@ -76,6 +95,50 @@ def main() -> None:
         message.ranges = ranges
         scan_publisher.publish(message)
 
+    def reply_to(ranges: list[float]) -> float | None:
+        """linear.x of the first command answering this scan, if any."""
+        received.clear()
+        publish_scan(ranges)
+        deadline = time.monotonic() + PROBE_REPLY_TIMEOUT
+        while time.monotonic() < deadline and student.poll() is None:
+            rclpy.spin_once(monitor, timeout_sec=0.01)
+            if received:
+                return received[0][0]
+        return None
+
+    def drives(ranges: list[float]) -> bool | None:
+        linear = reply_to(ranges)
+        return None if linear is None else linear > STOPPED
+
+    def probe_beams() -> dict:
+        """Close one beam group at a time and see whether the node stops.
+
+        Stops when the node does not answer, does not drive on a clear scan, or
+        does not drive again after a probe (a latched stop), so it never reports
+        beams it could not confirm.
+        """
+        clear = [PROBE_CLEAR] * SCAN_BEAMS
+        if drives(clear) is not True:
+            return {"status": "not_driving", "beams": []}
+        beams = []
+        deadline = time.monotonic() + PROBE_BUDGET_SECONDS
+        for display_index, group in enumerate(probe_groups()):
+            if time.monotonic() > deadline:
+                return {"status": "incomplete", "beams": beams}
+            ranges = list(clear)
+            for index in group:
+                ranges[index] = PROBE_NEAR
+            result = drives(ranges)
+            if result is None:
+                return {"status": "no_reply", "beams": beams}
+            if result is False:
+                beams.append(display_index)
+                if drives(clear) is not True:
+                    return {"status": "latched", "beams": beams}
+        return {"status": "complete", "beams": beams}
+
+    harness_started = time.monotonic()
+    sensitivity = None
     ready = False
     try:
         # The robot stays still and sees its start position until the node answers.
@@ -107,6 +170,11 @@ def main() -> None:
                     simulation.advance(PHYSICS_PERIOD)
                     next_physics += PHYSICS_PERIOD
             simulation.record()
+            if (
+                student.poll() is None
+                and time.monotonic() - harness_started < PROBE_LATEST_START
+            ):
+                sensitivity = probe_beams()
     finally:
         alive = student.poll() is None
         if alive:
@@ -131,6 +199,8 @@ def main() -> None:
             "Check that build_node() returns your node and that it publishes a Twist for each scan."
         )
     replay = simulation.replay(initial_walls) if ready else None
+    if replay is not None and sensitivity is not None:
+        replay["sensitivity"] = sensitivity
     output = f"Simulated {simulation.time:.1f} s: {replay['outcome'].replace('_', ' ')}." if replay else ""
     if stdout.strip():
         output += f"\nNode stdout: {stdout.strip()[-1000:]}"

@@ -25,9 +25,13 @@ class RobotSimView extends StatefulWidget {
     this.compact = false,
     this.canvasSide,
     this.layout = SimViewLayout.stacked,
+    this.focus,
   });
 
   final SimulationReplay replay;
+
+  /// Jump to one moment and view, from a failed check's "Watch it".
+  final SimFocus? focus;
 
   /// Panel mode: a square picture, controls, and a one-line summary only.
   final bool compact;
@@ -49,6 +53,9 @@ class _RobotSimViewState extends State<RobotSimView>
   SimSensorView _view = SimSensorView.arena;
 
   double get _end => math.max(widget.replay.endTime, 0.1);
+
+  /// Drawn beams the node stopped for in the grader's beam probe.
+  Set<int> get _readBeams => {...?widget.replay.sensitivity?.beams};
   double get _time => _controller.value * _end;
 
   @override
@@ -67,12 +74,36 @@ class _RobotSimViewState extends State<RobotSimView>
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
+    if (_takeFocus()) return;
     // Respect reduced motion: show the final position and let the slider scrub.
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
       _controller.value = 1;
     } else {
       _controller.forward();
     }
+  }
+
+  int? _focusToken;
+
+  /// Shows the requested moment, paused, in the requested view. Returns
+  /// false when there is no new request.
+  bool _takeFocus() {
+    final focus = widget.focus;
+    if (focus == null || focus.token == _focusToken) return false;
+    _focusToken = focus.token;
+    final at = widget.replay.firstEventTime(focus.events);
+    _controller.stop();
+    // Just before the moment, so the student sees what leads to it.
+    _controller.value =
+        at == null ? 0 : (math.max(0.0, at - 0.4) / _end).clamp(0.0, 1.0);
+    _view = switch (focus.view) {
+      'lidar' => SimSensorView.lidar,
+      'charts' => SimSensorView.charts,
+      'ranges' => SimSensorView.ranges,
+      'arena' => SimSensorView.arena,
+      _ => _view,
+    };
+    return true;
   }
 
   @override
@@ -82,11 +113,14 @@ class _RobotSimViewState extends State<RobotSimView>
       _controller
         ..duration = _duration
         ..value = 0;
+      if (_takeFocus()) return;
       if (!(MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
         _controller.forward();
       } else {
         _controller.value = 1;
       }
+    } else if (widget.focus?.token != _focusToken) {
+      setState(_takeFocus);
     }
   }
 
@@ -294,13 +328,14 @@ class _RobotSimViewState extends State<RobotSimView>
               trailColor: SimPalette.trail,
               alertColor: SimPalette.alert,
               textColor: SimPalette.label,
+              readBeams: _readBeams,
             ),
           ),
         ),
       SimSensorView.lidar => (
           'LiDAR scan at ${frame.t.toStringAsFixed(1)} seconds. '
               '${ScanSummary.of(replay, frame).spoken}',
-          LidarBarsView(replay: replay, frame: frame),
+          LidarBarsView(replay: replay, frame: frame, readBeams: _readBeams),
         ),
       SimSensorView.charts => (
           'Charts of the distance ahead, linear.x, and angular.z over the run.',
@@ -308,7 +343,7 @@ class _RobotSimViewState extends State<RobotSimView>
         ),
       SimSensorView.ranges => (
           'Table of scan.ranges readings.',
-          RangesTableView(replay: replay, frame: frame),
+          RangesTableView(replay: replay, frame: frame, readBeams: _readBeams),
         ),
     };
     return Semantics(
@@ -554,6 +589,9 @@ abstract final class SimPalette {
   static const trail = Color(0xFF4ADE80);
   static const alert = Color(0xFFF87171);
   static const label = Color(0xFF94A3B8);
+
+  /// Beams the student's node reacts to (beam probe).
+  static const read = Color(0xFFF472B6);
 }
 
 /// Draws the world, scan rays, trail, and robot at one moment of the replay.
@@ -569,10 +607,14 @@ class RobotSimPainter extends CustomPainter {
     required this.trailColor,
     required this.alertColor,
     required this.textColor,
+    this.readBeams = const {},
   });
 
   final SimulationReplay replay;
   final double time;
+
+  /// Beams the node reacts to; drawn in [SimPalette.read].
+  final Set<int> readBeams;
   final Color gridColor;
   final Color wallColor;
   final Color robotColor;
@@ -635,14 +677,17 @@ class RobotSimPainter extends CustomPainter {
       final end = toScreen(frame.x + length * math.cos(angle),
           frame.y + length * math.sin(angle));
       final isFront = index == middle;
+      final isRead = readBeams.contains(index);
       canvas.drawLine(
         robot,
         end,
         Paint()
-          ..color = isFront
-              ? frontColor
-              : rayColor.withValues(alpha: reading == null ? 0.10 : 0.35)
-          ..strokeWidth = isFront ? 2.5 : 1,
+          ..color = isRead
+              ? SimPalette.read.withValues(alpha: 0.9)
+              : isFront
+                  ? frontColor
+                  : rayColor.withValues(alpha: reading == null ? 0.10 : 0.35)
+          ..strokeWidth = isRead ? 2.5 : (isFront ? 2.5 : 1),
       );
       if (reading != null) {
         canvas.drawCircle(end, isFront ? 3.5 : 2,
@@ -738,6 +783,7 @@ class RobotSimPainter extends CustomPainter {
   bool shouldRepaint(RobotSimPainter oldDelegate) =>
       oldDelegate.time != time ||
       oldDelegate.replay != replay ||
+      oldDelegate.readBeams.length != readBeams.length ||
       oldDelegate.robotColor != robotColor ||
       oldDelegate.wallColor != wallColor;
 }

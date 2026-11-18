@@ -169,6 +169,18 @@ function-assignment check that returned a wrong value (null when the check
 passed, crashed, or has no tag). Older records omit these fields; analyses
 must treat a missing value as not collected.
 
+From 2026-11-18, a failed Assignment 7 behavior check may also store
+`hint_key`, the pattern the grader observed in the student's own published
+commands (`speed-too-high`, `speed-too-low`, `infinity-treated-as-obstacle`,
+`stops-too-early`, `stops-too-late`, `wrong-threshold-direction`,
+`must-drive-first`, `does-not-resume`, `turns-while-driving`,
+`publishes-too-rarely`, or `build-node-returns-none`), and its `message` ends
+with one sentence stating that observation (for example the `linear.x` the
+robot published). `hint_key` selects the built-in hint ladder; it is not a
+research label. Only a `hint_key` that is also one of the assignment's
+configured misconception tags is copied into `misconception_tag` for a ROS 2
+check. Null or missing means no pattern was recognised.
+
 For a ROS 2 assignment whose `grader_config` lists `gate_tests` and
 `pass_tests` (Assignment 7 onward), `score` is 0 whenever any gate check
 fails, and `passed` means every gate check and every listed pass check passed;
