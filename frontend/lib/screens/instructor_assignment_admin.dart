@@ -445,8 +445,16 @@ class _StudioAssignmentRow extends StatelessWidget {
           ),
         );
 
+    // The row's main area opens the editor and carries the assignment's
+    // name for screen readers; Insights and Old/current are separate buttons.
     return Card(
-      child: InkWell(
+      child: Row(
+        children: [
+          Expanded(
+      // Announced as a button that opens this assignment's editor.
+      child: Semantics(
+        button: true,
+        child: InkWell(
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -520,23 +528,6 @@ class _StudioAssignmentRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              if (onInsights != null)
-                IconButton(
-                  key: Key('assignment-insights-${assignment['id']}'),
-                  tooltip: 'Insights: where students get stuck',
-                  onPressed: onInsights,
-                  icon: const Icon(Icons.insights_rounded),
-                ),
-              IconButton(
-                key: Key('assignment-old-${assignment['id']}'),
-                tooltip: isOld
-                    ? 'Move to current assignments'
-                    : 'Move to Old assignments',
-                onPressed: onToggleOld,
-                icon: Icon(isOld
-                    ? Icons.unarchive_outlined
-                    : Icons.archive_outlined),
-              ),
               Tooltip(
                 message: 'Edit assignment',
                 child: Icon(Icons.edit_outlined,
@@ -545,6 +536,28 @@ class _StudioAssignmentRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+      ),
+          ),
+          if (onInsights != null)
+            IconButton(
+              key: Key('assignment-insights-${assignment['id']}'),
+              tooltip: 'Insights for Assignment ${assignment['id']}, '
+                  'where students get stuck',
+              onPressed: onInsights,
+              icon: const Icon(Icons.insights_rounded),
+            ),
+          IconButton(
+            key: Key('assignment-old-${assignment['id']}'),
+            tooltip: isOld
+                ? 'Move Assignment ${assignment['id']} to current assignments'
+                : 'Move Assignment ${assignment['id']} to Old assignments',
+            onPressed: onToggleOld,
+            icon: Icon(
+                isOld ? Icons.unarchive_outlined : Icons.archive_outlined),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
     );
   }

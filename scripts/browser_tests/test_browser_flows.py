@@ -73,9 +73,12 @@ def show_old_assignments(page: Page) -> None:
 
 
 def type_into(page: Page, label: str, text: str) -> None:
-    # Flutter listens for key events; Playwright's fill() bypasses them.
+    # Flutter's text field drops keys sent before its text-input connection
+    # opens, so give focus a moment, then insert the text through it (fill()
+    # would bypass Flutter entirely).
     page.get_by_label(label).click()
-    page.keyboard.type(text)
+    page.wait_for_timeout(400)
+    page.keyboard.insert_text(text)
 
 
 def wait_for_text(page: Page, text: str, timeout: int = 30_000) -> None:
