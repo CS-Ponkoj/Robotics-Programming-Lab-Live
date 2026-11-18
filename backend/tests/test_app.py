@@ -369,7 +369,11 @@ def test_assignment_reports_ai_tutor_unavailable_without_provider_key(client):
     assert "openai_api_key" not in assignment
 
 
-def test_assignment_reports_ai_tutor_available_without_revealing_key(tmp_path):
+def test_assignment_reports_ai_tutor_available_without_revealing_key(
+    tmp_path, monkeypatch
+):
+    import ai_policy
+
     secret = "sk-test-not-a-real-key-123456"
     settings = Settings(
         database_url="sqlite://",
@@ -381,12 +385,40 @@ def test_assignment_reports_ai_tutor_available_without_revealing_key(tmp_path):
         token = value.post(
             "/auth/login", json={"login_id": "student", "password": "student"}
         ).json()["token"]
-        response = value.get(
-            "/assignments/1", headers={"Authorization": f"Bearer {token}"}
+        student = {"Authorization": f"Bearer {token}"}
+        instructor = {"X-Admin-Token": "test-admin"}
+
+        def available():
+            body = value.get("/assignments/1", headers=student).json()
+            return body["ai_tutor_available"], body["ai_tutor_message"]
+
+        # A key alone is not enough: the course switch starts off.
+        assert available() == (False, ai_policy.NOT_ENABLED)
+        status = value.put(
+            "/admin/course-settings/ai-tutor",
+            json={"enabled": True, "daily_limit": 5},
+            headers=instructor,
         )
+        assert status.status_code == 200
+        assert status.json()["key_configured"] is True
+        assert secret not in status.text
+        # Switched on, but the assignment's AI cases are not approved yet.
+        assert available() == (False, ai_policy.NOT_REVIEWED)
+        version = value.get("/assignments/1", headers=student).json()["version"]
+        monkeypatch.setattr(
+            ai_policy, "approved_assignments", lambda: frozenset({(1, version)})
+        )
+        response = value.get("/assignments/1", headers=student)
+        # Students cannot change the course switch.
+        assert value.put(
+            "/admin/course-settings/ai-tutor",
+            json={"enabled": False, "daily_limit": 5},
+            headers=student,
+        ).status_code in (401, 403)
 
     assert response.status_code == 200
     assert response.json()["ai_tutor_available"] is True
+    assert response.json()["ai_tutor_message"] == ""
     assert secret not in response.text
 
 

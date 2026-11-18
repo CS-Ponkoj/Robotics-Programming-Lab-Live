@@ -61,6 +61,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _enableFeedback = false;
   // Set from the server once the assignment loads; AI stays off until then.
   bool _aiTutorAvailable = false;
+  String _aiTutorMessage = aiTutorUnavailableMessage;
   bool _isRos2 = false;
   bool _submitted = false;
   bool _emptyCodeAttempted = false;
@@ -143,6 +144,9 @@ class _MyHomePageState extends State<MyHomePage> {
     if (mounted) {
       setState(() {
         _aiTutorAvailable = assignment.aiTutorAvailable;
+        if (assignment.aiTutorMessage.isNotEmpty) {
+          _aiTutorMessage = assignment.aiTutorMessage;
+        }
         _isRos2 = assignment.language.contains('ros2');
         if (!_aiTutorAvailable) _enableFeedback = false;
       });
@@ -979,7 +983,7 @@ class _MyHomePageState extends State<MyHomePage> {
               title: const Text('AI tutoring'),
               subtitle: Text(_aiTutorAvailable
                   ? 'Off by default; built-in feedback remains available'
-                  : aiTutorUnavailableMessage),
+                  : _aiTutorMessage),
               value: _aiTutorOn,
               onChanged: _aiTutorAvailable
                   ? (value) {
@@ -1072,6 +1076,7 @@ class _MyHomePageState extends State<MyHomePage> {
       status: assignmentStatus,
       feedbackEnabled: _aiTutorOn,
       aiTutorAvailable: _aiTutorAvailable,
+      aiTutorMessage: _aiTutorMessage,
       onBack: () => Navigator.pop(context),
       onHome: () => Navigator.of(context).popUntil((route) => route.isFirst),
       onResultsOpen: _openResultsPanel,
@@ -3069,7 +3074,11 @@ class AssignmentPageHeader extends StatelessWidget
     required this.onHome,
     required this.onResultsOpen,
     required this.onFeedbackChanged,
+    this.aiTutorMessage = aiTutorUnavailableMessage,
   });
+
+  /// Why the AI tutor is unavailable, shown when it is.
+  final String aiTutorMessage;
 
   String get _displayTitle {
     final prefix = 'Assignment $assignmentId:';
@@ -3078,11 +3087,11 @@ class AssignmentPageHeader extends StatelessWidget
         : title;
   }
 
-  static Widget _withUnavailableTooltip({
+  Widget _withUnavailableTooltip({
     required bool show,
     required Widget child,
   }) =>
-      show ? Tooltip(message: aiTutorUnavailableMessage, child: child) : child;
+      show ? Tooltip(message: aiTutorMessage, child: child) : child;
 
   @override
   Size get preferredSize => const Size.fromHeight(76);
@@ -3184,7 +3193,7 @@ class AssignmentPageHeader extends StatelessWidget
           show: !aiTutorAvailable,
           child: Semantics(
             label: 'AI tutoring',
-            hint: aiTutorAvailable ? null : aiTutorUnavailableMessage,
+            hint: aiTutorAvailable ? null : aiTutorMessage,
             toggled: aiTutorAvailable && feedbackEnabled,
             enabled: aiTutorAvailable,
             child: Row(

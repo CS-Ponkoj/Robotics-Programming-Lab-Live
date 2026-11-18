@@ -96,3 +96,36 @@ String _errorMessage(http.Response response) {
     return 'Request failed (${response.statusCode}).';
   }
 }
+
+/// The course AI tutor switch, daily limit, whether a key is configured on the
+/// server (never the key), and each assignment's AI review state.
+Future<Map<String, dynamic>> fetchAiTutorSettings(String token) async {
+  final response = await http
+      .get(
+        Uri.parse('$apiBaseUrl/admin/course-settings/ai-tutor'),
+        headers: _headers(token),
+      )
+      .timeout(_adminTimeout);
+  if (response.statusCode != 200) {
+    throw Exception(_errorMessage(response));
+  }
+  return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+}
+
+Future<Map<String, dynamic>> saveAiTutorSettings(
+  String token, {
+  required bool enabled,
+  required int dailyLimit,
+}) async {
+  final response = await http
+      .put(
+        Uri.parse('$apiBaseUrl/admin/course-settings/ai-tutor'),
+        headers: _headers(token),
+        body: jsonEncode({'enabled': enabled, 'daily_limit': dailyLimit}),
+      )
+      .timeout(_adminTimeout);
+  if (response.statusCode != 200) {
+    throw Exception(_errorMessage(response));
+  }
+  return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+}

@@ -503,3 +503,22 @@ class PageFeedback(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class CourseSetting(Base):
+    """One course-wide instructor setting, such as the AI tutor switch.
+
+    Settings change how the course behaves, never past records, so each row
+    keeps who changed it last and when.
+    """
+
+    __tablename__ = "course_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )

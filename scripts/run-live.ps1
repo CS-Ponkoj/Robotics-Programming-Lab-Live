@@ -77,9 +77,22 @@ if (-not $SkipBuild) {
 $release = (git -C $repositoryRoot rev-parse HEAD).Trim()
 $env:RENDER_GIT_COMMIT = $release
 
-Start-Process -FilePath $python -WindowStyle Hidden -WorkingDirectory $backendRoot `
-    -ArgumentList @("-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "$BackendPort", "--proxy-headers", "--root-path", "/api", "--no-server-header") `
-    -RedirectStandardOutput (Join-Path $logs "api.out.log") -RedirectStandardError (Join-Path $logs "api.err.log")
+# Managed secrets (set with scripts/set-live-secret.ps1) are encrypted for this
+# Windows user. They are given to the API process only, then removed from this
+# shell so the web server, Caddy, and the tunnel never inherit them.
+$secretNames = @(Get-RoboticsLiveSecretNames)
+$aiKey = "not configured"
+foreach ($name in $secretNames) {
+    Set-Item -Path "Env:$name" -Value (Read-RoboticsLiveSecret -Name $name)
+    if ($name -eq "OPENAI_API_KEY") { $aiKey = "configured (managed secret)" }
+}
+try {
+    Start-Process -FilePath $python -WindowStyle Hidden -WorkingDirectory $backendRoot `
+        -ArgumentList @("-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "$BackendPort", "--proxy-headers", "--root-path", "/api", "--no-server-header") `
+        -RedirectStandardOutput (Join-Path $logs "api.out.log") -RedirectStandardError (Join-Path $logs "api.err.log")
+} finally {
+    foreach ($name in $secretNames) { Remove-Item -Path "Env:$name" -ErrorAction SilentlyContinue }
+}
 
 Start-Process -FilePath $python -WindowStyle Hidden `
     -ArgumentList @("`"$(Join-Path $PSScriptRoot 'serve_web.py')`"", "--directory", "`"$webBuild`"", "--port", "$FrontendPort") `
@@ -96,5 +109,6 @@ Start-Process -FilePath $cloudflared -WindowStyle Hidden `
     -RedirectStandardOutput (Join-Path $logs "tunnel.out.log") -RedirectStandardError (Join-Path $logs "tunnel.err.log")
 
 Write-Output "Live stack starting at release $($release.Substring(0, 12))."
+Write-Output "AI tutor key: $aiKey. The course switch is in Instructor Studio."
 Write-Output "Local address: http://127.0.0.1:8080/app (API at /api)"
 Write-Output "Logs: $logs"

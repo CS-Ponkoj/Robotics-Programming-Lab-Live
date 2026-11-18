@@ -145,4 +145,38 @@ function Invoke-RoboticsNative {
     }
 }
 
-Export-ModuleMember -Function Get-RoboticsRuntimeRoot, Get-RoboticsEnvironmentRoot, Get-RoboticsPrivateConfigPath, Get-RoboticsPythonExecutable, Invoke-RoboticsNative
+# Managed secrets for the self-hosted live stack: encrypted with Windows DPAPI
+# for the current user, outside the Git clone, and never printed.
+$script:RoboticsLiveSecretNames = @("OPENAI_API_KEY")
+
+function Get-RoboticsLiveSecretDirectory {
+    return Join-Path $env:LOCALAPPDATA "RoboticsProgrammingLab\secrets\RPL-Live"
+}
+
+function Get-RoboticsLiveSecretPath {
+    param([Parameter(Mandatory)][string]$Name)
+    if ($script:RoboticsLiveSecretNames -notcontains $Name) {
+        throw "Unknown live secret '$Name'. Allowed: $($script:RoboticsLiveSecretNames -join ', ')."
+    }
+    return Join-Path (Get-RoboticsLiveSecretDirectory) "$Name.dpapi"
+}
+
+function Get-RoboticsLiveSecretNames {
+    # Names that have a stored value, never the values.
+    return @($script:RoboticsLiveSecretNames | Where-Object { Test-Path (Get-RoboticsLiveSecretPath -Name $_) })
+}
+
+function Read-RoboticsLiveSecret {
+    param([Parameter(Mandatory)][string]$Name)
+    $secure = Get-Content -Path (Get-RoboticsLiveSecretPath -Name $Name) -Raw | ConvertTo-SecureString
+    return [System.Net.NetworkCredential]::new("", $secure).Password
+}
+
+function Write-RoboticsLiveSecret {
+    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][securestring]$Value)
+    $path = Get-RoboticsLiveSecretPath -Name $Name
+    New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+    $Value | ConvertFrom-SecureString | Set-Content -Path $path -Encoding ascii -NoNewline
+}
+
+Export-ModuleMember -Function Get-RoboticsRuntimeRoot, Get-RoboticsEnvironmentRoot, Get-RoboticsPrivateConfigPath, Get-RoboticsPythonExecutable, Invoke-RoboticsNative, Get-RoboticsLiveSecretPath, Get-RoboticsLiveSecretNames, Read-RoboticsLiveSecret, Write-RoboticsLiveSecret

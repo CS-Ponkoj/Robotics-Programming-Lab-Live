@@ -83,9 +83,14 @@ Rebuild after its Dockerfile or ROS grading dependencies change.
 .\scripts\run-local.ps1
 ```
 
-The AI tutoring switch starts off. If the private repository-root `.env` has
-`OPENAI_API_KEY`, turning on the switch makes AI available without a separate
-launcher flag. The optional `-EnableAi` flag only checks for a key at startup.
+The AI tutoring switch starts off. The key comes from the private
+repository-root `.env`. AI answers need four things: an `OPENAI_API_KEY` on the server, AI tutoring
+turned on in Instructor Studio > AI tutor (off by default, with a daily limit
+per student), the assignment's AI test cases approved by a named instructor
+for its current version (`backend/ai_evaluation_cases`), and quota left for
+the student today. Otherwise students get the built-in hints and a short
+reason. The optional `-EnableAi` flag only checks for a
+key at startup.
 
 Open the app at `http://127.0.0.1:8180/app` (API `http://127.0.0.1:5100`,
 sandbox `http://127.0.0.1:5101`). Signed-in students see their saved progress

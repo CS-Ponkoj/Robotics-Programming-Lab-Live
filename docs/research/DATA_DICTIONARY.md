@@ -287,6 +287,9 @@ response may contain a diagnosis, short answer, debugging steps, guiding
 question, next action, source, and solution-protection flag. For student
 questions, the stored response also records `interaction_type` but does not
 store the raw question. Demo sessions do not create persistent hint rows.
+From 2026-11-18 the daily AI quota counts a student's rows from the current
+UTC day whose stored `source` is `openai`; built-in (`fallback`) answers are
+never counted.
 
 ### `course_quiz_attempts`
 
@@ -339,6 +342,22 @@ shown on every signed-in page. Instructors read and resolve it from
 Feedback is operational, not research data: it is not part of the research
 exports or analytics. Each sender is limited to five messages per minute.
 
+### `course_settings`
+
+One row per course-wide instructor setting, changed in **Instructor Studio**.
+A missing row means the default. Operational configuration, not research data.
+
+| Field | Meaning |
+|---|---|
+| `key` | `ai_tutor` or `catalog` |
+| `value` | `ai_tutor`: `{"enabled": bool, "daily_limit": 1-200}` (defaults `false`, `20`). `catalog`: `{"old_assignment_ids": [int] or null}` (null uses `backend/assignments/catalog.json`) |
+| `updated_by_user_id` | Instructor who changed it last; empty when changed with the admin token |
+| `updated_at` | UTC time of the last change |
+
+Each change of the AI tutor setting also writes an `audit_events` row with
+action `ai_tutor_settings_changed` and the new values; each change of the
+catalog writes `catalog_settings_changed`.
+
 ## Assignment JSON fields
 
 Every assignment is normalized into the same fields before database storage.
@@ -364,6 +383,8 @@ configuration explicitly. All assignment files declare
   table without changing coding-assignment submissions.
 - Alembic migration `0007_page_feedback` adds the page-feedback table without
   changing any existing table.
+- Alembic migration `0009_course_settings` adds the `course_settings` table
+  without changing any existing table.
 - Alembic migration `0008_session_device` adds a nullable `device` column
   (`phone`, `tablet`, or `computer`) to `auth_sessions`. Only that category is
   derived from the sign-in browser; the full User-Agent is never stored.

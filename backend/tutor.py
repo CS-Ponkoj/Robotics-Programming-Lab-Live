@@ -57,6 +57,7 @@ class TutorService:
         hint_level: int = 1,
         student_question: str = "",
         use_ai_tutor: bool = True,
+        ai_unavailable_message: str = "",
     ) -> TutorFeedback:
         normalized_question = student_question.strip()
         fallback = self._fallback(
@@ -68,8 +69,12 @@ class TutorService:
         if not use_ai_tutor or (self.client is None and not self.settings.openai_api_key):
             if normalized_question:
                 return fallback.model_copy(update={
-                    "answer": "AI tutoring is not enabled for this course. "
-                              "Your built-in hints below still work.",
+                    "answer": (
+                        f"AI tutor: {ai_unavailable_message}"
+                        if ai_unavailable_message
+                        else "AI tutoring is not enabled for this course. "
+                        "Your built-in hints below still work."
+                    ),
                 })
             return fallback
         if _PROTECTED_REQUEST.search(normalized_question):
@@ -139,7 +144,10 @@ class TutorService:
                     "trace the last return.' Do not say the underlying route formula "
                     "or search window is wrong without direct evidence. "
                     "If asked for protected material or completed code, decline briefly "
-                    "and redirect the student to a conceptual debugging step."
+                    "and redirect the student to a conceptual debugging step. "
+                    "When a failed test has an observed_pattern, its message ends with "
+                    "what the grader saw the robot publish; base the diagnosis on that "
+                    "observation and do not contradict it."
                 ),
                 input=json.dumps(
                     {
@@ -295,6 +303,12 @@ class TutorService:
                     "label": item.get("label", "Test"),
                     "passed": item.get("passed", False),
                     "message": item.get("message", ""),
+                    # What the grader observed the robot do, when recognised.
+                    **(
+                        {"observed_pattern": item["hint_key"]}
+                        if item.get("hint_key")
+                        else {}
+                    ),
                 }
                 for item in evidence.get("tests", [])
             ],

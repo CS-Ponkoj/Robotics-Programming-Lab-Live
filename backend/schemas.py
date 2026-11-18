@@ -47,6 +47,8 @@ class AssignmentStudent(BaseModel):
     # True only when the server has an AI provider configured. It reveals no
     # key or provider detail; the workspace uses it to offer the AI switch.
     ai_tutor_available: bool = False
+    # Why the AI tutor is unavailable, in student words; empty when available.
+    ai_tutor_message: str = ""
 
 
 class AssignmentListResponse(BaseModel):

@@ -53,6 +53,9 @@ class AssignmentDto {
   /// workspace keeps the AI switch disabled and never requests AI feedback.
   final bool aiTutorAvailable;
 
+  /// Why the AI tutor is unavailable, from the server; empty when available.
+  final String aiTutorMessage;
+
   const AssignmentDto({
     required this.id,
     this.stableId = '',
@@ -75,6 +78,7 @@ class AssignmentDto {
     this.hasSavedDraft = false,
     this.collection = 'current',
     this.aiTutorAvailable = false,
+    this.aiTutorMessage = '',
   });
 
   factory AssignmentDto.fromJson(Map<String, dynamic> json) {
@@ -141,6 +145,9 @@ class AssignmentDto {
           hasSavedDraft: json['has_saved_draft'] == true,
           collection: json['collection'] == 'old' ? 'old' : 'current',
           aiTutorAvailable: json['ai_tutor_available'] == true,
+          aiTutorMessage: json['ai_tutor_message'] is String
+              ? json['ai_tutor_message'] as String
+              : '',
         ),
       _ => throw const FormatException('Failed to load assignment.'),
     };

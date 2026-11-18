@@ -108,6 +108,17 @@ with `scripts/stop-live.ps1`. It requires `ENVIRONMENT=production` and
 `SELF_HOSTED_DATABASE=true` in the machine's private `.env`; see
 `backend/.env.example`.
 
+On the live PC the OpenAI key is a managed secret, not a `.env` line: run
+`scripts/set-live-secret.ps1` (hidden prompt; stored encrypted with Windows
+DPAPI for that Windows user under LocalAppData), then restart the stack.
+`run-live.ps1` gives the key to the API process only and prints whether it is
+configured, never the key. `-Remove` deletes it. AI answers need four things: an `OPENAI_API_KEY` on the server, AI tutoring
+turned on in Instructor Studio > AI tutor (off by default, with a daily limit
+per student), the assignment's AI test cases approved by a named instructor
+for its current version (`backend/ai_evaluation_cases`), and quota left for
+the student today. Otherwise students get the built-in hints and a short
+reason.
+
 ## Verification
 
 ```powershell

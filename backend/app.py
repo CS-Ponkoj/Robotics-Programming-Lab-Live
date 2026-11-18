@@ -126,6 +126,8 @@ from analytics_service import (
     paginated_attempts,
 )
 from tutor import TutorService
+from ai_policy import ai_access, approved_assignments
+from course_settings import AiTutorSettings, get_setting, set_setting
 from validation import validate_assignment
 
 
@@ -1605,9 +1607,16 @@ def create_app(
         session: Session = Depends(session_dependency),
         _user: User = Depends(current_user),
     ):
-        payload = to_student_assignment(get_assignment_or_404(session, assignment_id))
-        available = bool(request.app.state.settings.openai_api_key)
-        return payload.model_copy(update={"ai_tutor_available": available})
+        assignment = get_assignment_or_404(session, assignment_id)
+        payload = to_student_assignment(assignment)
+        access = ai_access(
+            request.app.state.settings, session, assignment, _user,
+            demo=is_ephemeral_demo(request, _user), count_quota=False,
+        )
+        return payload.model_copy(update={
+            "ai_tutor_available": access.allowed,
+            "ai_tutor_message": access.message,
+        })
 
     @application.get(
         "/assignments/{assignment_id}/draft",
@@ -1975,8 +1984,14 @@ def create_app(
         )
         tutor_feedback = None
         if body.use_ai_tutor and not result.passed:
+            access = ai_access(
+                request.app.state.settings, session, assignment, user,
+                demo=is_ephemeral_demo(request, user),
+            )
             tutor_feedback = TutorService(request.app.state.settings).feedback(
-                assignment, submission, hint_level=1
+                assignment, submission, hint_level=1,
+                use_ai_tutor=access.allowed,
+                ai_unavailable_message=access.message,
             )
             if not is_ephemeral_demo(request, user):
                 session.add(
@@ -2043,11 +2058,16 @@ def create_app(
             raise HTTPException(404, "Submission not found.")
         if submission.student_id != user.login_id:
             raise HTTPException(404, "Submission not found.")
+        access = ai_access(
+            request.app.state.settings, session, assignment, user,
+            demo=is_ephemeral_demo(request, user),
+        ) if body.use_ai_tutor else None
         feedback = TutorService(request.app.state.settings).feedback(
             assignment,
             submission,
             hint_level=body.hint_level,
-            use_ai_tutor=body.use_ai_tutor,
+            use_ai_tutor=bool(access and access.allowed),
+            ai_unavailable_message=access.message if access else "",
         )
         if not is_ephemeral_demo(request, user):
             session.add(
@@ -2102,11 +2122,17 @@ def create_app(
         if submission is None or submission.student_id != user.login_id:
             raise HTTPException(404, "Submission not found.")
 
+        access = ai_access(
+            request.app.state.settings, session, assignment, user,
+            demo=is_ephemeral_demo(request, user),
+        )
         feedback = TutorService(request.app.state.settings).feedback(
             assignment,
             submission,
             hint_level=body.hint_level,
             student_question=body.question,
+            use_ai_tutor=access.allowed,
+            ai_unavailable_message=access.message,
         )
         if not is_ephemeral_demo(request, user):
             stored_feedback = feedback.model_dump()
@@ -2345,6 +2371,51 @@ def create_app(
                 to_admin_payload(item).model_dump()
                 for item in AssignmentRepository(session).list_all()
             ]
+        }
+
+    @application.get(
+        "/admin/course-settings/ai-tutor",
+        dependencies=[Depends(admin_dependency)],
+    )
+    def admin_ai_tutor_settings(
+        request: Request, session: Session = Depends(session_dependency)
+    ):
+        return ai_tutor_status(request, session)
+
+    @application.put("/admin/course-settings/ai-tutor")
+    def admin_update_ai_tutor_settings(
+        body: AiTutorSettings,
+        request: Request,
+        session: Session = Depends(session_dependency),
+        actor: User | None = Depends(admin_dependency),
+    ):
+        set_setting(session, body, actor)
+        record_audit(
+            session,
+            action="ai_tutor_settings_changed",
+            resource_type="course_setting",
+            resource_id="ai_tutor",
+            actor_user_id=actor.id if actor else None,
+            details={"enabled": body.enabled, "daily_limit": body.daily_limit},
+        )
+        return ai_tutor_status(request, session)
+
+    def ai_tutor_status(request: Request, session: Session) -> dict:
+        course = get_setting(session, AiTutorSettings)
+        approved = approved_assignments()
+        return {
+            **course.model_dump(),
+            # Whether a key is configured, never the key.
+            "key_configured": bool(request.app.state.settings.openai_api_key),
+            "assignments": [
+                {
+                    "id": item.id,
+                    "title": item.title,
+                    "version": item.version,
+                    "reviewed": (item.id, item.version) in approved,
+                }
+                for item in AssignmentRepository(session).list_published()
+            ],
         }
 
     @application.post(

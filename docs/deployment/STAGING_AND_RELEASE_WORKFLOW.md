@@ -45,9 +45,13 @@ the sandbox, API, and Flutter web application at `http://127.0.0.1:8180/app`. Py
 files stay outside the clone. The ignored repository-root `.env` supplies the
 Neon connection and optional AI configuration. Git supplies the password-free
 account roster at `backend/data/study_accounts.json`.
-AI tutoring remains off until the student turns on the assignment switch. When
-the ignored `.env` has `OPENAI_API_KEY`, the normal launcher makes that switch
-usable; `-EnableAi` is only an optional startup check for the key.
+AI tutoring remains off until the student turns on the assignment switch.
+AI answers need four things: an `OPENAI_API_KEY` on the server, AI tutoring
+turned on in Instructor Studio > AI tutor (off by default, with a daily limit
+per student), the assignment's AI test cases approved by a named instructor
+for its current version (`backend/ai_evaluation_cases`), and quota left for
+the student today. Otherwise students get the built-in hints and a short
+reason. `-EnableAi` is only an optional startup check for the key.
 The launcher refuses to reuse ports already owned by an older project process;
 stop that process or provide different `-FrontendPort`, `-BackendPort`, and
 `-SandboxPort` values.

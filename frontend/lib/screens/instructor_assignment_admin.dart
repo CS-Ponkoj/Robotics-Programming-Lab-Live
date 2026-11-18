@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/screens/ai_tutor_settings_page.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/screens/feedback_inbox_page.dart';
 import 'package:iuse_demo/screens/student_accounts_page.dart';
@@ -45,6 +46,14 @@ class InstructorAssignmentAdmin extends StatelessWidget {
         detail: 'Participation, attempts, and privacy-safe research exports.',
         onTap: () => open(
             const InstructorResearchDashboard(), 'Research study dashboard'),
+      ),
+      _StudioLinkCard(
+        key: const Key('studio-ai-card'),
+        icon: Icons.psychology_outlined,
+        title: 'AI tutor',
+        detail: 'Turn AI tutoring on for the course, set a daily limit, and '
+            'see which assignments are reviewed.',
+        onTap: () => open(const AiTutorSettingsPage(), 'AI tutor'),
       ),
       _StudioLinkCard(
         key: const Key('studio-feedback-card'),

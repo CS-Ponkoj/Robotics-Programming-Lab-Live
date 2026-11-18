@@ -149,9 +149,13 @@ Open the app at `http://127.0.0.1:8180/app` (API `http://127.0.0.1:5100`,
 sandbox `http://127.0.0.1:5101`). Signed-in students see their saved progress
 after signing in, on any browser or address. The launcher connects to Neon
 and starts the Python sandbox, FastAPI, and Flutter web. The AI tutoring switch
-is off by default. If the ignored repository-root `.env` contains
-`OPENAI_API_KEY`, the normal launcher makes AI available when you turn on the
-switch; it does not call OpenAI merely because the key is present.
+is off by default. The key comes from the ignored repository-root `.env`; the
+launcher never calls OpenAI merely because the key is present. AI answers need
+four things: the key, AI tutoring turned on in Instructor Studio > AI tutor
+(off by default, with a daily limit per student), the assignment's AI test
+cases approved by a named instructor for its current version
+(`backend/ai_evaluation_cases`), and quota left for the student today.
+Otherwise students get the built-in hints and a short reason.
 
 The optional `--enable-ai` flag checks for a configured key at startup; it is
 not required for the assignment switch. Never commit or print the `.env` file.
