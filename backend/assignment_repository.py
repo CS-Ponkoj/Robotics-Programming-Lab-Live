@@ -265,7 +265,12 @@ class AssignmentRepository:
             "solution_html",
             "reference_solution_path",
         }
-        changed = any(getattr(assignment, name) != values[name] for name in content_fields)
+        # Compare stored content after the same normalization as the payload,
+        # so a dropped legacy key alone is not a new version.
+        stored = normalize_assignment_structured_data(
+            {name: getattr(assignment, name) for name in content_fields}
+        )
+        changed = any(stored[name] != values[name] for name in content_fields)
         for name, value in values.items():
             setattr(assignment, name, value)
         if changed:

@@ -172,7 +172,9 @@ class RobotSimPanel extends StatelessWidget {
                 compact: onClose == null,
               ),
             )
-          else
+          // Collapsed: live readings once there is a run; before that, the
+          // header alone.
+          else if (simulation != null)
             SizedBox(
               height: kSimStripHeight,
               child: SimulationBody(
@@ -216,11 +218,6 @@ class _PanelHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final status = isSimulating
-        ? 'Running'
-        : simulation == null
-            ? 'Ready'
-            : 'Replay';
     return Container(
       color: theme.colorScheme.surfaceContainerHigh,
       padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
@@ -251,18 +248,7 @@ class _PanelHeader extends StatelessWidget {
                           ?.copyWith(fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  key: const Key('robot-sim-status'),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isSimulating
-                        ? theme.colorScheme.tertiaryContainer
-                        : theme.colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(status, style: theme.textTheme.labelSmall),
-                ),
+                _StatusChip(isSimulating: isSimulating, simulation: simulation),
               ],
             ),
           ),
@@ -313,6 +299,61 @@ class _PanelHeader extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Ready, Running, Replay, or No replay when the node could not drive.
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.isSimulating, required this.simulation});
+
+  final bool isSimulating;
+  final Future<SimulationResultDto>? simulation;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FutureBuilder<SimulationResultDto>(
+      future: simulation,
+      builder: (context, snap) {
+        final failed = !isSimulating &&
+            snap.connectionState == ConnectionState.done &&
+            (snap.hasError || snap.data?.replay == null);
+        final (label, color, text) = isSimulating ||
+                (simulation != null &&
+                    snap.connectionState == ConnectionState.waiting)
+            ? ('Running', scheme.tertiaryContainer, scheme.onTertiaryContainer)
+            : simulation == null
+                ? (
+                    'Ready',
+                    scheme.secondaryContainer,
+                    scheme.onSecondaryContainer
+                  )
+                : failed
+                    ? (
+                        'No replay',
+                        scheme.errorContainer,
+                        scheme.onErrorContainer
+                      )
+                    : (
+                        'Replay',
+                        scheme.secondaryContainer,
+                        scheme.onSecondaryContainer
+                      );
+        return Container(
+          key: const Key('robot-sim-status'),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: text)),
+        );
+      },
     );
   }
 }

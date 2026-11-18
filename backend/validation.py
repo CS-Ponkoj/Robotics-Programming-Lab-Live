@@ -3,6 +3,7 @@ from pathlib import Path
 
 from graders.base import AssignmentGrader
 from models import Assignment
+from ros2_worker import ROS2_HARNESSES
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
@@ -61,7 +62,8 @@ def validate_assignment(
             if not str(config.get(name, "")).strip():
                 errors.append(f"ROS 2 grader setting '{name}' is required.")
         harness = str(config.get("harness", "drive_forward"))
-        if harness not in {"drive_forward", "obstacle_stop"}:
+        # The worker's own table, so a new harness cannot be missed here.
+        if harness not in ROS2_HARNESSES:
             errors.append(f"Unsupported ROS 2 harness: {harness}.")
         project_files = [
             item

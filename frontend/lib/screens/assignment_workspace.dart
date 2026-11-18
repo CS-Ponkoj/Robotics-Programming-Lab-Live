@@ -102,7 +102,9 @@ class _MyHomePageState extends State<MyHomePage> {
   // The square Simulation panel: docked above the instructions or floating.
   // Its own floating window by default; it can dock above the instructions.
   SimPanelMode _simMode = SimPanelMode.floating;
-  bool _simCollapsed = false;
+  // Starts collapsed so the empty panel does not cover the instructions;
+  // the first Simulate opens it.
+  bool _simCollapsed = true;
   // Null until moved: the window starts at the top right of the workspace.
   Offset? _simOffset;
   double _simSize = 660;
@@ -3500,6 +3502,19 @@ class Feedback extends StatelessWidget {
     final total = passed + failed;
     final passRate = total > 0 ? (passed / total) * 100 : 0.0;
     final score = data.score.clamp(0, 100).toInt();
+    // Points come from weighted checks; zero-weight checks are requirements.
+    double? totalPoints;
+    var earnedPoints = 0.0;
+    var requirementChecks = 0;
+    for (final (index, detail) in data.evidence.indexed) {
+      final weight = detail.weight;
+      if (weight == null) continue;
+      totalPoints = (totalPoints ?? 0) + weight;
+      final checkPassed = index < data.unittestPassResults.length &&
+          data.unittestPassResults[index];
+      earnedPoints += detail.earnedWeight ?? (checkPassed ? weight : 0);
+      if (weight == 0) requirementChecks++;
+    }
     final vars = data.testedVals.map((value) => value.toString()).toList();
     final tutorAvailable = aiTutorEnabled && data.submissionId.isNotEmpty;
     final showHint = data.hint.isNotEmpty &&
@@ -3557,6 +3572,9 @@ class Feedback extends StatelessWidget {
             failed: failed,
             score: score,
             passRate: passRate,
+            earnedPoints: totalPoints == null ? null : earnedPoints,
+            totalPoints: totalPoints,
+            requirementChecks: requirementChecks,
           ),
           if (failed > 0 || !data.execSuccess) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -3894,12 +3912,39 @@ class _ResultSummary extends StatelessWidget {
     required this.failed,
     required this.score,
     required this.passRate,
+    this.earnedPoints,
+    this.totalPoints,
+    this.requirementChecks = 0,
   });
 
   final int passed;
   final int failed;
   final int score;
   final double passRate;
+
+  /// Points earned and available when checks carry points; null otherwise.
+  final double? earnedPoints;
+  final double? totalPoints;
+
+  /// Checks that must pass but carry no points of their own.
+  final int requirementChecks;
+
+  /// Why the score and the passed-check count can disagree, or null.
+  String? get _explanation {
+    final total = totalPoints;
+    if (total == null || total <= 0) return null;
+    final earned = earnedPoints ?? 0;
+    if (score == 0 && earned > 0) {
+      return 'A required check failed, so the score stays at 0% until it '
+          'passes.';
+    }
+    if (requirementChecks > 0 && passed > 0 && score < 100) {
+      return '$requirementChecks required checks carry no points; your score '
+          'comes from the ${_formatPoints(total)} points of the behavior '
+          'checks.';
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3910,7 +3955,8 @@ class _ResultSummary extends StatelessWidget {
 
     return Semantics(
       container: true,
-      label: 'Test score $score percent. $passed passed and $failed failed.',
+      label: 'Test score $score percent. $passed of ${passed + failed} '
+          'checks passed.',
       child: Container(
         key: const Key('result-summary'),
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -3967,23 +4013,36 @@ class _ResultSummary extends StatelessWidget {
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
               children: [
+                if (totalPoints != null)
+                  _ResultCount(
+                    key: const Key('result-points'),
+                    icon: Icons.stars_rounded,
+                    label: 'Points: ${_formatPoints(earnedPoints ?? 0)} of '
+                        '${_formatPoints(totalPoints!)}',
+                    color: theme.colorScheme.primary,
+                  ),
                 _ResultCount(
+                  key: const Key('result-checks'),
                   icon: Icons.check_rounded,
-                  label: 'Passed: $passed',
+                  label: 'Checks passed: $passed of ${passed + failed}',
                   color: AppColors.success,
                 ),
-                _ResultCount(
-                  icon: Icons.close_rounded,
-                  label: 'Failed: $failed',
-                  color: theme.colorScheme.error,
-                ),
-                _ResultCount(
-                  icon: Icons.analytics_outlined,
-                  label: 'Pass rate: ${passRate.toStringAsFixed(1)}%',
-                  color: theme.colorScheme.primary,
-                ),
+                if (failed > 0)
+                  _ResultCount(
+                    icon: Icons.close_rounded,
+                    label: 'Failed: $failed',
+                    color: theme.colorScheme.error,
+                  ),
               ],
             ),
+            if (_explanation case final note?) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                note,
+                key: const Key('result-score-explanation'),
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
           ],
         ),
       ),
@@ -3993,6 +4052,7 @@ class _ResultSummary extends StatelessWidget {
 
 class _ResultCount extends StatelessWidget {
   const _ResultCount({
+    super.key,
     required this.icon,
     required this.label,
     required this.color,
@@ -4018,12 +4078,15 @@ class _ResultCount extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: AppSpacing.xs),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
+          // Wraps instead of overflowing in a narrow Results panel.
+          Flexible(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
           ),
         ],
       ),
@@ -4708,9 +4771,11 @@ class _TestResultCard extends StatelessWidget {
                   Text(
                     weight == null
                         ? 'Check $checkNumber'
-                        : 'Check $checkNumber · '
-                            '${_formatPoints(earned ?? 0)} of '
-                            '${_formatPoints(weight!)} points',
+                        : weight == 0
+                            ? 'Check $checkNumber · required, no points'
+                            : 'Check $checkNumber · '
+                                '${_formatPoints(earned ?? 0)} of '
+                                '${_formatPoints(weight!)} points',
                     key: Key('test-result-points-$checkNumber'),
                     style: theme.textTheme.labelSmall,
                   ),

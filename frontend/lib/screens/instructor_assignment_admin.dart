@@ -8,6 +8,7 @@ import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 /// Instructor Studio home: one card per instructor tool.
 class InstructorAssignmentAdmin extends StatelessWidget {
@@ -55,7 +56,7 @@ class InstructorAssignmentAdmin extends StatelessWidget {
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('Instructor Studio')),
-      body: Center(
+      body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
           child: ListView(
@@ -181,7 +182,7 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
       appBar: AppBar(
         title: const Text('Assignment management'),
       ),
-      body: Center(
+      body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
           child: ListView(
@@ -432,6 +433,10 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
   bool _saving = false;
   Map<String, dynamic>? _saved;
   String? _message;
+  bool _messageIsError = false;
+
+  /// What is running now (Validate or Publish); null when idle.
+  String? _busy;
 
   static const _jsonFields = {
     'execution_settings',
@@ -564,12 +569,11 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
           _saved = saved;
           _controllers['version']!.text = '${saved['version']}';
           _message = 'Saved assignment version ${saved['version']}.';
+          _messageIsError = false;
         });
       }
     } on Object catch (error) {
-      if (mounted) {
-        setState(() => _message = error.toString());
-      }
+      _report(error.toString().replaceFirst('Exception: ', ''), error: true);
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -577,45 +581,64 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
     }
   }
 
+  void _report(String message, {bool error = false}) {
+    if (!mounted) return;
+    setState(() {
+      _message = message;
+      _messageIsError = error;
+    });
+  }
+
+  /// Runs one Validate or Publish action at a time, with visible progress.
+  Future<void> _run(String busy, Future<void> Function() action) async {
+    if (_busy != null || _saving) return;
+    setState(() {
+      _busy = busy;
+      _message = null;
+    });
+    try {
+      await action();
+    } on Object catch (error) {
+      _report(error.toString().replaceFirst('Exception: ', ''), error: true);
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
   Future<void> _validate() async {
     if (_saved?['id'] is! int) {
-      setState(() => _message = 'Save the assignment before validation.');
+      _report('Save the assignment before validation.', error: true);
       return;
     }
-    final result = await validateAdminAssignment(
-      widget.adminToken,
-      _saved!['id'] as int,
-    );
-    if (mounted) {
-      setState(() {
-        _message = result['valid'] == true
+    await _run('Validating: running the reference solution through the grader…',
+        () async {
+      final result = await validateAdminAssignment(
+        widget.adminToken,
+        _saved!['id'] as int,
+      );
+      final valid = result['valid'] == true;
+      _report(
+        valid
             ? 'Validation passed. This assignment is publishable.'
-            : 'Validation failed: ${(result['errors'] as List).join(' ')}';
-      });
-    }
+            : 'Validation failed: ${(result['errors'] as List).join(' ')}',
+        error: !valid,
+      );
+    });
   }
 
   Future<void> _publish() async {
     if (_saved?['id'] is! int) {
-      setState(() => _message = 'Save the assignment before publishing.');
+      _report('Save the assignment before publishing.', error: true);
       return;
     }
-    try {
+    await _run('Publishing…', () async {
       await publishAdminAssignment(
         widget.adminToken,
         _saved!['id'] as int,
       );
-      if (mounted) {
-        setState(() {
-          _saved!['status'] = 'published';
-          _message = 'Published successfully.';
-        });
-      }
-    } on Object catch (error) {
-      if (mounted) {
-        setState(() => _message = error.toString());
-      }
-    }
+      if (mounted) setState(() => _saved!['status'] = 'published');
+      _report('Published successfully.');
+    });
   }
 
   @override
@@ -653,26 +676,26 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
             ? [
                 IconButton(
                   tooltip: 'Validate',
-                  onPressed: _validate,
+                  onPressed: _busy != null ? null : _validate,
                   icon: const Icon(Icons.fact_check_outlined),
                 ),
                 IconButton(
                   tooltip: 'Publish',
-                  onPressed: _publish,
+                  onPressed: _busy != null ? null : _publish,
                   icon: const Icon(Icons.publish_rounded),
                 ),
                 const SizedBox(width: 4),
               ]
             : [
                 TextButton.icon(
-                  onPressed: _validate,
+                  onPressed: _busy != null ? null : _validate,
                   style: TextButton.styleFrom(foregroundColor: Colors.white),
                   icon: const Icon(Icons.fact_check_outlined, size: 18),
                   label: const Text('Validate'),
                 ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
-                  onPressed: _publish,
+                  onPressed: _busy != null ? null : _publish,
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: AppColors.brandDark,
@@ -686,84 +709,143 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
       ),
       body: Form(
         key: _formKey,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
-              children: [
-                section(
-                  'Identity',
-                  'Stable ID, version, and language identify every attempt.',
-                  [
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      children: [
-                        _field('stable_id', 'Stable ID', width: 360),
-                        _field('version', 'Version', width: 120),
-                        _field('language', 'Language', width: 180),
-                      ],
-                    ),
-                    _field('title', 'Title'),
-                  ],
-                ),
-                section(
-                  'Student-facing content',
-                  'What students read before they start coding.',
-                  [
-                    _field('description', 'Description', lines: 3),
-                    _field('learning_objectives',
-                        'Learning objectives (one per line)',
-                        lines: 4),
-                    _field('assignment_html', 'Instructions HTML',
-                        lines: 8, monospace: true),
-                  ],
-                ),
-                section(
-                  'Starter code and grading',
-                  'Starter code, public tests, rubric, and grader settings.',
-                  [
-                    _field('starter_code', 'Starter code',
-                        lines: 10, monospace: true),
-                    for (final field in _jsonFields)
-                      _field(
-                        field,
-                        field.replaceAll('_', ' '),
-                        lines: 7,
-                        jsonField: true,
+        child: _withStatusBar(
+          theme,
+          ScrollableCenter(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+                children: [
+                  section(
+                    'Identity',
+                    'Stable ID, version, and language identify every attempt.',
+                    [
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: [
+                          _field('stable_id', 'Stable ID', width: 360),
+                          _field('version', 'Version', width: 120),
+                          _field('language', 'Language', width: 180),
+                        ],
                       ),
-                  ],
-                ),
-                section(
-                  'Server-only solution',
-                  'Never shown to students before they unlock the worked solution.',
-                  [
-                    _field('solution_html', 'Worked solution HTML',
-                        lines: 6, monospace: true),
-                    _field(
-                      'reference_solution_path',
-                      'Server-side reference solution path',
-                    ),
-                  ],
-                ),
-                if (_message != null) ...[
-                  Text(_message!),
-                  const SizedBox(height: 16),
-                ],
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton.icon(
-                    onPressed: _saving ? null : _save,
-                    icon: const Icon(Icons.save_outlined),
-                    label: Text(_saving ? 'Saving…' : 'Save draft'),
+                      _field('title', 'Title'),
+                    ],
                   ),
-                ),
-              ],
+                  section(
+                    'Student-facing content',
+                    'What students read before they start coding.',
+                    [
+                      _field('description', 'Description', lines: 3),
+                      _field('learning_objectives',
+                          'Learning objectives (one per line)',
+                          lines: 4),
+                      _field('assignment_html', 'Instructions HTML',
+                          lines: 8, monospace: true),
+                    ],
+                  ),
+                  section(
+                    'Starter code and grading',
+                    'Starter code, public tests, rubric, and grader settings.',
+                    [
+                      _field('starter_code', 'Starter code',
+                          lines: 10, monospace: true),
+                      for (final field in _jsonFields)
+                        _field(
+                          field,
+                          field.replaceAll('_', ' '),
+                          lines: 7,
+                          jsonField: true,
+                        ),
+                    ],
+                  ),
+                  section(
+                    'Server-only solution',
+                    'Never shown to students before they unlock the worked solution.',
+                    [
+                      _field('solution_html', 'Worked solution HTML',
+                          lines: 6, monospace: true),
+                      _field(
+                        'reference_solution_path',
+                        'Server-side reference solution path',
+                      ),
+                    ],
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.icon(
+                      onPressed: _saving || _busy != null ? null : _save,
+                      icon: const Icon(Icons.save_outlined),
+                      label: Text(_saving ? 'Saving…' : 'Save draft'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _withStatusBar(ThemeData theme, Widget page) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [_statusBar(theme), Expanded(child: page)],
+      );
+
+  /// Progress and the latest outcome, pinned under the toolbar so Save,
+  /// Validate, and Publish always show what happened.
+  Widget _statusBar(ThemeData theme) {
+    final busy = _busy ?? (_saving ? 'Saving…' : null);
+    final message = busy ?? _message;
+    if (message == null) return const SizedBox.shrink();
+    final error = busy == null && _messageIsError;
+    final scheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (busy != null) const LinearProgressIndicator(minHeight: 3),
+        Material(
+          key: const Key('assignment-editor-status'),
+          color: busy != null
+              ? scheme.surfaceContainerHigh
+              : error
+                  ? scheme.errorContainer
+                  : scheme.primaryContainer,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  busy != null
+                      ? Icons.hourglass_top_rounded
+                      : error
+                          ? Icons.error_outline_rounded
+                          : Icons.check_circle_outline_rounded,
+                  size: 20,
+                  color: error ? scheme.onErrorContainer : scheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Semantics(
+                    liveRegion: true,
+                    child: SelectableText(message,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            color: error ? scheme.onErrorContainer : null)),
+                  ),
+                ),
+                if (busy == null)
+                  IconButton(
+                    tooltip: 'Dismiss',
+                    onPressed: () => setState(() => _message = null),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

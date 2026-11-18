@@ -1740,9 +1740,12 @@ void main() {
       ),
     );
 
-    expect(find.text('Passed: 1'), findsOneWidget);
+    expect(find.text('Checks passed: 1 of 2'), findsOneWidget);
     expect(find.text('Failed: 1'), findsOneWidget);
-    expect(find.textContaining('Pass rate: 50.0%'), findsOneWidget);
+    expect(find.textContaining('Pass rate'), findsNothing);
+    // No weights on this result, so no points chip or explanation.
+    expect(find.byKey(const Key('result-points')), findsNothing);
+    expect(find.byKey(const Key('result-score-explanation')), findsNothing);
     expect(find.byKey(const Key('result-summary')), findsOneWidget);
     expect(find.byKey(const Key('terminal-output')), findsOneWidget);
     expect(find.text('Keep refining your solution'), findsOneWidget);
@@ -1760,6 +1763,56 @@ void main() {
     expect(find.text('Needs attention'), findsOneWidget);
     expect(find.byIcon(Icons.check_rounded), findsNWidgets(2));
     expect(find.byIcon(Icons.close_rounded), findsNWidgets(2));
+  });
+
+  testWidgets('weighted results show points and explain required checks', (
+    WidgetTester tester,
+  ) async {
+    UnittestFeedbackDto result({required int score, required bool behavior}) =>
+        UnittestFeedbackDto(
+          id: 3,
+          score: score,
+          testedVals: const [],
+          pass: false,
+          unittestFeedback: const ['Imports', 'Builds', 'Drives', 'Stops'],
+          unittestPassResults: [true, true, behavior, false],
+          codeExecResult: '',
+          codeOutput: '',
+          execSuccess: true,
+          hint: '',
+          evidence: [
+            const TestEvidenceDto(
+                testId: 'imports', label: 'Imports', passed: true, weight: 0),
+            const TestEvidenceDto(
+                testId: 'build', label: 'Builds', passed: true, weight: 0),
+            TestEvidenceDto(
+                testId: 'drives',
+                label: 'Drives',
+                passed: behavior,
+                weight: 50),
+            const TestEvidenceDto(
+                testId: 'stops', label: 'Stops', passed: false, weight: 50),
+          ],
+        );
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: app.Feedback(data: result(score: 50, behavior: true))),
+    ));
+    expect(find.text('Points: 50 of 100'), findsOneWidget);
+    expect(find.text('Checks passed: 3 of 4'), findsOneWidget);
+    expect(
+      find.text('2 required checks carry no points; your score comes from '
+          'the 100 points of the behavior checks.'),
+      findsOneWidget,
+    );
+    expect(find.text('Check 1 · required, no points'), findsOneWidget);
+    expect(find.text('Check 3 · 50 of 50 points'), findsOneWidget);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: app.Feedback(data: result(score: 0, behavior: false))),
+    ));
+    expect(find.text('Points: 0 of 100'), findsOneWidget);
+    expect(find.text('Checks passed: 2 of 4'), findsOneWidget);
   });
 
   testWidgets('results put failed checks first and give a next step', (

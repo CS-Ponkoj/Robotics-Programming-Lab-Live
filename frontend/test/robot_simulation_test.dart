@@ -120,6 +120,33 @@ void main() {
       expect(summary('kept_driving'), contains('still driving'));
     });
 
+    test('a crash after a stop does not claim the robot never stopped', () {
+      final json = replayJson();
+      final events = [
+        ...(json['events'] as List),
+        {'t': 6.2, 'type': 'collided'},
+      ];
+      final replay = SimulationReplay.fromJson(
+          {...json, 'events': events, 'outcome': 'collided'})!;
+      expect(replay.summary, isNot(contains('without stopping')));
+      expect(
+        replay.summary,
+        'The robot stopped 0.50 m from the wall at 3.5 s, drove again after '
+        'the wall moved away, then hit the wall at 6.2 s.',
+      );
+
+      final straight = SimulationReplay.fromJson({
+        ...json,
+        'events': [
+          {'t': 0.0, 'type': 'started'},
+          {'t': 2.1, 'type': 'collided'},
+        ],
+        'outcome': 'collided',
+      })!;
+      expect(straight.summary,
+          'The robot hit the wall at 2.1 s without stopping.');
+    });
+
     test('terminal shows the error with the student line and a summary', () {
       final failed = buildSimulationTerminalLines(
         SimulationResultDto.fromJson(resultJson(
@@ -376,13 +403,14 @@ void main() {
         await tester.pumpAndSettle();
         final panel = find.byKey(const Key('robot-sim-panel'));
         expect(panel, findsOneWidget);
-        expect(find.text('Watch your robot'), findsOneWidget);
-        // Its own window by default, at the top right, with a drag grip.
+        // Its own window at the top right, with a drag grip, collapsed to
+        // its header so it does not cover the instructions before a run.
         expect(find.byKey(const Key('robot-sim-grip')), findsOneWidget);
         expect(tester.getRect(panel).right, closeTo(1400 - 24, 2));
-        // Header and view switch above a square replay.
-        expect(tester.getSize(panel).width,
-            closeTo(tester.getSize(panel).height - 92, 1));
+        expect(tester.getSize(panel).height, 48);
+        expect(find.text('Watch your robot'), findsNothing);
+        expect(find.text('Ready'), findsOneWidget);
+        expect(tester.takeException(), isNull);
 
         await tester.tap(find.byKey(const Key('simulate-button')));
         await tester.pump();
@@ -390,6 +418,10 @@ void main() {
         expect(simulated, hasLength(1));
         expect(jsonDecode(simulated.single)['code'], contains('build_node'));
         expect(find.text('Running your node on the robot…'), findsOneWidget);
+        // Simulate opens the window: header and view switch above a square.
+        expect(tester.getSize(panel).width,
+            closeTo(tester.getSize(panel).height - 92, 1));
+        expect(find.text('Running'), findsOneWidget);
         // Results stays closed: it holds test results only.
         expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
         final button = tester.widget(find.byKey(const Key('simulate-button')));
@@ -560,6 +592,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('simulation-error')), findsOneWidget);
         expect(find.textContaining('build_node() returned None'), findsWidgets);
+        // The chip says there is no replay rather than "Replay".
+        expect(find.text('No replay'), findsOneWidget);
+        expect(find.text('Replay'), findsNothing);
       }, () => mock);
     });
   });

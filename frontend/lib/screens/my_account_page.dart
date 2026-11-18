@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 /// Lets a signed-in student or instructor review their account and change
 /// their own password. Login ID and participant code are managed by
@@ -124,7 +125,7 @@ class _MyAccountPageState extends State<MyAccountPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('My account')),
-      body: Center(
+      body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
           child: ListView(

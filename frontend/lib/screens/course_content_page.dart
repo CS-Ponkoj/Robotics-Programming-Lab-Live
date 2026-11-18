@@ -8,6 +8,7 @@ import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/widgets/landing_page_header.dart';
 import 'package:iuse_demo/widgets/lesson_reader.dart';
+import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 /// Names the unanswered quiz questions by their 1-based display numbers,
 /// for example "Answer questions 2, 5 and 9 before submitting."
@@ -56,7 +57,7 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
           return const Center(child: CircularProgressIndicator());
         }
         final topics = snapshot.data!;
-        return Center(
+        return ScrollableCenter(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1160),
             child: ListView(

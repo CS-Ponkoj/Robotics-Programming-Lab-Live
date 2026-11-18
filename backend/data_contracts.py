@@ -110,7 +110,9 @@ class ExecutionSettings(ContractModel):
     allowed_imports: list[NonEmptyText] = Field(default_factory=list)
     editable_file: str | None = Field(default=None, min_length=1, max_length=500)
     network_enabled: bool = False
-    simulation_enabled: bool = False
+    # Unused legacy flag, still accepted from stored assignments but never
+    # written out: simulation_config.enabled is the only simulation switch.
+    simulation_enabled: bool = Field(default=False, exclude=True)
 
 
 class TutoringRules(ContractModel):

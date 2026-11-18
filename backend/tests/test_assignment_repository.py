@@ -106,3 +106,28 @@ def test_assignments_1_through_4_use_instructor_authored_learning_metadata():
         assert payload["grader_type"] == "python_function"
         assert payload["grader_config"]["cases"]
         assert payload["reference_solution_path"]
+
+
+def test_saving_unchanged_content_ignores_the_legacy_simulation_flag():
+    from assignment_repository import to_admin_payload
+
+    engine = build_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    local_session = sessionmaker(bind=engine, expire_on_commit=False)
+    with local_session() as session:
+        repository = AssignmentRepository(session)
+        repository.sync_seed_assignments()
+        assignment = session.get(Assignment, 7)
+        # Rows stored before the flag was retired still carry it.
+        assignment.execution_settings = {
+            **assignment.execution_settings,
+            "simulation_enabled": False,
+        }
+        session.commit()
+        version = assignment.version
+
+        payload = to_admin_payload(assignment)
+        assert "simulation_enabled" not in payload.model_dump()["execution_settings"]
+        repository.update(assignment, payload)
+        assert assignment.version == version
+        assert assignment.status == "published"

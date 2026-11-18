@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 class StudentResearchPage extends StatefulWidget {
   const StudentResearchPage({super.key, this.initialData});
@@ -1108,8 +1109,7 @@ class _ResearchPageBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
+    return ScrollableCenter(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1100),
         child: ListView(

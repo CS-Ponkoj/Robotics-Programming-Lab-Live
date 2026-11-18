@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/services/feedback_api.dart';
+import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 /// Instructor view of feedback sent from the Feedback button on any page.
 class FeedbackInboxPage extends StatefulWidget {
@@ -93,7 +94,7 @@ class _FeedbackInboxPageState extends State<FeedbackInboxPage> {
           ),
         ],
       ),
-      body: Center(
+      body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900),
           child: ListView(

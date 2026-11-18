@@ -141,7 +141,18 @@ class SimulationReplay {
         value == null ? 'nothing in range' : '${value.toStringAsFixed(2)} m';
     switch (outcome) {
       case 'collided':
-        return 'The robot hit the wall at ${collided?.t.toStringAsFixed(1) ?? end.t.toStringAsFixed(1)} s '
+        final hit = collided?.t ?? end.t;
+        // A stop before the crash is part of the story: say so.
+        if (stopped != null && stopped.t < hit) {
+          final resumed = first('resumed');
+          final again = resumed != null && resumed.t < hit
+              ? 'drove again after the wall moved away, '
+              : '';
+          return 'The robot stopped ${metres(stopped.front)} from the wall at '
+              '${stopped.t.toStringAsFixed(1)} s, ${again}then hit the wall at '
+              '${hit.toStringAsFixed(1)} s.';
+        }
+        return 'The robot hit the wall at ${hit.toStringAsFixed(1)} s '
             'without stopping.';
       case 'never_moved':
         return 'The robot never moved: every command had linear.x = 0.0.';
