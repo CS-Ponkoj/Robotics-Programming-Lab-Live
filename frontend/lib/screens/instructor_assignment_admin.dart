@@ -2,6 +2,10 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/screens/ai_tutor_settings_page.dart';
+import 'package:iuse_demo/screens/assignment_insights_page.dart';
+import 'package:iuse_demo/screens/assignment_workspace.dart'
+    show AssignmentInstructions;
+import 'package:iuse_demo/widgets/sim_world_editor.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/screens/feedback_inbox_page.dart';
 import 'package:iuse_demo/screens/student_accounts_page.dart';
@@ -117,6 +121,12 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
   bool _loading = true;
   String? _error;
 
+  /// Stable IDs on the students' Old assignments panel, and where that list
+  /// comes from: the repository file or an instructor's choice.
+  Set<String> _oldIds = {};
+  String _catalogSource = 'file';
+  bool _catalogBusy = false;
+
   @override
   void initState() {
     super.initState();
@@ -130,8 +140,18 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
     });
     try {
       final values = await fetchAdminAssignments(AuthApi.token ?? '');
+      // The list still works if the catalog cannot be read.
+      Map<String, dynamic>? catalog;
+      try {
+        catalog = await fetchCatalogSettings(AuthApi.token ?? '');
+      } on Object {
+        catalog = null;
+      }
       if (mounted) {
-        setState(() => _assignments = values);
+        setState(() {
+          _assignments = values;
+          if (catalog != null) _showCatalog(catalog);
+        });
       }
     } on Object catch (error) {
       if (mounted) {
@@ -142,6 +162,46 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  void _showCatalog(Map<String, dynamic> catalog) {
+    _oldIds = {
+      for (final id in (catalog['old_stable_ids'] as List? ?? const []))
+        '$id',
+    };
+    _catalogSource = '${catalog['source'] ?? 'file'}';
+  }
+
+  /// Moves one assignment between the students' current and Old panels.
+  Future<void> _saveCatalog(List<String>? oldIds) async {
+    setState(() => _catalogBusy = true);
+    try {
+      final catalog = await saveCatalogSettings(AuthApi.token ?? '', oldIds);
+      if (mounted) setState(() => _showCatalog(catalog));
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() =>
+            _error = error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _catalogBusy = false);
+    }
+  }
+
+  void _toggleOld(String stableId) {
+    final next = {..._oldIds};
+    if (!next.remove(stableId)) next.add(stableId);
+    _saveCatalog(next.toList()..sort());
+  }
+
+  void _openInsights(Map<String, dynamic> assignment) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      settings: const RouteSettings(arguments: FeedbackPage('Insights')),
+      builder: (_) => AssignmentInsightsPage(
+        assignmentId: assignment['id'] as int,
+        title: '${assignment['title']}',
+      ),
+    ));
   }
 
   Future<void> _edit([Map<String, dynamic>? assignment]) async {
@@ -233,6 +293,30 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
                     ),
                 ],
               ),
+              if (!_loading) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  children: [
+                    Text(
+                      _catalogSource == 'file'
+                          ? 'Old assignments panel: the repository list '
+                              '(catalog.json).'
+                          : 'Old assignments panel: chosen here.',
+                      key: const Key('catalog-source'),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    if (_catalogSource != 'file')
+                      TextButton(
+                        key: const Key('catalog-reset'),
+                        onPressed:
+                            _catalogBusy ? null : () => _saveCatalog(null),
+                        child: const Text('Use the repository list'),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               if (_loading)
                 const Padding(
@@ -251,6 +335,13 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
                   _StudioAssignmentRow(
                     assignment: assignment,
                     onTap: () => _edit(assignment),
+                    isOld: _oldIds.contains('${assignment['stable_id']}'),
+                    onToggleOld: _catalogBusy
+                        ? null
+                        : () => _toggleOld('${assignment['stable_id']}'),
+                    onInsights: assignment['id'] is int
+                        ? () => _openInsights(assignment)
+                        : null,
                   ),
             ],
           ),
@@ -320,10 +411,21 @@ class _StudioLinkCard extends StatelessWidget {
 }
 
 class _StudioAssignmentRow extends StatelessWidget {
-  const _StudioAssignmentRow({required this.assignment, required this.onTap});
+  const _StudioAssignmentRow({
+    required this.assignment,
+    required this.onTap,
+    this.isOld = false,
+    this.onToggleOld,
+    this.onInsights,
+  });
 
   final Map<String, dynamic> assignment;
   final VoidCallback onTap;
+
+  /// On the students' Old assignments panel.
+  final bool isOld;
+  final VoidCallback? onToggleOld;
+  final VoidCallback? onInsights;
 
   @override
   Widget build(BuildContext context) {
@@ -397,6 +499,15 @@ class _StudioAssignmentRow extends StatelessWidget {
                               ? theme.colorScheme.onSecondaryContainer
                               : AppColors.inkMuted,
                         ),
+                        chip(
+                          isOld ? 'Old' : 'Current',
+                          isOld
+                              ? AppColors.neutralContainer
+                              : theme.colorScheme.primaryContainer,
+                          isOld
+                              ? AppColors.inkMuted
+                              : theme.colorScheme.onPrimaryContainer,
+                        ),
                         Text(
                           '${assignment['stable_id']} • '
                           'v${assignment['version']}',
@@ -409,6 +520,23 @@ class _StudioAssignmentRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
+              if (onInsights != null)
+                IconButton(
+                  key: Key('assignment-insights-${assignment['id']}'),
+                  tooltip: 'Insights: where students get stuck',
+                  onPressed: onInsights,
+                  icon: const Icon(Icons.insights_rounded),
+                ),
+              IconButton(
+                key: Key('assignment-old-${assignment['id']}'),
+                tooltip: isOld
+                    ? 'Move to current assignments'
+                    : 'Move to Old assignments',
+                onPressed: onToggleOld,
+                icon: Icon(isOld
+                    ? Icons.unarchive_outlined
+                    : Icons.archive_outlined),
+              ),
               Tooltip(
                 message: 'Edit assignment',
                 child: Icon(Icons.edit_outlined,
@@ -752,6 +880,15 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                           lines: 4),
                       _field('assignment_html', 'Instructions HTML',
                           lines: 8, monospace: true),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          key: const Key('preview-as-student'),
+                          onPressed: _previewAsStudent,
+                          icon: const Icon(Icons.visibility_outlined),
+                          label: const Text('Preview as a student sees it'),
+                        ),
+                      ),
                     ],
                   ),
                   section(
@@ -767,6 +904,15 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                           lines: 7,
                           jsonField: true,
                         ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          key: const Key('edit-simulation-world'),
+                          onPressed: _editSimulationWorld,
+                          icon: const Icon(Icons.map_outlined),
+                          label: const Text('Edit the simulation world'),
+                        ),
+                      ),
                     ],
                   ),
                   section(
@@ -796,6 +942,93 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
         ),
       ),
     );
+  }
+
+  /// The instructions exactly as the student workspace renders them, at
+  /// computer or phone width, before saving.
+  void _previewAsStudent() {
+    var phone = false;
+    showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialog) => Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900, maxHeight: 820),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+                  child: Row(children: [
+                    const Expanded(child: Text('Student preview')),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(value: false, label: Text('Computer')),
+                        ButtonSegment(value: true, label: Text('Phone')),
+                      ],
+                      selected: {phone},
+                      onSelectionChanged: (value) =>
+                          setDialog(() => phone = value.first),
+                    ),
+                    IconButton(
+                      tooltip: 'Close preview',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ]),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: Center(
+                    child: SizedBox(
+                      width: phone ? 390 : double.infinity,
+                      child: AssignmentInstructions(
+                        key: const Key('student-preview'),
+                        html: _controllers['assignment_html']!.text,
+                        assignmentId: _saved?['id'] as int? ?? 0,
+                        assignmentVersion:
+                            int.tryParse(_controllers['version']!.text) ?? 1,
+                        canRevealSolution: false,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Edits simulation_config.world with fields and a live preview.
+  Future<void> _editSimulationWorld() async {
+    final controller = _controllers['simulation_config']!;
+    Map<String, dynamic> config;
+    try {
+      config = Map<String, dynamic>.from(jsonDecode(controller.text) as Map);
+    } on Object {
+      _report('Fix the simulation config JSON before editing the world.',
+          error: true);
+      return;
+    }
+    final world = config['world'] is Map
+        ? Map<String, dynamic>.from(config['world'] as Map)
+        : <String, dynamic>{
+            'walls': [
+              [1.2, -3.0, 1.2, 3.0],
+            ],
+            'robot': {'x': 0.0, 'y': 0.0, 'theta': 0.0, 'radius': 0.15},
+            'duration_seconds': 8.0,
+          };
+    final edited = await editSimWorld(context, world);
+    if (edited == null || !mounted) return;
+    config['world'] = edited;
+    setState(() {
+      controller.text = const JsonEncoder.withIndent('  ').convert(config);
+    });
+    _report('Simulation world updated. Save the draft to keep it.');
   }
 
   Widget _withStatusBar(ThemeData theme, Widget page) => Column(

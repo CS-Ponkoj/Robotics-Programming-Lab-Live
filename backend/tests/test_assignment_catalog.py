@@ -62,3 +62,34 @@ def test_catalog_is_optional_and_validated(tmp_path):
     with pytest.raises(ValueError):
         old_assignment_ids(broken)
     assert CATALOG_PATH.name == "catalog.json"  # not matched by the assignment_*.json seed glob
+
+
+def test_instructor_can_choose_old_assignments_and_return_to_the_file(client):
+    admin = {"X-Admin-Token": "test-admin"}
+    assert client.get("/admin/course-settings/catalog", headers=admin).json() == {
+        "old_stable_ids": sorted(OLD), "source": "file",
+    }
+    # Move Assignment 6 back to current; the change is the instructor's now.
+    chosen = sorted(OLD - {"ros2-obstacle-stop"})
+    response = client.put(
+        "/admin/course-settings/catalog", json={"old_stable_ids": chosen}, headers=admin
+    )
+    assert response.json() == {"old_stable_ids": chosen, "source": "instructor"}
+    listed = {item["id"]: item["collection"] for item in client.get("/assignments").json()["assignments"]}
+    assert listed[6] == "current" and listed[5] == "old"
+    assert client.get("/assignments/6").json()["collection"] == "current"
+
+    # Unknown IDs are refused; students cannot change the grouping.
+    assert client.put(
+        "/admin/course-settings/catalog", json={"old_stable_ids": ["nope"]}, headers=admin
+    ).status_code == 422
+    assert client.put(
+        "/admin/course-settings/catalog", json={"old_stable_ids": []}
+    ).status_code in (401, 403)
+
+    # null returns to catalog.json.
+    reset = client.put(
+        "/admin/course-settings/catalog", json={"old_stable_ids": None}, headers=admin
+    )
+    assert reset.json()["source"] == "file"
+    assert client.get("/assignments/6").json()["collection"] == "old"

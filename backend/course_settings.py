@@ -26,9 +26,9 @@ class AiTutorSettings(_Setting):
 
 
 class CatalogSettings(_Setting):
-    """Assignments shown in the Old assignments panel; None uses catalog.json."""
+    """Stable IDs shown in the Old assignments panel; None uses catalog.json."""
 
-    old_assignment_ids: list[int] | None = Field(default=None, max_length=200)
+    old_stable_ids: list[str] | None = Field(default=None, max_length=200)
 
 
 KEYS: dict[str, type[_Setting]] = {

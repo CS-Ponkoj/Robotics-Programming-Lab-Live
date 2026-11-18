@@ -283,7 +283,9 @@ class AssignmentRepository:
         return assignment
 
 
-def to_student_assignment(assignment: Assignment) -> AssignmentStudent:
+def to_student_assignment(
+    assignment: Assignment, old_ids: frozenset[str] | None = None
+) -> AssignmentStudent:
     project_files = [
         {
             "path": str(item.get("path", "")),
@@ -313,7 +315,12 @@ def to_student_assignment(assignment: Assignment) -> AssignmentStudent:
         project_files=project_files,
         editable_file_path=editable_paths[0] if len(editable_paths) == 1 else None,
         has_solution=bool(assignment.solution_html),
-        collection="old" if assignment.stable_id in old_assignment_ids() else "current",
+        collection=(
+            "old"
+            if assignment.stable_id
+            in (old_assignment_ids() if old_ids is None else old_ids)
+            else "current"
+        ),
         solution_html="",
         vals={},
         playground_function=_playground_function(assignment),

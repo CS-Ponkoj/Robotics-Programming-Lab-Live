@@ -350,7 +350,7 @@ A missing row means the default. Operational configuration, not research data.
 | Field | Meaning |
 |---|---|
 | `key` | `ai_tutor` or `catalog` |
-| `value` | `ai_tutor`: `{"enabled": bool, "daily_limit": 1-200}` (defaults `false`, `20`). `catalog`: `{"old_assignment_ids": [int] or null}` (null uses `backend/assignments/catalog.json`) |
+| `value` | `ai_tutor`: `{"enabled": bool, "daily_limit": 1-200}` (defaults `false`, `20`). `catalog`: `{"old_stable_ids": [stable ID] or null}`, the assignments grouped under Old assignments (null uses `backend/assignments/catalog.json`) |
 | `updated_by_user_id` | Instructor who changed it last; empty when changed with the admin token |
 | `updated_at` | UTC time of the last change |
 

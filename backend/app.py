@@ -25,6 +25,7 @@ from account_sync import (
 )
 from assignment_repository import (
     AssignmentRepository,
+    old_assignment_ids,
     to_admin_payload,
     to_student_assignment,
 )
@@ -127,7 +128,13 @@ from analytics_service import (
 )
 from tutor import TutorService
 from ai_policy import ai_access, approved_assignments
-from course_settings import AiTutorSettings, get_setting, set_setting
+from assignment_insights import assignment_insights
+from course_settings import (
+    AiTutorSettings,
+    CatalogSettings,
+    get_setting,
+    set_setting,
+)
 from validation import validate_assignment
 
 
@@ -1589,8 +1596,10 @@ def create_app(
             )
         }
 
+        old_ids = current_old_ids(session)
+
         def with_draft_flag(assignment: Assignment) -> AssignmentStudent:
-            payload = to_student_assignment(assignment)
+            payload = to_student_assignment(assignment, old_ids)
             code = drafts.get((assignment.id, assignment.version))
             saved = bool(code and code.strip() and code != assignment.starter_code)
             return payload.model_copy(update={"has_saved_draft": saved})
@@ -1608,7 +1617,7 @@ def create_app(
         _user: User = Depends(current_user),
     ):
         assignment = get_assignment_or_404(session, assignment_id)
-        payload = to_student_assignment(assignment)
+        payload = to_student_assignment(assignment, current_old_ids(session))
         access = ai_access(
             request.app.state.settings, session, assignment, _user,
             demo=is_ephemeral_demo(request, _user), count_quota=False,
@@ -2399,6 +2408,59 @@ def create_app(
             details={"enabled": body.enabled, "daily_limit": body.daily_limit},
         )
         return ai_tutor_status(request, session)
+
+    @application.get(
+        "/admin/assignments/{assignment_id}/insights",
+        dependencies=[Depends(admin_dependency)],
+    )
+    def admin_assignment_insights(
+        assignment_id: int,
+        version: int | None = Query(default=None, ge=1),
+        session: Session = Depends(session_dependency),
+    ):
+        assignment = session.get(Assignment, assignment_id)
+        if assignment is None:
+            raise HTTPException(404, "Assignment not found.")
+        return assignment_insights(session, assignment, version)
+
+    def current_old_ids(session: Session) -> frozenset[str]:
+        """The instructor's Old assignments list, or catalog.json until set."""
+        chosen = get_setting(session, CatalogSettings).old_stable_ids
+        return old_assignment_ids() if chosen is None else frozenset(chosen)
+
+    @application.get(
+        "/admin/course-settings/catalog",
+        dependencies=[Depends(admin_dependency)],
+    )
+    def admin_catalog_settings(session: Session = Depends(session_dependency)):
+        chosen = get_setting(session, CatalogSettings).old_stable_ids
+        return {
+            "old_stable_ids": sorted(current_old_ids(session)),
+            "source": "file" if chosen is None else "instructor",
+        }
+
+    @application.put("/admin/course-settings/catalog")
+    def admin_update_catalog_settings(
+        body: CatalogSettings,
+        session: Session = Depends(session_dependency),
+        actor: User | None = Depends(admin_dependency),
+    ):
+        if body.old_stable_ids is not None:
+            known = {item.stable_id for item in AssignmentRepository(session).list_all()}
+            unknown = sorted(set(body.old_stable_ids) - known)
+            if unknown:
+                raise HTTPException(422, f"Unknown assignment IDs: {', '.join(unknown)}")
+            body = CatalogSettings(old_stable_ids=sorted(set(body.old_stable_ids)))
+        set_setting(session, body, actor)
+        record_audit(
+            session,
+            action="catalog_settings_changed",
+            resource_type="course_setting",
+            resource_id="catalog",
+            actor_user_id=actor.id if actor else None,
+            details={"old_stable_ids": body.old_stable_ids},
+        )
+        return admin_catalog_settings(session)
 
     def ai_tutor_status(request: Request, session: Session) -> dict:
         course = get_setting(session, AiTutorSettings)

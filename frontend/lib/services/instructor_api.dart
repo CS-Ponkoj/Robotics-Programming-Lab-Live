@@ -129,3 +129,53 @@ Future<Map<String, dynamic>> saveAiTutorSettings(
   }
   return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
 }
+
+/// Stable IDs grouped under Old assignments, and whether they come from the
+/// repository file or an instructor's choice.
+Future<Map<String, dynamic>> fetchCatalogSettings(String token) async {
+  final response = await http
+      .get(
+        Uri.parse('$apiBaseUrl/admin/course-settings/catalog'),
+        headers: _headers(token),
+      )
+      .timeout(_adminTimeout);
+  if (response.statusCode != 200) {
+    throw Exception(_errorMessage(response));
+  }
+  return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+}
+
+/// Saves the Old assignments list; null returns to the repository file.
+Future<Map<String, dynamic>> saveCatalogSettings(
+  String token,
+  List<String>? oldStableIds,
+) async {
+  final response = await http
+      .put(
+        Uri.parse('$apiBaseUrl/admin/course-settings/catalog'),
+        headers: _headers(token),
+        body: jsonEncode({'old_stable_ids': oldStableIds}),
+      )
+      .timeout(_adminTimeout);
+  if (response.statusCode != 200) {
+    throw Exception(_errorMessage(response));
+  }
+  return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+}
+
+/// Aggregate teaching insights for one assignment version (no student IDs).
+Future<Map<String, dynamic>> fetchAssignmentInsights(
+  String token,
+  int assignmentId,
+) async {
+  final response = await http
+      .get(
+        Uri.parse('$apiBaseUrl/admin/assignments/$assignmentId/insights'),
+        headers: _headers(token),
+      )
+      .timeout(_adminTimeout);
+  if (response.statusCode != 200) {
+    throw Exception(_errorMessage(response));
+  }
+  return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+}
