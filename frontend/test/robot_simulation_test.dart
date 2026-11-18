@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:iuse_demo/main.dart' as app;
 import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/robot_sim_panel.dart';
+import 'package:iuse_demo/widgets/robot_sim_sensors.dart';
 import 'package:iuse_demo/widgets/robot_sim_view.dart';
 import 'package:iuse_demo/widgets/run_terminal.dart';
 
@@ -148,7 +151,9 @@ void main() {
       await tester.pumpWidget(host(RobotSimView(replay: replay)));
       await tester.pump(const Duration(seconds: 1));
       expect(find.byTooltip('Pause replay'), findsOneWidget);
-      expect(find.textContaining('linear.x 0.20 m/s'), findsOneWidget);
+      expect(find.byKey(const ValueKey('robot-sim-telemetry')), findsOneWidget);
+      expect(find.bySemanticsLabel('linear.x 0.20 m/s'), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp(r'^Ahead \d')), findsOneWidget);
       expect(find.byKey(const ValueKey('robot-sim-summary')), findsOneWidget);
       expect(
         find.bySemanticsLabel(
@@ -168,7 +173,7 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('robot-sim-restart')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('t 8.0 s'), findsOneWidget);
+      expect(find.bySemanticsLabel('Time 8.0 seconds'), findsOneWidget);
       expect(find.textContaining('Drove again'), findsOneWidget);
     });
 
@@ -182,7 +187,89 @@ void main() {
           .pumpWidget(host(RobotSimView(replay: replay), reduceMotion: true));
       await tester.pump();
       expect(find.byTooltip('Play replay'), findsOneWidget);
-      expect(find.textContaining('t 8.0 s'), findsOneWidget);
+      expect(find.bySemanticsLabel('Time 8.0 seconds'), findsOneWidget);
+    });
+
+    testWidgets('switches to the LiDAR, chart, and ranges views',
+        (tester) async {
+      tester.view.physicalSize = const Size(520, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final replay = SimulationReplay.fromJson(replayJson())!;
+      await tester.pumpWidget(host(RobotSimView(replay: replay)));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byKey(const ValueKey('robot-sim-canvas')), findsOneWidget);
+
+      await tester.tap(find.text('LiDAR'));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('robot-sim-lidar')), findsOneWidget);
+      expect(find.byKey(const ValueKey('robot-sim-canvas')), findsNothing);
+      expect(find.bySemanticsLabel(RegExp(r'^LiDAR scan .*Closest reading')),
+          findsOneWidget);
+      expect(find.text('[45] ahead'), findsOneWidget);
+
+      await tester.tap(find.text('Charts'));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('robot-sim-charts')), findsOneWidget);
+
+      await tester.tap(find.text('Ranges'));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('robot-sim-ranges')), findsOneWidget);
+      expect(find.text('ranges[45]'), findsOneWidget);
+      expect(find.text('ranges[0]'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    test('summarises the scan by side and nearest reading', () {
+      final replay = SimulationReplay.fromJson(replayJson())!;
+      final frame = SimulationFrame(
+        t: 0,
+        x: 0,
+        y: 0,
+        theta: 0,
+        linear: 0,
+        angular: 0,
+        ranges: [
+          for (var beam = 0; beam < 31; beam++)
+            beam == 2 ? 0.9 : (beam == 15 ? 1.4 : (beam == 28 ? 2.0 : null)),
+        ],
+      );
+      final summary = ScanSummary.of(replay, frame);
+      expect(summary.right, 0.9);
+      expect(summary.ahead, 1.4);
+      expect(summary.left, 2.0);
+      expect(summary.closest, 0.9);
+      expect(summary.closestAngle, -117);
+      expect(summary.closestIndex, 6);
+      expect(sourceIndex(replay, 15), 45);
+    });
+
+    testWidgets('the docked divider resizes with the arrow keys',
+        (tester) async {
+      var fraction = kSimDockDefault;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => SimDockDivider(
+              fraction: fraction,
+              columnHeight: 900,
+              onChanged: (value) => setState(() => fraction = value),
+            ),
+          ),
+        ),
+      ));
+      Focus.of(tester.element(find.byKey(const Key('robot-sim-dock-divider'))))
+          .requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(fraction, closeTo(kSimDockDefault + 0.05, 1e-9));
+      for (var i = 0; i < 20; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+        await tester.pump();
+      }
+      await tester.pump();
+      expect(fraction, kSimDockMin);
     });
 
     testWidgets('fits a 320 px phone without overflow', (tester) async {
@@ -293,8 +380,9 @@ void main() {
         // Its own window by default, at the top right, with a drag grip.
         expect(find.byKey(const Key('robot-sim-grip')), findsOneWidget);
         expect(tester.getRect(panel).right, closeTo(1400 - 24, 2));
+        // Header and view switch above a square replay.
         expect(tester.getSize(panel).width,
-            closeTo(tester.getSize(panel).height - 48, 1));
+            closeTo(tester.getSize(panel).height - 92, 1));
 
         await tester.tap(find.byKey(const Key('simulate-button')));
         await tester.pump();
@@ -326,10 +414,13 @@ void main() {
         expect(find.textContaining('drove again after the wall moved away'),
             findsWidgets);
 
-        // Collapse to the header, then expand again.
+        // Collapse to the header and live readings, then expand again.
         await tester.tap(find.byKey(const Key('robot-sim-collapse')));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('robot-sim-view')), findsNothing);
+        expect(find.byKey(const ValueKey('robot-sim-strip')), findsOneWidget);
+        expect(find.bySemanticsLabel(RegExp(r'^linear\.x ')), findsOneWidget);
+        expect(tester.takeException(), isNull);
         await tester.tap(find.byKey(const Key('robot-sim-collapse')));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('robot-sim-view')), findsOneWidget);
@@ -385,6 +476,28 @@ void main() {
             lessThanOrEqualTo(tester.getRect(instructions).top + 1));
         expect(tester.getRect(instructions).top,
             greaterThan(floatingInstructionsTop));
+        // Docked in a wide, short space: the picture sits beside the
+        // readings and stays square.
+        final dockedCanvas =
+            tester.getSize(find.byKey(const ValueKey('robot-sim-canvas')));
+        expect(dockedCanvas.width, closeTo(dockedCanvas.height, 1));
+        expect(
+            tester
+                .getRect(find.byKey(const ValueKey('robot-sim-canvas')))
+                .right,
+            lessThan(tester
+                .getRect(find.byKey(const ValueKey('robot-sim-view-switch')))
+                .left));
+        // The divider shares the column with the instructions.
+        final divider = find.byKey(const Key('robot-sim-dock-divider'));
+        final dockedHeight = tester.getSize(panel).height;
+        await tester.drag(divider, const Offset(0, 120));
+        await tester.pumpAndSettle();
+        expect(tester.getSize(panel).height, greaterThan(dockedHeight + 60));
+        await tester.drag(divider, const Offset(0, -2000));
+        await tester.pumpAndSettle();
+        expect(tester.getSize(panel).height, lessThan(dockedHeight));
+        expect(tester.getRect(instructions).height, greaterThan(400));
         await tester.tap(find.byKey(const Key('robot-sim-pop-out')));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('robot-sim-grip')), findsOneWidget);

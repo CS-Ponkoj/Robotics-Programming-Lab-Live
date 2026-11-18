@@ -3,6 +3,19 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/widgets/playground_diagram.dart' show niceDiagramStep;
+import 'package:iuse_demo/widgets/robot_sim_sensors.dart';
+
+/// How the replay is arranged in the space it gets.
+enum SimViewLayout {
+  /// Readings, picture, then controls, top to bottom.
+  stacked,
+
+  /// Picture on the left, readings beside it: wide, short spaces.
+  sideBySide,
+
+  /// Only the live readings: a collapsed panel.
+  strip,
+}
 
 /// Top-down replay of the student's node driving the robot. Visual only.
 class RobotSimView extends StatefulWidget {
@@ -11,6 +24,7 @@ class RobotSimView extends StatefulWidget {
     required this.replay,
     this.compact = false,
     this.canvasSide,
+    this.layout = SimViewLayout.stacked,
   });
 
   final SimulationReplay replay;
@@ -21,6 +35,8 @@ class RobotSimView extends StatefulWidget {
   /// Side of the square picture in compact mode; null keeps a 4:3 picture.
   final double? canvasSide;
 
+  final SimViewLayout layout;
+
   @override
   State<RobotSimView> createState() => _RobotSimViewState();
 }
@@ -30,6 +46,7 @@ class _RobotSimViewState extends State<RobotSimView>
   late final AnimationController _controller;
   double _speed = 1;
   bool _started = false;
+  SimSensorView _view = SimSensorView.arena;
 
   double get _end => math.max(widget.replay.endTime, 0.1);
   double get _time => _controller.value * _end;
@@ -109,8 +126,111 @@ class _RobotSimViewState extends State<RobotSimView>
     final replay = widget.replay;
     final frame = replay.frameAt(_time);
     final playing = _controller.isAnimating;
-    String metres(double? value) =>
-        value == null ? 'nothing in range' : '${value.toStringAsFixed(2)} m';
+
+    final play = IconButton(
+      key: const ValueKey('robot-sim-play'),
+      tooltip: playing ? 'Pause replay' : 'Play replay',
+      onPressed: _togglePlay,
+      icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+    );
+
+    // Collapsed panel: live readings only.
+    if (widget.layout == SimViewLayout.strip) {
+      return Semantics(
+        container: true,
+        explicitChildNodes: true,
+        child: Row(
+          key: const ValueKey('robot-sim-strip'),
+          children: [
+            play,
+            const SizedBox(width: 4),
+            Expanded(child: _TelemetryCards(frame: frame)),
+          ],
+        ),
+      );
+    }
+
+    final controls = Row(
+      children: [
+        play,
+        IconButton(
+          key: const ValueKey('robot-sim-restart'),
+          tooltip: 'Replay from the start',
+          onPressed: _restart,
+          icon: const Icon(Icons.replay_rounded),
+        ),
+        Expanded(
+          child: Slider(
+            key: const ValueKey('robot-sim-scrub'),
+            value: _controller.value.clamp(0, 1),
+            label: '${_time.toStringAsFixed(1)} s',
+            semanticFormatterCallback: (_) =>
+                '${_time.toStringAsFixed(1)} seconds',
+            onChanged: (value) {
+              _controller.stop();
+              _controller.value = value;
+            },
+          ),
+        ),
+        PopupMenuButton<double>(
+          key: const ValueKey('robot-sim-speed'),
+          tooltip: 'Replay speed',
+          initialValue: _speed,
+          onSelected: _setSpeed,
+          itemBuilder: (_) => [
+            for (final speed in const [0.5, 1.0, 2.0])
+              PopupMenuItem(
+                  value: speed, child: Text('${_formatSpeed(speed)}×')),
+          ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Text('${_formatSpeed(_speed)}×',
+                style: theme.textTheme.labelLarge),
+          ),
+        ),
+      ],
+    );
+    final summary = Text(replay.summary,
+        key: const ValueKey('robot-sim-summary'),
+        maxLines: widget.compact ? 3 : null,
+        overflow: widget.compact ? TextOverflow.ellipsis : null,
+        style:
+            theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600));
+
+    // Docked in a wide, short space: picture on the left, readings beside it.
+    if (widget.layout == SimViewLayout.sideBySide) {
+      final side = widget.canvasSide ?? 300;
+      return Semantics(
+        container: true,
+        explicitChildNodes: true,
+        child: Column(
+          key: const ValueKey('robot-sim-view'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox.square(dimension: side, child: _visual(replay, frame)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _viewSwitch(),
+                      const SizedBox(height: 8),
+                      _TelemetryCards(frame: frame),
+                      const SizedBox(height: 8),
+                      summary,
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            controls,
+          ],
+        ),
+      );
+    }
 
     // Keep the picture, controls, readout, and events as separate nodes so a
     // screen reader does not hear them as one long label.
@@ -121,107 +241,15 @@ class _RobotSimViewState extends State<RobotSimView>
         key: const ValueKey('robot-sim-view'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Semantics(
-            label: 'Robot simulation replay. ${replay.summary}',
-            image: true,
-            child: _canvasFrame(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: ColoredBox(
-                  color: theme.colorScheme.surfaceContainerLowest,
-                  child: CustomPaint(
-                    key: const ValueKey('robot-sim-canvas'),
-                    painter: RobotSimPainter(
-                      replay: replay,
-                      time: _time,
-                      gridColor: theme.colorScheme.outlineVariant
-                          .withValues(alpha: 0.5),
-                      wallColor: theme.colorScheme.onSurfaceVariant,
-                      robotColor: theme.colorScheme.primary,
-                      rayColor:
-                          theme.colorScheme.primary.withValues(alpha: 0.25),
-                      frontColor: theme.colorScheme.primary,
-                      trailColor: theme.colorScheme.tertiary,
-                      alertColor: theme.colorScheme.error,
-                      textColor: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          _TelemetryCards(frame: frame),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              IconButton(
-                key: const ValueKey('robot-sim-play'),
-                tooltip: playing ? 'Pause replay' : 'Play replay',
-                onPressed: _togglePlay,
-                icon: Icon(
-                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-              ),
-              IconButton(
-                key: const ValueKey('robot-sim-restart'),
-                tooltip: 'Replay from the start',
-                onPressed: _restart,
-                icon: const Icon(Icons.replay_rounded),
-              ),
-              Expanded(
-                child: Slider(
-                  key: const ValueKey('robot-sim-scrub'),
-                  value: _controller.value.clamp(0, 1),
-                  label: '${_time.toStringAsFixed(1)} s',
-                  semanticFormatterCallback: (_) =>
-                      '${_time.toStringAsFixed(1)} seconds',
-                  onChanged: (value) {
-                    _controller.stop();
-                    _controller.value = value;
-                  },
-                ),
-              ),
-              PopupMenuButton<double>(
-                key: const ValueKey('robot-sim-speed'),
-                tooltip: 'Replay speed',
-                initialValue: _speed,
-                onSelected: _setSpeed,
-                itemBuilder: (_) => [
-                  for (final speed in const [0.5, 1.0, 2.0])
-                    PopupMenuItem(
-                        value: speed, child: Text('${_formatSpeed(speed)}×')),
-                ],
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                  child: Text('${_formatSpeed(_speed)}×',
-                      style: theme.textTheme.labelLarge),
-                ),
-              ),
-            ],
-          ),
-          Wrap(
-            key: const ValueKey('robot-sim-readout'),
-            spacing: 16,
-            runSpacing: 4,
-            children: [
-              Text('t ${frame.t.toStringAsFixed(1)} s'),
-              Text('linear.x ${frame.linear.toStringAsFixed(2)} m/s'),
-              Text('angular.z ${frame.angular.toStringAsFixed(2)} rad/s'),
-              Text('ahead ${metres(frame.front)}'),
-            ]
-                .map((child) => DefaultTextStyle.merge(
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(fontFamily: 'monospace'),
-                      child: child,
-                    ))
-                .toList(),
-          ),
-          SizedBox(height: widget.compact ? 6 : 12),
-          Text(replay.summary,
-              key: const ValueKey('robot-sim-summary'),
-              maxLines: widget.compact ? 2 : null,
-              overflow: widget.compact ? TextOverflow.ellipsis : null,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w600)),
+          _viewSwitch(),
+          const SizedBox(height: 8),
+          _canvasFrame(child: _visual(replay, frame)),
+          const SizedBox(height: 8),
+          controls,
+          SizedBox(height: widget.compact ? 2 : 8),
+          summary,
           if (!widget.compact) ...[
             const SizedBox(height: 8),
             for (final event in replay.events)
@@ -247,6 +275,89 @@ class _RobotSimViewState extends State<RobotSimView>
     );
   }
 
+  /// Arena, LiDAR bars, charts, or the ranges table, on the arena floor.
+  Widget _visual(SimulationReplay replay, SimulationFrame frame) {
+    final (String label, Widget child) = switch (_view) {
+      SimSensorView.arena => (
+          'Robot simulation replay. ${replay.summary}',
+          CustomPaint(
+            key: const ValueKey('robot-sim-canvas'),
+            size: Size.infinite,
+            painter: RobotSimPainter(
+              replay: replay,
+              time: _time,
+              gridColor: SimPalette.grid,
+              wallColor: SimPalette.wall,
+              robotColor: SimPalette.robot,
+              rayColor: SimPalette.ray,
+              frontColor: SimPalette.front,
+              trailColor: SimPalette.trail,
+              alertColor: SimPalette.alert,
+              textColor: SimPalette.label,
+            ),
+          ),
+        ),
+      SimSensorView.lidar => (
+          'LiDAR scan at ${frame.t.toStringAsFixed(1)} seconds. '
+              '${ScanSummary.of(replay, frame).spoken}',
+          LidarBarsView(replay: replay, frame: frame),
+        ),
+      SimSensorView.charts => (
+          'Charts of the distance ahead, linear.x, and angular.z over the run.',
+          SensorChartsView(replay: replay, time: _time),
+        ),
+      SimSensorView.ranges => (
+          'Table of scan.ranges readings.',
+          RangesTableView(replay: replay, frame: frame),
+        ),
+    };
+    return Semantics(
+      label: label,
+      image: _view != SimSensorView.ranges,
+      container: true,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: ColoredBox(color: SimPalette.floor, child: child),
+      ),
+    );
+  }
+
+  Widget _viewSwitch() => LayoutBuilder(
+        builder: (context, constraints) {
+          final icons = constraints.maxWidth >= 420;
+          return SegmentedButton<SimSensorView>(
+            key: const ValueKey('robot-sim-view-switch'),
+            showSelectedIcon: false,
+            // Narrow columns: tighter padding and text so labels stay on
+            // one line.
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              padding: WidgetStatePropertyAll(EdgeInsets.symmetric(
+                  horizontal: constraints.maxWidth < 340 ? 2 : 12)),
+              textStyle: WidgetStatePropertyAll(TextStyle(
+                  fontSize: constraints.maxWidth < 340 ? 12 : 14,
+                  fontWeight: FontWeight.w600)),
+            ),
+            segments: [
+              for (final (view, name, icon) in const [
+                (SimSensorView.arena, 'Arena', Icons.map_outlined),
+                (SimSensorView.lidar, 'LiDAR', Icons.radar_rounded),
+                (SimSensorView.charts, 'Charts', Icons.show_chart_rounded),
+                (SimSensorView.ranges, 'Ranges', Icons.table_rows_outlined),
+              ])
+                ButtonSegment(
+                  value: view,
+                  label: Text(name, maxLines: 1, softWrap: false),
+                  icon: icons ? Icon(icon, size: 16) : null,
+                ),
+            ],
+            selected: {_view},
+            onSelectionChanged: (selection) =>
+                setState(() => _view = selection.first),
+          );
+        },
+      );
+
   /// A square of [RobotSimView.canvasSide] in panels, otherwise 4:3.
   Widget _canvasFrame({required Widget child}) {
     final side = widget.canvasSide;
@@ -269,6 +380,180 @@ class _RobotSimViewState extends State<RobotSimView>
         'finished' => 'Replay ended',
         _ => null,
       };
+}
+
+/// Sensor and command telemetry at the current replay moment: what the node
+/// read from /scan and what it published on /cmd_vel.
+class _TelemetryCards extends StatelessWidget {
+  const _TelemetryCards({required this.frame});
+
+  final SimulationFrame frame;
+
+  @override
+  Widget build(BuildContext context) {
+    final front = frame.front;
+    final cards = [
+      _TelemetryCard(
+        topic: '/scan',
+        name: 'Ahead',
+        value: front == null ? 'clear' : front.toStringAsFixed(2),
+        unit: front == null ? '' : 'm',
+        accent: SimPalette.front,
+        spoken: front == null
+            ? 'Ahead: nothing in range'
+            : 'Ahead ${front.toStringAsFixed(2)} metres',
+      ),
+      _TelemetryCard(
+        topic: '/cmd_vel',
+        name: 'linear.x',
+        value: frame.linear.toStringAsFixed(2),
+        unit: 'm/s',
+        accent: SimPalette.robot,
+        spoken: 'linear.x ${frame.linear.toStringAsFixed(2)} m/s',
+      ),
+      _TelemetryCard(
+        topic: '/cmd_vel',
+        name: 'angular.z',
+        value: frame.angular.toStringAsFixed(2),
+        unit: 'rad/s',
+        accent: SimPalette.robot,
+        spoken: 'angular.z ${frame.angular.toStringAsFixed(2)} rad/s',
+      ),
+      _TelemetryCard(
+        topic: 'replay',
+        name: 'Time',
+        value: frame.t.toStringAsFixed(1),
+        unit: 's',
+        accent: SimPalette.trail,
+        spoken: 'Time ${frame.t.toStringAsFixed(1)} seconds',
+      ),
+    ];
+    return LayoutBuilder(
+      key: const ValueKey('robot-sim-telemetry'),
+      builder: (context, constraints) {
+        const gap = 6.0;
+        // Four in a row when there is room, otherwise two by two.
+        final perRow = constraints.maxWidth >= 340 ? 4 : 2;
+        final width = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final card in cards) SizedBox(width: width, child: card),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TelemetryCard extends StatelessWidget {
+  const _TelemetryCard({
+    required this.topic,
+    required this.name,
+    required this.value,
+    required this.unit,
+    required this.accent,
+    required this.spoken,
+  });
+
+  final String topic;
+  final String name;
+  final String value;
+  final String unit;
+  final Color accent;
+  final String spoken;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: spoken,
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(6, 6, 8, 6),
+        decoration: BoxDecoration(
+          color: SimPalette.floor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: SimPalette.grid),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 3,
+              height: 44,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 7),
+            Expanded(child: _body()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _body() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                color: Color(0xFFCBD5E1),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                  text: value,
+                  style: TextStyle(
+                      color: accent,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()]),
+                ),
+                if (unit.isNotEmpty)
+                  TextSpan(
+                    text: ' $unit',
+                    style:
+                        const TextStyle(color: SimPalette.label, fontSize: 11),
+                  ),
+              ]),
+              maxLines: 1,
+            ),
+          ),
+          Text(
+            topic,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: SimPalette.label, fontSize: 10),
+          ),
+        ],
+      );
+}
+
+/// Fixed colors of the simulated arena, the same in light and dark themes:
+/// a dark floor with a bright robot, so the robot and walls stand out.
+abstract final class SimPalette {
+  static const floor = Color(0xFF0F1B2D);
+  static const grid = Color(0xFF22344D);
+  static const wall = Color(0xFFC084FC);
+  static const robot = Color(0xFFFF7A1A);
+  static const ray = Color(0xFF38BDF8);
+  static const front = Color(0xFFFACC15);
+  static const trail = Color(0xFF4ADE80);
+  static const alert = Color(0xFFF87171);
+  static const label = Color(0xFF94A3B8);
 }
 
 /// Draws the world, scan rays, trail, and robot at one moment of the replay.
@@ -356,7 +641,7 @@ class RobotSimPainter extends CustomPainter {
         Paint()
           ..color = isFront
               ? frontColor
-              : rayColor.withValues(alpha: reading == null ? 0.08 : 0.25)
+              : rayColor.withValues(alpha: reading == null ? 0.10 : 0.35)
           ..strokeWidth = isFront ? 2.5 : 1,
       );
       if (reading != null) {
@@ -412,18 +697,26 @@ class RobotSimPainter extends CustomPainter {
       }
     }
 
-    // The robot: a disc with a heading line.
-    final radius = math.max(replay.robotRadius * scale, 6.0);
-    canvas.drawCircle(robot, radius, Paint()..color = robotColor);
-    final nose =
-        robot + Offset(math.cos(frame.theta), -math.sin(frame.theta)) * radius;
-    canvas.drawLine(
-      robot,
-      nose,
+    // The robot: a triangle whose tip points where it is heading.
+    final radius = math.max(replay.robotRadius * scale, 8.0);
+    Offset corner(double angle, double length) =>
+        robot +
+        Offset(math.cos(frame.theta + angle), -math.sin(frame.theta + angle)) *
+            length;
+    final body = Path()
+      ..addPolygon([
+        corner(0, radius * 1.5),
+        corner(math.pi * 0.78, radius * 1.1),
+        corner(-math.pi * 0.78, radius * 1.1),
+      ], true);
+    canvas.drawPath(body, Paint()..color = robotColor);
+    canvas.drawPath(
+      body,
       Paint()
         ..color = Colors.white
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round,
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..strokeJoin = StrokeJoin.round,
     );
   }
 

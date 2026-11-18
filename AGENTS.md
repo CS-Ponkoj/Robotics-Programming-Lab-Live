@@ -541,9 +541,12 @@ Treat every submission as hostile input.
   result and the student's code, never from protected tests.
 - A square Simulation panel (owner-approved 2026-11-17) shows the visual-only
   robot replay for assignments with a `ros2_2d` simulation. It opens as its
-  own movable, resizable window by default, can dock above the instructions,
-  open full screen, or collapse, and is its own tab on phones. Results stays
-  for test results.
+  own movable, resizable window by default, can dock above the instructions
+  (sharing the column through a draggable divider, picture beside the
+  readings), open full screen, or collapse to a strip of live readings, and is
+  its own tab on phones. Its Arena, LiDAR, Charts, and Ranges views and
+  telemetry cards draw only the recorded replay. Results stays for test
+  results.
 
 - Keep networking in `lib/services`, shared state in `lib/state`, transport data
   in `lib/models`, and screens focused on presentation and interaction.

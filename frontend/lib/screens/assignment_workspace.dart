@@ -105,7 +105,9 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _simCollapsed = false;
   // Null until moved: the window starts at the top right of the workspace.
   Offset? _simOffset;
-  double _simSize = 440;
+  double _simSize = 660;
+  // Share of the right column the docked panel takes; kept for the session.
+  double _simDockFraction = kSimDockDefault;
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
   // Playground runs for the current code only; memory only, never sent.
@@ -506,7 +508,11 @@ class _MyHomePageState extends State<MyHomePage> {
         .clamp(280.0,
             math.max(280.0, math.min(area.maxWidth - 32, area.maxHeight - 64)))
         .toDouble();
-    final height = _simCollapsed ? 48.0 : size + 48;
+    // Header, then the strip when collapsed; otherwise room for the view
+    // switch on top of a square replay.
+    final height = _simCollapsed
+        ? 48.0 + (_simulation == null ? 0 : kSimStripHeight)
+        : math.min(size + 92, math.max(200.0, area.maxHeight - 16));
     final offset = _simOffset ?? Offset(area.maxWidth - size - 24, 16);
     final left =
         offset.dx.clamp(0.0, math.max(0.0, area.maxWidth - size)).toDouble();
@@ -1420,15 +1426,22 @@ class _MyHomePageState extends State<MyHomePage> {
                                           child: _simCollapsed
                                               ? _simPanel(phone: false)
                                               : SizedBox(
-                                                  height: math.min(
-                                                    rightConstraints.maxHeight *
-                                                        0.58,
-                                                    rightConstraints.maxWidth +
-                                                        130,
-                                                  ),
+                                                  height: rightConstraints
+                                                          .maxHeight *
+                                                      _simDockFraction,
                                                   child:
                                                       _simPanel(phone: false),
                                                 ),
+                                        ),
+                                      // Drag to share the column with the
+                                      // instructions.
+                                      if (showDockedSim && !_simCollapsed)
+                                        SimDockDivider(
+                                          fraction: _simDockFraction,
+                                          columnHeight:
+                                              rightConstraints.maxHeight,
+                                          onChanged: (value) => setState(
+                                              () => _simDockFraction = value),
                                         ),
                                       // Instructions fill the rest of the panel.
                                       if (!showSimTab)

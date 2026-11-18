@@ -1,11 +1,97 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/widgets/robot_sim_view.dart';
 
 /// Where the Simulation panel is shown in the workspace.
 enum SimPanelMode { docked, floating }
+
+/// Height of the live-readings strip a collapsed panel keeps.
+const double kSimStripHeight = 86;
+
+/// Share of the column the docked panel starts with, and its limits.
+const double kSimDockDefault = 0.42;
+const double kSimDockMin = 0.25;
+const double kSimDockMax = 0.7;
+
+/// The bar between the docked Simulation panel and the instructions: drag
+/// it, use the arrow keys, or double-click it to reset.
+class SimDockDivider extends StatelessWidget {
+  const SimDockDivider({
+    super.key,
+    required this.fraction,
+    required this.onChanged,
+    required this.columnHeight,
+  });
+
+  final double fraction;
+  final ValueChanged<double> onChanged;
+  final double columnHeight;
+
+  void _set(double value) =>
+      onChanged(value.clamp(kSimDockMin, kSimDockMax).toDouble());
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      slider: true,
+      label: 'Simulation panel height',
+      value: '${(fraction * 100).round()} percent',
+      increasedValue: '${((fraction + 0.05) * 100).round()} percent',
+      decreasedValue: '${((fraction - 0.05) * 100).round()} percent',
+      onIncrease: () => _set(fraction + 0.05),
+      onDecrease: () => _set(fraction - 0.05),
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.resizeRow,
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.arrowUp): _Nudge(-0.05),
+          SingleActivator(LogicalKeyboardKey.arrowDown): _Nudge(0.05),
+        },
+        actions: {
+          _Nudge: CallbackAction<_Nudge>(
+              onInvoke: (nudge) => _set(fraction + nudge.delta)),
+        },
+        child: Builder(builder: (context) {
+          final focused = Focus.of(context).hasFocus;
+          return Tooltip(
+            message: 'Drag to resize. Double-click to reset.',
+            waitDuration: const Duration(milliseconds: 600),
+            child: GestureDetector(
+              key: const Key('robot-sim-dock-divider'),
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragUpdate: (details) =>
+                  _set(fraction + details.delta.dy / math.max(columnHeight, 1)),
+              onDoubleTap: () => _set(kSimDockDefault),
+              child: SizedBox(
+                height: 14,
+                child: Center(
+                  child: Container(
+                    width: 48,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: focused
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _Nudge extends Intent {
+  const _Nudge(this.delta);
+  final double delta;
+}
 
 /// Square Simulation panel: header with view controls, then the replay.
 ///
@@ -84,6 +170,15 @@ class RobotSimPanel extends StatelessWidget {
                 simulation: simulation,
                 onRetry: onSimulate,
                 compact: onClose == null,
+              ),
+            )
+          else
+            SizedBox(
+              height: kSimStripHeight,
+              child: SimulationBody(
+                simulation: simulation,
+                onRetry: onSimulate,
+                strip: true,
               ),
             ),
         ],
@@ -229,16 +324,39 @@ class SimulationBody extends StatelessWidget {
     required this.simulation,
     required this.onRetry,
     this.compact = true,
+    this.strip = false,
   });
 
   final Future<SimulationResultDto>? simulation;
   final VoidCallback? onRetry;
   final bool compact;
 
+  /// A collapsed panel: one line of live readings, or one line of status.
+  final bool strip;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final future = simulation;
+    if (strip) {
+      return FutureBuilder<SimulationResultDto>(
+        future: future,
+        builder: (context, snap) {
+          final replay = snap.data?.replay;
+          if (replay != null) return _body(theme, snap);
+          final text = future == null
+              ? 'Press Simulate to watch your robot.'
+              : snap.connectionState == ConnectionState.waiting
+                  ? 'Running your node on the robot…'
+                  : 'No replay. Expand the panel for details.';
+          return Center(
+            child: Text(text,
+                key: const Key('robot-sim-strip-status'),
+                style: theme.textTheme.bodyMedium),
+          );
+        },
+      );
+    }
     if (future == null) {
       return _Message(
         icon: Icons.smart_toy_outlined,
@@ -249,76 +367,103 @@ class SimulationBody extends StatelessWidget {
     }
     return FutureBuilder<SimulationResultDto>(
       future: future,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const _Message(
-            icon: Icons.hourglass_top_rounded,
-            title: 'Running your node on the robot…',
-            text: 'The grader builds your package and drives the robot for '
-                'up to 8 seconds. This takes about 10 seconds.',
-            busy: true,
-          );
-        }
-        if (snap.hasError) {
-          final error = snap.error;
-          return _Message(
-            icon: Icons.cloud_off_rounded,
-            title: 'The simulation could not run',
-            text: error is Exception
-                ? error.toString().replaceFirst('Exception: ', '')
-                : 'Check your connection and try again.',
-            action: onRetry == null
-                ? null
-                : TextButton(
-                    onPressed: onRetry, child: const Text('Try again')),
-          );
-        }
-        final result = snap.data;
-        final replay = result?.replay;
-        if (result == null) return const SizedBox.shrink();
-        if (replay == null) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(12),
-            child: Card(
-              key: const Key('simulation-error'),
-              color: theme.colorScheme.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('The simulation could not start',
-                        style: theme.textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    SelectableText(result.error.isEmpty
-                        ? 'Your node did not drive the robot.'
-                        : result.error),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-        return LayoutBuilder(builder: (context, constraints) {
-          // Room under the square for the controls, readout, and summary.
-          final reserve = compact ? 190.0 : 260.0;
-          final side = math.max(
-            120.0,
-            math.min(
-                constraints.maxWidth - 24, constraints.maxHeight - reserve),
-          );
-          return SingleChildScrollView(
-            key: const Key('simulation-results'),
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-            child: RobotSimView(
-              replay: replay,
-              compact: compact,
-              canvasSide: side,
-            ),
-          );
-        });
-      },
+      builder: (context, snap) => _body(theme, snap),
     );
+  }
+
+  Widget _body(ThemeData theme, AsyncSnapshot<SimulationResultDto> snap) {
+    if (snap.connectionState == ConnectionState.waiting) {
+      return const _Message(
+        icon: Icons.hourglass_top_rounded,
+        title: 'Running your node on the robot…',
+        text: 'The grader builds your package and drives the robot for '
+            'up to 8 seconds. This takes about 10 seconds.',
+        busy: true,
+      );
+    }
+    if (snap.hasError) {
+      final error = snap.error;
+      return _Message(
+        icon: Icons.cloud_off_rounded,
+        title: 'The simulation could not run',
+        text: error is Exception
+            ? error.toString().replaceFirst('Exception: ', '')
+            : 'Check your connection and try again.',
+        action: onRetry == null
+            ? null
+            : TextButton(onPressed: onRetry, child: const Text('Try again')),
+      );
+    }
+    final result = snap.data;
+    final replay = result?.replay;
+    if (result == null) return const SizedBox.shrink();
+    if (replay == null) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Card(
+          key: const Key('simulation-error'),
+          color: theme.colorScheme.errorContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('The simulation could not start',
+                    style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                SelectableText(result.error.isEmpty
+                    ? 'Your node did not drive the robot.'
+                    : result.error),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return LayoutBuilder(builder: (context, constraints) {
+      if (strip) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
+          child: RobotSimView(
+              replay: replay, compact: true, layout: SimViewLayout.strip),
+        );
+      }
+      // Wide and short, as when docked: picture beside the readings, so
+      // a short panel still gets a large square.
+      if (constraints.maxWidth >= 560 &&
+          constraints.maxWidth > constraints.maxHeight * 1.3) {
+        final side = math.max(
+          160.0,
+          math.min(constraints.maxHeight - 76, constraints.maxWidth * 0.58),
+        );
+        return SingleChildScrollView(
+          key: const Key('simulation-results'),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+          child: RobotSimView(
+            replay: replay,
+            compact: true,
+            canvasSide: side,
+            layout: SimViewLayout.sideBySide,
+          ),
+        );
+      }
+      // Room for the telemetry cards and view switch above the square,
+      // and the controls and summary under it.
+      final reserve = compact ? 266.0 : 326.0;
+      final side = math.max(
+        120.0,
+        math.min(constraints.maxWidth - 24, constraints.maxHeight - reserve),
+      );
+      return SingleChildScrollView(
+        key: const Key('simulation-results'),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+        child: RobotSimView(
+          replay: replay,
+          compact: compact,
+          canvasSide: side,
+        ),
+      );
+    });
   }
 }
 
