@@ -127,6 +127,10 @@ backend/                          FastAPI application
   ros2_callback_audit.py           Container-only callback publication instrumentation
   simulation_service.py / ros2_sim_world.py  Visual-only 2D robot replay (never graded)
   tutor.py / hinter.py            Deterministic and optional AI tutoring
+  ros2_feedback.py                Observed causes and hint ladders for ROS 2 checks
+  ai_policy.py                    AI tutor gates: key, course switch, review, quota
+  course_settings.py              Instructor course settings (AI tutor, Old assignments)
+  assignment_insights.py          Aggregate per-assignment insights for instructors
   research_service.py             Study sessions, events, summaries, and exports
   instructor_dataset.py           Offline instructor AI-evaluation contract and validator
   ai_evaluation_cases/            Server-only, instructor-reviewed tutor evaluation cases
@@ -144,6 +148,7 @@ scripts/                          Local run, verification, and release automatio
   course_quiz_bank.json           Authored questions for topics without a source quiz
 .github/workflows/ci.yml          Continuous-integration release gates
 scripts/run-live.ps1              Self-hosted live stack on the lab PC (Caddy + Cloudflare Tunnel)
+scripts/set-live-secret.ps1       Store the live OpenAI key as a DPAPI-encrypted managed secret
 ```
 
 Read `README.md`, `docs/README.md`,
@@ -496,6 +501,13 @@ Treat every submission as hostile input.
 ## AI tutor rules
 
 - AI is an optional enhancement and remains off by default.
+- Route every AI call through `ai_policy.ai_access`: an AI answer needs a
+  server key, the Instructor Studio course switch, approved AI evaluation
+  cases for the assignment version (named reviewer), and daily quota; demo
+  sessions never get AI. Otherwise answer with built-in hints and the reason.
+- On RPL Live the OpenAI key is a managed secret (`scripts/set-live-secret.ps1`,
+  DPAPI for the lab PC's Windows user) given to the API process only; never
+  put it in `.env`, Git, logs, or the browser.
 - Never place an OpenAI API key in Flutter, source control, logs, screenshots,
   exports, or assignment configuration.
 - Send only sanitized assignment context and grader evidence.
@@ -545,8 +557,13 @@ Treat every submission as hostile input.
   (sharing the column through a draggable divider, picture beside the
   readings), open full screen, or collapse to a strip of live readings, and is
   its own tab on phones. Its Arena, LiDAR, Charts, and Ranges views and
-  telemetry cards draw only the recorded replay. Results stays for test
-  results.
+  telemetry cards draw only the recorded replay and the grader's beam probe
+  (which beams the node reacts to). It starts collapsed until the first
+  Simulate, and a failed check's "Watch it in the simulation" opens the
+  replay at the matching moment. Results stays for test results.
+- Built-in hints for ROS 2 checks come from `ros2_feedback.py`: the harness
+  reports what the student's node published, and only configured tags become
+  `misconception_tag`; other observed patterns are `hint_key` only.
 
 - Keep networking in `lib/services`, shared state in `lib/state`, transport data
   in `lib/models`, and screens focused on presentation and interaction.
