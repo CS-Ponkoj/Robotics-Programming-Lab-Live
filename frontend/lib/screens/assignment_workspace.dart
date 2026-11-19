@@ -2732,14 +2732,17 @@ class AssignmentProjectWorkspace extends StatelessWidget {
             ],
           );
         }
-        return Row(
+        // The explorer is a narrow icon rail that slides open over the
+        // editor, so the editor keeps its width when the names are shown.
+        return Stack(
           children: [
-            SizedBox(width: 250, child: explorer),
-            VerticalDivider(
-              width: 1,
-              color: Theme.of(context).colorScheme.outlineVariant,
+            Padding(
+              padding: const EdgeInsets.only(
+                left: AssignmentProjectExplorer.railWidth,
+              ),
+              child: editor,
             ),
-            Expanded(child: editor),
+            Positioned(left: 0, top: 0, bottom: 0, child: explorer),
           ],
         );
       },
@@ -2815,7 +2818,11 @@ class ProjectFilePicker extends StatelessWidget {
   }
 }
 
-class AssignmentProjectExplorer extends StatelessWidget {
+/// Project files as a narrow rail of icons, each badged with a lock (read
+/// only) or a pencil (editable). Hovering or focusing the rail slides it open
+/// over the editor to show every file name; the header pin keeps it open,
+/// which is also how touch screens without hover open it.
+class AssignmentProjectExplorer extends StatefulWidget {
   const AssignmentProjectExplorer({
     super.key,
     required this.files,
@@ -2823,98 +2830,460 @@ class AssignmentProjectExplorer extends StatelessWidget {
     required this.onFileSelected,
   });
 
+  static const double railWidth = 52;
+  static const double openWidth = 280;
+
   final List<AssignmentProjectFile> files;
   final String? selectedPath;
   final ValueChanged<AssignmentProjectFile> onFileSelected;
 
   @override
+  State<AssignmentProjectExplorer> createState() =>
+      _AssignmentProjectExplorerState();
+}
+
+class _AssignmentProjectExplorerState extends State<AssignmentProjectExplorer> {
+  bool _hovered = false;
+  bool _focused = false;
+  bool _pinned = false;
+
+  bool get _open => _hovered || _focused || _pinned;
+
+  /// Folders the student has closed; every folder starts open.
+  final Set<String> _closedFolders = {};
+
+  /// Folders first, then files, each sorted by name, like a code editor.
+  List<_ProjectTreeRow> _treeRows() {
+    final root = _ProjectFolder('');
+    for (final file in widget.files) {
+      final segments = file.path.split('/');
+      var folder = root;
+      for (var i = 0; i < segments.length - 1; i++) {
+        final path = segments.sublist(0, i + 1).join('/');
+        folder = folder.folders.putIfAbsent(
+          segments[i],
+          () => _ProjectFolder(path),
+        );
+      }
+      folder.files.add(file);
+    }
+    final rows = <_ProjectTreeRow>[];
+    void visit(_ProjectFolder folder, int depth) {
+      final names = folder.folders.keys.toList()..sort();
+      for (final name in names) {
+        final child = folder.folders[name]!;
+        rows.add(_ProjectTreeRow(depth: depth, name: name, folder: child));
+        if (!_closedFolders.contains(child.path)) {
+          visit(child, depth + 1);
+        }
+      }
+      String fileName(AssignmentProjectFile file) => file.path.split('/').last;
+      final files = [...folder.files]
+        ..sort((a, b) => fileName(a).compareTo(fileName(b)));
+      for (final file in files) {
+        rows.add(
+          _ProjectTreeRow(
+            depth: depth,
+            name: file.path.split('/').last,
+            file: file,
+          ),
+        );
+      }
+    }
+
+    visit(root, 0);
+    return rows;
+  }
+
+  Widget _treeRow(ThemeData theme, _ProjectTreeRow row) {
+    final scheme = theme.colorScheme;
+    final file = row.file;
+    final folder = row.folder;
+    final selected = file != null && file.path == widget.selectedPath;
+    final folderOpen =
+        folder != null && !_closedFolders.contains(folder.path);
+    const indent = 14.0;
+    final contentColor =
+        selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    final Widget leading;
+    if (folder != null) {
+      leading = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            folderOpen
+                ? Icons.keyboard_arrow_down_rounded
+                : Icons.keyboard_arrow_right_rounded,
+            size: 18,
+            color: scheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 2),
+          Icon(
+            folderOpen ? Icons.folder_open_rounded : Icons.folder_rounded,
+            size: 18,
+            color: scheme.primary,
+          ),
+        ],
+      );
+    } else {
+      final badgeColor = file!.editable ? scheme.primary : scheme.outline;
+      leading = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(width: 20),
+          Icon(_fileIcon(row.name), size: 18, color: contentColor),
+        ],
+      );
+      return _treeRowFrame(
+        theme,
+        key: Key('project-file-${file.path}'),
+        depth: row.depth,
+        indent: indent,
+        selected: selected,
+        semantics: '${file.path}, ${file.editable ? 'editable' : 'read only'}',
+        onTap: () => widget.onFileSelected(file),
+        children: [
+          leading,
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              row.name,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: selected ? FontWeight.w700 : null,
+                color: selected ? scheme.onPrimaryContainer : null,
+              ),
+            ),
+          ),
+          Tooltip(
+            message: file.editable ? 'Editable' : 'Read only',
+            child: Icon(
+              file.editable ? Icons.edit_outlined : Icons.lock_outline,
+              size: 14,
+              color: badgeColor,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+        ],
+      );
+    }
+    return _treeRowFrame(
+      theme,
+      key: Key('project-folder-${folder.path}'),
+      depth: row.depth,
+      indent: indent,
+      selected: false,
+      semantics:
+          'Folder ${folder.path}, ${folderOpen ? 'expanded' : 'collapsed'}',
+      onTap: () => setState(() {
+        if (!_closedFolders.remove(folder.path)) {
+          _closedFolders.add(folder.path);
+        }
+      }),
+      children: [
+        leading,
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            row.name,
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// One tree line: indent guides for each level, then the row content,
+  /// laid out at the open width so it never overflows while sliding open.
+  Widget _treeRowFrame(
+    ThemeData theme, {
+    required Key key,
+    required int depth,
+    required double indent,
+    required bool selected,
+    required String semantics,
+    required VoidCallback onTap,
+    required List<Widget> children,
+  }) {
+    final scheme = theme.colorScheme;
+    return Semantics(
+      label: semantics,
+      button: true,
+      selected: selected,
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        child: Material(
+          color: selected ? scheme.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          child: InkWell(
+            key: key,
+            borderRadius: BorderRadius.circular(6),
+            onTap: onTap,
+            child: SizedBox(
+              height: 32,
+              child: OverflowBox(
+                alignment: Alignment.centerLeft,
+                minWidth: AssignmentProjectExplorer.openWidth - 9,
+                maxWidth: AssignmentProjectExplorer.openWidth - 9,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 6),
+                    for (var level = 0; level < depth; level++)
+                      SizedBox(
+                        width: indent,
+                        height: 32,
+                        child: Center(
+                          child: VerticalDivider(
+                            width: 1,
+                            thickness: 1,
+                            color: scheme.outlineVariant,
+                          ),
+                        ),
+                      ),
+                    ...children,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ColoredBox(
-      color: theme.colorScheme.surfaceContainerLow,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.sm,
-            ),
+    final scheme = theme.colorScheme;
+    final open = _open;
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (value) => setState(() => _focused = value),
+        child: AnimatedContainer(
+          key: const Key('project-file-explorer'),
+          duration:
+              reduceMotion ? Duration.zero : const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          width: open
+              ? AssignmentProjectExplorer.openWidth
+              : AssignmentProjectExplorer.railWidth,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            border: Border(right: BorderSide(color: scheme.outlineVariant)),
+            boxShadow: open && !_pinned
+                ? [
+                    BoxShadow(
+                      color: scheme.shadow.withValues(alpha: 0.18),
+                      blurRadius: 12,
+                      offset: const Offset(3, 0),
+                    ),
+                  ]
+                : null,
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _header(theme, open),
+              Expanded(
+                child: open
+                    ? Builder(
+                        builder: (context) {
+                          final rows = _treeRows();
+                          return ListView.builder(
+                            key: const Key('assignment-project-file-tree'),
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.sm,
+                            ),
+                            itemCount: rows.length,
+                            itemBuilder: (context, index) =>
+                                _treeRow(theme, rows[index]),
+                          );
+                        },
+                      )
+                    : ListView.builder(
+                        key: const Key('assignment-project-file-tree'),
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        itemCount: widget.files.length,
+                        itemBuilder: (context, index) =>
+                            _fileRow(theme, widget.files[index], open),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _header(ThemeData theme, bool open) {
+    final scheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      toggled: _pinned,
+      label: _pinned ? 'Unpin project files' : 'Pin project files open',
+      excludeSemantics: true,
+      child: InkWell(
+        key: const Key('project-files-pin'),
+        onTap: () => setState(() => _pinned = !_pinned),
+        // Laid out at the open width and clipped, so the header never
+        // overflows while the rail is sliding open or shut.
+        child: SizedBox(
+          height: 44,
+          child: OverflowBox(
+            alignment: Alignment.centerLeft,
+            minWidth: AssignmentProjectExplorer.openWidth - 1,
+            maxWidth: AssignmentProjectExplorer.openWidth - 1,
             child: Row(
               children: [
-                Icon(
-                  Icons.account_tree_outlined,
-                  size: 18,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  'PROJECT FILES',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
+                SizedBox(
+                  width: AssignmentProjectExplorer.railWidth - 1,
+                  child: Icon(
+                    Icons.account_tree_outlined,
+                    size: 20,
+                    color: scheme.primary,
                   ),
                 ),
+                Expanded(
+                  child: Text(
+                    'PROJECT FILES (${widget.files.length})',
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
+                if (open)
+                  Padding(
+                    padding: const EdgeInsets.only(right: AppSpacing.sm),
+                    child: Icon(
+                      _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                      size: 16,
+                      color: _pinned ? scheme.primary : scheme.onSurfaceVariant,
+                    ),
+                  ),
               ],
             ),
           ),
-          Expanded(
-            child: ListView.builder(
-              key: const Key('assignment-project-file-tree'),
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              itemCount: files.length,
-              itemBuilder: (context, index) {
-                final file = files[index];
-                final selected = file.path == selectedPath;
-                final segments = file.path.split('/');
-                final name = segments.last;
-                final depth = (segments.length - 1).clamp(0, 4);
-                return Semantics(
-                  label:
-                      '${file.path}, ${file.editable ? 'editable' : 'read only'}',
-                  button: true,
-                  selected: selected,
-                  child: Padding(
-                    padding: EdgeInsets.only(left: depth * 8.0),
-                    child: ListTile(
-                      key: Key('project-file-${file.path}'),
-                      dense: true,
-                      selected: selected,
-                      selectedTileColor: theme.colorScheme.primaryContainer,
-                      leading: Icon(
-                        _fileIcon(name),
-                        size: 18,
-                        color: selected
-                            ? theme.colorScheme.onPrimaryContainer
-                            : theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
+  Widget _fileRow(ThemeData theme, AssignmentProjectFile file, bool open) {
+    final scheme = theme.colorScheme;
+    final selected = file.path == widget.selectedPath;
+    final segments = file.path.split('/');
+    final name = segments.last;
+    final folder = segments.length > 1
+        ? segments.sublist(0, segments.length - 1).join('/')
+        : '';
+    final iconColor =
+        selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    final badgeColor = file.editable ? scheme.primary : scheme.outline;
+    return Semantics(
+      label: '${file.path}, ${file.editable ? 'editable' : 'read only'}',
+      button: true,
+      selected: selected,
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        child: Material(
+          color: selected ? scheme.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            key: Key('project-file-${file.path}'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => widget.onFileSelected(file),
+            child: SizedBox(
+              height: 44,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: AssignmentProjectExplorer.railWidth - 9,
+                    child: Center(
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(_fileIcon(name), size: 22, color: iconColor),
+                          Positioned(
+                            right: -6,
+                            bottom: -5,
+                            child: Container(
+                              key: Key('project-file-badge-${file.path}'),
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: scheme.surface,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: badgeColor),
+                              ),
+                              child: Icon(
+                                file.editable
+                                    ? Icons.edit_outlined
+                                    : Icons.lock_outline,
+                                size: 10,
+                                color: badgeColor,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      title: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: selected ? FontWeight.w700 : null,
-                        ),
-                      ),
-                      trailing: Icon(
-                        file.editable
-                            ? Icons.edit_outlined
-                            : Icons.lock_outline,
-                        size: 16,
-                        color: file.editable
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                      onTap: () => onFileSelected(file),
                     ),
                   ),
-                );
-              },
+                  Expanded(
+                    child: AnimatedOpacity(
+                      opacity: open ? 1 : 0,
+                      duration: const Duration(milliseconds: 120),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: selected ? FontWeight.w700 : null,
+                              color:
+                                  selected ? scheme.onPrimaryContainer : null,
+                            ),
+                          ),
+                          if (folder.isNotEmpty)
+                            Text(
+                              folder,
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -2931,6 +3300,28 @@ class AssignmentProjectExplorer extends StatelessWidget {
     }
     return Icons.insert_drive_file_outlined;
   }
+}
+
+class _ProjectFolder {
+  _ProjectFolder(this.path);
+
+  final String path;
+  final Map<String, _ProjectFolder> folders = {};
+  final List<AssignmentProjectFile> files = [];
+}
+
+class _ProjectTreeRow {
+  const _ProjectTreeRow({
+    required this.depth,
+    required this.name,
+    this.folder,
+    this.file,
+  });
+
+  final int depth;
+  final String name;
+  final _ProjectFolder? folder;
+  final AssignmentProjectFile? file;
 }
 
 class ProjectFileStatusBar extends StatelessWidget {

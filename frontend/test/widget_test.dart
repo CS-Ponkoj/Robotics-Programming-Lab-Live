@@ -122,27 +122,91 @@ void main() {
       MaterialApp(
         theme: buildAppTheme(),
         home: Scaffold(
-          body: app.AssignmentProjectExplorer(
-            files: files,
-            selectedPath: files.last.path,
-            onFileSelected: (file) => selected = file,
+          body: Align(
+            alignment: Alignment.centerLeft,
+            child: app.AssignmentProjectExplorer(
+              files: files,
+              selectedPath: files.last.path,
+              onFileSelected: (file) => selected = file,
+            ),
           ),
         ),
       ),
     );
 
+    final explorer = find.byKey(const Key('project-file-explorer'));
     expect(
       find.byKey(const Key('assignment-project-file-tree')),
       findsOneWidget,
     );
-    expect(find.text('package.xml'), findsOneWidget);
-    expect(find.text('controller.py'), findsOneWidget);
+    // Collapsed: a narrow rail of icons with lock and pencil badges.
+    expect(tester.getSize(explorer).width,
+        app.AssignmentProjectExplorer.railWidth);
     expect(find.byIcon(Icons.lock_outline), findsOneWidget);
     expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('src/robot_motion/package.xml, read only'),
+      findsOneWidget,
+    );
 
-    await tester.tap(find.text('package.xml'));
+    // A file icon can be picked straight from the collapsed rail.
+    await tester.tap(
+      find.byKey(const Key('project-file-src/robot_motion/package.xml')),
+    );
     expect(selected?.path, endsWith('package.xml'));
     expect(selected?.editable, isFalse);
+
+    // Hovering slides the panel open to show every name.
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(explorer));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(explorer).width,
+        app.AssignmentProjectExplorer.openWidth);
+    // A real tree: every folder has its own row above its files.
+    expect(find.text('package.xml'), findsOneWidget);
+    expect(find.text('controller.py'), findsOneWidget);
+    for (final folder in [
+      'src',
+      'src/robot_motion',
+      'src/robot_motion/robot_motion',
+    ]) {
+      expect(find.byKey(Key('project-folder-$folder')), findsOneWidget);
+    }
+    expect(
+      tester.getTopLeft(find.text('robot_motion').first).dy,
+      lessThan(tester.getTopLeft(find.text('package.xml')).dy),
+    );
+
+    await tester.tap(find.text('controller.py'));
+    expect(selected?.editable, isTrue);
+
+    // Closing a folder hides its files; opening it shows them again.
+    await tester.tap(
+      find.byKey(const Key('project-folder-src/robot_motion/robot_motion')),
+    );
+    await tester.pump();
+    expect(find.text('controller.py'), findsNothing);
+    expect(find.text('package.xml'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('project-folder-src/robot_motion/robot_motion')),
+    );
+    await tester.pump();
+    expect(find.text('controller.py'), findsOneWidget);
+
+    // Leaving closes it again unless it is pinned.
+    await mouse.moveTo(const Offset(700, 300));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(explorer).width,
+        app.AssignmentProjectExplorer.railWidth);
+
+    await tester.tap(find.byKey(const Key('project-files-pin')));
+    await tester.pumpAndSettle();
+    await mouse.moveTo(const Offset(700, 300));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(explorer).width,
+        app.AssignmentProjectExplorer.openWidth);
   });
 
   testWidgets('locked ROS project file makes the code viewer read only', (
@@ -1796,7 +1860,8 @@ void main() {
         );
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: app.Feedback(data: result(score: 50, behavior: true))),
+      home:
+          Scaffold(body: app.Feedback(data: result(score: 50, behavior: true))),
     ));
     expect(find.text('Points: 50 of 100'), findsOneWidget);
     expect(find.text('Checks passed: 3 of 4'), findsOneWidget);
@@ -1809,7 +1874,8 @@ void main() {
     expect(find.text('Check 3 · 50 of 50 points'), findsOneWidget);
 
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: app.Feedback(data: result(score: 0, behavior: false))),
+      home:
+          Scaffold(body: app.Feedback(data: result(score: 0, behavior: false))),
     ));
     expect(find.text('Points: 0 of 100'), findsOneWidget);
     expect(find.text('Checks passed: 2 of 4'), findsOneWidget);
