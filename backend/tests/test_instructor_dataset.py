@@ -125,10 +125,10 @@ def test_repository_instructor_dataset_review_state():
     assert inventory.assignment_count == 8
     assert inventory.case_count >= 27
     assert inventory.case_count == inventory.draft_count + inventory.approved_count
-    # Only Assignment 7 has been reviewed and approved by a named instructor;
-    # Assignment 8's cases are drafts, so its AI tutor stays off.
+    # Only Assignments 7 and 8 have been reviewed and approved by a named
+    # instructor, so only they can use the AI tutor.
     approved = {d.assignment_id for d in datasets if d.review_status == "approved"}
-    assert approved == {7}
+    assert approved == {7, 8}
     for dataset in datasets:
-        if dataset.assignment_id == 7:
+        if dataset.assignment_id in approved:
             assert all(c.review_status == "approved" and c.reviewer for c in dataset.cases)

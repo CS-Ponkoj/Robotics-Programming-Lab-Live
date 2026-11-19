@@ -231,11 +231,12 @@ def test_grader_turns_findings_into_hints():
     assert 0 < result.score < 100
 
 
-def test_ai_cases_are_drafts_so_the_tutor_stays_off():
+def test_ai_cases_are_approved_by_a_named_reviewer():
     datasets = {dataset.assignment_id: dataset for dataset in load_instructor_datasets()}
     dataset = datasets[8]
     assert dataset.assignment_stable_id == SOURCE["stable_id"]
-    assert all(case.review_status == "draft" for case in dataset.cases)
+    assert dataset.review_status == "approved"
+    assert all(case.review_status == "approved" and case.reviewer for case in dataset.cases)
     used = {tag for case in dataset.cases for tag in case.misconception_tags}
     assert used == {item["tag"] for item in SOURCE["common_misconceptions"]}
 
