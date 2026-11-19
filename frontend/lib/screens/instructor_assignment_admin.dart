@@ -22,7 +22,6 @@ class InstructorAssignmentAdmin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     void open(Widget page, String name) => Navigator.of(context).push(
           MaterialPageRoute<void>(
             settings: RouteSettings(arguments: FeedbackPage(name)),
@@ -76,13 +75,11 @@ class InstructorAssignmentAdmin extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
             children: [
-              Text('Instructor Studio', style: theme.textTheme.headlineSmall),
-              const SizedBox(height: 6),
-              Text(
-                'Choose a tool. Your instructor login authorizes assignment, '
-                'account, research, and feedback management.',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              const SectionHeader(
+                prominent: true,
+                title: 'Instructor Studio',
+                subtitle: 'Choose a tool. Your instructor login authorizes '
+                    'assignment, account, research, and feedback management.',
               ),
               const SizedBox(height: 24),
               LayoutBuilder(
@@ -236,14 +233,11 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
     final intro = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Manage versioned assignments',
-            style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 6),
-        Text(
-          'Publishing is blocked until the reference solution passes '
-          'the hidden grader.',
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        const SectionHeader(
+          prominent: true,
+          title: 'Manage versioned assignments',
+          subtitle: 'Publishing is blocked until the reference solution '
+              'passes the hidden grader.',
         ),
       ],
     );
@@ -377,15 +371,7 @@ class _StudioLinkCard extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.brandTint,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Icon(icon, color: AppColors.brandDark),
-              ),
+              IconTile(icon: icon, size: 44),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -790,27 +776,20 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    Widget section(String title, String detail, List<Widget> fields) => Card(
+    Widget section(String title, String detail, List<Widget> fields) =>
+        AppPanel(
           margin: const EdgeInsets.only(bottom: 20),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(title, style: theme.textTheme.titleMedium),
-                const SizedBox(height: 2),
-                Text(
-                  detail,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 16),
-                for (final (index, field) in fields.indexed) ...[
-                  if (index > 0) const SizedBox(height: 16),
-                  field,
-                ],
+          title: title,
+          subtitle: detail,
+          bodyPadding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (index, field) in fields.indexed) ...[
+                if (index > 0) const SizedBox(height: 16),
+                field,
               ],
-            ),
+            ],
           ),
         );
 

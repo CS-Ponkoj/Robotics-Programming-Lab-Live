@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 typedef InsightsLoader = Future<Map<String, dynamic>> Function(
@@ -173,22 +174,9 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return SizedBox(
       width: 170,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: theme.textTheme.headlineSmall),
-              const SizedBox(height: 4),
-              Text(label, style: theme.textTheme.bodySmall),
-            ],
-          ),
-        ),
-      ),
+      child: StatTile(label: label, value: value),
     );
   }
 }

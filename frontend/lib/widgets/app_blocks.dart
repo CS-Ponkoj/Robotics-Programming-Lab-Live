@@ -343,11 +343,15 @@ class SectionHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.trailing,
+    this.prominent = false,
   });
 
   final String title;
   final String? subtitle;
   final Widget? trailing;
+
+  /// A page title rather than a section title: one size larger.
+  final bool prominent;
 
   @override
   Widget build(BuildContext context) {
@@ -361,7 +365,12 @@ class SectionHeader extends StatelessWidget {
             children: [
               Semantics(
                 header: true,
-                child: Text(title, style: theme.textTheme.titleLarge),
+                child: Text(
+                  title,
+                  style: prominent
+                      ? theme.textTheme.headlineSmall
+                      : theme.textTheme.titleLarge,
+                ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: AppSpacing.xs),
