@@ -171,6 +171,35 @@ def test_feedback_names_the_observed_cause(failed, overrides, hint_key):
     assert hint_key in HINT_LADDERS
 
 
+def test_always_turning_one_way_is_named_and_not_blamed_on_nan():
+    """A robot that always turns right also fails the NaN situations."""
+    always_right = {
+        name: phase(0.0, -0.5)
+        for name in ("left-open", "right-open", "front-unknown", "side-unknown")
+    }
+    findings = classify(
+        "open_side",
+        {"turn-toward-open-side": False, "unknown-distance-safe": False},
+        observations(**always_right),
+    )
+    assert findings["turn-toward-open-side"].hint_key == "same-turn-every-time"
+    assert "turned right" in findings["turn-toward-open-side"].observation
+    assert findings["unknown-distance-safe"].hint_key == "same-turn-every-time"
+
+
+def test_swapped_turns_are_not_blamed_on_nan():
+    swapped = {
+        "left-open": phase(0.0, -0.5), "right-open": phase(0.0, 0.5),
+        "front-unknown": phase(0.0, -0.5), "side-unknown": phase(0.0, -0.5),
+    }
+    findings = classify(
+        "open_side",
+        {"turn-toward-open-side": False, "unknown-distance-safe": False},
+        observations(**swapped),
+    )
+    assert findings["unknown-distance-safe"].hint_key == "turn-direction-swapped"
+
+
 def test_every_configured_misconception_has_a_hint_ladder():
     for item in SOURCE["common_misconceptions"]:
         assert item["tag"] in HINT_LADDERS

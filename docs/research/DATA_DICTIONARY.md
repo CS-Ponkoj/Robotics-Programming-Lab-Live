@@ -184,8 +184,9 @@ check. Null or missing means no pattern was recognised.
 From 2026-11-19, a failed Assignment 8 (turn toward the open side) behavior
 check may store one of these `hint_key` values in the same way:
 `turns-while-clear`, `forward-speed-wrong`, `front-check-reversed`,
-`turn-direction-swapped`, `no-turn-when-blocked`, `threshold-boundary`,
-`tie-goes-left`, `nan-side-chosen`, or `open-side-no-resume`.
+`turn-direction-swapped`, `no-turn-when-blocked`, `same-turn-every-time`,
+`threshold-boundary`, `tie-goes-left`, `nan-side-chosen`, or
+`open-side-no-resume`.
 
 For a ROS 2 assignment whose `grader_config` lists `gate_tests` and
 `pass_tests` (Assignment 7 onward), `score` is 0 whenever any gate check

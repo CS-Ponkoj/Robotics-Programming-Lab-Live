@@ -214,20 +214,31 @@ def open_side_findings(passed: dict[str, bool], observations: dict) -> dict[str,
                 "Your robot stopped when the front was 2.0 m away and drove when it "
                 "was 0.5 m away: the front comparison is reversed.",
             )
+    turn_finding = None
     if not passed.get("turn-toward-open-side", True):
         left_turn, right_turn = _turn(left_open), _turn(right_open)
         if left_turn == -1.0 and right_turn == 1.0:
-            findings["turn-toward-open-side"] = Finding(
+            turn_finding = Finding(
                 "turn-direction-swapped",
                 "Your robot turned right when the left had more space and left when the "
                 "right had more space: positive angular.z turns left.",
             )
         elif left_turn == 0.0 and right_turn == 0.0:
-            findings["turn-toward-open-side"] = Finding(
+            turn_finding = Finding(
                 "no-turn-when-blocked",
                 "Your robot did not turn when the front was blocked; set angular.z to "
                 "+0.5 or -0.5 toward the side with more space.",
             )
+        elif left_turn is not None and left_turn == right_turn and left_turn != 0.0:
+            way = "left" if left_turn > 0 else "right"
+            turn_finding = Finding(
+                "same-turn-every-time",
+                f"Your robot turned {way} whether the left or the right had more space; "
+                "choose the turn from comparing left with right, with a different sign "
+                "for each side.",
+            )
+        if turn_finding:
+            findings["turn-toward-open-side"] = turn_finding
     if not passed.get("stop-at-threshold", True) and _drives(threshold):
         findings["stop-at-threshold"] = Finding(
             "threshold-boundary",
@@ -240,7 +251,11 @@ def open_side_findings(passed: dict[str, bool], observations: dict) -> dict[str,
             "Your robot turned left when left and right were equal; left is not "
             "greater, so the rule turns right.",
         )
-    if not passed.get("unknown-distance-safe", True) and _turn(side_unknown) == -1.0:
+    if not passed.get("unknown-distance-safe", True) and turn_finding:
+        # A turn rule that is wrong everywhere also fails the NaN situations;
+        # name that cause instead of blaming the NaN handling.
+        findings["unknown-distance-safe"] = turn_finding
+    elif not passed.get("unknown-distance-safe", True) and _turn(side_unknown) == -1.0:
         findings["unknown-distance-safe"] = Finding(
             "nan-side-chosen",
             "Your robot turned right, toward a side whose distance was NaN (unknown); "
@@ -438,6 +453,17 @@ HINT_LADDERS: dict[str, HintLadder] = {
             "In the blocked branch publish linear.x = 0.0 and angular.z = +0.5 or -0.5 toward the larger side.",
         ),
         "Add the turn to the blocked branch and rerun the tests.",
+    ),
+    "same-turn-every-time": HintLadder(
+        "Your robot always turns the same way, no matter which side has more space.",
+        "What should change in your command when the right, not the left, has more space?",
+        (
+            "Compare the turns your robot made when the left was open and when the right was open.",
+            "The direction must come from comparing msg.left with msg.right.",
+            "Check that the two branches publish different signs: one positive, one negative.",
+            "Publish angular.z = +0.5 when left is greater than right, and -0.5 otherwise.",
+        ),
+        "Give each side its own turn sign and rerun the tests.",
     ),
     "threshold-boundary": HintLadder(
         "Your robot treats a front distance of exactly 0.75 m as clear.",
