@@ -402,6 +402,26 @@ void main() {
     final liveText = tester.widget<Text>(find.text('Live'));
     expect(liveText.style?.color, AppColors.success);
     expect(tester.takeException(), isNull);
+
+    // A tile in a loose layout (a Stack, as in the research grid) still
+    // fills its cell, so tiles in one row line up.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: const Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 300,
+              child: Stack(
+                children: [StatTile(label: 'Attempts', value: '5')],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.getSize(find.byType(StatTile)).width, 300);
   });
 
   testWidgets('shared app theme defines the visual system', (

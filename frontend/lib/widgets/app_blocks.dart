@@ -281,6 +281,17 @@ class StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // A tile fills the width it is given (for example a grid cell), so the
+    // tiles in a row line up instead of shrinking to their text.
+    return LayoutBuilder(
+      builder: (context, outer) => SizedBox(
+        width: outer.hasBoundedWidth ? outer.maxWidth : null,
+        child: _tile(theme),
+      ),
+    );
+  }
+
+  Widget _tile(ThemeData theme) {
     return AppSurface(
       child: LayoutBuilder(
         builder: (context, constraints) {
