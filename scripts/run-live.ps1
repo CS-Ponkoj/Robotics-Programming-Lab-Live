@@ -2,7 +2,9 @@ param(
     [int]$FrontendPort = 8180,
     [int]$BackendPort = 5100,
     [string]$ApiBaseUrl = "https://rpl.ponkoj.com/api",
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    # Restart a running stack without rebuilding (backend-only deploys).
+    [switch]$Restart
 )
 
 # Starts the self-hosted production stack on the lab PC: database migrations,
@@ -26,17 +28,42 @@ if (-not (Select-String -Path (Join-Path $repositoryRoot ".env") -Pattern '^ENVI
     throw "The live launcher requires ENVIRONMENT=production in the repository-root .env."
 }
 
+# One launch at a time. The scheduled task runs this script every five
+# minutes with -SkipBuild as a watchdog; while a deploy is building or
+# restarting, the watchdog must not start a second copy of the stack.
+$watchdog = $SkipBuild -and -not $Restart
+$launchLock = [System.Threading.Mutex]::new($false, "Global\RoboticsProgrammingLab-RPL-Live-Launch")
+$haveLock = $false
+try {
+    $haveLock = $launchLock.WaitOne($(if ($watchdog) { 0 } else { [TimeSpan]::FromMinutes(15) }))
+} catch [System.Threading.AbandonedMutexException] {
+    # A previous launch ended without releasing the lock; it is ours now.
+    $haveLock = $true
+}
+if (-not $haveLock) {
+    if ($watchdog) {
+        Write-Output "Another live launch is in progress; this run changes nothing."
+        exit 0
+    }
+    throw "Another live launch did not finish within 15 minutes."
+}
+trap {
+    if ($haveLock) { $launchLock.ReleaseMutex(); $haveLock = $false }
+    break
+}
+
 $components = @('uvicorn app:app', 'serve_web\.py', 'Caddyfile\.live', 'tunnel run rpl-live')
 $commandLines = @(Get-CimInstance Win32_Process | ForEach-Object { $_.CommandLine } | Where-Object { $_ })
 $runningComponents = @($components | Where-Object { $pattern = $_; $commandLines -match $pattern })
-if ($runningComponents.Count -eq $components.Count) {
+if ($watchdog -and $runningComponents.Count -eq $components.Count) {
     # Already running, so a repeated scheduled run changes nothing.
+    $launchLock.ReleaseMutex()
     exit 0
 }
-if ($runningComponents.Count -gt 0) {
-    # Partly running (for example after a killed start): restart cleanly.
-    & (Join-Path $PSScriptRoot "stop-live.ps1") | Out-Null
-}
+# A deploy builds first while the old stack keeps serving, then replaces it
+# just before starting (see below). A partly running stack (for example after
+# a killed start) is replaced the same way.
+$replaceRunning = $runningComponents.Count -gt 0
 
 # After a reboot Docker Desktop can take several minutes to accept commands.
 for ($i = 0; $i -lt 60; $i++) {
@@ -72,6 +99,10 @@ if (-not $SkipBuild) {
     } finally {
         Pop-Location
     }
+}
+
+if ($replaceRunning) {
+    & (Join-Path $PSScriptRoot "stop-live.ps1") | Out-Null
 }
 
 $release = (git -C $repositoryRoot rev-parse HEAD).Trim()
@@ -112,3 +143,5 @@ Write-Output "Live stack starting at release $($release.Substring(0, 12))."
 Write-Output "AI tutor key: $aiKey. The course switch is in Instructor Studio."
 Write-Output "Local address: http://127.0.0.1:8080/app (API at /api)"
 Write-Output "Logs: $logs"
+$launchLock.ReleaseMutex()
+$haveLock = $false

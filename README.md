@@ -108,6 +108,13 @@ with `scripts/stop-live.ps1`. It requires `ENVIRONMENT=production` and
 `SELF_HOSTED_DATABASE=true` in the machine's private `.env`; see
 `backend/.env.example`.
 
+To deploy, run `scripts/run-live.ps1` on its own: it builds the web app while
+the old stack keeps serving, then replaces the running processes. For a
+backend-only change use `scripts/run-live.ps1 -SkipBuild -Restart`. Only one
+launch runs at a time; the scheduled `RPL-Live` task (a watchdog that runs
+`-SkipBuild` every five minutes) skips its run while a deploy is in progress,
+so it can no longer start a second copy of the stack.
+
 On the live PC the OpenAI key is a managed secret, not a `.env` line: run
 `scripts/set-live-secret.ps1` (hidden prompt; stored encrypted with Windows
 DPAPI for that Windows user under LocalAppData), then restart the stack.
