@@ -509,19 +509,48 @@ class _TelemetryCards extends StatelessWidget {
         spoken: 'Time ${frame.t.toStringAsFixed(1)} seconds',
       ),
     ];
+    // One joined strip of readings with thin dividers, four across when there
+    // is room, otherwise two by two.
     return LayoutBuilder(
       key: const ValueKey('robot-sim-telemetry'),
       builder: (context, constraints) {
-        const gap = 6.0;
-        // Four in a row when there is room, otherwise two by two.
         final perRow = constraints.maxWidth >= 340 ? 4 : 2;
-        final width = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (final card in cards) SizedBox(width: width, child: card),
-          ],
+        Widget row(List<_TelemetryCard> items) => IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < items.length; i++) ...[
+                    if (i > 0)
+                      const VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        color: SimPalette.grid,
+                      ),
+                    Expanded(child: items[i]),
+                  ],
+                ],
+              ),
+            );
+        return Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: SimPalette.floor,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: SimPalette.grid),
+          ),
+          child: perRow == 4
+              ? row(cards)
+              : Column(
+                  children: [
+                    row(cards.sublist(0, 2)),
+                    const Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: SimPalette.grid,
+                    ),
+                    row(cards.sublist(2)),
+                  ],
+                ),
         );
       },
     );
@@ -550,77 +579,70 @@ class _TelemetryCard extends StatelessWidget {
     return Semantics(
       label: spoken,
       excludeSemantics: true,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(6, 6, 8, 6),
-        decoration: BoxDecoration(
-          color: SimPalette.floor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: SimPalette.grid),
-        ),
-        child: Row(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 3,
-              height: 44,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: BorderRadius.circular(2),
+            Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    '$name · $topic',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFCBD5E1),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(
+                    text: value,
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  if (unit.isNotEmpty)
+                    TextSpan(
+                      text: ' $unit',
+                      style: const TextStyle(
+                        color: SimPalette.label,
+                        fontSize: 11,
+                      ),
+                    ),
+                ]),
+                maxLines: 1,
               ),
             ),
-            const SizedBox(width: 7),
-            Expanded(child: _body()),
           ],
         ),
       ),
     );
   }
-
-  Widget _body() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                color: Color(0xFFCBD5E1),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2),
-          ),
-          const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text.rich(
-              TextSpan(children: [
-                TextSpan(
-                  text: value,
-                  style: TextStyle(
-                      color: accent,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()]),
-                ),
-                if (unit.isNotEmpty)
-                  TextSpan(
-                    text: ' $unit',
-                    style:
-                        const TextStyle(color: SimPalette.label, fontSize: 11),
-                  ),
-              ]),
-              maxLines: 1,
-            ),
-          ),
-          Text(
-            topic,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: SimPalette.label, fontSize: 10),
-          ),
-        ],
-      );
 }
 
 /// Fixed colors of the simulated arena, the same in light and dark themes:

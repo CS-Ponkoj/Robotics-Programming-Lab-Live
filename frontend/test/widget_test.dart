@@ -250,6 +250,52 @@ void main() {
     expect(find.text('Check line 3'), findsOneWidget);
   });
 
+  testWidgets('editor tabs keep the editable file and preview a locked one', (
+    WidgetTester tester,
+  ) async {
+    const files = [
+      AssignmentProjectFile(path: 'src/pkg/package.xml', content: '<package/>'),
+      AssignmentProjectFile(path: 'src/pkg/pkg/controller.py', editable: true),
+    ];
+    final selected = <String>[];
+
+    Future<void> show(String path) => tester.pumpWidget(
+          MaterialApp(
+            theme: buildAppTheme(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 900,
+                child: app.ProjectFileStatusBar(
+                  path: path,
+                  editable: path.endsWith('.py'),
+                  files: files,
+                  onFileSelected: (file) => selected.add(file.path),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    // Only the editable file has a tab while it is open.
+    await show(files.last.path);
+    expect(find.byKey(Key('editor-tab-${files.last.path}')), findsOneWidget);
+    expect(find.byKey(Key('editor-tab-${files.first.path}')), findsNothing);
+    expect(find.text('Editable'), findsOneWidget);
+
+    // Opening the locked file adds a closable preview tab.
+    await show(files.first.path);
+    expect(find.byKey(Key('editor-tab-${files.first.path}')), findsOneWidget);
+    expect(find.text('Read only'), findsOneWidget);
+    await tester.tap(
+      find.byKey(Key('editor-tab-close-${files.first.path}')),
+    );
+    expect(selected.last, files.last.path);
+
+    // The editable tab switches back to the editable file.
+    await tester.tap(find.byKey(Key('editor-tab-${files.last.path}')));
+    expect(selected.last, files.last.path);
+  });
+
   test('switching project files replaces the complete code model', () {
     final controller =
         CodeController(language: python, text: 'controller code');
@@ -1084,7 +1130,7 @@ void main() {
     expect(find.byIcon(Icons.fact_check_rounded), findsOneWidget);
     expect(find.text('Results'), findsOneWidget);
     expect(find.text('Review test outcomes and feedback'), findsOneWidget);
-    expect(tester.getSize(find.byType(app.AssignmentPanelHeader)).height, 64);
+    expect(tester.getSize(find.byType(app.AssignmentPanelHeader)).height, 56);
   });
 
   testWidgets('assignment instructions organize content without losing it', (

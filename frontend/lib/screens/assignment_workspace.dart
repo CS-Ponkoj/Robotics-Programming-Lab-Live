@@ -1219,9 +1219,25 @@ class _MyHomePageState extends State<MyHomePage> {
                               : 1,
                           child: Container(
                             key: const Key('assignment-editor-panel'),
-                            color: Theme.of(
+                            margin: useDesktopLayout
+                                ? EdgeInsets.fromLTRB(
+                                    AppSpacing.sm,
+                                    AppSpacing.sm,
+                                    showResizeHandle ? 0 : AppSpacing.sm,
+                                    AppSpacing.sm,
+                                  )
+                                : EdgeInsets.zero,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: workspaceCardDecoration(
                               context,
-                            ).colorScheme.secondaryFixedDim,
+                              framed: useDesktopLayout,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.secondaryFixedDim,
+                            ),
+                            foregroundDecoration: useDesktopLayout
+                                ? workspaceCardEdge()
+                                : null,
                             child: Column(
                               children: [
                                 AssignmentEditorToolbar(
@@ -1478,7 +1494,36 @@ class _MyHomePageState extends State<MyHomePage> {
                                       // Instructions fill the rest of the panel.
                                       if (!showSimTab)
                                         Expanded(
-                                          child: Column(
+                                          child: Container(
+                                            key: const Key(
+                                              'assignment-instructions-card',
+                                            ),
+                                            margin: useDesktopLayout
+                                                ? EdgeInsets.fromLTRB(
+                                                    showResizeHandle
+                                                        ? 0
+                                                        : AppSpacing.sm,
+                                                    showDockedSim &&
+                                                            !_simCollapsed
+                                                        ? 0
+                                                        : AppSpacing.sm,
+                                                    AppSpacing.sm,
+                                                    AppSpacing.sm,
+                                                  )
+                                                : EdgeInsets.zero,
+                                            clipBehavior: Clip.antiAlias,
+                                            decoration: workspaceCardDecoration(
+                                              context,
+                                              framed: useDesktopLayout,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .surface,
+                                            ),
+                                            foregroundDecoration:
+                                                useDesktopLayout
+                                                    ? workspaceCardEdge()
+                                                    : null,
+                                            child: Column(
                                             children: [
                                               AssignmentPanelHeader(
                                                 icon: Icons.menu_book_rounded,
@@ -1564,6 +1609,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                 ),
                                               ),
                                             ],
+                                          ),
                                           ),
                                         ),
                                     ],
@@ -2141,6 +2187,25 @@ class _SolutionSection extends StatelessWidget {
   }
 }
 
+/// Background of a workspace panel; on desktop it is a rounded card with a
+/// light shadow, separated from the next panel by the grey page.
+BoxDecoration workspaceCardDecoration(
+  BuildContext context, {
+  required bool framed,
+  required Color color,
+}) =>
+    BoxDecoration(
+      color: color,
+      borderRadius: framed ? BorderRadius.circular(AppRadii.md) : null,
+      boxShadow: framed ? appCardShadow : null,
+    );
+
+/// The card's visible edge, drawn over the content so it is never hidden.
+BoxDecoration workspaceCardEdge() => BoxDecoration(
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      border: Border.all(color: AppColors.border),
+    );
+
 class AssignmentPanelHeader extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -2162,7 +2227,7 @@ class AssignmentPanelHeader extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      height: 64,
+      height: 56,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -2172,20 +2237,7 @@ class AssignmentPanelHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(AppRadii.sm),
-            ),
-            child: Icon(
-              icon,
-              color: theme.colorScheme.onPrimaryContainer,
-              size: 19,
-            ),
-          ),
+          IconTile(icon: icon, size: 34),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
@@ -2315,20 +2367,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(AppRadii.sm),
-                ),
-                child: Icon(
-                  Icons.code_rounded,
-                  color: theme.colorScheme.onPrimaryContainer,
-                  size: 19,
-                ),
-              ),
+              const IconTile(icon: Icons.code_rounded, size: 34),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
@@ -2636,6 +2675,8 @@ class AssignmentProjectWorkspace extends StatelessWidget {
             path: selectedPath ?? files.first.path,
             editable: selectedFileEditable,
             diagnosticLine: diagnosticLine,
+            files: files,
+            onFileSelected: onFileSelected,
           ),
         Expanded(
           child: Semantics(
@@ -2695,14 +2736,49 @@ class AssignmentProjectWorkspace extends StatelessWidget {
             final line = '\n'.allMatches(beforeCaret).length + 1;
             final column = caret - beforeCaret.lastIndexOf('\n');
             final lineText = code.split('\n')[line - 1];
+            final style = TextStyle(
+              color: palette.lineNumber,
+              fontSize: 12,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            );
+            final path = selectedPath ?? '';
+            final language = path.endsWith('.xml')
+                ? 'XML'
+                : path.endsWith('.cfg')
+                    ? 'Config'
+                    : path.isEmpty || path.endsWith('.py')
+                        ? 'Python'
+                        : 'Plain text';
+            // Position on the left, file details on the right, like the
+            // status bar of a code editor.
             return Container(
               key: const Key('editor-position-status'),
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              color: palette.background,
-              child: Text(
-                'Ln $line, Col $column  ·  Indent level ${editorIndentLevel(lineText)}',
-                style: TextStyle(color: palette.lineNumber, fontSize: 12),
+              decoration: BoxDecoration(
+                color: palette.background,
+                border: Border(
+                  top: BorderSide(
+                    color: palette.lineNumber.withValues(alpha: 0.25),
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Text('Ln $line, Col $column', style: style),
+                  const SizedBox(width: 16),
+                  Flexible(
+                    child: Text(
+                      'Indent level ${editorIndentLevel(lineText)}',
+                      style: style,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(language, style: style),
+                  const SizedBox(width: 16),
+                  Text('Spaces: 4', style: style),
+                ],
               ),
             );
           },
@@ -2932,7 +3008,7 @@ class _AssignmentProjectExplorerState extends State<AssignmentProjectExplorer> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(width: 20),
-          Icon(_fileIcon(row.name), size: 18, color: contentColor),
+          Icon(projectFileIcon(row.name), size: 18, color: contentColor),
         ],
       );
       return _treeRowFrame(
@@ -3222,7 +3298,7 @@ class _AssignmentProjectExplorerState extends State<AssignmentProjectExplorer> {
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
-                          Icon(_fileIcon(name), size: 22, color: iconColor),
+                          Icon(projectFileIcon(name), size: 22, color: iconColor),
                           Positioned(
                             right: -6,
                             bottom: -5,
@@ -3288,19 +3364,6 @@ class _AssignmentProjectExplorerState extends State<AssignmentProjectExplorer> {
       ),
     );
   }
-
-  static IconData _fileIcon(String name) {
-    if (name.endsWith('.py')) {
-      return Icons.code_rounded;
-    }
-    if (name.endsWith('.xml')) {
-      return Icons.data_object_rounded;
-    }
-    if (name.endsWith('.cfg')) {
-      return Icons.tune_rounded;
-    }
-    return Icons.insert_drive_file_outlined;
-  }
 }
 
 class _ProjectFolder {
@@ -3325,68 +3388,181 @@ class _ProjectTreeRow {
   final AssignmentProjectFile? file;
 }
 
+/// Icon for a project file, by its extension.
+IconData projectFileIcon(String name) {
+  if (name.endsWith('.py')) return Icons.code_rounded;
+  if (name.endsWith('.xml')) return Icons.data_object_rounded;
+  if (name.endsWith('.cfg')) return Icons.tune_rounded;
+  return Icons.insert_drive_file_outlined;
+}
+
+/// File tabs above the editor, like a code editor's tab strip. Editable files
+/// always have a tab; a read-only file opened from the tree shows as a
+/// preview tab that can be closed. The right side shows the open file's
+/// state (Editable or Read only) and the line to check after an error.
 class ProjectFileStatusBar extends StatelessWidget {
   const ProjectFileStatusBar({
     super.key,
     required this.path,
     required this.editable,
     this.diagnosticLine,
+    this.files = const [],
+    this.onFileSelected,
   });
 
   final String path;
   final bool editable;
   final int? diagnosticLine;
+  final List<AssignmentProjectFile> files;
+  final ValueChanged<AssignmentProjectFile>? onFileSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final editableFiles = files.where((file) => file.editable).toList();
+    final tabs = <AssignmentProjectFile>[
+      ...editableFiles,
+      if (!editableFiles.any((file) => file.path == path))
+        files.firstWhere(
+          (file) => file.path == path,
+          orElse: () => AssignmentProjectFile(path: path, editable: editable),
+        ),
+    ];
+    final fallback = editableFiles.isEmpty ? null : editableFiles.first;
+    final select = onFileSelected;
+    return Container(
+      key: const Key('project-file-status-bar'),
+      height: 40,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (final file in tabs)
+                  _FileTab(
+                    file: file,
+                    active: file.path == path,
+                    onTap: select == null ? null : () => select(file),
+                    onClose: !file.editable && fallback != null && select != null
+                        ? () => select(fallback)
+                        : null,
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            child: Row(
+              children: [
+                if (diagnosticLine != null) ...[
+                  StatusPill(
+                    key: const Key('editor-diagnostic-line'),
+                    label: 'Check line $diagnosticLine',
+                    color: scheme.error,
+                    icon: Icons.error_outline_rounded,
+                    size: PillSize.small,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                ],
+                StatusPill(
+                  label: editable ? 'Editable' : 'Read only',
+                  color: editable ? scheme.primary : scheme.onSurfaceVariant,
+                  icon: editable ? Icons.edit_outlined : Icons.lock_outline,
+                  size: PillSize.small,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FileTab extends StatelessWidget {
+  const _FileTab({
+    required this.file,
+    required this.active,
+    this.onTap,
+    this.onClose,
+  });
+
+  final AssignmentProjectFile file;
+  final bool active;
+  final VoidCallback? onTap;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      key: const Key('project-file-status-bar'),
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        border: Border(
-          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              path,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          if (diagnosticLine != null) ...[
-            Icon(
-              Icons.error_outline_rounded,
-              size: 15,
-              color: theme.colorScheme.error,
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Text(
-              'Check line $diagnosticLine',
-              key: const Key('editor-diagnostic-line'),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.error,
-                fontWeight: FontWeight.w700,
+    final scheme = theme.colorScheme;
+    final name = file.path.split('/').last;
+    final color = active ? scheme.onSurface : scheme.onSurfaceVariant;
+    final readOnlyNote = file.editable ? '' : ', read only';
+    return Tooltip(
+      message: file.path + readOnlyNote,
+      child: Semantics(
+        button: true,
+        selected: active,
+        label: '$name tab$readOnlyNote',
+        excludeSemantics: true,
+        child: Material(
+          color: active ? scheme.surface : Colors.transparent,
+          child: InkWell(
+            key: Key('editor-tab-${file.path}'),
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 0, 6, 0),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: active ? scheme.primary : Colors.transparent,
+                    width: 2,
+                  ),
+                  right: BorderSide(color: scheme.outlineVariant),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(projectFileIcon(name), size: 16, color: color),
+                  const SizedBox(width: 6),
+                  Text(
+                    name,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: color,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                      fontStyle:
+                          file.editable ? FontStyle.normal : FontStyle.italic,
+                    ),
+                  ),
+                  if (!file.editable) ...[
+                    const SizedBox(width: 4),
+                    Icon(Icons.lock_outline, size: 12, color: color),
+                  ],
+                  if (onClose != null)
+                    IconButton(
+                      key: Key('editor-tab-close-${file.path}'),
+                      tooltip: 'Close $name',
+                      onPressed: onClose,
+                      icon: const Icon(Icons.close_rounded, size: 14),
+                      visualDensity: VisualDensity.compact,
+                      constraints:
+                          const BoxConstraints(minWidth: 28, minHeight: 28),
+                      padding: EdgeInsets.zero,
+                    )
+                  else
+                    const SizedBox(width: 6),
+                ],
               ),
             ),
-            const SizedBox(width: AppSpacing.md),
-          ],
-          Icon(editable ? Icons.edit_outlined : Icons.lock_outline, size: 15),
-          const SizedBox(width: AppSpacing.xs),
-          Text(
-            editable ? 'Editable' : 'Read only',
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -3423,7 +3599,8 @@ class WorkspaceResizeHandle extends StatelessWidget {
           onHorizontalDragUpdate: (details) => onDragUpdate(details.delta.dx),
           child: Container(
             width: 12,
-            color: theme.colorScheme.surface,
+            // Transparent so the grey page shows between the two cards.
+            color: Colors.transparent,
             alignment: Alignment.center,
             child: Container(
               width: 2,
