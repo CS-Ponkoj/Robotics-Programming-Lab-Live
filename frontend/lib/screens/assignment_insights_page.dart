@@ -175,7 +175,7 @@ class _Stat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 170,
+      width: 200,
       child: StatTile(label: label, value: value),
     );
   }

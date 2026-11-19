@@ -373,7 +373,7 @@ class _StudioLinkCard extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           // Room for a two-line description, so cards side by side match.
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 60),
+            constraints: const BoxConstraints(minHeight: 68),
             child: Row(
             children: [
               IconTile(icon: icon, size: 44),
