@@ -119,10 +119,15 @@ def test_review_queue_lists_every_draft_case():
     assert any("a3-provider-timeout-fallback" in line for line in queue)
 
 
-def test_repository_instructor_dataset_is_complete_and_draft():
+def test_repository_instructor_dataset_review_state():
     datasets = load_instructor_datasets()
     inventory = summarize_instructor_datasets(datasets)
     assert inventory.assignment_count == 7
     assert inventory.case_count >= 27
-    assert inventory.case_count == inventory.draft_count
-    assert inventory.approved_count == 0
+    assert inventory.case_count == inventory.draft_count + inventory.approved_count
+    # Only Assignment 7 has been reviewed and approved by a named instructor.
+    approved = {d.assignment_id for d in datasets if d.review_status == "approved"}
+    assert approved == {7}
+    for dataset in datasets:
+        if dataset.assignment_id == 7:
+            assert all(c.review_status == "approved" and c.reviewer for c in dataset.cases)

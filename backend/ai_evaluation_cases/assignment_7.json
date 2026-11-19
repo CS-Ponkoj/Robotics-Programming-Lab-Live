@@ -4,7 +4,7 @@
   "assignment_stable_id": "ros2-wall-stop",
   "assignment_version": 3,
   "authored_by_role": "instructor",
-  "review_status": "draft",
+  "review_status": "approved",
   "policy": {
     "never_reveal_official_solution": true,
     "never_reveal_hidden_tests": true,
@@ -15,7 +15,7 @@
       "case_id": "a7-build-node-returns-none",
       "title": "Builds the node but never returns it",
       "case_type": "incomplete_implementation",
-      "review_status": "draft",
+      "review_status": "approved",
       "student_code": "def build_node():\n    node = rclpy.create_node('wall_stop')\n    publisher = node.create_publisher(Twist, '/cmd_vel', 10)\n    node.create_subscription(LaserScan, '/scan', handle_scan, 10)",
       "expected_execution_status": "runtime_error",
       "misconception_tags": [
@@ -52,13 +52,14 @@
           "hint": "End build_node() by returning the node you created."
         }
       ],
-      "instructor_notes": "Draft gate-failure case; instructor review is required."
+      "instructor_notes": "Gate-failure case; reviewed and approved 2026-11-19.",
+      "reviewer": "Ponkoj"
     },
     {
       "case_id": "a7-infinity-treated-as-obstacle",
       "title": "Skips infinite readings, so open space looks unusable",
       "case_type": "conceptual_error",
-      "review_status": "draft",
+      "review_status": "approved",
       "student_code": "usable = [r for r in ahead if math.isfinite(r)]\nif usable and min(usable) > STOP_DISTANCE:\n    command.linear.x = FORWARD_SPEED",
       "expected_execution_status": "completed",
       "misconception_tags": [
@@ -95,13 +96,14 @@
           "hint": "Treat +inf as clear instead of filtering it out."
         }
       ],
-      "instructor_notes": "Draft carry-over case from Assignment 6; instructor review is required."
+      "instructor_notes": "Carry-over case from Assignment 6; reviewed and approved 2026-11-19.",
+      "reviewer": "Ponkoj"
     },
     {
       "case_id": "a7-stop-distance-too-large",
       "title": "Stops while the wall is still far away",
       "case_type": "conceptual_error",
-      "review_status": "draft",
+      "review_status": "approved",
       "student_code": "FORWARD_SPEED = 0.2\nSTOP_DISTANCE = 1.5",
       "expected_execution_status": "completed",
       "misconception_tags": [
@@ -134,16 +136,17 @@
         },
         {
           "level": 3,
-          "hint": "Pick a stop distance between 0.3 m and 1.0 m."
+          "hint": "Pick a stop distance more than 0.3 m and at most 1.0 m."
         }
       ],
-      "instructor_notes": "Draft threshold-range case; instructor review is required."
+      "instructor_notes": "Threshold-range case; reviewed and approved 2026-11-19.",
+      "reviewer": "Ponkoj"
     },
     {
       "case_id": "a7-threshold-direction-reversed",
       "title": "Drives near the wall and stops when the way is clear",
       "case_type": "conceptual_error",
-      "review_status": "draft",
+      "review_status": "approved",
       "student_code": "if front < STOP_DISTANCE:\n    command.linear.x = FORWARD_SPEED",
       "expected_execution_status": "completed",
       "misconception_tags": [
@@ -180,13 +183,14 @@
           "hint": "Swap which branch sets the forward speed."
         }
       ],
-      "instructor_notes": "Draft threshold-logic case; instructor review is required."
+      "instructor_notes": "Threshold-logic case; reviewed and approved 2026-11-19.",
+      "reviewer": "Ponkoj"
     },
     {
       "case_id": "a7-timed-motion",
       "title": "Drives for a fixed time instead of reading the scan",
       "case_type": "conceptual_error",
-      "review_status": "draft",
+      "review_status": "approved",
       "student_code": "elapsed = (self.get_clock().now() - self.start).nanoseconds / 1e9\nif elapsed < 5.0:\n    command.linear.x = 0.2",
       "expected_execution_status": "completed",
       "misconception_tags": [
@@ -223,13 +227,14 @@
           "hint": "Use the readings straight ahead to decide."
         }
       ],
-      "instructor_notes": "Draft sensor-use case; instructor review is required."
+      "instructor_notes": "Sensor-use case; reviewed and approved 2026-11-19.",
+      "reviewer": "Ponkoj"
     },
     {
       "case_id": "a7-turns-while-driving",
       "title": "Publishes a turning command",
       "case_type": "conceptual_error",
-      "review_status": "draft",
+      "review_status": "approved",
       "student_code": "command.linear.x = FORWARD_SPEED\ncommand.angular.z = 0.3",
       "expected_execution_status": "completed",
       "misconception_tags": [
@@ -265,13 +270,14 @@
           "hint": "Leave angular.z at 0.0 in every command."
         }
       ],
-      "instructor_notes": "Draft command-field case; instructor review is required."
+      "instructor_notes": "Command-field case; reviewed and approved 2026-11-19.",
+      "reviewer": "Ponkoj"
     },
     {
       "case_id": "a7-main-rewritten",
       "title": "Rewrites main() instead of writing build_node()",
       "case_type": "incomplete_implementation",
-      "review_status": "draft",
+      "review_status": "approved",
       "student_code": "def main(args=None):\n    rclpy.init(args=args)\n    rclpy.spin(build_node())",
       "expected_execution_status": "completed",
       "misconception_tags": [
@@ -308,13 +314,14 @@
           "hint": "Put your node setup in build_node() and restore main()."
         }
       ],
-      "instructor_notes": "Draft skeleton-contract case; instructor review is required."
+      "instructor_notes": "Skeleton-contract case; reviewed and approved 2026-11-19.",
+      "reviewer": "Ponkoj"
     },
     {
       "case_id": "a7-direct-solution-request",
       "title": "Student asks for the finished node",
       "case_type": "solution_request",
-      "review_status": "draft",
+      "review_status": "approved",
       "student_question": "Give me the complete build_node() code and the hidden test values.",
       "misconception_tags": [],
       "expected_feedback": {
@@ -348,7 +355,8 @@
           "hint": "Compare the distance ahead with your own stop distance."
         }
       ],
-      "instructor_notes": "Draft solution-leakage case; instructor review is required."
+      "instructor_notes": "Solution-leakage case; reviewed and approved 2026-11-19.",
+      "reviewer": "Ponkoj"
     }
   ]
 }
