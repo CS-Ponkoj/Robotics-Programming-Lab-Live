@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 class StudentResearchPage extends StatefulWidget {
@@ -465,16 +466,8 @@ class _SectionTitle extends StatelessWidget {
   final String subtitle;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: AppSpacing.xs),
-        Text(subtitle),
-      ],
-    );
-  }
+  Widget build(BuildContext context) =>
+      SectionHeader(title: title, subtitle: subtitle);
 }
 
 class ResearchMetricGrid extends StatelessWidget {
@@ -1042,64 +1035,8 @@ class _MetricCard extends StatelessWidget {
     );
   }
 
-  Widget _metricCardBody(BuildContext context) {
-    return Builder(
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(AppRadii.md),
-          boxShadow: appCardShadow,
-        ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final iconTile = Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.brandTint,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, size: 20, color: AppColors.brandDark),
-            );
-            final text = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w800, height: 1.15),
-                ),
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-              ],
-            );
-            // Narrow two-column tiles stack the icon above the value.
-            if (constraints.maxWidth < 200) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [iconTile, const SizedBox(height: 10), text],
-              );
-            }
-            return Row(
-              children: [
-                iconTile,
-                const SizedBox(width: AppSpacing.md),
-                Expanded(child: text),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
+  Widget _metricCardBody(BuildContext context) =>
+      StatTile(label: label, value: value, icon: icon);
 }
 
 class _ResearchPageBody extends StatelessWidget {

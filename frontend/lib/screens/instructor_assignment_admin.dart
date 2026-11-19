@@ -13,6 +13,7 @@ import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 /// Instructor Studio home: one card per instructor tool.
@@ -432,17 +433,12 @@ class _StudioAssignmentRow extends StatelessWidget {
     final theme = Theme.of(context);
     final published = assignment['status'] == 'published';
     final ros2 = '${assignment['language']}'.contains('ros2');
-    Widget chip(String label, Color background, Color foreground) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(AppRadii.pill),
-          ),
-          child: Text(
-            label,
-            style: theme.textTheme.labelSmall
-                ?.copyWith(color: foreground, fontWeight: FontWeight.w700),
-          ),
+    Widget chip(String label, Color background, Color foreground) =>
+        StatusPill(
+          label: label,
+          color: foreground,
+          background: background,
+          size: PillSize.small,
         );
 
     // The row's main area opens the editor and carries the assignment's

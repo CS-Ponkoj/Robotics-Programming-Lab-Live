@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:iuse_demo/screens/sign_in_history_page.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/feature_flags.dart';
 import 'package:iuse_demo/services/student_admin_api.dart';
 
@@ -913,22 +914,11 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                       student['role'] == 'instructor';
                                   Widget chip(String label, Color background,
                                           Color foreground) =>
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 9, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: background,
-                                          borderRadius: BorderRadius.circular(
-                                              AppRadii.pill),
-                                        ),
-                                        child: Text(
-                                          label,
-                                          style: theme.textTheme.labelSmall
-                                              ?.copyWith(
-                                            color: foreground,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
+                                      StatusPill(
+                                        label: label,
+                                        color: foreground,
+                                        background: background,
+                                        size: PillSize.small,
                                       );
                                   return Card(
                                     child: ListTile(

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iuse_demo/models/simulation_trace.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/widgets/robot_sim_view.dart';
 
 /// Where the Simulation panel is shown in the workspace.
@@ -345,18 +346,13 @@ class _StatusChip extends StatelessWidget {
                         scheme.secondaryContainer,
                         scheme.onSecondaryContainer
                       );
-        return Container(
+        return StatusPill(
           key: const Key('robot-sim-status'),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: text)),
+          label: label,
+          color: text,
+          background: color,
+          dot: true,
+          size: PillSize.small,
         );
       },
     );

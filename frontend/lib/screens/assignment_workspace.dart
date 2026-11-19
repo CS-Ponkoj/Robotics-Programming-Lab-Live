@@ -16,6 +16,7 @@ import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/theme/editor_palette.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/widgets/earlier_draft_banner.dart';
 import 'package:iuse_demo/widgets/playground_dialog.dart';
 import 'package:iuse_demo/widgets/robot_sim_panel.dart';
@@ -4718,20 +4719,13 @@ class AiGeneratedBadge extends StatelessWidget {
   const AiGeneratedBadge({super.key});
 
   @override
-  Widget build(BuildContext context) => Container(
-        key: const Key('ai-generated-badge'),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: AppColors.ai,
-          borderRadius: BorderRadius.circular(AppRadii.pill),
-        ),
-        child: Text(
-          'AI-generated',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-        ),
+  Widget build(BuildContext context) => const StatusPill(
+        key: Key('ai-generated-badge'),
+        label: 'AI-generated',
+        color: AppColors.ai,
+        icon: Icons.auto_awesome_rounded,
+        solid: true,
+        size: PillSize.small,
       );
 }
 

@@ -5,6 +5,7 @@ import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/services/course_content_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/widgets/landing_page_header.dart';
 import 'package:iuse_demo/widgets/lesson_reader.dart';
@@ -289,31 +290,8 @@ class _QuizProgress extends StatelessWidget {
         ? Theme.of(context).colorScheme.outline
         : performanceColor(latest);
     final neutral = Theme.of(context).colorScheme.onSurfaceVariant;
-    Widget badge(String label, Color badgeColor, {IconData? icon}) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: badgeColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 16, color: badgeColor),
-                const SizedBox(width: 7),
-              ],
-              Flexible(
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: badgeColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-              ),
-            ],
-          ),
-        );
+    Widget badge(String label, Color badgeColor, {IconData? icon}) =>
+        StatusPill(label: label, color: badgeColor, icon: icon);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -19,6 +19,7 @@ import 'package:iuse_demo/navigation/app_entry_policy.dart';
 import 'package:iuse_demo/screens/assignment_list.dart';
 import 'package:iuse_demo/screens/login_page.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/theme/editor_palette.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -303,6 +304,58 @@ void main() {
     );
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getString('auth_session_token'), isNull);
+  });
+
+  testWidgets('shared blocks draw panels, pills and stat tiles', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: AppPanel(
+              title: 'Sensor telemetry',
+              subtitle: 'Last replay',
+              icon: Icons.sensors_rounded,
+              actions: const [
+                StatusPill(label: 'Live', color: AppColors.success, dot: true),
+              ],
+              footer: const Text('Refresh 500 ms'),
+              child: const Column(
+                children: [
+                  StatTile(label: 'Forward', value: '0.336', unit: 'm'),
+                  StatusPill(
+                    label: 'AI-generated',
+                    color: AppColors.ai,
+                    solid: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Sensor telemetry'), findsOneWidget);
+    expect(find.text('Last replay'), findsOneWidget);
+    expect(find.text('Refresh 500 ms'), findsOneWidget);
+    expect(find.text('Forward'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is RichText &&
+            widget.text.toPlainText() == '0.336 m',
+      ),
+      findsOneWidget,
+    );
+    // A solid pill puts white text on its colour so the label stays legible.
+    final aiText = tester.widget<Text>(find.text('AI-generated'));
+    expect(aiText.style?.color, Colors.white);
+    final liveText = tester.widget<Text>(find.text('Live'));
+    expect(liveText.style?.color, AppColors.success);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('shared app theme defines the visual system', (
@@ -1768,14 +1821,11 @@ void main() {
 
     expect(find.text('Attempted'), findsOneWidget);
     expect(find.text('Last score: 60%'), findsOneWidget);
-    final badge = tester.widget<Container>(
+    // The latest score badge takes the score's performance colour.
+    final badge = tester.widget<StatusPill>(
       find.byKey(const Key('latest-score-badge')),
     );
-    final decoration = badge.decoration! as BoxDecoration;
-    expect(
-        decoration.color,
-        Color.alphaBlend(
-            performanceColor(60).withValues(alpha: 0.12), Colors.white));
+    expect(badge.color, performanceColor(60));
     expect(find.text('Best score: 60%'), findsOneWidget);
     expect(find.text('Attempted: 1'), findsOneWidget);
     expect(find.text('Continue assignment'), findsOneWidget);

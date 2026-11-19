@@ -12,6 +12,7 @@ import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:http/http.dart' as http;
 
 const landingPageBackgroundColor = AppColors.pageBackground;
@@ -238,16 +239,10 @@ class AssignmentSkeletonCard extends StatelessWidget {
       );
     }
 
-    return Container(
+    return AppSurface(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
-      ),
+      radius: AppRadii.lg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -874,49 +869,25 @@ class AssignmentCard extends StatelessWidget {
         : progressState == AssignmentProgressState.inProgress
             ? theme.colorScheme.primary
             : theme.colorScheme.onSurfaceVariant;
-    final statusBackground = progressState == AssignmentProgressState.completed
-        ? AppColors.successContainer
-        : progressState == AssignmentProgressState.inProgress
-            ? theme.colorScheme.primaryContainer
-            : theme.colorScheme.surfaceContainerHighest;
 
     final ros2 = isRos2Assignment(a);
     final completed = progressState == AssignmentProgressState.completed;
     // On phones the track tag moves into the status row so titles keep the
     // full card width.
     final compact = MediaQuery.sizeOf(context).width < 600;
-    final trackTag = Container(
+    final trackTag = StatusPill(
       key: const Key('assignment-track-tag'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: ros2
-            ? theme.colorScheme.secondaryContainer
-            : AppColors.neutralContainer,
-        borderRadius: BorderRadius.circular(AppRadii.pill),
-      ),
-      child: Text(
-        ros2 ? 'ROS 2' : 'Python',
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: ros2
-              ? theme.colorScheme.onSecondaryContainer
-              : AppColors.inkMuted,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+      label: ros2 ? 'ROS 2' : 'Python',
+      size: PillSize.small,
+      color: ros2 ? theme.colorScheme.secondary : AppColors.inkMuted,
     );
 
-    return Container(
+    return AppSurface(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(
-          color: completed
-              ? AppColors.success.withValues(alpha: 0.45)
-              : AppColors.border,
-        ),
-        boxShadow: appCardShadow,
-      ),
+      radius: AppRadii.lg,
+      padding: EdgeInsets.zero,
+      borderColor:
+          completed ? AppColors.success.withValues(alpha: 0.45) : null,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
@@ -990,121 +961,45 @@ class AssignmentCard extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     if (compact) trackTag,
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusBackground,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            switch (progressState) {
-                              AssignmentProgressState.completed =>
-                                Icons.check_circle_rounded,
-                              AssignmentProgressState.attempted =>
-                                Icons.science_outlined,
-                              AssignmentProgressState.inProgress =>
-                                Icons.edit_outlined,
-                              AssignmentProgressState.notStarted =>
-                                Icons.schedule_rounded,
-                            },
-                            size: 16,
-                            color: statusColor,
-                          ),
-                          const SizedBox(width: 7),
-                          Text(
-                            statusText,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: statusColor,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+                    StatusPill(
+                      label: statusText,
+                      color: statusColor,
+                      icon: switch (progressState) {
+                        AssignmentProgressState.completed =>
+                          Icons.check_circle_rounded,
+                        AssignmentProgressState.attempted =>
+                          Icons.science_outlined,
+                        AssignmentProgressState.inProgress =>
+                          Icons.edit_outlined,
+                        AssignmentProgressState.notStarted =>
+                          Icons.schedule_rounded,
+                      },
                     ),
                     if (hasAccuracy)
-                      Container(
+                      StatusPill(
                         key: const Key('best-score-badge'),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.neutralContainer,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
+                        label:
                             'Best score: ${learningProgress.bestScores[a.id] ?? score}%',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                                color: performanceColor(
-                                    learningProgress.bestScores[a.id] ??
-                                        score!),
-                                fontWeight: FontWeight.w700)),
+                        color: performanceColor(
+                            learningProgress.bestScores[a.id] ?? score!),
                       ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                          color: AppColors.neutralContainer,
-                          borderRadius: BorderRadius.circular(999)),
-                      child: Text(
+                    StatusPill(
+                      label:
                           'Attempted: ${learningProgress.attemptCounts[a.id] ?? 0}',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w700)),
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                     if (hasAccuracy)
-                      Container(
+                      StatusPill(
                         key: const Key('latest-score-badge'),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Color.alphaBlend(
-                              scoreColor.withValues(alpha: 0.12), Colors.white),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          'Last score: ${lastAttemptAccuracy[a.id]}%',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: scoreColor,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        label: 'Last score: ${lastAttemptAccuracy[a.id]}%',
+                        color: scoreColor,
                       ),
                     if (solutionRevealed)
-                      Container(
+                      StatusPill(
                         key: const Key('solution-viewed-badge'),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.visibility_rounded,
-                              size: 16,
-                              color: theme.colorScheme.onPrimaryContainer,
-                            ),
-                            const SizedBox(width: 7),
-                            Text(
-                              'Solution viewed',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
+                        label: 'Solution viewed',
+                        icon: Icons.visibility_rounded,
+                        color: theme.colorScheme.primary,
                       ),
                   ],
                 );
