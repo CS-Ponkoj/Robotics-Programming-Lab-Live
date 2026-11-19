@@ -3,6 +3,10 @@
 The robot moves with the latest /cmd_vel command and every /scan is computed
 from where the robot is now, so the student's node controls the robot in a
 closed loop. The replay is for students to watch; it never changes grading.
+
+Assignments whose node reads the course's four-sector summary instead of the
+raw scan set ``flbr_topic`` in their grader config; the harness then publishes
+rse_msgs/Flbr computed from the same simulated scan.
 """
 
 from __future__ import annotations
@@ -20,7 +24,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from ros2_callback_audit import launch_student, summarize_student_failure
 from ros2_sim_world import (
-    RANGE_MAX, RANGE_MIN, SCAN_BEAMS, SCAN_INCREMENT_DEG, SCAN_MIN_DEG, Simulation, scan,
+    RANGE_MAX, RANGE_MIN, SCAN_BEAMS, SCAN_INCREMENT_DEG, SCAN_MIN_DEG, Simulation, flbr,
+    scan,
 )
 
 
@@ -67,6 +72,7 @@ def main() -> None:
     executable = str(config.get("executable", "controller"))
     command_topic = str(config.get("topic", "/cmd_vel"))
     scan_topic = str(config.get("scan_topic", "/scan"))
+    flbr_topic = str(config.get("flbr_topic") or "")
     scenario = config["simulation"]
     simulation = Simulation.from_scenario(scenario)
     initial_walls = list(simulation.walls)
@@ -79,10 +85,27 @@ def main() -> None:
         lambda message: received.append((float(message.linear.x), float(message.angular.z))),
         10,
     )
-    scan_publisher = monitor.create_publisher(LaserScan, scan_topic, 10)
-    student, audit_fd = launch_student(package, executable, "open", command_topic, scan_topic)
+    if flbr_topic:
+        from rse_msgs.msg import Flbr
+
+        flbr_publisher = monitor.create_publisher(Flbr, flbr_topic, 10)
+        student, audit_fd = launch_student(package, executable, "scan", command_topic, flbr_topic)
+    else:
+        scan_publisher = monitor.create_publisher(LaserScan, scan_topic, 10)
+        student, audit_fd = launch_student(package, executable, "open", command_topic, scan_topic)
 
     def publish_scan(ranges: list[float]) -> None:
+        if flbr_topic:
+            sectors = flbr(ranges)
+            summary = Flbr()
+            summary.header.stamp = monitor.get_clock().now().to_msg()
+            summary.header.frame_id = "laser"
+            summary.front = sectors["front"]
+            summary.left = sectors["left"]
+            summary.back = sectors["back"]
+            summary.right = sectors["right"]
+            flbr_publisher.publish(summary)
+            return
         message = LaserScan()
         message.header.stamp = monitor.get_clock().now().to_msg()
         message.header.frame_id = "laser"
@@ -171,7 +194,8 @@ def main() -> None:
                     next_physics += PHYSICS_PERIOD
             simulation.record()
             if (
-                student.poll() is None
+                not flbr_topic
+                and student.poll() is None
                 and time.monotonic() - harness_started < PROBE_LATEST_START
             ):
                 sensitivity = probe_beams()
@@ -192,6 +216,12 @@ def main() -> None:
         runtime_error = (
             "build_node() returned None or something that is not a ROS node, so there was "
             "no robot to drive. Create your node and return it at the end of build_node()."
+        )
+    if not ready and not runtime_error and flbr_topic:
+        runtime_error = (
+            "The node did not publish on /cmd_vel within 5 seconds, so the robot never moved. "
+            "Check that it creates the /cmd_vel publisher and the /flbr subscription and "
+            "publishes one Twist for each message."
         )
     if not ready and not runtime_error:
         runtime_error = (

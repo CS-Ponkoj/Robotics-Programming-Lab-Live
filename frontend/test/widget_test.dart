@@ -1700,6 +1700,61 @@ void main() {
     expect(nextAssignmentFor(assignments), isNull);
   });
 
+  testWidgets('course numbers replace IDs where students see them', (
+    WidgetTester tester,
+  ) async {
+    // The ID stays 7 for records; students see this course's number, 1.
+    final parsed = AssignmentDto.fromJson({
+      'id': 7,
+      'title': 'Assignment 7: Stop Before the Wall with ROS 2',
+      'description': 'Stop before the wall.',
+      'assignment_html': '',
+      'starter_code': '',
+      'display_number': 1,
+      'vals': <String, dynamic>{},
+    });
+    expect(parsed.id, 7);
+    expect(parsed.displayNumber, 1);
+    expect(parsed.shownNumber, 1);
+    final unnumbered = AssignmentDto.fromJson({
+      'id': 6,
+      'title': 'Assignment 6: Stop for an Obstacle',
+      'description': '',
+      'assignment_html': '',
+      'starter_code': '',
+      'vals': <String, dynamic>{},
+    });
+    expect(unnumbered.shownNumber, 6);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: ListView(
+              children: [
+                ProgressSummary(
+                  totalAssignments: 2,
+                  nextAssignment: parsed,
+                  onOpenNext: () {},
+                ),
+                AssignmentCard(
+                  a: parsed,
+                  theme: Theme.of(context),
+                  onReturn: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Assignment 1 · Stop Before the Wall with ROS 2'),
+        findsOneWidget);
+    expect(find.text('01'), findsOneWidget);
+    expect(find.text('07'), findsNothing);
+  });
+
   testWidgets('progress summary offers the next assignment', (
     WidgetTester tester,
   ) async {

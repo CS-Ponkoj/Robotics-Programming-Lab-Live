@@ -16,17 +16,30 @@ MAX_FILE_CHARS = 100_000
 ALLOWED_IMPORT_ROOTS = frozenset(
     {"geometry_msgs", "math", "rclpy", "sensor_msgs"}
 )
+# Extra import roots an assignment may opt into with grader_config
+# "extra_import_roots"; only course interfaces built into the image qualify.
+OPTIONAL_IMPORT_ROOTS = frozenset({"rse_msgs"})
 ROS2_HARNESSES = {
     "drive_forward": "/grader/ros2_topic_harness.py",
     "obstacle_stop": "/grader/ros2_obstacle_harness.py",
     "wall_stop_open": "/grader/ros2_wall_stop_harness.py",
+    "open_side": "/grader/ros2_open_side_harness.py",
 }
+# Course interfaces (rse_msgs) built into the image; see Dockerfile.ros2.
+COURSE_OVERLAY_SETUP = "/opt/rse_ws/install/setup.bash"
 SIMULATION_HARNESS = "/grader/ros2_sim_harness.py"
 HARNESS_TIMEOUT_SECONDS = 12
 SIMULATION_TIMEOUT_SECONDS = 16
 
 
-def validate_controller(code: str) -> None:
+def allowed_import_roots(config: dict) -> frozenset[str]:
+    extra = config.get("extra_import_roots", []) if isinstance(config, dict) else []
+    if not isinstance(extra, list):
+        return ALLOWED_IMPORT_ROOTS
+    return ALLOWED_IMPORT_ROOTS | (frozenset(map(str, extra)) & OPTIONAL_IMPORT_ROOTS)
+
+
+def validate_controller(code: str, allowed: frozenset[str] = ALLOWED_IMPORT_ROOTS) -> None:
     tree = ast.parse(code, filename="controller.py", mode="exec")
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -39,7 +52,7 @@ def validate_controller(code: str) -> None:
             continue
         for name in names:
             root = name.split(".", 1)[0]
-            if root not in ALLOWED_IMPORT_ROOTS:
+            if root not in allowed:
                 raise ImportError(f"Import of '{name}' is not allowed")
 
 
@@ -50,7 +63,7 @@ def prepare_workspace(request: dict) -> None:
         raise ValueError("A non-empty controller.py submission is required")
     if not isinstance(files, list) or len(files) > MAX_PROJECT_FILES:
         raise ValueError("Invalid ROS project file manifest")
-    validate_controller(code)
+    validate_controller(code, allowed_import_roots(request.get("config", {})))
 
     editable_count = 0
     for item in files:
@@ -157,8 +170,12 @@ def evaluate(request: dict) -> dict:
     except ValueError as error:
         return failure(str(error))
     config_json = json.dumps(config)
+    overlay = (
+        f"source {COURSE_OVERLAY_SETUP} && " if Path(COURSE_OVERLAY_SETUP).is_file() else ""
+    )
     shell_command = (
         "source /opt/ros/jazzy/setup.bash && "
+        f"{overlay}"
         "source /workspace/install/setup.bash && "
         f"python3 {harness_path}"
     )

@@ -169,8 +169,99 @@ def wall_stop_findings(passed: dict[str, bool], observations: dict) -> dict[str,
     return findings
 
 
+def _turn(phase: dict) -> float | None:
+    """The single turn direction published in a phase: +1, -1, 0, or None if mixed."""
+    low, high = _number(phase, "angular_min"), _number(phase, "angular_max")
+    if low is None or high is None:
+        return None
+    if low > 0.25 and high > 0.25:
+        return 1.0
+    if low < -0.25 and high < -0.25:
+        return -1.0
+    if abs(low) <= STOP_TOLERANCE and abs(high) <= STOP_TOLERANCE:
+        return 0.0
+    return None
+
+
+def open_side_findings(passed: dict[str, bool], observations: dict) -> dict[str, Finding]:
+    """Findings for the turn-toward-the-open-side harness (Assignment 8)."""
+    findings: dict[str, Finding] = {}
+    clear = _phase(observations, "clear")
+    differ = _phase(observations, "clear-sides-differ")
+    left_open = _phase(observations, "left-open")
+    right_open = _phase(observations, "right-open")
+    threshold = _phase(observations, "threshold")
+    sides_equal = _phase(observations, "sides-equal")
+    side_unknown = _phase(observations, "side-unknown")
+    resume = _phase(observations, "resume")
+
+    if not passed.get("clear-path-forward", True):
+        if _turn(clear) not in (None, 0.0) or _turn(differ) not in (None, 0.0):
+            findings["clear-path-forward"] = Finding(
+                "turns-while-clear",
+                "Your robot turned while the front was clear; with the front clear, "
+                "keep angular.z at 0.0 and drive straight.",
+            )
+        elif _drives(clear) and not (0.18 <= (_number(clear, "linear_max") or 0.0) <= 0.22):
+            findings["clear-path-forward"] = Finding(
+                "forward-speed-wrong",
+                f"Your robot drove at linear.x = {_number(clear, 'linear_max'):.2f} m/s "
+                "with the front clear; the rule is 0.20 m/s.",
+            )
+        elif _stopped(clear) and _drives(left_open):
+            findings["clear-path-forward"] = Finding(
+                "front-check-reversed",
+                "Your robot stopped when the front was 2.0 m away and drove when it "
+                "was 0.5 m away: the front comparison is reversed.",
+            )
+    if not passed.get("turn-toward-open-side", True):
+        left_turn, right_turn = _turn(left_open), _turn(right_open)
+        if left_turn == -1.0 and right_turn == 1.0:
+            findings["turn-toward-open-side"] = Finding(
+                "turn-direction-swapped",
+                "Your robot turned right when the left had more space and left when the "
+                "right had more space: positive angular.z turns left.",
+            )
+        elif left_turn == 0.0 and right_turn == 0.0:
+            findings["turn-toward-open-side"] = Finding(
+                "no-turn-when-blocked",
+                "Your robot did not turn when the front was blocked; set angular.z to "
+                "+0.5 or -0.5 toward the side with more space.",
+            )
+    if not passed.get("stop-at-threshold", True) and _drives(threshold):
+        findings["stop-at-threshold"] = Finding(
+            "threshold-boundary",
+            "Your robot drove with the front exactly 0.75 m away; 0.75 m counts as "
+            "blocked, so drive only when the front is greater than 0.75 m.",
+        )
+    if not passed.get("equal-sides-turn-right", True) and _turn(sides_equal) == 1.0:
+        findings["equal-sides-turn-right"] = Finding(
+            "tie-goes-left",
+            "Your robot turned left when left and right were equal; left is not "
+            "greater, so the rule turns right.",
+        )
+    if not passed.get("unknown-distance-safe", True) and _turn(side_unknown) == -1.0:
+        findings["unknown-distance-safe"] = Finding(
+            "nan-side-chosen",
+            "Your robot turned right, toward a side whose distance was NaN (unknown); "
+            "treat NaN as no space so the robot turns toward the known open side.",
+        )
+    if (
+        not passed.get("resume-forward", True)
+        and _stopped(resume)
+        and _drives(clear)
+    ):
+        findings["resume-forward"] = Finding(
+            "open-side-no-resume",
+            "Your robot stayed stopped after the front cleared again; decide from "
+            "every /flbr message instead of remembering that it stopped.",
+        )
+    return findings
+
+
 _CLASSIFIERS: dict[str, Callable[[dict[str, bool], dict], dict[str, Finding]]] = {
     "wall_stop_open": wall_stop_findings,
+    "open_side": open_side_findings,
 }
 
 
@@ -292,6 +383,105 @@ HINT_LADDERS: dict[str, HintLadder] = {
             "Leave angular.z at 0.0 in every command you publish.",
         ),
         "Keep angular.z at 0.0 and rerun the tests.",
+    ),
+    "turns-while-clear": HintLadder(
+        "Your robot turns even though the front is clear.",
+        "When the front distance is greater than 0.75 m, which value should angular.z have?",
+        (
+            "With the front clear the robot drives straight. Which branch sets angular.z?",
+            "Turning belongs only to the blocked case; the clear case keeps angular.z at 0.0.",
+            "Use one if/else on the front distance: the drive branch sets only linear.x.",
+            "When the front is greater than 0.75 m, publish linear.x = 0.20 and leave angular.z at 0.0.",
+        ),
+        "Make the clear branch drive straight and rerun the tests.",
+    ),
+    "forward-speed-wrong": HintLadder(
+        "Your robot drives with the front clear, but not at the required speed.",
+        "Which value does your node publish as linear.x when the front is clear?",
+        (
+            "Compare the speed you published with the rule: 0.20 m/s.",
+            "Check the forward-speed attribute set in __init__ and where you use it.",
+            "Use self.forward_speed for linear.x instead of a different number.",
+            "Publish linear.x = self.forward_speed (0.20 m/s) whenever the front is clear.",
+        ),
+        "Use the given forward speed and rerun the tests.",
+    ),
+    "front-check-reversed": HintLadder(
+        "The front comparison is reversed: the robot stops when clear and drives when blocked.",
+        "If the front distance is larger than 0.75 m, is the way ahead clear or blocked?",
+        (
+            "Your robot did the opposite of the rule. Look at the comparison with the stop distance.",
+            "A large front distance means the obstacle is far away, so the robot should drive.",
+            "Read your if-condition aloud with a front of 2.0 m and a stop distance of 0.75 m.",
+            "Drive when front > self.stop_distance; otherwise stop and turn.",
+        ),
+        "Fix the comparison direction and rerun the tests.",
+    ),
+    "turn-direction-swapped": HintLadder(
+        "Your robot turns toward the side with less space.",
+        "Which sign of angular.z turns a ROS robot to the left?",
+        (
+            "Compare the turn you published with the side that had more space.",
+            "In ROS, positive angular.z turns left (counter-clockwise) and negative turns right.",
+            "Check which side your comparison picks and which sign you then publish.",
+            "When left is greater than right, publish angular.z = +0.5; otherwise publish -0.5.",
+        ),
+        "Fix the turn sign and rerun the tests.",
+    ),
+    "no-turn-when-blocked": HintLadder(
+        "Your robot stops for a blocked front but does not turn, so it stays stuck.",
+        "After stopping, how does the robot find a new way forward?",
+        (
+            "With the front blocked, the robot must turn on the spot toward more space.",
+            "Set angular.z in the blocked branch, as well as linear.x = 0.0.",
+            "Compare msg.left with msg.right to choose the direction.",
+            "In the blocked branch publish linear.x = 0.0 and angular.z = +0.5 or -0.5 toward the larger side.",
+        ),
+        "Add the turn to the blocked branch and rerun the tests.",
+    ),
+    "threshold-boundary": HintLadder(
+        "Your robot treats a front distance of exactly 0.75 m as clear.",
+        "Is 0.75 greater than 0.75?",
+        (
+            "The rule drives only when the front is greater than 0.75 m.",
+            "Check whether your comparison is > or >=.",
+            "At exactly 0.75 m the robot must stop and turn.",
+            "Use front > self.stop_distance for the drive branch.",
+        ),
+        "Fix the boundary comparison and rerun the tests.",
+    ),
+    "tie-goes-left": HintLadder(
+        "With equal space on both sides your robot turns left; the rule turns right.",
+        "When left equals right, is left greater than right?",
+        (
+            "The rule turns left only when left is greater than right; otherwise it turns right.",
+            "Check whether your side comparison is > or >=.",
+            "Equal sides are not 'left greater', so they fall into the right-turn branch.",
+            "Use left > right for the left turn and turn right in every other case.",
+        ),
+        "Fix the side comparison and rerun the tests.",
+    ),
+    "nan-side-chosen": HintLadder(
+        "Your robot turned toward a side whose distance is unknown (NaN).",
+        "What does any comparison with NaN return in Python?",
+        (
+            "A NaN distance means that direction has no usable reading.",
+            "Any comparison with NaN is False, so left > right can fail even when left is the known open side.",
+            "Replace a NaN distance with 0.0 (no space) before comparing; math.isnan() tells you when.",
+            "Set left and right to 0.0 when they are NaN, then turn left when left > right, otherwise right.",
+        ),
+        "Handle NaN before comparing and rerun the tests.",
+    ),
+    "open-side-no-resume": HintLadder(
+        "Your robot stays stopped after the front clears again.",
+        "Does your node decide from each new message, or does it remember that it stopped?",
+        (
+            "When the front is clear again, the robot should drive straight again.",
+            "Look for a flag or saved state that is set when the robot stops and never cleared.",
+            "Decide drive or turn from the current message only, every time one arrives.",
+            "Remove the stopped state; choose the command from each /flbr message.",
+        ),
+        "Decide from every message and rerun the tests.",
     ),
     "publishes-too-rarely": HintLadder(
         "Your robot does not publish a command often enough.",

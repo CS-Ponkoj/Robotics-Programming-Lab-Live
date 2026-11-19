@@ -1,0 +1,276 @@
+{
+  "id": 8,
+  "stable_id": "ros2-turn-open-side",
+  "version": 1,
+  "data_schema_version": 1,
+  "title": "Assignment 8: Turn Toward the Open Side with ROS 2",
+  "description": "Use the four obstacle distances on /flbr to drive straight when the way is clear, and otherwise stop and turn toward the side with more space.",
+  "assignment_html": "<p><strong>Scenario</strong></p><p>In Assignment 1 your robot stopped in front of a wall. Now it should keep going: <strong>drive forward while the way ahead is clear, and when something is close in front, stop and turn toward the side with more space.</strong> The robot never stops for good; it keeps finding a new way forward.</p><p><img src=\"/images/8\" alt=\"Diagram. Left: a robot seen from above with four distances around it: front 0.5 m, left 2.4 m, right 0.9 m, back 3.0 m. Middle: the rule. If the front is greater than 0.75 m, drive straight with linear.x 0.20. Otherwise set linear.x to 0.0 and turn toward the side with more space: angular.z +0.5 to turn left when left is greater than right, otherwise -0.5 to turn right. A NaN distance counts as no space. Right: the example robot stops and turns left, because the front is 0.5 m and the left has more space.\"></p><p><strong>What the robot gives you</strong></p><ul><li>The robot's laser is already summarised for you. A helper node turns every scan into four numbers and publishes them on <code>/flbr</code> as <code>rse_msgs/msg/Flbr</code>, about 12 times per second: <code>msg.front</code>, <code>msg.left</code>, <code>msg.back</code> and <code>msg.right</code>.</li><li>Each number is the distance in metres to the closest obstacle in that direction (a 90&deg; slice centred on front, left, back or right).</li><li>A distance can be <code>NaN</code> (not a number) when that direction has no usable reading. Treat NaN as <strong>no space</strong> (0.0): never drive or turn toward an unknown direction. <code>math.isnan(value)</code> tells you when a distance is NaN.</li><li><code>/cmd_vel</code> (<code>geometry_msgs/msg/Twist</code>) moves the robot. <code>linear.x</code> is the forward speed in m/s; <code>angular.z</code> is the turn speed in rad/s. Positive <code>angular.z</code> turns left, negative turns right.</li></ul><p><strong>The rule your node must follow</strong> (for every <code>/flbr</code> message)</p><ul><li><strong>Front clear</strong> (front greater than 0.75 m): drive straight, <code>linear.x = 0.20</code> and <code>angular.z = 0.0</code>.</li><li><strong>Front blocked</strong> (front 0.75 m or less, or NaN): <code>linear.x = 0.0</code> and turn on the spot toward the side with more space: <code>angular.z = +0.5</code> (left) when left is greater than right, otherwise <code>angular.z = -0.5</code> (right).</li><li>The back distance is there if you want to print it, but the rule does not use it.</li></ul><p>Press <strong>Simulate</strong> to watch your node drive a robot around a small room with a box in it. The simulation is only for watching: it does not change your score.</p><p><strong>Task</strong></p><p>Complete the TODOs in <code>src/open_side/open_side/controller.py</code>:</p><ol><li>Create a Twist publisher on <code>/cmd_vel</code> with queue depth 10.</li><li>Subscribe to <code>Flbr</code> messages on <code>/flbr</code> with queue depth 10, calling <code>self.handle_flbr</code>.</li><li>In <code>handle_flbr</code>, read <code>msg.front</code>, <code>msg.left</code> and <code>msg.right</code>, using 0.0 for any NaN.</li><li>Drive straight when the front is clear; otherwise stop and turn toward the side with more space. Use <code>self.forward_speed</code>, <code>self.turn_speed</code> and <code>self.stop_distance</code>.</li><li>Publish exactly one Twist for each message.</li></ol><p><strong>Rules</strong></p><ul><li>Read the complete project tree, but edit only <code>src/open_side/open_side/controller.py</code>.</li><li>Do not rename the package, executable, node, topics, class or <code>handle_flbr</code>, and keep <code>main()</code> as it is.</li><li><code>controller.py</code> may import only <code>rclpy</code>, <code>geometry_msgs</code>, <code>rse_msgs</code> and <code>math</code>.</li><li>Do not use a <code>while True</code> loop or <code>sleep()</code>: let the callback do the work.</li></ul><p><strong>What Run Tests checks</strong></p><p>The grader sends your node made-up <code>/flbr</code> messages and watches <code>/cmd_vel</code>. No robot simulator is used. Each situation lasts 0.8 seconds (about 10 messages), and every command is checked against the message that triggered it. The situations, in order:</p><ul><li>Front 2.0 m: drive straight.</li><li>Front 2.0 m, much more space on the left: still drive straight (do not turn while clear).</li><li>Front 0.5 m, more space on the left: stop and turn left.</li><li>Front 0.5 m, more space on the right: stop and turn right.</li><li>Front exactly 0.75 m: blocked, so stop and turn.</li><li>Front 0.5 m, left and right equal: stop and turn right.</li><li>Front unknown (NaN): stop and turn.</li><li>Front 0.5 m, right unknown (NaN): stop and turn left, never toward the unknown side.</li><li>Front 2.0 m again: drive straight again.</li></ul><p>Drive straight means <code>linear.x</code> within &plusmn;0.02 of 0.20 m/s and <code>angular.z</code> within &plusmn;0.001. Stopped means <code>linear.x</code> within &plusmn;0.001. Turning means <code>angular.z</code> within &plusmn;0.05 of +0.5 or -0.5. All other Twist fields must stay 0.0. Stopping and turning only earn credit when the robot also drives when the front is clear.</p><p>This is a test with made-up distances, not a real-robot safety certification.</p><p><strong>How scoring works</strong></p><p>Each check has points (shown next to it in the results). The build and start checks count once your own code passes at least one behaviour check, so the untouched starter earns 0%. The task counts as <strong>passed</strong> when every check passes.</p>",
+  "starter_code": "import math\n\nimport rclpy\nfrom geometry_msgs.msg import Twist\nfrom rclpy.executors import ExternalShutdownException\nfrom rclpy.node import Node\nfrom rse_msgs.msg import Flbr\n\n\nclass OpenSideController(Node):\n\n    def __init__(self):\n        super().__init__('open_side_controller')\n\n        # TODO 1: Create a Twist publisher on /cmd_vel with queue depth 10.\n        self.velocity_publisher = None\n\n        # TODO 2: Subscribe to Flbr messages on /flbr with queue depth 10,\n        # and call self.handle_flbr for each message.\n        self.flbr_subscription = None\n\n        self.forward_speed = 0.20   # m/s\n        self.turn_speed = 0.5       # rad/s\n        self.stop_distance = 0.75   # m\n\n    def handle_flbr(self, msg):\n        # TODO 3: Read msg.front, msg.left and msg.right. A NaN distance is\n        # unknown: treat it as no space (0.0). math.isnan() tells you when.\n\n        command = Twist()\n        # TODO 4: If the front is greater than self.stop_distance, drive\n        # straight: set command.linear.x to self.forward_speed.\n        # TODO 5: Otherwise keep linear.x at 0.0 and turn toward the side\n        # with more space: +self.turn_speed (left) when left > right,\n        # otherwise -self.turn_speed (right).\n        pass\n\n        # TODO 6: Publish the velocity command.\n        pass\n\n\ndef main(args=None):\n    rclpy.init(args=args)\n    controller = OpenSideController()\n    try:\n        rclpy.spin(controller)\n    except (KeyboardInterrupt, ExternalShutdownException):\n        pass\n    finally:\n        controller.destroy_node()\n        rclpy.try_shutdown()\n\n\nif __name__ == '__main__':\n    main()\n",
+  "language": "python-ros2",
+  "status": "published",
+  "learning_objectives": [
+    "Subscribe to a custom ROS 2 message (rse_msgs/Flbr) and publish geometry_msgs/Twist commands.",
+    "Turn sensor distances into a drive-or-turn decision with a clear threshold.",
+    "Use the sign of angular.z to turn toward the side with more space.",
+    "Handle unknown (NaN) sensor values safely."
+  ],
+  "execution_settings": {
+    "runtime": "ros2-jazzy-python",
+    "timeout_seconds": 30,
+    "editable_file": "src/open_side/open_side/controller.py",
+    "network_enabled": false,
+    "simulation_enabled": false
+  },
+  "public_tests": [
+    {
+      "id": "package-build",
+      "label": "ROS 2 package builds successfully"
+    },
+    {
+      "id": "node-start",
+      "label": "open_side_controller starts and publishes on /cmd_vel"
+    },
+    {
+      "id": "flbr-response",
+      "label": "Publishes exactly one command for every /flbr message"
+    },
+    {
+      "id": "cmd-vel-topic",
+      "label": "Publishes Twist messages on /cmd_vel"
+    },
+    {
+      "id": "clear-path-forward",
+      "label": "Drives straight at 0.20 m/s when the front is clear"
+    },
+    {
+      "id": "stop-when-blocked",
+      "label": "Stops driving forward when the front is 0.75 m or closer"
+    },
+    {
+      "id": "turn-toward-open-side",
+      "label": "Turns toward the side with more space"
+    },
+    {
+      "id": "stop-at-threshold",
+      "label": "Treats a front of exactly 0.75 m as blocked"
+    },
+    {
+      "id": "equal-sides-turn-right",
+      "label": "Turns right when both sides are equal"
+    },
+    {
+      "id": "unknown-distance-safe",
+      "label": "Treats a NaN distance as no space"
+    },
+    {
+      "id": "resume-forward",
+      "label": "Drives straight again when the front clears"
+    }
+  ],
+  "rubric": [
+    {
+      "criterion": "Package execution",
+      "description": "The package builds and the node starts.",
+      "weight": 15
+    },
+    {
+      "criterion": "ROS interfaces",
+      "description": "Subscribes to Flbr on /flbr and publishes exactly one Twist on /cmd_vel per message.",
+      "weight": 15
+    },
+    {
+      "criterion": "Clear-path driving",
+      "description": "Drives straight at 0.20 m/s when the front is greater than 0.75 m, and again after it clears.",
+      "weight": 20
+    },
+    {
+      "criterion": "Obstacle reaction",
+      "description": "Stops driving forward at 0.75 m or closer and turns toward the side with more space, turning right on a tie.",
+      "weight": 40
+    },
+    {
+      "criterion": "Unknown readings",
+      "description": "Treats NaN distances as no space.",
+      "weight": 10
+    }
+  ],
+  "common_misconceptions": [
+    {
+      "tag": "turns-while-clear",
+      "description": "Turns toward the open side even when the front is clear (the class demo's always-turning rule)."
+    },
+    {
+      "tag": "turn-direction-swapped",
+      "description": "Uses the wrong sign for angular.z, so the robot turns toward the side with less space."
+    },
+    {
+      "tag": "no-turn-when-blocked",
+      "description": "Stops for a blocked front but never turns, so the robot stays stuck."
+    },
+    {
+      "tag": "threshold-boundary",
+      "description": "Treats a front of exactly 0.75 m as clear (>= instead of >)."
+    },
+    {
+      "tag": "nan-side-chosen",
+      "description": "Compares NaN distances directly, so the robot can turn toward an unknown side."
+    },
+    {
+      "tag": "front-check-reversed",
+      "description": "Drives when the front is blocked and stops when it is clear."
+    }
+  ],
+  "tutoring_rules": {
+    "max_hint_level": 4,
+    "start_with_question": true,
+    "never_reveal_solution": true,
+    "never_reveal_hidden_tests": true,
+    "ai_enabled_by_default": false
+  },
+  "simulation_config": {
+    "enabled": true,
+    "provider": "ros2_2d",
+    "scenario": "Drive around a 4 m room with a box; turn toward open space whenever something is within 0.75 m ahead.",
+    "world": {
+      "walls": [
+        [
+          -2.0,
+          -2.0,
+          2.0,
+          -2.0
+        ],
+        [
+          2.0,
+          -2.0,
+          2.0,
+          2.0
+        ],
+        [
+          2.0,
+          2.0,
+          -2.0,
+          2.0
+        ],
+        [
+          -2.0,
+          2.0,
+          -2.0,
+          -2.0
+        ],
+        [
+          0.6,
+          -0.5,
+          1.2,
+          -0.5
+        ],
+        [
+          1.2,
+          -0.5,
+          1.2,
+          0.3
+        ],
+        [
+          1.2,
+          0.3,
+          0.6,
+          0.3
+        ],
+        [
+          0.6,
+          0.3,
+          0.6,
+          -0.5
+        ]
+      ],
+      "robot": {
+        "x": -0.6,
+        "y": -0.1,
+        "theta": 0.0,
+        "radius": 0.15
+      },
+      "duration_seconds": 8.0
+    }
+  },
+  "asset_manifest": [
+    {
+      "kind": "project_file",
+      "path": "src/open_side/package.xml",
+      "editable": false,
+      "content": "<?xml version='1.0'?>\n<package format='3'>\n  <name>open_side</name>\n  <version>0.0.1</version>\n  <description>Turn-toward-the-open-side ROS 2 learning package</description>\n  <maintainer email='instructor@example.invalid'>Robotics Programming Lab</maintainer>\n  <license>Apache-2.0</license>\n  <exec_depend>rclpy</exec_depend>\n  <exec_depend>geometry_msgs</exec_depend>\n  <exec_depend>rse_msgs</exec_depend>\n  <exec_depend>launch</exec_depend>\n  <exec_depend>launch_ros</exec_depend>\n  <test_depend>ament_copyright</test_depend>\n  <test_depend>ament_flake8</test_depend>\n  <test_depend>ament_pep257</test_depend>\n  <test_depend>python3-pytest</test_depend>\n  <export><build_type>ament_python</build_type></export>\n</package>\n"
+    },
+    {
+      "kind": "project_file",
+      "path": "src/open_side/setup.py",
+      "editable": false,
+      "content": "from setuptools import find_packages, setup\n\npackage_name = 'open_side'\n\nsetup(\n    name=package_name,\n    version='0.0.1',\n    packages=find_packages(exclude=['test']),\n    data_files=[\n        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),\n        ('share/' + package_name, ['package.xml']),\n        ('share/' + package_name + '/launch', ['launch/controller.launch.py']),\n    ],\n    install_requires=['setuptools'],\n    zip_safe=True,\n    maintainer='Robotics Programming Lab',\n    maintainer_email='instructor@example.invalid',\n    description='Turn-toward-the-open-side ROS 2 learning package',\n    license='Apache-2.0',\n    entry_points={'console_scripts': ['controller = open_side.controller:main']},\n)\n"
+    },
+    {
+      "kind": "project_file",
+      "path": "src/open_side/setup.cfg",
+      "editable": false,
+      "content": "[develop]\nscript_dir=$base/lib/open_side\n[install]\ninstall_scripts=$base/lib/open_side\n"
+    },
+    {
+      "kind": "project_file",
+      "path": "src/open_side/resource/open_side",
+      "editable": false,
+      "content": ""
+    },
+    {
+      "kind": "project_file",
+      "path": "src/open_side/open_side/__init__.py",
+      "editable": false,
+      "content": ""
+    },
+    {
+      "kind": "project_file",
+      "path": "src/open_side/open_side/controller.py",
+      "editable": true,
+      "content": ""
+    },
+    {
+      "kind": "project_file",
+      "path": "src/open_side/launch/controller.launch.py",
+      "editable": false,
+      "content": "from launch import LaunchDescription\nfrom launch_ros.actions import Node\n\n\ndef generate_launch_description():\n    return LaunchDescription([\n        Node(\n            package='open_side',\n            executable='controller',\n            name='open_side_controller',\n            output='screen',\n        )\n    ])\n"
+    }
+  ],
+  "grader_type": "ros2_topic",
+  "grader_config": {
+    "harness": "open_side",
+    "package_name": "open_side",
+    "executable": "controller",
+    "topic": "/cmd_vel",
+    "message_type": "geometry_msgs/msg/Twist",
+    "flbr_topic": "/flbr",
+    "flbr_message_type": "rse_msgs/msg/Flbr",
+    "extra_import_roots": [
+      "rse_msgs"
+    ],
+    "expected_linear_x": 0.2,
+    "turn_angular_z": 0.5,
+    "linear_tolerance": 0.02,
+    "stop_distance": 0.75,
+    "minimum_publish_rate_hz": 3,
+    "scaffold_tests": [
+      "package-build",
+      "node-start"
+    ],
+    "test_weights": {
+      "package-build": 10,
+      "node-start": 5,
+      "flbr-response": 10,
+      "cmd-vel-topic": 5,
+      "clear-path-forward": 15,
+      "stop-when-blocked": 15,
+      "turn-toward-open-side": 15,
+      "stop-at-threshold": 5,
+      "equal-sides-turn-right": 5,
+      "unknown-distance-safe": 10,
+      "resume-forward": 5
+    }
+  },
+  "solution_html": "<p><strong>Approach</strong></p><ol><li>Create the Twist publisher on <code>/cmd_vel</code> and the Flbr subscription on <code>/flbr</code>, both with queue depth 10.</li><li>In the callback, replace a NaN front, left or right with 0.0 (no space).</li><li>If the front is greater than <code>stop_distance</code>, publish <code>linear.x = forward_speed</code> with <code>angular.z = 0.0</code>.</li><li>Otherwise publish <code>linear.x = 0.0</code> and <code>angular.z = +turn_speed</code> when left is greater than right, or <code>-turn_speed</code> otherwise.</li><li>Publish exactly one command per message, so the robot reacts to every new reading.</li></ol>",
+  "reference_solution_path": "assignments_answers/assignment_8_ros2_turn_open_side/controller.py"
+}

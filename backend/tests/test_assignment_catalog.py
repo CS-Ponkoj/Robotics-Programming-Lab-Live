@@ -38,13 +38,18 @@ def test_catalog_names_assignments_1_to_6_by_stable_id():
     assert "ros2-wall-stop" not in old_assignment_ids()
 
 
-def test_student_list_groups_old_assignments_but_keeps_all_seven(client):
+def test_student_list_groups_old_assignments_but_keeps_every_assignment(client):
     listed = client.get("/assignments").json()["assignments"]
-    assert [item["id"] for item in listed] == [1, 2, 3, 4, 5, 6, 7]
+    assert [item["id"] for item in listed] == [1, 2, 3, 4, 5, 6, 7, 8]
     assert {item["id"]: item["collection"] for item in listed} == {
-        1: "old", 2: "old", 3: "old", 4: "old", 5: "old", 6: "old", 7: "current",
+        1: "old", 2: "old", 3: "old", 4: "old", 5: "old", 6: "old",
+        7: "current", 8: "current",
     }
     assert client.get("/assignments/7").json()["collection"] == "current"
+    # The current course is numbered 1 and 2 for students; IDs stay 7 and 8.
+    assert {item["id"]: item["display_number"] for item in listed} == {
+        1: None, 2: None, 3: None, 4: None, 5: None, 6: None, 7: 1, 8: 2,
+    }
 
 
 def test_old_assignments_stay_open_and_gradable(client):

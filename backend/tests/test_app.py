@@ -338,8 +338,8 @@ def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
     response = client.get("/assignments")
     assert response.status_code == 200
     assignments = response.json()["assignments"]
-    assert [assignment["id"] for assignment in assignments] == [1, 2, 3, 4, 5, 6, 7]
-    assert [assignment["version"] for assignment in assignments] == [17, 16, 18, 16, 12, 12, 3]
+    assert [assignment["id"] for assignment in assignments] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [assignment["version"] for assignment in assignments] == [17, 16, 18, 16, 12, 12, 3, 1]
     assert all(assignment["stable_id"] for assignment in assignments)
     assert all(assignment["solution_html"] == "" for assignment in assignments)
     assert all(assignment["vals"] == {} for assignment in assignments)
@@ -350,7 +350,7 @@ def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
     )
 
 
-@pytest.mark.parametrize("assignment_id", [1, 2, 3, 4, 5, 6, 7])
+@pytest.mark.parametrize("assignment_id", [1, 2, 3, 4, 5, 6, 7, 8])
 def test_gets_each_assignment_without_hidden_grader_data(client, assignment_id):
     response = client.get(f"/assignments/{assignment_id}")
     assert response.status_code == 200

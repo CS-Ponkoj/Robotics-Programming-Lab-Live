@@ -12,8 +12,9 @@ from ros2_feedback import classify
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 ASSIGNMENTS_DIRECTORY = Path(__file__).resolve().parent / "assignments"
-ROS_ASSIGNMENT_IDS = (5, 6, 7)
+ROS_ASSIGNMENT_IDS = (5, 6, 7, 8)
 OPEN_ASSIGNMENT_IDS = (7,)
+OPEN_SIDE_ASSIGNMENT_IDS = (8,)
 
 
 def run_open(source: dict, image: str, code: str) -> dict:
@@ -152,7 +153,106 @@ def verify_simulation(assignment_id: int, image: str) -> None:
     print(f"Assignment {assignment_id}: PASS simulation replay (answer stops and resumes; never-stop collides).")
 
 
+def verify_open_side_assignment(assignment_id: int, image: str) -> None:
+    """Turn toward the open side: the answer passes and each mistake is caught."""
+    source = json.loads(
+        (ASSIGNMENTS_DIRECTORY / f"assignment_{assignment_id}.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    reference = (REPOSITORY_ROOT / source["reference_solution_path"]).read_text(
+        encoding="utf-8"
+    )
+    expected_ids = [str(item["id"]) for item in source.get("public_tests", [])]
+
+    def outcome_of(code: str) -> tuple[dict, dict]:
+        result = run_open(source, image, code)
+        return result, {str(item.get("id")): item.get("passed") for item in result.get("tests", [])}
+
+    result, outcome = outcome_of(reference)
+    failures = sorted(test_id for test_id, passed in outcome.items() if passed is not True)
+    if result.get("success") is not True or list(outcome) != expected_ids or failures:
+        raise RuntimeError(
+            f"Assignment {assignment_id} ROS verification failed: "
+            + json.dumps(result, sort_keys=True)
+        )
+    print(f"Assignment {assignment_id}: PASS ({len(outcome)}/{len(expected_ids)} checks) - {result.get('output', '')}")
+
+    def variant(old: str, new: str) -> str:
+        code = reference.replace(old, new)
+        if code == reference:
+            raise RuntimeError(f"Assignment {assignment_id}: reference answer changed shape near {old!r}.")
+        return code
+
+    mistakes = {
+        "starter": (source["starter_code"], ("clear-path-forward", "turn-toward-open-side")),
+        "duplicate publish": (
+            variant(
+                "        self.velocity_publisher.publish(command)\n",
+                "        self.velocity_publisher.publish(command)\n"
+                "        self.velocity_publisher.publish(command)\n",
+            ),
+            ("flbr-response",),
+        ),
+        "class demo (always turns)": (
+            variant(
+                "        if front > self.stop_distance:\n            command.linear.x = self.forward_speed\n        elif left > right:",
+                "        if front > self.stop_distance:\n            command.linear.x = self.forward_speed\n        if left > right:",
+            ),
+            ("clear-path-forward",),
+        ),
+        "swapped turn sign": (
+            variant("command.angular.z = self.turn_speed\n", "command.angular.z = -self.turn_speed\n"),
+            ("turn-toward-open-side",),
+        ),
+        "boundary uses >=": (
+            variant("if front > self.stop_distance:", "if front >= self.stop_distance:"),
+            ("stop-at-threshold",),
+        ),
+        "tie turns left": (variant("elif left > right:", "elif left >= right:"), ("equal-sides-turn-right",)),
+        "NaN compared directly": (
+            variant(
+                "        right = 0.0 if math.isnan(msg.right) else msg.right\n",
+                "        right = msg.right\n",
+            ),
+            ("unknown-distance-safe",),
+        ),
+    }
+    for name, (code, must_fail) in mistakes.items():
+        _result, mistake = outcome_of(code)
+        if any(mistake.get(test_id) is not False for test_id in must_fail):
+            raise RuntimeError(f"Assignment {assignment_id}: '{name}' was not caught by {must_fail}: {mistake}")
+        print(f"Assignment {assignment_id}: PASS '{name}' fails {', '.join(must_fail)}.")
+
+    world = (source.get("simulation_config") or {}).get("world")
+    config = {**source.get("grader_config", {}), "mode": "simulate", "simulation": world}
+
+    def replay_of(code: str) -> dict:
+        project_files = [
+            item for item in source.get("asset_manifest", [])
+            if isinstance(item, dict) and item.get("kind") == "project_file"
+        ]
+        timeout = float(source.get("execution_settings", {}).get("timeout_seconds", 20))
+        replay = DockerRos2Executor(image, timeout).execute(code, project_files, config).get("simulation")
+        return replay if isinstance(replay, dict) else {}
+
+    answer = replay_of(reference)
+    if answer.get("outcome") in (None, "collided", "never_moved"):
+        raise RuntimeError(f"Assignment {assignment_id}: the answer did not drive safely in the replay: {answer.get('outcome')}.")
+    straight = variant(
+        "        elif left > right:\n            command.angular.z = self.turn_speed\n"
+        "        else:\n            command.angular.z = -self.turn_speed\n",
+        "        else:\n            command.linear.x = self.forward_speed\n",
+    )
+    if replay_of(straight).get("outcome") != "collided":
+        raise RuntimeError(f"Assignment {assignment_id}: a node that never turns did not collide in the replay.")
+    print(f"Assignment {assignment_id}: PASS simulation replay (answer {answer.get('outcome')}; never-turn collides).")
+
+
 def verify_assignment(assignment_id: int, image: str) -> None:
+    if assignment_id in OPEN_SIDE_ASSIGNMENT_IDS:
+        verify_open_side_assignment(assignment_id, image)
+        return
     if assignment_id in OPEN_ASSIGNMENT_IDS:
         verify_open_assignment(assignment_id, image)
         verify_simulation(assignment_id, image)

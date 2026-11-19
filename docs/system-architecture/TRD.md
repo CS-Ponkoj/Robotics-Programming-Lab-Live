@@ -45,7 +45,7 @@ flowchart LR
 | Frontend | Flutter 3.32.8 (CI pin), Dart, `flutter_code_editor` 0.3.5, `http`, `shared_preferences` |
 | Backend | Python 3.14, FastAPI 0.141, SQLAlchemy 2.0, Alembic 1.16, Pydantic Settings, psycopg 3 |
 | Database | PostgreSQL in Docker (live) · Neon PostgreSQL (staging) · SQLite (automated tests only) |
-| Execution | Docker images `robotics-lab-sandbox:latest` and `robotics-lab-ros2-grader:jazzy-v1` |
+| Execution | Docker images `robotics-lab-sandbox:latest` and `robotics-lab-ros2-grader:jazzy-v1` (ROS 2 Jazzy plus the course `rse_msgs` interfaces from `backend/ros2_vendor`) |
 | Hosting | Lab PC, Caddy, Cloudflare Tunnel, Windows scheduled task **RPL-Live** (re-checks every 5 min) |
 | CI | GitHub Actions ([`ci.yml`](../../.github/workflows/ci.yml)): 7 jobs, backend + frontend + build |
 

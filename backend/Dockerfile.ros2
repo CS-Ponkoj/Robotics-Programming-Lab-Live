@@ -5,15 +5,25 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --create-home --shell /usr/sbin/nologin grader
 
+# Course message definitions (rse_msgs/Flbr), built once into a read-only
+# overlay that the entrypoint sources for every grading run.
+COPY ros2_vendor/rse_msgs /opt/rse_ws/src/rse_msgs
+RUN bash -c "source /opt/ros/jazzy/setup.bash \
+    && cd /opt/rse_ws \
+    && colcon build --base-paths src --event-handlers console_direct- \
+    && rm -rf build log"
+
 WORKDIR /grader
 COPY ros2_worker.py /grader/ros2_worker.py
 COPY ros2_topic_harness.py /grader/ros2_topic_harness.py
 COPY ros2_obstacle_harness.py /grader/ros2_obstacle_harness.py
 COPY ros2_callback_audit.py /grader/ros2_callback_audit.py
 COPY ros2_wall_stop_harness.py /grader/ros2_wall_stop_harness.py
+COPY ros2_open_side_harness.py /grader/ros2_open_side_harness.py
 COPY ros2_code_checks.py /grader/ros2_code_checks.py
 COPY ros2_sim_world.py /grader/ros2_sim_world.py
 COPY ros2_sim_harness.py /grader/ros2_sim_harness.py
+COPY ros2_entrypoint.sh /grader/ros2_entrypoint.sh
 
 USER 10001:10001
-ENTRYPOINT ["/ros_entrypoint.sh", "python3", "/grader/ros2_worker.py"]
+ENTRYPOINT ["bash", "/grader/ros2_entrypoint.sh"]

@@ -239,6 +239,12 @@ def _safe_config(config: dict) -> dict:
         "skeleton_imports",
         "mode",
         "simulation",
+        # Turn toward the open side (Assignment 8): the course's four-sector
+        # topic, its turn speed, and the course interfaces it may import.
+        "flbr_topic",
+        "flbr_message_type",
+        "turn_angular_z",
+        "extra_import_roots",
     }
     return {key: value for key, value in config.items() if key in allowed}
 

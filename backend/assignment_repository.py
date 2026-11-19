@@ -30,6 +30,28 @@ def old_assignment_ids(path: Path = CATALOG_PATH) -> frozenset[str]:
     if not isinstance(values, list) or not all(isinstance(item, str) for item in values):
         raise ValueError("catalog.json old_assignments must be a list of stable IDs")
     return frozenset(values)
+
+
+def course_numbers(path: Path = CATALOG_PATH) -> dict[str, int]:
+    """Numbers students see for the current course, keyed by stable ID.
+
+    Presentation only: the database ID stays the assignment's identity for
+    attempts, research records, and exports. An assignment without a course
+    number is shown by its ID.
+    """
+    if not path.is_file():
+        return {}
+    values = json.loads(path.read_text(encoding="utf-8")).get("course_numbers", {})
+    if not isinstance(values, dict) or not all(
+        isinstance(key, str) and isinstance(number, int) and number > 0
+        for key, number in values.items()
+    ):
+        raise ValueError(
+            "catalog.json course_numbers must map stable IDs to positive integers"
+        )
+    return dict(values)
+
+
 COURSE_MATERIALS = BASE_DIR.parent / "course_materials"
 REFERENCE_SOLUTIONS = {
     1: COURSE_MATERIALS
@@ -324,6 +346,7 @@ def to_student_assignment(
         solution_html="",
         vals={},
         playground_function=_playground_function(assignment),
+        display_number=course_numbers().get(assignment.stable_id),
     )
 
 

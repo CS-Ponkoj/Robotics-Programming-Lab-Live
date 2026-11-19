@@ -122,10 +122,11 @@ def test_review_queue_lists_every_draft_case():
 def test_repository_instructor_dataset_review_state():
     datasets = load_instructor_datasets()
     inventory = summarize_instructor_datasets(datasets)
-    assert inventory.assignment_count == 7
+    assert inventory.assignment_count == 8
     assert inventory.case_count >= 27
     assert inventory.case_count == inventory.draft_count + inventory.approved_count
-    # Only Assignment 7 has been reviewed and approved by a named instructor.
+    # Only Assignment 7 has been reviewed and approved by a named instructor;
+    # Assignment 8's cases are drafts, so its AI tutor stays off.
     approved = {d.assignment_id for d in datasets if d.review_status == "approved"}
     assert approved == {7}
     for dataset in datasets:

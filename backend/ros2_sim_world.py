@@ -69,6 +69,35 @@ def scan(pose: Pose, walls: list[tuple]) -> list[float]:
     return ranges
 
 
+FLBR_SECTORS = (("front", 0.0), ("left", 90.0), ("back", 180.0), ("right", -90.0))
+FLBR_HALF_WIDTH_DEG = 45.0
+
+
+def flbr(ranges: list[float]) -> dict[str, float]:
+    """The closest usable distance in four 90-degree sectors of one scan.
+
+    Follows the course's scan_parser (rse_obstacles): +inf counts as the
+    sensor's maximum range, a reading is usable when it lies between the
+    minimum and maximum range, a sector covers readings strictly within 45
+    degrees of its centre, and a sector with no usable reading is NaN. With
+    the 270-degree scan the back sector is never covered, so it is NaN.
+    """
+    readings = []
+    for index, distance in enumerate(ranges):
+        if distance == math.inf:
+            distance = RANGE_MAX
+        if math.isfinite(distance) and RANGE_MIN <= distance <= RANGE_MAX:
+            readings.append((SCAN_MIN_DEG + index * SCAN_INCREMENT_DEG, distance))
+    result = {}
+    for name, centre in FLBR_SECTORS:
+        covered = [
+            distance for angle, distance in readings
+            if abs((angle - centre + 180.0) % 360.0 - 180.0) < FLBR_HALF_WIDTH_DEG
+        ]
+        result[name] = min(covered) if covered else math.nan
+    return result
+
+
 def distance_to_wall(x: float, y: float, wall: tuple) -> float:
     x1, y1, x2, y2 = wall
     sx, sy = x2 - x1, y2 - y1

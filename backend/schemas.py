@@ -37,6 +37,9 @@ class AssignmentStudent(BaseModel):
     # Home-page grouping: "old" assignments are earlier test tasks shown in
     # their own panel. They stay fully usable; grading is unchanged.
     collection: Literal["current", "old"] = "current"
+    # The number students see for this course (catalog.json course_numbers);
+    # None shows the ID. The ID stays the identity for all records.
+    display_number: int | None = None
     solution_html: str = ""
     vals: dict[str, Any] = Field(default_factory=dict)
     # Required function name when the ungraded input playground is available.

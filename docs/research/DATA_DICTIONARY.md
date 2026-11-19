@@ -68,7 +68,7 @@ One row describes the current form of an assignment.
 
 | Field | Meaning |
 |---|---|
-| `id` | Internal numeric assignment ID |
+| `id` | Internal numeric assignment ID. It is the identity in every attempt, event, and export. From 2026-11-19 students may instead see a course number (`backend/assignments/catalog.json` `course_numbers`, for example Assignment 7 shown as 1 and Assignment 8 as 2); that number is presentation only and is never stored |
 | `stable_id` | Permanent readable identity, such as `ros2-obstacle-stop` |
 | `version` | Content version shown to students and saved with attempts |
 | `data_schema_version` | Version of the JSON structure; currently `1` |
@@ -80,7 +80,7 @@ One row describes the current form of an assignment.
 | `rubric` | Criteria, descriptions, and weights |
 | `misconceptions` | Known misunderstanding tags and descriptions |
 | `tutoring_rules` | Hint limits and solution-protection rules |
-| `simulation_config` | Optional simulation settings; `diagram` describes the playground drawing, and `provider: ros2_2d` with a `world` (walls, robot start, duration, optional `wall_move`) enables the ROS 2 robot replay |
+| `simulation_config` | Optional simulation settings; `diagram` describes the playground drawing, and `provider: ros2_2d` with a `world` (walls, robot start, duration, optional `wall_move`) enables the ROS 2 robot replay. An assignment whose `grader_config` sets `flbr_topic` (Assignment 8) receives the course's four-sector summary (`rse_msgs/Flbr`) computed from the same simulated scan |
 | `asset_manifest` | Project files and which file may be edited |
 | `grader_type`, `grader_config` | Server-side grader selection and protected settings |
 
@@ -180,6 +180,12 @@ robot published). `hint_key` selects the built-in hint ladder; it is not a
 research label. Only a `hint_key` that is also one of the assignment's
 configured misconception tags is copied into `misconception_tag` for a ROS 2
 check. Null or missing means no pattern was recognised.
+
+From 2026-11-19, a failed Assignment 8 (turn toward the open side) behavior
+check may store one of these `hint_key` values in the same way:
+`turns-while-clear`, `forward-speed-wrong`, `front-check-reversed`,
+`turn-direction-swapped`, `no-turn-when-blocked`, `threshold-boundary`,
+`tie-goes-left`, `nan-side-chosen`, or `open-side-no-resume`.
 
 For a ROS 2 assignment whose `grader_config` lists `gate_tests` and
 `pass_tests` (Assignment 7 onward), `score` is 0 whenever any gate check

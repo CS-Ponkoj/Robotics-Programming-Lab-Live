@@ -24,9 +24,17 @@ import 'package:iuse_demo/widgets/run_terminal.dart';
 import 'package:highlight/languages/python.dart';
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title, required this.id});
+  const MyHomePage({
+    super.key,
+    required this.title,
+    required this.id,
+    this.displayNumber,
+  });
   final String title;
   final int id;
+
+  /// The course number students see; null shows the ID.
+  final int? displayNumber;
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
@@ -1074,6 +1082,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final appBar = AssignmentPageHeader(
       title: widget.title,
       assignmentId: widget.id,
+      displayNumber: widget.displayNumber,
       status: assignmentStatus,
       feedbackEnabled: _aiTutorOn,
       aiTutorAvailable: _aiTutorAvailable,
@@ -3582,6 +3591,9 @@ class AssignmentPageHeader extends StatelessWidget
     implements PreferredSizeWidget {
   final String title;
   final int assignmentId;
+
+  /// The course number students see; null shows the ID.
+  final int? displayNumber;
   final String status;
   final bool feedbackEnabled;
 
@@ -3597,6 +3609,7 @@ class AssignmentPageHeader extends StatelessWidget
     super.key,
     required this.title,
     required this.assignmentId,
+    this.displayNumber,
     required this.status,
     required this.feedbackEnabled,
     this.aiTutorAvailable = true,
@@ -3653,7 +3666,7 @@ class AssignmentPageHeader extends StatelessWidget
               borderRadius: BorderRadius.circular(AppRadii.sm),
             ),
             child: Text(
-              assignmentId.toString().padLeft(2, '0'),
+              (displayNumber ?? assignmentId).toString().padLeft(2, '0'),
               style: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.onPrimary,
                 fontWeight: FontWeight.w800,

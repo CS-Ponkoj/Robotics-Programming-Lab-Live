@@ -49,6 +49,13 @@ class AssignmentDto {
 
   bool get isOld => collection == 'old';
 
+  /// The number students see for this course (for example 1 and 2), when
+  /// the course numbers its assignments; otherwise null and the ID is shown.
+  final int? displayNumber;
+
+  /// The number to show students: the course number, or the ID.
+  int get shownNumber => displayNumber ?? id;
+
   /// True only when the server has AI tutoring configured. When false the
   /// workspace keeps the AI switch disabled and never requests AI feedback.
   final bool aiTutorAvailable;
@@ -77,6 +84,7 @@ class AssignmentDto {
     this.playgroundFunction,
     this.hasSavedDraft = false,
     this.collection = 'current',
+    this.displayNumber,
     this.aiTutorAvailable = false,
     this.aiTutorMessage = '',
   });
@@ -144,6 +152,10 @@ class AssignmentDto {
               : null,
           hasSavedDraft: json['has_saved_draft'] == true,
           collection: json['collection'] == 'old' ? 'old' : 'current',
+          displayNumber: json['display_number'] is int &&
+                  (json['display_number'] as int) > 0
+              ? json['display_number'] as int
+              : null,
           aiTutorAvailable: json['ai_tutor_available'] == true,
           aiTutorMessage: json['ai_tutor_message'] is String
               ? json['ai_tutor_message'] as String

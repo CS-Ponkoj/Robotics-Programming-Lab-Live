@@ -523,7 +523,11 @@ void openAssignment(
     context,
     MaterialPageRoute(
       settings: RouteSettings(arguments: FeedbackPage(a.title)),
-      builder: (_) => MyHomePage(title: a.title, id: a.id),
+      builder: (_) => MyHomePage(
+        title: a.title,
+        id: a.id,
+        displayNumber: a.displayNumber,
+      ),
     ),
   ).then((_) {
     // Rebuild when the learner returns so the latest score is visible.
@@ -664,7 +668,7 @@ class ProgressSummary extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Assignment ${next.id} · ${assignmentDisplayTitle(next)}',
+                  'Assignment ${next.shownNumber} · ${assignmentDisplayTitle(next)}',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -811,7 +815,11 @@ class ListAssignment extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       settings: RouteSettings(arguments: FeedbackPage(a.title)),
-                      builder: (_) => MyHomePage(title: a.title, id: a.id),
+                      builder: (_) => MyHomePage(
+                        title: a.title,
+                        id: a.id,
+                        displayNumber: a.displayNumber,
+                      ),
                     ),
                   ).then((_) {
                     // when we pop back, call the callback to rebuild
@@ -907,7 +915,7 @@ class AssignmentCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(13),
                   ),
                   child: Text(
-                    a.id.toString().padLeft(2, '0'),
+                    a.shownNumber.toString().padLeft(2, '0'),
                     style: theme.textTheme.labelLarge?.copyWith(
                       color: completed
                           ? AppColors.success
