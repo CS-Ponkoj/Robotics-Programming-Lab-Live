@@ -521,3 +521,30 @@ def test_reasoning_options_are_sent_only_to_reasoning_models(model, expected):
         responses=SimpleNamespace(create=create))).feedback(_assignment(), _submission())
     assert captured["model"] == model
     assert {k: captured[k] for k in ("reasoning", "max_output_tokens") if k in captured} == expected
+
+
+def test_prompt_sends_only_the_rules_for_the_assignment_type():
+    python_prompt = TutorService._instructions(_assignment())
+    ros = _assignment()
+    ros.language = "python-ros2"
+    ros_prompt = TutorService._instructions(ros)
+    for prompt in (python_prompt, ros_prompt):
+        assert "plain text only" in prompt
+        assert "state the range but never pick a value" in prompt
+        assert "Leave misconception empty" in prompt
+    assert "returned values through wrappers" in python_prompt
+    assert "observed_pattern" in ros_prompt and "moving versus stopped" in ros_prompt
+    assert "returned values through wrappers" not in ros_prompt
+    assert "angle wrapping" not in ros_prompt
+    assert "moving versus stopped" not in python_prompt
+
+
+def test_inline_code_backticks_are_removed_for_the_plain_text_ui():
+    output = _ai_output(
+        diagnosis="In `handle_scan()`, the robot drove at 0.3 m.",
+        debugging_steps=["Trace `min(usable)` for one scan."],
+    )
+    feedback, _ = _ai_feedback(output, 1)
+    assert feedback.source == "openai"
+    assert "`" not in feedback.diagnosis + "".join(feedback.debugging_steps)
+    assert feedback.diagnosis == "In handle_scan(), the robot drove at 0.3 m."
