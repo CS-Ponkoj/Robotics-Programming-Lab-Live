@@ -428,13 +428,14 @@ class TutorService:
         student_question: str = "",
     ) -> TutorFeedback:
         evidence = submission.evidence or {}
+        failures = [
+            item for item in evidence.get("tests", []) if not item.get("passed", False)
+        ]
+        # Explain the first failed check whose cause the grader observed, so a
+        # targeted hint is not hidden behind an earlier check without one.
         failed = next(
-            (
-                item
-                for item in evidence.get("tests", [])
-                if not item.get("passed", False)
-            ),
-            None,
+            (item for item in failures if item.get("hint_key") in HINT_LADDERS),
+            failures[0] if failures else None,
         )
         misconception = ""
         # A hint level is not evidence of a misconception. Name only a tag

@@ -239,13 +239,21 @@ def open_side_findings(passed: dict[str, bool], observations: dict) -> dict[str,
             )
         if turn_finding:
             findings["turn-toward-open-side"] = turn_finding
-    if not passed.get("stop-at-threshold", True) and _drives(threshold):
-        findings["stop-at-threshold"] = Finding(
+    if _drives(threshold) and not _drives(left_open):
+        boundary = Finding(
             "threshold-boundary",
             "Your robot drove with the front exactly 0.75 m away; 0.75 m counts as "
             "blocked, so drive only when the front is greater than 0.75 m.",
         )
-    if not passed.get("equal-sides-turn-right", True) and _turn(sides_equal) == 1.0:
+        for test_id in ("stop-at-threshold", "stop-when-blocked"):
+            if not passed.get(test_id, True):
+                findings[test_id] = boundary
+    elif not passed.get("stop-at-threshold", True) and turn_finding:
+        # Stopped at 0.75 m but turned the wrong way: same cause as the turn check.
+        findings["stop-at-threshold"] = turn_finding
+    if not passed.get("equal-sides-turn-right", True) and turn_finding:
+        findings["equal-sides-turn-right"] = turn_finding
+    elif not passed.get("equal-sides-turn-right", True) and _turn(sides_equal) == 1.0:
         findings["equal-sides-turn-right"] = Finding(
             "tie-goes-left",
             "Your robot turned left when left and right were equal; left is not "

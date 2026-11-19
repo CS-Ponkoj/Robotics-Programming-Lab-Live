@@ -200,6 +200,58 @@ def test_swapped_turns_are_not_blamed_on_nan():
     assert findings["unknown-distance-safe"].hint_key == "turn-direction-swapped"
 
 
+def test_boundary_mistake_also_explains_the_blocked_check():
+    findings = classify(
+        "open_side",
+        {"stop-when-blocked": False, "stop-at-threshold": False},
+        observations(threshold=phase(0.2, 0.0)),
+    )
+    assert findings["stop-when-blocked"].hint_key == "threshold-boundary"
+    assert findings["stop-at-threshold"].hint_key == "threshold-boundary"
+
+
+def test_swapped_turns_explain_the_tie_and_threshold_checks():
+    swapped = {
+        "left-open": phase(0.0, -0.5), "right-open": phase(0.0, 0.5),
+        "threshold": phase(0.0, 0.5), "sides-equal": phase(0.0, 0.5),
+    }
+    findings = classify(
+        "open_side",
+        {"turn-toward-open-side": False, "stop-at-threshold": False,
+         "equal-sides-turn-right": False},
+        observations(**swapped),
+    )
+    for test_id in ("turn-toward-open-side", "stop-at-threshold", "equal-sides-turn-right"):
+        assert findings[test_id].hint_key == "turn-direction-swapped"
+
+
+def test_built_in_hint_uses_the_first_check_with_an_observed_cause():
+    from tutor import TutorService
+    from models import Submission
+    from config import Settings
+
+    assignment = Assignment(
+        id=8, version=1, title=SOURCE["title"], language="python-ros2",
+        grader_type="ros2_topic", grader_config=CONFIG,
+    )
+    submission = Submission(
+        code=REFERENCE,
+        evidence={
+            "execution_succeeded": True,
+            "tests": [
+                {"test_id": "stop-when-blocked", "label": "Stops", "passed": False,
+                 "message": "Stop.", "hint_key": None},
+                {"test_id": "stop-at-threshold", "label": "Boundary", "passed": False,
+                 "message": "Drove at 0.75 m.", "hint_key": "threshold-boundary"},
+            ],
+        },
+    )
+    feedback = TutorService(Settings(openai_api_key=None)).feedback(
+        assignment, submission, hint_level=1, use_ai_tutor=False
+    )
+    assert feedback.hint == HINT_LADDERS["threshold-boundary"].levels[0]
+
+
 def test_every_configured_misconception_has_a_hint_ladder():
     for item in SOURCE["common_misconceptions"]:
         assert item["tag"] in HINT_LADDERS
