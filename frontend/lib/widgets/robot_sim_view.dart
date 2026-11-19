@@ -18,6 +18,24 @@ enum SimViewLayout {
 }
 
 /// Top-down replay of the student's node driving the robot. Visual only.
+/// Playback state of each replay, so a new view of the same replay (after
+/// collapsing, expanding, or docking) continues where the last view was.
+final Expando<_Playback> _playbackMemo = Expando('simulation playback');
+
+class _Playback {
+  const _Playback({
+    required this.value,
+    required this.playing,
+    required this.speed,
+    required this.view,
+  });
+
+  final double value;
+  final bool playing;
+  final double speed;
+  final SimSensorView view;
+}
+
 class RobotSimView extends StatefulWidget {
   const RobotSimView({
     super.key,
@@ -75,6 +93,18 @@ class _RobotSimViewState extends State<RobotSimView>
     if (_started) return;
     _started = true;
     if (_takeFocus()) return;
+    // Collapsing, expanding, docking, or going full screen builds a new view
+    // of the same replay: continue exactly where the previous view was.
+    final saved = _playbackMemo[widget.replay];
+    if (saved != null) {
+      _speed = saved.speed;
+      _view = saved.view;
+      _controller
+        ..duration = _duration
+        ..value = saved.value;
+      if (saved.playing && _controller.value < 1) _controller.forward();
+      return;
+    }
     // Respect reduced motion: show the final position and let the slider scrub.
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
       _controller.value = 1;
@@ -122,6 +152,22 @@ class _RobotSimViewState extends State<RobotSimView>
     } else if (widget.focus?.token != _focusToken) {
       setState(_takeFocus);
     }
+  }
+
+  void _remember() {
+    _playbackMemo[widget.replay] = _Playback(
+      value: _controller.value,
+      playing: _controller.isAnimating,
+      speed: _speed,
+      view: _view,
+    );
+  }
+
+  @override
+  void deactivate() {
+    // Runs before a replacement view of this replay is built.
+    _remember();
+    super.deactivate();
   }
 
   @override
@@ -742,7 +788,8 @@ class RobotSimPainter extends CustomPainter {
       }
     }
 
-    // The robot: a triangle whose tip points where it is heading.
+    // The robot: a triangle whose tip points where it is heading. It fits
+    // inside the grader's collision radius, so a drawn touch is a real touch.
     final radius = math.max(replay.robotRadius * scale, 8.0);
     Offset corner(double angle, double length) =>
         robot +
@@ -750,9 +797,9 @@ class RobotSimPainter extends CustomPainter {
             length;
     final body = Path()
       ..addPolygon([
-        corner(0, radius * 1.5),
-        corner(math.pi * 0.78, radius * 1.1),
-        corner(-math.pi * 0.78, radius * 1.1),
+        corner(0, radius),
+        corner(math.pi * 0.78, radius),
+        corner(-math.pi * 0.78, radius),
       ], true);
     canvas.drawPath(body, Paint()..color = robotColor);
     canvas.drawPath(

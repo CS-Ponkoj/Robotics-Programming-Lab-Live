@@ -98,8 +98,20 @@ void main() {
       expect(replay.frameAt(3.55).t, closeTo(3.4, 1e-9));
       expect(replay.wallsAt(1.0).single.first, 1.2);
       expect(replay.wallsAt(5.0).single.first, 2.7);
-      expect(replay.summary, contains('stopped 0.50 m from the wall at 3.5 s'));
+      expect(replay.summary, contains('stopped 0.35 m from the wall (lidar read 0.50 m) at 3.5 s'));
       expect(replay.summary, contains('drove again'));
+    });
+
+    test("a stop at the robot's edge is reported as touching the wall", () {
+      final json = replayJson();
+      final events = [
+        for (final event in json['events'] as List)
+          if ((event as Map)['type'] == 'stopped') {...event, 'front': 0.16}
+          else event,
+      ];
+      final replay = SimulationReplay.fromJson({...json, 'events': events})!;
+      expect(replay.summary,
+          contains('stopped touching the wall (lidar read 0.16 m)'));
     });
 
     test('a failed node has no replay and keeps its error', () {
@@ -132,7 +144,8 @@ void main() {
       expect(replay.summary, isNot(contains('without stopping')));
       expect(
         replay.summary,
-        'The robot stopped 0.50 m from the wall at 3.5 s, drove again after '
+        'The robot stopped 0.35 m from the wall (lidar read 0.50 m) at 3.5 s, '
+        'drove again after '
         'the wall moved away, then hit the wall at 6.2 s.',
       );
 
@@ -203,6 +216,36 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Time 8.0 seconds'), findsOneWidget);
       expect(find.textContaining('Drove again'), findsOneWidget);
+    });
+
+    testWidgets('a new view of the same replay keeps its place and pause',
+        (tester) async {
+      tester.view.physicalSize = const Size(520, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final replay = SimulationReplay.fromJson(replayJson())!;
+      await tester.pumpWidget(host(RobotSimView(replay: replay)));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(find.byKey(const ValueKey('robot-sim-play')));
+      await tester.pump();
+      String time() => tester
+          .getSemantics(find.bySemanticsLabel(RegExp(r'^Time ')))
+          .label;
+      final pausedAt = time();
+
+      // Collapsing or expanding rebuilds the view in a different parent.
+      await tester.pumpWidget(host(Padding(
+          padding: EdgeInsets.zero, child: RobotSimView(replay: replay))));
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.byTooltip('Play replay'), findsOneWidget);
+      expect(time(), pausedAt);
+
+      // A playing replay keeps playing from the same place.
+      await tester.tap(find.byKey(const ValueKey('robot-sim-play')));
+      await tester.pump();
+      await tester.pumpWidget(host(RobotSimView(replay: replay)));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byTooltip('Pause replay'), findsOneWidget);
     });
 
     testWidgets('reduced motion shows the final position without playing',

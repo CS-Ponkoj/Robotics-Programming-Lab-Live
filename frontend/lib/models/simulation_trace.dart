@@ -213,6 +213,17 @@ class SimulationReplay {
     final collided = first('collided');
     String metres(double? value) =>
         value == null ? 'nothing in range' : '${value.toStringAsFixed(2)} m';
+    // The lidar sits at the robot's centre; the gap that matters to a viewer
+    // is from the robot's front edge to the wall.
+    String stopGap(SimulationEvent? event) {
+      final reading = event?.front;
+      if (reading == null) return 'with nothing in range';
+      final gap = math.max(0.0, reading - robotRadius);
+      final where = gap < 0.02
+          ? 'touching the wall'
+          : '${gap.toStringAsFixed(2)} m from the wall';
+      return '$where (lidar read ${metres(reading)})';
+    }
     switch (outcome) {
       case 'collided':
         final hit = collided?.t ?? end.t;
@@ -222,7 +233,7 @@ class SimulationReplay {
           final again = resumed != null && resumed.t < hit
               ? 'drove again after the wall moved away, '
               : '';
-          return 'The robot stopped ${metres(stopped.front)} from the wall at '
+          return 'The robot stopped ${stopGap(stopped)} at '
               '${stopped.t.toStringAsFixed(1)} s, ${again}then hit the wall at '
               '${hit.toStringAsFixed(1)} s.';
         }
@@ -231,10 +242,10 @@ class SimulationReplay {
       case 'never_moved':
         return 'The robot never moved: every command had linear.x = 0.0.';
       case 'stopped_and_resumed':
-        return 'The robot stopped ${metres(stopped?.front)} from the wall at ${stopped?.t.toStringAsFixed(1)} s, '
+        return 'The robot stopped ${stopGap(stopped)} at ${stopped?.t.toStringAsFixed(1)} s, '
             'then drove again after the wall moved away.';
       case 'stopped':
-        return 'The robot stopped ${metres(stopped?.front)} from the wall at ${stopped?.t.toStringAsFixed(1)} s, '
+        return 'The robot stopped ${stopGap(stopped)} at ${stopped?.t.toStringAsFixed(1)} s, '
             'but did not drive again after the wall moved away.';
       default:
         return 'The robot was still driving when the replay ended '
