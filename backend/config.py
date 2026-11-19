@@ -30,8 +30,12 @@ class Settings(BaseSettings):
     auto_create_schema: bool = True
     redis_url: str = "redis://127.0.0.1:6379/0"
     openai_api_key: str | None = None
-    openai_hint_model: str = "gpt-4.1-mini"
-    openai_timeout_seconds: float = 7.0
+    # Chosen 2026-11-19 from a 32-answer comparison on Assignment 7: it never
+    # gave the fix away early and stayed under the timeout at low effort.
+    openai_hint_model: str = "gpt-6.2-sol"
+    # Thinking effort for reasoning models; ignored by models without it.
+    openai_reasoning_effort: str = "low"
+    openai_timeout_seconds: float = 10.0
     openai_max_retries: int = 0
     admin_api_token: str | None = None
     enable_demo_accounts: bool = True

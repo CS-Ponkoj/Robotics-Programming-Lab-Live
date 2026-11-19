@@ -233,7 +233,10 @@ def test_openai_client_uses_bounded_timeout_and_no_retries(monkeypatch):
     assert request["store"] is False
     assert request["text"]["format"]["type"] == "json_schema"
     assert request["text"]["format"]["strict"] is True
-    assert request["max_output_tokens"] == 1000
+    # The default model reasons: low effort, room for the answer after thinking.
+    assert request["model"] == "gpt-6.2-sol"
+    assert request["reasoning"] == {"effort": "low"}
+    assert request["max_output_tokens"] == 4000
     assert "module-level definitions" in request["instructions"]
     assert "source of truth for execution claims" in request["instructions"]
     assert "Diagnostic print statements are allowed" in request["instructions"]
@@ -500,3 +503,21 @@ def test_grounded_global_input_or_real_name_error_explanation_is_allowed(executi
     )
     assert feedback.source == "openai"
     assert feedback.diagnosis == diagnosis
+
+
+@pytest.mark.parametrize("model, expected", [
+    ("gpt-4.1-mini", {"max_output_tokens": 1000}),
+    ("gpt-6.2-sol", {"reasoning": {"effort": "medium"}, "max_output_tokens": 4000}),
+])
+def test_reasoning_options_are_sent_only_to_reasoning_models(model, expected):
+    captured = {}
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(output_text=json.dumps(_ai_output()))
+
+    settings = Settings(openai_hint_model=model, openai_reasoning_effort="medium")
+    TutorService(settings, client=SimpleNamespace(
+        responses=SimpleNamespace(create=create))).feedback(_assignment(), _submission())
+    assert captured["model"] == model
+    assert {k: captured[k] for k in ("reasoning", "max_output_tokens") if k in captured} == expected

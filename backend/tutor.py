@@ -36,6 +36,9 @@ _UNDEFINED_NAME_CLAIM = re.compile(
 )
 
 
+_REASONING_MODEL_PREFIXES = ("gpt-5", "gpt-6", "o1", "o3", "o4")
+
+
 # "Swap the logic", "reverse the condition", "use > instead of <": a finished
 # repair, which an early hint must leave to the student.
 _PRESCRIBED_FIX = re.compile(
@@ -206,8 +209,8 @@ class TutorService:
                         "schema": TutorGeneratedContent.model_json_schema(),
                     }
                 },
-                max_output_tokens=1000,
                 store=False,
+                **self._model_options(),
             )
             parsed = TutorGeneratedContent.model_validate_json(response.output_text)
             self._enforce_output_policy(parsed)
@@ -263,6 +266,16 @@ class TutorService:
             r"(?:or higher|or lower|or more|or less)", text, re.IGNORECASE
         ):
             raise ValueError("Tutor changed the fixed obstacle-safety threshold.")
+
+    def _model_options(self) -> dict[str, Any]:
+        """Reasoning models think before answering: bound the effort and leave
+        room for the answer after the thinking tokens."""
+        if self.settings.openai_hint_model.startswith(_REASONING_MODEL_PREFIXES):
+            return {
+                "reasoning": {"effort": self.settings.openai_reasoning_effort},
+                "max_output_tokens": 4000,
+            }
+        return {"max_output_tokens": 1000}
 
     @staticmethod
     def _enforce_gradual_hint(content: TutorGeneratedContent, hint_level: int) -> None:
