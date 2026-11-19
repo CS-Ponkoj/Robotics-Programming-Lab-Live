@@ -391,7 +391,7 @@ class SimulationBody extends StatelessWidget {
           final replay = snap.data?.replay;
           if (replay != null) return _body(theme, snap);
           final text = future == null
-              ? 'Press Simulate to watch your robot.'
+              ? 'Press Simulate (▶) to watch your robot.'
               : snap.connectionState == ConnectionState.waiting
                   ? 'Running your node on the robot…'
                   : 'No replay. Expand the panel for details.';
@@ -407,7 +407,7 @@ class SimulationBody extends StatelessWidget {
       return _Message(
         icon: Icons.smart_toy_outlined,
         title: 'Watch your robot',
-        text: 'Press Simulate to run your node in a small 2D world and replay '
+        text: 'Press Simulate (▶) to run your node in a small 2D world and replay '
             'how it drives the robot. It is not graded.',
       );
     }

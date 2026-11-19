@@ -101,18 +101,30 @@ def main() -> None:
         message.right = right
         return message
 
+    subscribed = [False]
+
     def wait_for_controller(timeout: float = 5.0) -> bool:
-        """Wait for ROS discovery and one end-to-end reply."""
+        """Wait for ROS discovery and one end-to-end reply.
+
+        Readiness messages alternate between a clear and a blocked front, so a
+        node that answers only one of them still counts as started and the
+        scored situations then show exactly what it skips.
+        """
         deadline = time.monotonic() + timeout
         next_publish = time.monotonic()
+        clear = True
         while time.monotonic() < deadline:
             if student.poll() is not None:
                 return False
             now = time.monotonic()
             if now >= next_publish:
-                flbr_publisher.publish(flbr_message(2.0, 1.0, 1.0, 1.0))
+                values = (2.0, 1.0, 1.0, 1.0) if clear else (0.5, 2.0, 1.0, 1.0)
+                flbr_publisher.publish(flbr_message(*values))
+                clear = not clear
                 next_publish = now + MESSAGE_PERIOD
             rclpy.spin_once(monitor, timeout_sec=0.03)
+            if flbr_publisher.get_subscription_count() > 0:
+                subscribed[0] = True
             if (
                 flbr_publisher.get_subscription_count() > 0
                 and monitor.count_publishers(command_topic) > 0
@@ -229,6 +241,8 @@ def main() -> None:
             node_started,
             "The open_side_controller node started."
             if node_started
+            # The feedback classifier adds the observed cause (unfinished wiring
+            # or a callback that never answers) from the observations below.
             else "The node did not start publishing on /cmd_vel within 5 seconds.",
         ),
         result(
@@ -318,6 +332,10 @@ def main() -> None:
                 "observations": {
                     "phases": {name: phase_summary(name) for name, *_values in PHASES},
                     "rate_hz": round(publish_rate, 2),
+                    # How the node behaved before the scored situations.
+                    "started": node_started,
+                    "subscribed": subscribed[0],
+                    "alive": alive_at_end,
                 },
                 "error": runtime_error
                 or ("" if all(item["passed"] for item in tests) else "One or more ROS behavior requirements need attention."),

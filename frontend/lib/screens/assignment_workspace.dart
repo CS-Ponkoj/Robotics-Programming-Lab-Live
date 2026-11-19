@@ -103,6 +103,9 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _terminalRequestError;
   String _terminalFileName = 'your_code.py';
   bool _terminalPython = true;
+
+  /// The ROS 2 run command (ros2 run, package, executable); null otherwise.
+  String? _terminalCommand;
   Map<String, dynamic> _simulationConfig = const {};
   // Robot replay (visual only): the last simulation and which results tab shows.
   Future<SimulationResultDto>? _simulation;
@@ -412,6 +415,7 @@ class _MyHomePageState extends State<MyHomePage> {
             code: ranCode,
             fileName: _terminalFileName,
             python: _terminalPython,
+            command: _terminalCommand,
           );
           _diagnosticLine = extractPythonErrorLine(
             '${feedback.codeExecResult}\n${feedback.codeOutput}',
@@ -1351,6 +1355,16 @@ class _MyHomePageState extends State<MyHomePage> {
                                               'your_code.py';
                                           _terminalPython = snap.data!.language
                                               .startsWith('python');
+                                          final rosPath = snap
+                                                  .data!.editableFilePath
+                                                  ?.split('/') ??
+                                              const <String>[];
+                                          _terminalCommand = snap.data!.language
+                                                      .contains('ros2') &&
+                                                  rosPath.length >= 3
+                                              ? 'ros2 run ${rosPath[1]} '
+                                                  '${rosPath.last.replaceAll('.py', '')}'
+                                              : null;
                                           _simulationConfig =
                                               snap.data!.simulationConfig;
                                           setAssignmentEditorContent(

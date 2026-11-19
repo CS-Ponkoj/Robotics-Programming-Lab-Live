@@ -446,7 +446,21 @@ class TutorService:
         if not evidence.get("execution_succeeded", False):
             diagnosis = "The program must execute before its calculations can be checked."
             guiding_question = "What is the first error message and line number?"
-            hint = "Fix the first execution error, then run the tests again."
+            # Each level adds one concrete step, so asking again helps.
+            if evidence.get("execution_status") == "syntax_error":
+                hint = {
+                    1: "Fix the first execution error, then run the tests again.",
+                    2: "Look at the line the error names and the line just before it.",
+                    3: "A missing colon, bracket, or quote, or uneven indentation, is the usual cause.",
+                    4: "Compare that line's shape with a similar line in the starter code.",
+                }[hint_level]
+            else:
+                hint = {
+                    1: "Fix the first execution error, then run the tests again.",
+                    2: "Read the last line of the error: it names the problem, such as a name or attribute that does not exist.",
+                    3: "Open the line number from your file in the error and compare each name on it with the instructions and starter code.",
+                    4: "If the error appeared after your last change, undo it, then change one thing at a time and rerun.",
+                }[hint_level]
             next_action = "Inspect the reported line and complete or correct that expression."
         elif failed is None and evidence.get("tests"):
             diagnosis = "Your program runs and all recorded checks passed."

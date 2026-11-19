@@ -414,7 +414,8 @@ class AssignmentCollection extends StatelessWidget {
             ),
             if (useGrid)
               SliverPadding(
-                padding: const EdgeInsets.only(bottom: 32),
+                // Room below the last card for the floating Feedback button.
+                padding: const EdgeInsets.only(bottom: 96),
                 sliver: SliverGrid(
                   key: const Key('assignment-grid'),
                   delegate: assignmentDelegate,
@@ -426,7 +427,8 @@ class AssignmentCollection extends StatelessWidget {
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.only(bottom: 32),
+                // Room below the last card for the floating Feedback button.
+                padding: const EdgeInsets.only(bottom: 96),
                 sliver: SliverList(
                   key: const Key('assignment-list'),
                   delegate: assignmentDelegate,

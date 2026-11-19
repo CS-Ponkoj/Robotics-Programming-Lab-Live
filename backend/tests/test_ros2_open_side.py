@@ -252,6 +252,62 @@ def test_built_in_hint_uses_the_first_check_with_an_observed_cause():
     assert feedback.hint == HINT_LADDERS["threshold-boundary"].levels[0]
 
 
+@pytest.mark.parametrize(
+    ("subscribed", "hint_key"),
+    [(False, "not-wired"), (True, "silent-callback")],
+)
+def test_running_node_that_never_answers_gets_its_cause(subscribed, hint_key):
+    empty = {name: {"count": 0} for name in observations()["phases"]}
+    findings = classify(
+        "open_side",
+        {"node-start": False, "flbr-response": False, "cmd-vel-topic": False},
+        {"phases": empty, "started": False, "subscribed": subscribed, "alive": True},
+    )
+    assert {finding.hint_key for finding in findings.values()} == {hint_key}
+    assert set(findings) == {"node-start", "flbr-response", "cmd-vel-topic"}
+
+
+def test_crashed_node_is_left_to_the_runtime_error():
+    empty = {name: {"count": 0} for name in observations()["phases"]}
+    findings = classify(
+        "open_side",
+        {"node-start": False},
+        {"phases": empty, "started": False, "subscribed": True, "alive": False},
+    )
+    assert "node-start" not in findings
+
+
+def test_node_that_skips_clear_messages_is_named():
+    skipped = {"clear": {"count": 0}, "clear-sides-differ": {"count": 0}, "resume": {"count": 0}}
+    findings = classify(
+        "open_side",
+        {"flbr-response": False, "clear-path-forward": False},
+        observations(**skipped),
+    )
+    assert findings["flbr-response"].hint_key == "skips-clear-messages"
+    assert findings["clear-path-forward"].hint_key == "skips-clear-messages"
+
+
+@pytest.mark.parametrize("status", ["runtime_error", "syntax_error"])
+def test_error_hints_add_a_step_at_each_level(status):
+    from tutor import TutorService
+    from models import Submission
+    from config import Settings
+
+    assignment = Assignment(id=8, version=1, title=SOURCE["title"], language="python-ros2",
+                            grader_type="ros2_topic", grader_config=CONFIG)
+    submission = Submission(code=REFERENCE, evidence={
+        "execution_succeeded": False, "execution_status": status,
+        "tests": [{"test_id": "node-start", "label": "Starts", "passed": False, "message": "No."}],
+    })
+    service = TutorService(Settings(openai_api_key=None))
+    hints = [
+        service.feedback(assignment, submission, hint_level=level, use_ai_tutor=False).hint
+        for level in (1, 2, 3, 4)
+    ]
+    assert len(set(hints)) == 4
+
+
 def test_every_configured_misconception_has_a_hint_ladder():
     for item in SOURCE["common_misconceptions"]:
         assert item["tag"] in HINT_LADDERS

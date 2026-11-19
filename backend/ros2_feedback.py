@@ -186,8 +186,39 @@ def _turn(phase: dict) -> float | None:
 def open_side_findings(passed: dict[str, bool], observations: dict) -> dict[str, Finding]:
     """Findings for the turn-toward-the-open-side harness (Assignment 8)."""
     findings: dict[str, Finding] = {}
+    wiring = ("node-start", "flbr-response", "cmd-vel-topic")
+    if not passed.get("node-start", True) and observations.get("alive") is True:
+        # A running node that never answered: unfinished wiring or a callback
+        # that never returns. A crash is reported as a runtime error instead.
+        cause = (
+            Finding(
+                "silent-callback",
+                "Your node subscribed to /flbr but never published a Twist; "
+                "handle_flbr must return quickly and publish for every message.",
+            )
+            if observations.get("subscribed") is True
+            else Finding(
+                "not-wired",
+                "Your node never subscribed to /flbr or published on /cmd_vel; "
+                "complete TODO 1 and TODO 2 first.",
+            )
+        )
+        for test_id in wiring:
+            if not passed.get(test_id, True):
+                findings[test_id] = cause
+        return findings
     clear = _phase(observations, "clear")
     differ = _phase(observations, "clear-sides-differ")
+    if not clear.get("count") and _phase(observations, "left-open").get("count"):
+        skipped = Finding(
+            "skips-clear-messages",
+            "Your node published only when the front was blocked; publish one "
+            "Twist for every message, also when the front is clear.",
+        )
+        for test_id in (*wiring, "clear-path-forward"):
+            if not passed.get(test_id, True):
+                findings[test_id] = skipped
+        return findings
     left_open = _phase(observations, "left-open")
     right_open = _phase(observations, "right-open")
     threshold = _phase(observations, "threshold")
@@ -461,6 +492,39 @@ HINT_LADDERS: dict[str, HintLadder] = {
             "In the blocked branch publish linear.x = 0.0 and angular.z = +0.5 or -0.5 toward the larger side.",
         ),
         "Add the turn to the blocked branch and rerun the tests.",
+    ),
+    "not-wired": HintLadder(
+        "Your node is not connected yet: it has no /cmd_vel publisher or /flbr subscription.",
+        "Which two lines in __init__ still say None?",
+        (
+            "Start with TODO 1 and TODO 2 in __init__; the robot cannot hear or move without them.",
+            "TODO 1 creates a Twist publisher on /cmd_vel with queue depth 10.",
+            "TODO 2 subscribes to Flbr on /flbr with queue depth 10 and calls self.handle_flbr.",
+            "Replace each None with the matching create_publisher(...) or create_subscription(...) call.",
+        ),
+        "Complete TODO 1 and TODO 2, then run the tests again.",
+    ),
+    "silent-callback": HintLadder(
+        "Your node receives /flbr messages but never publishes a reply.",
+        "Does handle_flbr always reach the publish line, and does it finish quickly?",
+        (
+            "Every /flbr message must get exactly one Twist on /cmd_vel.",
+            "Check that the publish call runs on every path through handle_flbr.",
+            "A loop that never ends, or waiting inside the callback, stops all replies.",
+            "Build one Twist, set it from the distances, publish it, and return.",
+        ),
+        "Make handle_flbr publish once and return, then rerun the tests.",
+    ),
+    "skips-clear-messages": HintLadder(
+        "Your node answers only when the front is blocked, so it never drives forward.",
+        "What does handle_flbr publish when the front is clear?",
+        (
+            "Every /flbr message needs a reply, including when the way ahead is clear.",
+            "Look for a return or a branch that skips the publish call.",
+            "Set the command in each branch, then publish once at the end of handle_flbr.",
+            "When the front is clear, publish linear.x = self.forward_speed.",
+        ),
+        "Publish for every message and rerun the tests.",
     ),
     "same-turn-every-time": HintLadder(
         "Your robot always turns the same way, no matter which side has more space.",

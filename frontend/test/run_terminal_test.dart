@@ -213,6 +213,16 @@ void main() {
       expect(lines.where((l) => l.line == 3), hasLength(1));
     });
 
+    test('a ROS 2 package shows the command it really runs with', () {
+      final lines = buildRunTerminalLines(
+        data: result(success: true),
+        code: 'import rclpy\n',
+        fileName: 'controller.py',
+        command: 'ros2 run open_side controller',
+      );
+      expect(texts(lines).first, r'$ ros2 run open_side controller');
+    });
+
     test('a ROS node error becomes a clickable traceback', () {
       const node = 'import rclpy\n'
           'class Robot:\n'

@@ -44,10 +44,17 @@ List<TerminalLine> buildRunTerminalLines({
   required String code,
   String fileName = 'your_code.py',
   bool python = true,
+  // The command a ROS 2 node really runs with, such as
+  // 'ros2 run open_side controller'; null for a plain Python file.
+  String? command,
 }) {
   final lines = <TerminalLine>[
     TerminalLine(
-      python ? '\$ python $fileName' : '\$ run assignment tests',
+      command != null
+          ? '\$ $command'
+          : python
+              ? '\$ python $fileName'
+              : '\$ run assignment tests',
       TerminalLineKind.command,
     ),
   ];

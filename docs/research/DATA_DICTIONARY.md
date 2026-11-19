@@ -185,8 +185,10 @@ From 2026-11-19, a failed Assignment 8 (turn toward the open side) behavior
 check may store one of these `hint_key` values in the same way:
 `turns-while-clear`, `forward-speed-wrong`, `front-check-reversed`,
 `turn-direction-swapped`, `no-turn-when-blocked`, `same-turn-every-time`,
-`threshold-boundary`, `tie-goes-left`, `nan-side-chosen`, or
-`open-side-no-resume`.
+`threshold-boundary`, `tie-goes-left`, `nan-side-chosen`,
+`open-side-no-resume`, `not-wired`, `silent-callback`, or
+`skips-clear-messages`. The Assignment 8 harness also reports `started`,
+`subscribed`, and `alive` (booleans) in its observations; they are not stored.
 
 For a ROS 2 assignment whose `grader_config` lists `gate_tests` and
 `pass_tests` (Assignment 7 onward), `score` is 0 whenever any gate check
