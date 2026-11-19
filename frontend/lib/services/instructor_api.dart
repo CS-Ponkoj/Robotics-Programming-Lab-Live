@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:iuse_demo/api_config.dart';
+import 'package:iuse_demo/services/auth_api.dart';
 
 const _adminTimeout = Duration(seconds: 20);
 
@@ -86,16 +87,9 @@ Future<void> publishAdminAssignment(
   }
 }
 
-String _errorMessage(http.Response response) {
-  try {
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return data['detail']?.toString() ??
-        data['error']?.toString() ??
-        'Request failed (${response.statusCode}).';
-  } on Object {
-    return 'Request failed (${response.statusCode}).';
-  }
-}
+/// The shared auth helper also flags an expired sign-in, so the app shows
+/// its "Please sign in again" dialog instead of a raw error on the page.
+String _errorMessage(http.Response response) => AuthApi.errorMessage(response);
 
 /// The course AI tutor switch, daily limit, whether a key is configured on the
 /// server (never the key), and each assignment's AI review state.

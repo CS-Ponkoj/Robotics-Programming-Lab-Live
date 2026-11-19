@@ -86,41 +86,15 @@ class AppPanel extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
-                12,
                 AppSpacing.sm,
-                12,
+                AppSpacing.sm,
+                AppSpacing.sm,
               ),
-              child: Row(
-                children: [
-                  if (icon != null) ...[
-                    IconTile(icon: icon!),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Semantics(
-                          header: true,
-                          child: Text(
-                            title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (subtitle != null)
-                          Text(
-                            subtitle!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  ...actions,
-                ],
+              child: PanelTitleRow(
+                title: title,
+                icon: icon,
+                subtitle: subtitle,
+                actions: actions,
               ),
             ),
             const Divider(height: 1),
@@ -148,6 +122,72 @@ class AppPanel extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// One compact header line for a panel, as in a code editor or dashboard:
+/// a plain coloured icon, the title, a muted one-line description after it,
+/// and the panel's actions on the right.
+class PanelTitleRow extends StatelessWidget {
+  const PanelTitleRow({
+    super.key,
+    required this.title,
+    this.icon,
+    this.subtitle,
+    this.actions = const [],
+    this.minHeight = 36,
+  });
+
+  final String title;
+  final IconData? icon;
+  final String? subtitle;
+  final List<Widget> actions;
+  final double minHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: minHeight),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: scheme.primary),
+            const SizedBox(width: 10),
+          ],
+          Flexible(
+            child: Semantics(
+              header: true,
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 2,
+              child: Text(
+                subtitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ] else
+            const Spacer(),
+          ...actions,
+        ],
       ),
     );
   }
@@ -291,57 +331,65 @@ class StatTile extends StatelessWidget {
     );
   }
 
+  // Dashboard style: a small capitalised label with its icon on top, then
+  // the value large, with its unit muted beside it. One label line keeps
+  // every tile in a row the same height.
   Widget _tile(ThemeData theme) {
+    final scheme = theme.colorScheme;
     return AppSurface(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final text = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text.rich(
-                TextSpan(
-                  text: value,
-                  children: [
-                    if (unit != null)
-                      TextSpan(
-                        text: ' $unit',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Semantics(
+        label: unit == null ? '$label: $value' : '$label: $value $unit',
+        excludeSemantics: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 15, color: scheme.primary),
+                  const SizedBox(width: 6),
+                ],
+                Expanded(
+                  child: Text(
+                    label.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 11,
+                      letterSpacing: 0.8,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text.rich(
+              TextSpan(
+                text: value,
+                children: [
+                  if (unit != null)
+                    TextSpan(
+                      text: ' $unit',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
                       ),
-                  ],
-                ),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                    ),
+                ],
               ),
-              Text(
-                label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.1,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
-            ],
-          );
-          if (icon == null) return text;
-          final tile = IconTile(icon: icon!, size: 40);
-          // Narrow tiles stack the icon above the value.
-          if (constraints.maxWidth < 200) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [tile, const SizedBox(height: 10), text],
-            );
-          }
-          return Row(
-            children: [
-              tile,
-              const SizedBox(width: AppSpacing.md),
-              Expanded(child: text),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }

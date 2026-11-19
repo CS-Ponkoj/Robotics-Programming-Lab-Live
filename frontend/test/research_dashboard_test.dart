@@ -136,6 +136,9 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('research-participant-P-042')),
       300,
+      // The page scroll; more of the page can be built (and with it other
+      // scrolling areas further down) when the overview tiles are compact.
+      scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('P-042'), findsOneWidget);
     expect(find.textContaining('3 attempts'), findsOneWidget);

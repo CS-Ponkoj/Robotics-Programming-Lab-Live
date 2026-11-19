@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:iuse_demo/main.dart' as app;
 import 'package:iuse_demo/screens/login_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
+import 'package:iuse_demo/services/instructor_api.dart';
 import 'package:iuse_demo/state/learning_progress_store.dart';
 import 'package:iuse_demo/state/progress_storage_base.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,6 +45,34 @@ void main() {
     expect(find.byType(LoginPage), findsOneWidget);
     expect(find.byKey(const Key('session-expired-dialog')), findsNothing);
     expect(AuthApi.sessionExpired.value, isFalse);
+  });
+
+  test('an expired sign-in on an instructor page raises the sign-in dialog',
+      () async {
+    SharedPreferences.setMockInitialValues({'auth_session_token': 'old'});
+    final client = MockClient((request) async {
+      if (request.url.path.endsWith('/auth/me')) {
+        return http.Response(
+          jsonEncode(
+              {'id': 'i1', 'login_id': 'teacher', 'role': 'instructor'}),
+          200,
+        );
+      }
+      return http.Response(
+          jsonEncode({'error': 'Instructor authentication required.'}), 401);
+    });
+    await http.runWithClient(() async {
+      await AuthApi.restore();
+      AuthApi.sessionExpired.value = false;
+      // Instructor pages share the app-wide expired sign-in signal.
+      await expectLater(
+        fetchAdminAssignments(AuthApi.token ?? ''),
+        throwsA(isA<Exception>()),
+      );
+    }, () => client);
+    expect(AuthApi.sessionExpired.value, isTrue);
+    AuthApi.sessionExpired.value = false;
+    await AuthApi.clearLocalSession();
   });
 
   test('code from an earlier assignment version is kept, never reloaded',

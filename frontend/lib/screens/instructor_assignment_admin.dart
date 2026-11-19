@@ -153,7 +153,9 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
       }
     } on Object catch (error) {
       if (mounted) {
-        setState(() => _error = error.toString());
+        setState(
+          () => _error = error.toString().replaceFirst('Exception: ', ''),
+        );
       }
     } finally {
       if (mounted) {
@@ -369,7 +371,10 @@ class _StudioLinkCard extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Row(
+          // Room for a two-line description, so cards side by side match.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 60),
+            child: Row(
             children: [
               IconTile(icon: icon, size: 44),
               const SizedBox(width: 16),
@@ -390,6 +395,7 @@ class _StudioLinkCard extends StatelessWidget {
               const Icon(Icons.chevron_right_rounded,
                   color: AppColors.inkMuted),
             ],
+          ),
           ),
         ),
       ),

@@ -2226,53 +2226,32 @@ class AssignmentPanelHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // One compact header line shared with the other panels.
     return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      height: 48,
+      padding: const EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.xs),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
           bottom: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
       ),
-      child: Row(
-        children: [
-          IconTile(icon: icon, size: 34),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            ),
-          ),
+      child: PanelTitleRow(
+        title: title,
+        icon: icon,
+        subtitle: subtitle,
+        actions: [
           if (onFocusToggle != null)
             IconButton(
               key: Key('focus-${title.toLowerCase()}-button'),
               tooltip: isFocused ? 'Restore workspace' : 'Focus $title',
               onPressed: onFocusToggle,
+              visualDensity: VisualDensity.compact,
               icon: Icon(
                 isFocused
                     ? Icons.close_fullscreen_rounded
                     : Icons.open_in_full_rounded,
+                size: 20,
               ),
             ),
         ],
@@ -2367,30 +2346,12 @@ class AssignmentEditorToolbar extends StatelessWidget {
         children: [
           Row(
             children: [
-              const IconTile(icon: Icons.code_rounded, size: 34),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Python editor',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      'Edit the starter code, then run the tests',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+              const Expanded(
+                child: PanelTitleRow(
+                  title: 'Python editor',
+                  icon: Icons.code_rounded,
+                  subtitle: 'Edit the starter code, then run the tests',
+                  minHeight: 40,
                 ),
               ),
               if (saveState != DraftSaveState.idle)

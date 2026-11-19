@@ -387,7 +387,9 @@ void main() {
     expect(find.text('Sensor telemetry'), findsOneWidget);
     expect(find.text('Last replay'), findsOneWidget);
     expect(find.text('Refresh 500 ms'), findsOneWidget);
-    expect(find.text('Forward'), findsOneWidget);
+    // Dashboard style: a capitalised label, read out in full with its value.
+    expect(find.text('FORWARD'), findsOneWidget);
+    expect(find.bySemanticsLabel('Forward: 0.336 m'), findsOneWidget);
     expect(
       find.byWidgetPredicate(
         (widget) =>
@@ -1150,7 +1152,7 @@ void main() {
     expect(find.byIcon(Icons.fact_check_rounded), findsOneWidget);
     expect(find.text('Results'), findsOneWidget);
     expect(find.text('Review test outcomes and feedback'), findsOneWidget);
-    expect(tester.getSize(find.byType(app.AssignmentPanelHeader)).height, 56);
+    expect(tester.getSize(find.byType(app.AssignmentPanelHeader)).height, 48);
   });
 
   testWidgets('assignment instructions organize content without losing it', (
