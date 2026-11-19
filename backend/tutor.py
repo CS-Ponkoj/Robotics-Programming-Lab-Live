@@ -36,6 +36,17 @@ _UNDEFINED_NAME_CLAIM = re.compile(
 )
 
 
+# "Swap the logic", "reverse the condition", "use > instead of <": a finished
+# repair, which an early hint must leave to the student.
+_PRESCRIBED_FIX = re.compile(
+    r"(?:^|[.!?:;]\s+|\b(?:try|should|need to|must|just|then)\s+)"
+    r"(?:swap|swapping|reverse|reversing|flip|flipping|invert|inverting)\b[^.!?\n]{0,40}"
+    r"\b(?:logic|conditions?|comparisons?|operators?|branch(?:es)?|checks?)\b|"
+    r"\buse\s+[<>]=?\s+instead\b",
+    re.IGNORECASE,
+)
+
+
 _PROTECTED_REQUEST = re.compile(
     r"\b(?:give|show|write|provide)\b[^.!?]{0,100}\b(?:complete|completed|full|finished|working|exact|correct)\b"
     r"[^.!?]{0,80}\b(?:code|solution|controller|calculations)\b|"
@@ -147,7 +158,21 @@ class TutorService:
                     "and redirect the student to a conceptual debugging step. "
                     "When a failed test has an observed_pattern, its message ends with "
                     "what the grader saw the robot publish; base the diagnosis on that "
-                    "observation and do not contradict it."
+                    "observation and do not contradict it. "
+                    "The student already sees built_in_feedback for this level. Add "
+                    "what it cannot give: name the student's own function, variable, "
+                    "or condition where the issue lives (a short fragment of their "
+                    "own line is fine), and connect it to the observed behaviour with "
+                    "the concrete distances or speeds from the check messages. Never "
+                    "repeat built_in_feedback sentences, and be no more specific than "
+                    "it about the fix. Level 1: say where to look and why, as a "
+                    "question. Level 2: explain the concept the line gets wrong. "
+                    "Level 3: say exactly which line or comparison is wrong and what "
+                    "it does now. Level 4: describe the change in words. Below level "
+                    "4, never state the corrected condition, operator, value, or "
+                    "branch order, and never tell the student to swap, reverse, or "
+                    "flip something; let them decide the change. The same limits "
+                    "apply to the answer field."
                 ),
                 input=json.dumps(
                     {
@@ -165,6 +190,11 @@ class TutorService:
                         "code_observations": self._code_observations(submission.code),
                         "visible_evidence": self._visible_evidence(submission.evidence),
                         "hint_level": hint_level,
+                        "built_in_feedback": {
+                            "diagnosis": fallback.diagnosis,
+                            "hint": fallback.hint,
+                            "guiding_question": fallback.guiding_question,
+                        },
                         "student_question": normalized_question,
                     }
                 ),
@@ -183,8 +213,12 @@ class TutorService:
             self._enforce_output_policy(parsed)
             self._enforce_evidence_grounding(parsed, submission.evidence or {})
             self._enforce_assignment_scope(parsed, assignment)
+            self._enforce_gradual_hint(parsed, hint_level)
             if hint_level == 1 and len(parsed.debugging_steps) > 2:
-                raise ValueError("First hint gave too many debugging steps.")
+                # Keep the focused first steps instead of discarding the answer.
+                parsed = parsed.model_copy(
+                    update={"debugging_steps": parsed.debugging_steps[:2]}
+                )
             if self._code_observations(submission.code) and not re.search(
                 r"return|placeholder|replace|override|literal|discard", parsed.diagnosis,
                 re.IGNORECASE,
@@ -229,6 +263,18 @@ class TutorService:
             r"(?:or higher|or lower|or more|or less)", text, re.IGNORECASE
         ):
             raise ValueError("Tutor changed the fixed obstacle-safety threshold.")
+
+    @staticmethod
+    def _enforce_gradual_hint(content: TutorGeneratedContent, hint_level: int) -> None:
+        """Below level 3 a hint points the way; it never prescribes the fix."""
+        if hint_level >= 3:
+            return
+        text = " ".join([
+            content.diagnosis, content.answer, content.hint, content.next_action,
+            content.guiding_question, *content.debugging_steps,
+        ])
+        if _PRESCRIBED_FIX.search(text):
+            raise ValueError("Tutor prescribed the fix before hint level 3.")
 
     @staticmethod
     def _enforce_evidence_grounding(

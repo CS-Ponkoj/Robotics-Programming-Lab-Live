@@ -99,10 +99,76 @@ def test_first_hint_and_final_return_guards_use_safe_fallback(unsafe_case):
     feedback = TutorService(Settings(), client=SimpleNamespace(responses=responses)).feedback(
         _assignment(), submission, hint_level=1,
     )
-    assert feedback.source == 'fallback'
     assert len(feedback.debugging_steps) <= 2
-    if unsafe_case == 'missed_return_override':
+    if unsafe_case == 'too_many_steps':
+        # The focused first two steps are kept rather than discarding the answer.
+        assert feedback.source == 'openai'
+        assert feedback.debugging_steps == ['Fix the approach.', 'Fix the boundary.']
+    else:
+        assert feedback.source == 'fallback'
         assert 'final returned fields' in feedback.diagnosis
+
+
+def _ai_output(**fields):
+    output = {
+        'diagnosis': 'Your robot drove while the wall was 0.2 m away.',
+        'misconception': '', 'answer': '',
+        'debugging_steps': ['Read the if condition in handle_scan.'],
+        'guiding_question': 'Which branch runs when min(usable) is 0.2?',
+        'hint': 'Look at the comparison that chooses FORWARD_SPEED.',
+        'next_action': 'Rerun the tests.',
+    }
+    output.update(fields)
+    return output
+
+
+def _ai_feedback(output, level, question=''):
+    captured = {}
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(output_text=json.dumps(output))
+
+    feedback = TutorService(
+        Settings(), client=SimpleNamespace(responses=SimpleNamespace(create=create))
+    ).feedback(_assignment(), _submission(), hint_level=level, student_question=question)
+    return feedback, captured
+
+
+@pytest.mark.parametrize('fix', [
+    {'hint': 'Swap the logic so the robot stops when the wall is close.'},
+    {'hint': 'Try reversing the comparison that sets the speed.'},
+    {'answer': 'You should flip the condition in handle_scan.'},
+    {'debugging_steps': ['Use > instead of < in the check.']},
+])
+def test_early_hints_must_not_prescribe_the_fix(fix):
+    for level in (1, 2):
+        question = 'Why?' if 'answer' in fix else ''
+        feedback, _ = _ai_feedback(_ai_output(**fix), level, question)
+        assert feedback.source == 'fallback'
+    # From level 3 the hint may name the exact change in words.
+    feedback, _ = _ai_feedback(_ai_output(**fix), 3, 'Why?' if 'answer' in fix else '')
+    assert feedback.source == 'openai'
+
+
+def test_describing_a_swapped_condition_is_not_a_prescription():
+    output = _ai_output(diagnosis='You swapped the logic: the drive and stop branches are reversed.')
+    feedback, _ = _ai_feedback(output, 1)
+    assert feedback.source == 'openai'
+
+
+def test_the_ai_sees_the_built_in_hint_it_must_improve_on():
+    feedback, captured = _ai_feedback(_ai_output(), 2)
+    payload = json.loads(captured['input'])
+    built_in = TutorService(Settings()).feedback(
+        _assignment(), _submission(), hint_level=2, use_ai_tutor=False)
+    assert payload['built_in_feedback'] == {
+        'diagnosis': built_in.diagnosis,
+        'hint': built_in.hint,
+        'guiding_question': built_in.guiding_question,
+    }
+    assert 'built_in_feedback' in captured['instructions']
+    assert feedback.hint != built_in.hint
 
 
 @pytest.mark.parametrize('level', [1, 2, 3, 4])
