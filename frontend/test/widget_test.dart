@@ -2196,7 +2196,16 @@ void main() {
       ),
     );
 
-    expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
+    // The run's reply is one hint card; the answer card waits for a question.
+    expect(find.byKey(const Key('guided-hint')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('guided-hint')),
+        matching: find.byKey(const Key('tutor-hint-details')),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('tutor-answer-card')), findsNothing);
     expect(
       find.textContaining('The first distance calculation is incorrect.'),
       findsOneWidget,
@@ -2267,7 +2276,8 @@ void main() {
     );
 
     expect(find.byKey(const Key('tutor-question-field')), findsOneWidget);
-    expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
+    expect(find.byKey(const Key('tutor-hint-details')), findsOneWidget);
+    expect(find.byKey(const Key('tutor-answer-card')), findsNothing);
   });
 
   testWidgets('tutor question failure keeps input and allows retry', (
@@ -2507,7 +2517,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('tutor-question-field')), findsOneWidget);
-    expect(find.byKey(const Key('tutor-answer-card')), findsOneWidget);
+    expect(find.byKey(const Key('tutor-hint-details')), findsOneWidget);
+    expect(find.byKey(const Key('tutor-answer-card')), findsNothing);
     semantics.dispose();
   });
 

@@ -4807,10 +4807,14 @@ class _TerminalPanel extends StatelessWidget {
 }
 
 class _HintCallout extends StatelessWidget {
-  const _HintCallout({required this.hint, required this.source});
+  const _HintCallout({required this.hint, required this.source, this.details});
 
   final String hint;
   final String source;
+
+  /// The rest of the same tutor reply (what to inspect, steps, next action),
+  /// shown under the one-line hint so one reply reads as one card.
+  final Map<String, dynamic>? details;
 
   @override
   Widget build(BuildContext context) {
@@ -4870,6 +4874,16 @@ class _HintCallout extends StatelessWidget {
                     color: fromAi ? AppColors.ink : Colors.brown.shade900,
                   ),
                 ),
+                if (details != null && _TutorDetails.hasContent(details!))
+                  DefaultTextStyle.merge(
+                    style: TextStyle(
+                      color: fromAi ? AppColors.ink : Colors.brown.shade900,
+                    ),
+                    child: _TutorDetails(
+                      key: const Key('tutor-hint-details'),
+                      data: details!,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -4920,6 +4934,7 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
   bool _loading = false;
   bool _asking = false;
   Map<String, dynamic>? _answer;
+  Map<String, dynamic>? _details;
   String? _error;
   String? _questionError;
 
@@ -4951,7 +4966,10 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
     _hintLevel = 1;
     _loading = false;
     _asking = false;
-    _answer = !widget.allowQuestions || widget.data.tutorFeedback.isEmpty
+    // The run's tutor reply belongs to the hint; the answer card is only for
+    // questions the student actually asks.
+    _answer = null;
+    _details = !widget.allowQuestions || widget.data.tutorFeedback.isEmpty
         ? null
         : Map<String, dynamic>.from(widget.data.tutorFeedback);
     _error = null;
@@ -5021,6 +5039,7 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
       setState(() {
         _hint = feedback['hint']?.toString() ?? _hint;
         _source = feedback['source']?.toString() ?? 'fallback';
+        _details = widget.allowQuestions ? feedback : null;
         _hintLevel = feedback['hint_level'] is int
             ? feedback['hint_level'] as int
             : _hintLevel + 1;
@@ -5042,7 +5061,7 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_hint.isNotEmpty) ...[
-          _HintCallout(hint: _hint, source: _source),
+          _HintCallout(hint: _hint, source: _source, details: _details),
           const SizedBox(height: AppSpacing.sm),
         ],
         if (_hint.isNotEmpty)
@@ -5163,16 +5182,6 @@ class _TutorAnswerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final source = data['source']?.toString() ?? 'fallback';
-    final answer = data['answer']?.toString() ?? '';
-    final diagnosis = data['diagnosis']?.toString() ?? '';
-    final guidingQuestion = data['guiding_question']?.toString() ?? '';
-    final nextAction = data['next_action']?.toString() ?? '';
-    final debuggingSteps =
-        (data['debugging_steps'] as List<dynamic>? ?? const [])
-            .map((item) => item.toString())
-            .where((item) => item.isNotEmpty)
-            .toList();
-
     return Semantics(
       container: true,
       liveRegion: true,
@@ -5220,36 +5229,71 @@ class _TutorAnswerCard extends StatelessWidget {
                   if (source == 'openai') const AiGeneratedBadge(),
                 ],
               ),
-              if (answer.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(answer),
-              ],
-              if (diagnosis.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text('What to inspect: $diagnosis'),
-              ],
-              if (debuggingSteps.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Debugging steps',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                ...debuggingSteps.asMap().entries.map(
-                      (entry) => Text('${entry.key + 1}. ${entry.value}'),
-                    ),
-              ],
-              if (guidingQuestion.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text('Think about: $guidingQuestion'),
-              ],
-              if (nextAction.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text('Next action: $nextAction'),
-              ],
+              _TutorDetails(data: data, includeAnswer: true),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The structured parts of a tutor reply: answer, what to inspect, debugging
+/// steps, guiding question, and next action. Empty parts are left out.
+class _TutorDetails extends StatelessWidget {
+  const _TutorDetails({super.key, required this.data, this.includeAnswer = false});
+
+  final Map<String, dynamic> data;
+  final bool includeAnswer;
+
+  static List<String> _steps(Map<String, dynamic> data) =>
+      (data['debugging_steps'] as List<dynamic>? ?? const [])
+          .map((item) => item.toString())
+          .where((item) => item.isNotEmpty)
+          .toList();
+
+  static bool hasContent(Map<String, dynamic> data) =>
+      ['diagnosis', 'guiding_question', 'next_action']
+          .any((key) => (data[key]?.toString() ?? '').isNotEmpty) ||
+      _steps(data).isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    final answer = includeAnswer ? data['answer']?.toString() ?? '' : '';
+    final diagnosis = data['diagnosis']?.toString() ?? '';
+    final guidingQuestion = data['guiding_question']?.toString() ?? '';
+    final nextAction = data['next_action']?.toString() ?? '';
+    final debuggingSteps = _steps(data);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (answer.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(answer),
+        ],
+        if (diagnosis.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text('What to inspect: $diagnosis'),
+        ],
+        if (debuggingSteps.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Debugging steps',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          ...debuggingSteps.asMap().entries.map(
+                (entry) => Text('${entry.key + 1}. ${entry.value}'),
+              ),
+        ],
+        if (guidingQuestion.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text('Think about: $guidingQuestion'),
+        ],
+        if (nextAction.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text('Next action: $nextAction'),
+        ],
+      ],
     );
   }
 }
