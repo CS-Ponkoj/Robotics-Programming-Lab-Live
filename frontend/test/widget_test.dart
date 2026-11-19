@@ -323,7 +323,11 @@ void main() {
     expect(theme.scaffoldBackgroundColor, AppColors.pageBackground);
     expect(theme.textTheme.bodySmall?.fontSize, 14);
     expect(theme.textTheme.labelSmall?.fontSize, 13);
-    expect(theme.cardTheme.elevation, 0);
+    // Cards are lifted off the page with a light shadow and a visible edge.
+    expect(theme.cardTheme.elevation, greaterThan(0));
+    final cardShape = theme.cardTheme.shape! as RoundedRectangleBorder;
+    expect(cardShape.side.color, AppColors.border);
+    expect(AppColors.border, isNot(AppColors.pageBackground));
     expect(theme.progressIndicatorTheme.linearMinHeight, 8);
   });
 

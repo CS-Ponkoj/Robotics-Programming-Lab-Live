@@ -6,10 +6,12 @@ abstract final class AppColors {
   static const brandDeep = Color(0xFF0A3742);
   // Teal tint for selected and brand-highlight surfaces.
   static const brandTint = Color(0xFFDDEFF2);
-  static const pageBackground = Color(0xFFF4F7F9);
+  // Cool grey page so white cards stand out from it.
+  static const pageBackground = Color(0xFFEDF1F5);
   static const ink = Color(0xFF16222E);
   static const inkMuted = Color(0xFF475766);
-  static const border = Color(0xFFDCE3EA);
+  // Visible card and panel edges on both white and the page.
+  static const border = Color(0xFFD3DBE4);
   static const borderStrong = Color(0xFF93A3B2);
   static const neutralContainer = Color(0xFFEDF1F5);
   // Reserved for AI-generated feedback so it is always recognizable.
@@ -27,33 +29,20 @@ abstract final class AppColors {
   static const insightSurface = Color(0xFFF5F2FC);
 }
 
-/// Quiet color around the work, while keeping text and code surfaces readable.
+/// A plain page behind the work, so white cards read as separate layers.
 class LearningBackdrop extends StatelessWidget {
   const LearningBackdrop({super.key, required this.child});
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.learningSurface,
-              AppColors.pageBackground,
-              AppColors.insightSurface
-            ],
-          ),
-        ),
+  Widget build(BuildContext context) => ColoredBox(
+        color: AppColors.pageBackground,
         child: child,
       );
 }
 
-Color learningCardSurface(int index) => switch (index % 3) {
-      0 => AppColors.learningSurface,
-      1 => AppColors.practiceSurface,
-      _ => AppColors.insightSurface,
-    };
+/// Cards are white on the grey page; colour is kept for accents and status.
+Color learningCardSurface(int index) => Colors.white;
 
 Color performanceColor(num percentage) {
   final normalized = (percentage.toDouble().clamp(0, 100)) / 100;
@@ -80,17 +69,23 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppRadii {
-  static const sm = 12.0;
-  static const md = 16.0;
-  static const lg = 20.0;
+  static const sm = 10.0;
+  static const md = 12.0;
+  static const lg = 16.0;
   static const pill = 999.0;
 }
 
-/// Soft, low-contrast elevation for raised cards and panels.
+/// Two-layer elevation for raised cards and panels: a tight contact shadow
+/// that defines the edge, and a soft one that lifts the card off the page.
 const appCardShadow = [
   BoxShadow(
+    color: Color(0x1416222E),
+    blurRadius: 2,
+    offset: Offset(0, 1),
+  ),
+  BoxShadow(
     color: Color(0x0F16222E),
-    blurRadius: 18,
+    blurRadius: 16,
     offset: Offset(0, 6),
   ),
 ];
@@ -182,7 +177,9 @@ ThemeData buildAppTheme() {
       ),
     ),
     cardTheme: CardThemeData(
-      elevation: 0,
+      // A border plus a light shadow keeps every card's edge visible.
+      elevation: 1.5,
+      shadowColor: const Color(0x3316222E),
       color: colorScheme.surface,
       clipBehavior: Clip.antiAlias,
       margin: const EdgeInsets.symmetric(vertical: 6),
