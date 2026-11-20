@@ -4715,6 +4715,11 @@ class _TerminalOutput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Traditional runs carry no printed output, so an empty panel would
+    // wrongly read as "your program printed nothing".
+    if (data.execSuccess && data.feedbackMode == 'traditional') {
+      return const SizedBox.shrink();
+    }
     if (data.execSuccess) {
       return _TerminalPanel(
         key: const Key('terminal-output'),

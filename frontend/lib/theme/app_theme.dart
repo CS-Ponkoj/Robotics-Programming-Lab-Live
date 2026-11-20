@@ -38,11 +38,12 @@ abstract final class BrandPalettes {
     deep: Color(0xFF123B24),
     tint: Color(0xFFDFF0E5),
   );
+  // Gold: the lightest shade that keeps white text at 4.5:1 contrast.
   static const tddAi = BrandPalette(
-    brand: Color(0xFFA4502A),
-    dark: Color(0xFF7A3A1D),
-    deep: Color(0xFF4F2411),
-    tint: Color(0xFFF6E6DC),
+    brand: Color(0xFF96700A),
+    dark: Color(0xFF7A5B05),
+    deep: Color(0xFF4F3B00),
+    tint: Color(0xFFFBF0D2),
   );
 
   /// Signed out and instructors use the original teal.

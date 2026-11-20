@@ -6,6 +6,7 @@ import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/screens/student_accounts_page.dart';
 import 'package:iuse_demo/state/feedback_mode.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/run_terminal.dart';
 
 UnittestFeedbackDto result(String mode) => UnittestFeedbackDto(
       id: 7,
@@ -78,6 +79,15 @@ void main() {
     expect(find.byKey(const Key('guided-hint')), findsNothing);
     expect(find.textContaining('compare your code with the task'),
         findsOneWidget);
+    // Output was left out by the server, so no "nothing printed" panel.
+    expect(find.byKey(const Key('terminal-output')), findsNothing);
+  });
+
+  test('the traditional terminal says output is not shown, not missing', () {
+    final lines = buildRunTerminalLines(data: result('traditional'), code: '');
+    final texts = lines.map((line) => line.text).toList();
+    expect(texts.join(' '), contains('not part of this account'));
+    expect(texts, isNot(contains('(no printed output)')));
   });
 
   testWidgets('TDD results keep test details and the built-in hint', (

@@ -63,6 +63,11 @@ List<TerminalLine> buildRunTerminalLines({
     for (final text in printed.split('\n')) {
       lines.add(TerminalLine(text, TerminalLineKind.output));
     }
+  } else if (data.feedbackMode == 'traditional') {
+    // The server leaves printed output out of this feedback mode.
+    lines.add(const TerminalLine(
+        "(printed output is not part of this account's feedback)",
+        TerminalLineKind.info));
   } else if (data.execSuccess) {
     lines.add(const TerminalLine('(no printed output)', TerminalLineKind.info));
   }
