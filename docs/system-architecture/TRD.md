@@ -4,8 +4,8 @@
 >
 > | Blueprint | [PRD](PRD.md) · [AppFlow](AppFlow.md) · [UI_Spec](UI_Spec.md) · [TRD](TRD.md) · [Schema](Schema.md) · [Plan](Plan.md) |
 > |---|---|
-> | Describes | Live release `3571938b`, self-hosted on the lab PC |
-> | Last reviewed | 2026-10-26 |
+> | Describes | Live release `a69b89b3`, self-hosted on the lab PC |
+> | Last reviewed | 2026-11-20 |
 
 ---
 
@@ -25,7 +25,7 @@ flowchart LR
         API -->|docker run per attempt| ROS[[ROS 2 grader<br/>robotics-lab-ros2-grader:jazzy-v1]]
     end
 
-    API -.->|optional, off| OAI[(OpenAI API)]
+    API -.->|optional; TDD + AI accounts only| OAI[(OpenAI API)]
 ```
 
 | Component | Role | Why it is needed |
@@ -36,17 +36,17 @@ flowchart LR
 | **FastAPI** | Auth, assignments, grading, research, admin | Typed, fast, easy to test |
 | **PostgreSQL** | All persistent data | Reliable, and schema changes go through migrations |
 | **Docker sandboxes** | Run untrusted student code | Isolation: no network, time-limited, separate container per attempt |
-| **OpenAI (optional)** | AI tutor explanations | An enhancement only, off by default |
+| **OpenAI (optional)** | AI tutor explanations | An enhancement only, off by default; on live it serves TDD + AI accounts on reviewed assignments (7 and 8) |
 
 ## 2. Technology stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | Flutter 3.32.8 (CI pin), Dart, `flutter_code_editor` 0.3.5, `http`, `shared_preferences` |
+| Frontend | Flutter 3.35 (lab PC build), Dart, `flutter_code_editor` 0.3.5, `http`, `shared_preferences` |
 | Backend | Python 3.14, FastAPI 0.141, SQLAlchemy 2.0, Alembic 1.16, Pydantic Settings, psycopg 3 |
 | Database | PostgreSQL in Docker (live) · Neon PostgreSQL (staging) · SQLite (automated tests only) |
 | Execution | Docker images `robotics-lab-sandbox:latest` and `robotics-lab-ros2-grader:jazzy-v1` (ROS 2 Jazzy plus the course `rse_msgs` interfaces from `backend/ros2_vendor`) |
-| Hosting | Lab PC, Caddy, Cloudflare Tunnel, Windows scheduled task **RPL-Live** (re-checks every 5 min) |
+| Hosting | Lab PC, Caddy, Cloudflare Tunnel, Windows scheduled task **RPL-Live** (a watchdog that runs `run-live.ps1 -SkipBuild` every 5 min). `run-live.ps1` holds a launch lock: one launch at a time, and the watchdog skips while a deploy runs. A deploy builds the web app while the old stack serves, then replaces it; `-SkipBuild -Restart` restarts without a build |
 | CI | GitHub Actions ([`ci.yml`](../../.github/workflows/ci.yml)): 7 jobs, backend + frontend + build |
 
 ## 3. Code map
@@ -65,6 +65,10 @@ backend/
   graders/                   python_function · python_variables · ros2_topic
   sandbox.py                 Docker / remote / subprocess execution
   tutor.py · hinter.py       built-in hints + optional AI
+  ai_policy.py               AI gates: key, course switch, review, feedback mode, quota
+  feedback_modes.py          per-account study condition and response trimming
+  course_settings.py         instructor course settings (AI tutor, Old assignments)
+  ros2_feedback.py           observed causes and hint ladders for ROS 2 checks
   research_service.py        study sessions, events, exports
   course_content_repository.py   lessons + server-side quiz grading
   migrations/                Alembic schema history
@@ -85,8 +89,12 @@ flowchart TD
     SBX --> EV[Evidence: returns, errors, timings]
     RBX --> EV
     EV --> SCORE[Score each rubric criterion<br/>+ misconception labels]
-    SCORE --> SAVE[(Submission<br/>with assignment_version)]
-    SAVE --> RESP[Response: checks, score,<br/>terminal lines — never hidden values]
+    SCORE --> SAVE[(Submission<br/>with assignment_version<br/>+ feedback_mode)]
+    SAVE --> MODE{Account's feedback mode}
+    MODE -->|Traditional| RT1[Score, pass, counts,<br/>error at the student's line]
+    MODE -->|TDD / TDD + AI| RT2[Checks, messages, output,<br/>built-in hint]
+    RT1 --> RESP[Response — never hidden values]
+    RT2 --> RESP
 ```
 
 **Execution outcomes** (`execution_status`): `completed` · `syntax_error` ·
@@ -107,8 +115,9 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 | **Research** 🔐 | `POST /research/sessions` · `POST …/{sid}/heartbeat` · `POST …/{sid}/events` · `POST …/{sid}/end` · `GET /research/me` · `GET /research/me/attempts` · `GET /research/metrics` |
 | **Feedback** | 🔐 `POST /feedback` · 🛡️ `GET /admin/feedback` · 🛡️ `PATCH /admin/feedback/{id}` |
 | **Admin: assignments** 🛡️ | `GET/POST /admin/assignments` · `PUT /admin/assignments/{id}` · `POST …/{id}/validate` · `POST …/{id}/publish` |
-| **Admin: accounts** 🛡️ | `GET/POST /admin/students` · `PATCH /admin/students/{id}` · `POST …/{id}/reset-password` · same four for `/admin/instructors` · `POST /admin/accounts/import` · `GET /admin/sign-in-history` |
+| **Admin: accounts** 🛡️ | `GET/POST /admin/students` (with `feedback_mode`) · `PATCH /admin/students/{id}` (changes `feedback_mode`, audited) · `POST …/{id}/reset-password` · same four for `/admin/instructors` · `POST /admin/accounts/import` · `GET /admin/sign-in-history` |
 | **Admin: research** 🛡️ | `GET /admin/research/summary` · `…/assignments` · `…/students/{id}` · `…/students/{id}/attempts` · `…/export` |
+| **Admin: course settings** 🛡️ | `GET/PUT /admin/course-settings/ai-tutor` · `PUT /admin/course-settings/catalog` |
 | **Admin: email** 🛡️ | `GET /admin/email/status`* · `POST /admin/email/test`* |
 
 \* Behind feature flags, off on live.
@@ -123,6 +132,7 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 | Secrets | Never in Git or in the client | Ignored root `.env`; Flutter only gets `API_BASE_URL` |
 | Untrusted code | Isolated and bounded | Separate Docker container per attempt: `--network none`, 256 MB memory, 1 CPU, 64 processes, time limit, import allow-list; a timed-out container is force-removed |
 | Data leaks | Hidden tests and solutions stay server-side | Responses carry checks and evidence, never expected values |
+| Feedback modes | A student gets only the feedback their mode allows | `feedback_modes.py` trims run/submit responses on the server; hint, tutor and simulate requests outside the mode return 403; the AI gate checks the mode. The browser only hides controls |
 | Abuse | Rate limits per user/address | Execution 30/min · tutor 10/min · auth 120/min · admin 300/min · general 60/min · request ≤ 100 KB |
 | Transport | HTTPS end to end | Cloudflare TLS; local services bind to 127.0.0.1 only |
 | Headers | Safe defaults | Security middleware; JSON is always `charset=utf-8` |
@@ -136,7 +146,8 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 | `SANDBOX_BACKEND` | `docker` | `docker` · `remote` · `subprocess` (tests only) |
 | `ENABLE_DEMO_ACCOUNTS` | `true` | Public student demo |
 | `ENABLE_PASSWORD_RESET` / `ENABLE_EMAIL_FEATURES` | `false` | Self-service reset and email |
-| `OPENAI_API_KEY` | not set | AI tutor unavailable, so built-in hints are used |
+| `OPENAI_API_KEY` | managed secret, not in `.env` | Stored with `scripts/set-live-secret.ps1` (Windows DPAPI) and given to the API process only |
+| `MAX_CONCURRENT_EXECUTIONS` | 6 | Grading runs at once before requests queue |
 | `AUTH_SESSION_HOURS` | default 12 | Sign-in lifetime |
 
 ## 8. Environments
@@ -152,7 +163,7 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 | Quality | Target |
 |---|---|
 | Availability without AI | 100 % of core features |
-| Concurrency | 2 executions at once per API process (queue beyond) |
-| Recovery | The scheduled task restarts a partly stopped stack within 5 min; database dumped before every deploy |
+| Concurrency | 6 executions at once on live (`MAX_CONCURRENT_EXECUTIONS`), queue beyond |
+| Recovery | The scheduled task restarts a stopped stack within 5 min, but never during a deploy (launch lock); database dumped before every deploy |
 | Data | UTC timestamps; every attempt and event stores the assignment version and `data_schema_version` |
 | Quality gate | Backend + frontend tests, analyzer, web build and CI green before deploy |

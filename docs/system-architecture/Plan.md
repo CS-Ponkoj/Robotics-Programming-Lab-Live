@@ -5,8 +5,8 @@
 >
 > | Blueprint | [PRD](PRD.md) · [AppFlow](AppFlow.md) · [UI_Spec](UI_Spec.md) · [TRD](TRD.md) · [Schema](Schema.md) · [Plan](Plan.md) |
 > |---|---|
-> | Describes | Live release `3571938b` |
-> | Last reviewed | 2026-10-26 |
+> | Describes | Live release `a69b89b3` |
+> | Last reviewed | 2026-11-20 |
 
 ---
 
@@ -40,14 +40,15 @@ tell apart from what is already live.
 ```mermaid
 flowchart LR
     subgraph Done[✅ Live now]
-        A1[6 assignments<br/>4 Python + 2 ROS 2]
+        A1[2 current ROS 2 assignments<br/>7 and 8, shown as 1 and 2<br/>+ 6 old assignments]
         A2[Course contents<br/>6 topics + quizzes]
-        A3[Workspace: editor, terminal,<br/>results, try inputs, hints]
-        A4[Instructor Studio<br/>+ research dashboard]
+        A3[Workspace: editor, terminal,<br/>results, hints, 2D simulation]
+        A4[Instructor Studio<br/>+ research dashboard + insights]
         A5[Self-hosted on the lab PC<br/>Cloudflare Tunnel]
+        A6[AI tutor for Assignments 7 and 8]
+        A7[Three feedback modes<br/>with gradient themes]
     end
     subgraph Off[🟡 Built, switched off]
-        B1[AI tutor]
         B2[Password reset + email]
     end
     subgraph Not[⬜ Not started]
@@ -57,11 +58,11 @@ flowchart LR
 
 | Area | State | Evidence |
 |---|---|---|
-| Backend tests | ✅ 726 passed | Local run, release `3571938b` |
-| Frontend tests | ✅ 223 passed, analyzer clean (Flutter 3.32.8) | Local + CI |
-| CI | ✅ 7 of 7 jobs green | GitHub Actions |
-| Live verification | ✅ Grading messages, UTF-8 output, fractions, ROS feedback, no leaked containers | Checked on rpl.ponkoj.com |
-| cloudflared | ✅ 2026.10.4 (advisory needs ≥ 2026.10.2) | Upgraded 2026-10-26 |
+| Backend tests | ✅ 871 passed | Local run, feedback-mode release `e17ad549` |
+| Frontend tests | ✅ 266 passed, analyzer shows only 7 deprecation notes (Flutter 3.35.6) | Local, release `a69b89b3` |
+| Live verification | ✅ `traditional`, `tdd` and `ai` accounts: starter, wrong and correct answers on Assignments 1 and 2, hints, simulation, AI hint and Ask the tutor | Checked on rpl.ponkoj.com, 2026-11-20 |
+| Browser tests (Playwright) | 🟡 3 passed, 3 skipped (need instructor or student passwords) | Against live |
+| Launcher | ✅ One launch at a time; the scheduled watchdog skips during a deploy | Tested during a real deploy |
 
 ## 3. Known gaps
 
@@ -70,8 +71,8 @@ flowchart LR
 | # | Gap | Impact | Suggested fix |
 |---|---|---|---|
 | G1 | `must_change_password` is stored but the app does not force a password change at first sign-in | Instructor-set passwords may never be changed | Show a "Set a new password" step after login when the flag is true |
-| G2 | The master SQA workbook has no entries for the latest fixes | Release evidence is incomplete | Add a dated run for `3571938b` |
-| G3 | Accessibility not fully audited (screen reader, contrast) | Possible barriers for some students | Run one audit pass and fix findings |
+| G3 | Accessibility not fully audited (screen reader). Theme contrast is now checked by a test (white text ≥ 4.5:1 on every gradient stop) | Possible barriers for some students | Run one audit pass and fix findings |
+| G4 | Test accounts `traditional`, `tdd`, `ai` have attempts on live | They would appear in research exports | Deactivate them before data collection |
 
 ### Owner decisions and operations
 
@@ -80,7 +81,7 @@ flowchart LR
 | O1 | **Off-machine database backups** | The live data exists only on one PC today |
 | O2 | **Windows autologon / restart after reboot** | The stack starts from a scheduled task tied to the user session |
 | O3 | **Rotate credentials** shared earlier in chat | Exposed secrets must be replaced, not only deleted |
-| O4 | **AI tutor decision** (key, model, study approval) | Turns on feature F15 |
+| O4 | **Study design**: two or three groups, and how students are assigned to modes | Decides how the Accounts page is used |
 | O5 | **Separate Researcher role?** | Today researchers need instructor access |
 
 ## 4. Roadmap (proposal, edit freely)
@@ -90,11 +91,11 @@ timeline
     title Proposed roadmap
     Now : Off-machine DB backup (O1)
         : Force first-login password change (G1)
-        : SQA workbook entry (G2)
+        : Deactivate test accounts (G4)
     Next : Accessibility audit (G3)
          : Autologon / reboot recovery (O2)
-    Later : AI tutor pilot with evaluation cases (O4)
-          : More ROS 2 assignments
+         : NASA-TLX survey storage
+    Later : Random assignment of students to modes
           : Researcher role (O5)
 ```
 
@@ -102,24 +103,24 @@ timeline
 
 - [ ] **O1** Nightly `pg_dump` copied off the PC (cloud drive or second machine), plus a tested restore.
 - [ ] **G1** First-login password change screen.
-- [ ] **G2** Record release `3571938b` evidence in the master SQA workbook.
+- [ ] **G4** Deactivate the `traditional`, `tdd` and `ai` test accounts before data collection.
 
 ### Next
 
 - [ ] **G3** Accessibility audit of the workspace and Home.
 - [ ] **O2** Reliable start after a power cut or reboot.
+- [ ] 💡 NASA-TLX survey after the final Assignment 7 or 8 submission, stored with the feedback mode (see the study-design document).
 
 ### Later
 
-- [ ] **O4** AI tutor pilot: approve evaluation cases, set quotas, and label AI answers (already built).
-- [ ] 💡 Additional ROS 2 assignments using the same `ros2_topic` grader.
+- [ ] 💡 Random, balanced assignment of students to feedback modes.
 - [ ] **O5** Researcher role with read-only research access.
 
 ## 5. Definition of done (every change)
 
 1. Behaviour matches the updated blueprint file.
 2. Focused tests pass; the full backend and frontend suites pass for larger changes.
-3. CI is green on Flutter 3.32.8.
+3. CI is green.
 4. The database is backed up, then the change is deployed and verified on https://rpl.ponkoj.com as a real user would.
 5. The blueprint file's status and **Last reviewed** date are updated.
 
@@ -128,3 +129,4 @@ timeline
 | Date | Change |
 |---|---|
 | 2026-10-26 | Blueprint created from live release `3571938b` |
+| 2026-11-20 | Reviewed against live release `a69b89b3`: Assignment 8, display numbers, 2D simulation, AI tutor live for Assignments 7 and 8, three feedback modes with gradient themes, one-launch-at-a-time launcher |

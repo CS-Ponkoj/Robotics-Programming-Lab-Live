@@ -5,8 +5,8 @@
 >
 > | Blueprint | [PRD](PRD.md) · [AppFlow](AppFlow.md) · [UI_Spec](UI_Spec.md) · [TRD](TRD.md) · [Schema](Schema.md) · [Plan](Plan.md) |
 > |---|---|
-> | Describes | Live release `3571938b` |
-> | Last reviewed | 2026-10-26 |
+> | Describes | Live release `a69b89b3` |
+> | Last reviewed | 2026-11-20 |
 
 ---
 
@@ -97,15 +97,20 @@ sequenceDiagram
         G->>SB: execute in isolation (time-limited)
         SB-->>G: return values / errors
         G-->>API: checks, score, evidence
-        API->>DB: save Submission (+ version)
-        API-->>UI: results + terminal lines
+        API->>DB: save Submission (+ version, + feedback mode)
+        API-->>UI: results trimmed to the account's feedback mode
         UI-->>S: Results panel + terminal
     end
 
-    opt Stuck
+    opt Stuck (TDD and TDD + AI modes)
         S->>UI: Get a hint (levels 1–4)
         UI->>API: POST /assignments/{id}/hint
-        API-->>UI: built-in hint (AI only if enabled)
+        API-->>UI: built-in hint (AI only for TDD + AI and when every AI gate holds)
+    end
+    opt Ask the tutor (TDD + AI mode)
+        S->>UI: Type a question
+        UI->>API: POST /assignments/{id}/tutor
+        API-->>UI: AI answer, or a built-in answer with the reason
     end
     opt After at least one attempt
         S->>UI: Show solution approach
@@ -121,12 +126,16 @@ sequenceDiagram
 | **Run tests** | `POST /assignments/{id}/run` | ✅ | ✅ Submission row |
 | **Submit** | `POST /assignments/{id}/submit` | ✅ | ✅ Submission row |
 | **Try inputs** | `POST /assignments/{id}/playground` | ❌ | ❌ |
+| **Simulate** (ROS 2) | `POST /assignments/{id}/simulate` | ❌ | ✅ research event only (TDD and TDD + AI) |
+| **Ask the tutor** | `POST /assignments/{id}/tutor` | ❌ | ✅ HintInteraction row (TDD + AI only) |
 | **Format Python** | `POST /assignments/{id}/format` | ❌ | ❌ |
 | **Save draft** (auto) | `PUT /assignments/{id}/draft` | ❌ | ✅ CodeDraft row |
 | **Get a hint** | `POST /assignments/{id}/hint` | ❌ | ✅ HintInteraction row (needs an earlier run) |
 | **Show solution** | `POST /assignments/{id}/solution` | ❌ | ✅ research event (needs an earlier run) |
 
 > Demo sessions get the same responses, but none of the ✅ rows are written.
+> A request the account's feedback mode excludes (a hint for Traditional, the
+> tutor for TDD, Simulate for Traditional) returns 403 with a plain message.
 
 ### When the assignment version changes
 
@@ -168,6 +177,10 @@ flowchart TD
         B1[Add student / instructor] --> B2[Instructor shares the password<br/>student can change it in My account]
         B3[Import accounts file] --> B2
         B4[Deactivate / reset password]
+        B5[Set feedback mode<br/>Traditional · TDD · TDD + AI] --> B6[Change is audited;<br/>next attempt uses the new mode]
+    end
+    subgraph AI[AI tutor]
+        E1[Switch on for the course<br/>+ daily limit] --> E2[TDD + AI students on reviewed<br/>assignments get AI answers]
     end
     subgraph Research
         C1[Classroom overview] --> C2[Participant detail<br/>by participant code]
@@ -178,7 +191,22 @@ flowchart TD
     end
 ```
 
-## 6. Demo flow (public visitors)
+## 6. Feedback modes (study conditions)
+
+```mermaid
+flowchart LR
+    I([Instructor]) -->|Accounts page| M[Student's feedback mode]
+    M --> T[Traditional<br/>score + counts]
+    M --> D[TDD<br/>details, hints, simulation]
+    M --> A[TDD + AI<br/>TDD + AI tutor]
+    T & D & A --> G[Same grader, same score]
+    G --> R[(Attempt saved with<br/>its feedback mode)]
+```
+
+The student sees their mode as the app's theme colour (blue, green or bronze)
+and only the tools it includes; they cannot change it themselves.
+
+## 7. Demo flow (public visitors)
 
 ```mermaid
 flowchart LR
@@ -188,4 +216,5 @@ flowchart LR
 ```
 
 The demo writes **no** auth, submission, hint, audit, quiz or research rows.
+It always uses the TDD feedback mode (green theme) and never gets AI.
 Each browser's demo is isolated from every other session.

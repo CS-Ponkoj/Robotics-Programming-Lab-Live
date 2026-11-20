@@ -4,8 +4,8 @@
 >
 > | Blueprint | [PRD](PRD.md) · [AppFlow](AppFlow.md) · [UI_Spec](UI_Spec.md) · [TRD](TRD.md) · [Schema](Schema.md) · [Plan](Plan.md) |
 > |---|---|
-> | Describes | Live release `3571938b` (Flutter web) |
-> | Last reviewed | 2026-10-26 |
+> | Describes | Live release `a69b89b3` (Flutter web) |
+> | Last reviewed | 2026-11-20 |
 
 ---
 
@@ -14,7 +14,7 @@
 | Principle | In practice |
 |---|---|
 | **Learning first** | The instructions keep their full height. Results open as a separate panel instead of pushing the instructions down |
-| **Calm and clear** | Light page background, one teal brand colour, a purple accent only for AI |
+| **Calm and clear** | Light grey page with white cards. One brand gradient per account (see §5), and a purple accent only for AI-generated content |
 | **Honest feedback** | Results name the failed check, the student's own line, and what to try next |
 | **Works everywhere** | Desktop, tablet and phone widths share one codebase |
 | **Accessible** | Keyboard reachable, labelled controls, live-region messages, readable contrast |
@@ -30,7 +30,8 @@
 | My account | [`my_account_page.dart`](../../frontend/lib/screens/my_account_page.dart) | Not demo | Change password |
 | My study progress / Research dashboard | [`research_dashboard_page.dart`](../../frontend/lib/screens/research_dashboard_page.dart) | Student / Instructor | Own progress / class analytics and export |
 | Instructor Studio | [`instructor_assignment_admin.dart`](../../frontend/lib/screens/instructor_assignment_admin.dart) | Instructor | Hub for assignments, accounts, research and feedback |
-| Manage accounts | [`student_accounts_page.dart`](../../frontend/lib/screens/student_accounts_page.dart) | Instructor | Add, import, deactivate and reset accounts |
+| Manage accounts | [`student_accounts_page.dart`](../../frontend/lib/screens/student_accounts_page.dart) | Instructor | Add, import, deactivate and reset accounts; set each student's feedback mode (coloured pill on the card, picker in New account and Edit details) |
+| AI tutor settings | [`ai_tutor_settings_page.dart`](../../frontend/lib/screens/ai_tutor_settings_page.dart) | Instructor | Course switch, daily limit, reviewed assignments |
 | Sign-in history | [`sign_in_history_page.dart`](../../frontend/lib/screens/sign_in_history_page.dart) | Instructor | Recent sign-ins per account |
 | Feedback inbox | [`feedback_inbox_page.dart`](../../frontend/lib/screens/feedback_inbox_page.dart) | Instructor | Page feedback from users |
 
@@ -86,7 +87,23 @@
 | **Terminal** | Collapsible and resizable. Shows printed output, the error on the student's line, and a summary such as "· code changed since" |
 | **Results overlay** | Right side, can be minimized and keeps its content when reopened. Shows checks, hints and the solution approach |
 | **Try inputs dialog** | Call the function with your own values, including fractions such as `1/3`. Not graded or saved. Warns when the inputs changed after the shown result |
-| **AI tutoring** | Toggle off by default, and every AI answer is labelled. When AI is unavailable, the built-in hints remain |
+| **Simulation** | Square panel with a 2D replay of the student's ROS 2 node (Arena, LiDAR, Charts, Ranges). Visual only, never graded |
+| **AI tutoring** | Toggle off by default, and every AI answer is labelled. When AI is unavailable, the built-in hints remain. One tutor reply is one card: the hint, then what to inspect, debugging steps and the next action. The Ask the tutor answer card appears only after a question |
+
+### What each feedback mode shows
+
+The server trims each result to the account's mode; the app hides controls the
+mode cannot use. Grading is the same in every mode.
+
+| Part | Traditional | TDD | TDD + AI | Instructor |
+|---|---|---|---|---|
+| Score, points, "checks passed: n of m" | ✅ | ✅ | ✅ | ✅ |
+| Error at the student's own line | ✅ | ✅ | ✅ | ✅ |
+| Check names, messages, test details | — | ✅ | ✅ | ✅ |
+| Printed output (terminal says it is not part of the feedback) | — | ✅ | ✅ | ✅ |
+| Built-in hint ladder | — | ✅ | ✅ | ✅ |
+| Simulate button and Simulation panel | — | ✅ | ✅ | ✅ |
+| AI tutoring switch, AI hint, Ask the tutor | — | — | ✅ | ✅ |
 
 ## 4. Responsive breakpoints
 
@@ -103,11 +120,29 @@
 
 ### Colour tokens ([`app_theme.dart`](../../frontend/lib/theme/app_theme.dart))
 
+**Brand palettes.** `brand`, `brandDark`, `brandDeep`, `brandTint` and the
+header/button gradient come from the signed-in account
+(`BrandPalettes.forAccount`). Signed out and instructors use teal; students use
+their feedback mode's palette. Headers (`BrandHeaderGradient`) and filled
+buttons run left to right from the gradient start to its end; tonal and
+custom-coloured buttons stay flat.
+
+| Palette | `brand` | Gradient | Tint |
+|---|---|---|---|
+| Instructor and signed out (teal) | `#19778C` | `#0F4C5C` → `#1A7F8E` | `#DDEFF2` |
+| Traditional (blue) | `#2F5FA7` | `#1F4277` → `#3567B5` | `#DFE8F5` |
+| TDD (green; also the demo) | `#2E7D4F` | `#1E5A37` → `#2F8554` | `#DFF0E5` |
+| TDD + AI (bronze) | `#A8661A` | `#7A3F0E` → `#A8661A` | `#F7E9D7` |
+
+White text is at least 4.5:1 on every gradient stop and every `brand`; a test
+in `frontend/test/feedback_mode_test.dart` enforces it.
+
 | Token | Hex | Used for |
 |---|---|---|
-| `brand` | `#19778C` | Primary buttons, links, active tabs |
-| `brandDark` | `#0F4C5C` | Headers, strong emphasis |
-| `pageBackground` | `#F4F7F9` | App background |
+| `brand` | per palette | Links, active tabs, icons, solid fallbacks |
+| `brandDark` | per palette | Strong emphasis |
+| `pageBackground` | `#EDF1F5` | App background |
+| `border` | `#D3DBE4` | Card and panel edges |
 | `ink` / `inkMuted` | `#16222E` / `#475766` | Body text / secondary text |
 | `success` | `#18794E` | Passed checks |
 | `performanceLow` | `#C62828` | Failed checks, low scores |
@@ -146,4 +181,5 @@ Every screen that loads data must show each of these states:
 - [x] Keyboard shortcuts are listed in the editor ("Keyboard shortcuts").
 - [x] Light-mode code tokens get a thin outline for readability.
 - [ ] Full screen-reader walkthrough of the workspace (not yet audited).
-- [ ] Colour-contrast audit of every token pair (not yet audited).
+- [x] White text on every brand gradient stop is at least 4.5:1 (enforced by a test).
+- [ ] Colour-contrast audit of the remaining token pairs (not yet audited).

@@ -5,8 +5,8 @@
 >
 > | Blueprint | [PRD](PRD.md) · [AppFlow](AppFlow.md) · [UI_Spec](UI_Spec.md) · [TRD](TRD.md) · [Schema](Schema.md) · [Plan](Plan.md) |
 > |---|---|
-> | Describes | Live release `3571938b` at https://rpl.ponkoj.com |
-> | Last reviewed | 2026-10-26 |
+> | Describes | Live release `a69b89b3` at https://rpl.ponkoj.com |
+> | Last reviewed | 2026-11-20 |
 
 ---
 
@@ -16,8 +16,10 @@
 programming by reading short lessons, taking topic quizzes, and solving
 versioned coding assignments in the browser. Each run is graded on the
 server in an isolated sandbox, and students get immediate, structured
-feedback and built-in hints. Instructors manage assignments and accounts, and
-researchers study how students learn through privacy-safe, version-exact data.
+feedback and built-in hints. Instructors manage assignments and accounts and
+assign each student one of three feedback modes (Traditional, TDD, TDD + AI)
+for the study, and researchers study how students learn through
+privacy-safe, version-exact data.
 
 ```mermaid
 flowchart LR
@@ -26,7 +28,7 @@ flowchart LR
     R([Researcher]) -->|views dashboards,<br/>exports data| RPL
     D([Demo visitor]) -->|tries the student view,<br/>nothing saved| RPL
     RPL -->|grades in isolation| SB[[Code sandbox]]
-    RPL -.->|optional, off by default| AI[(OpenAI tutor)]
+    RPL -.->|optional; TDD + AI accounts only| AI[(OpenAI tutor)]
 ```
 
 ## 2. Users and their goals
@@ -34,7 +36,7 @@ flowchart LR
 | User | Main goal | What they can do |
 |---|---|---|
 | **Student** | Learn and pass assignments | Read lessons, take quizzes, write code, run tests, try inputs, get hints, reveal the solution approach after an attempt, see their own progress |
-| **Instructor** | Run the course | Everything a student sees, plus create/validate/publish assignments, manage student and instructor accounts, read page feedback, view sign-in history and the research dashboard |
+| **Instructor** | Run the course | Everything a student sees (always with every feedback tool), plus create/validate/publish assignments, manage student and instructor accounts, set each student's feedback mode, switch the AI tutor on, read page feedback, view sign-in history and the research dashboard |
 | **Researcher** (an instructor role today) | Study learning behaviour | Classroom overview, per-participant detail by participant code, exact-version analytics, privacy-safe export |
 | **Demo visitor** | Try the student experience | A temporary student session. Nothing is stored, and a refresh returns to login |
 
@@ -67,9 +69,11 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 | F10 | Draft autosave per assignment version | ✅ | A draft from an earlier version is kept in a separate banner, never loaded into a newer workspace |
 | F11 | Page feedback button and instructor inbox | ✅ | |
 | F12 | Instructor Studio: create, validate, publish | ✅ | |
-| F13 | Account management and CSV import | ✅ | |
+| F13 | Account management and CSV import | ✅ | Each student card shows its feedback mode |
 | F14 | Research dashboard and export | ✅ | Uses participant codes, never login IDs, and never exports source code |
-| F15 | AI tutor | 🟡 | Code is in place. Off by default, and no API key is set on live |
+| F15 | AI tutor | ✅ | Live for TDD + AI accounts on Assignments 7 and 8 (evaluation cases approved by a named instructor). Gated by key, course switch, review, feedback mode and a daily quota; built-in hints always remain |
+| F18 | Feedback modes (study conditions) | ✅ | Traditional (score and counts), TDD (details, hints, simulation), TDD + AI. Set per account, enforced on the server, recorded with every attempt; each mode has its own gradient theme |
+| F19 | 2D simulation replay (ROS 2) | ✅ | Visual only, never graded; TDD and TDD + AI modes |
 | F16 | Self-service password reset and email | 🟡 | Behind feature flags |
 | F17 | Mobile app (Android/iOS) | ⬜ | Out of scope for now |
 
@@ -83,6 +87,12 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 | 4 | `robotics-assignment-4` | 16 | Simplified VFH direction choice | `python_function` |
 | 5 | `ros2-drive-forward` | 12 | Drive forward and stop (ROS 2) | `ros2_topic` |
 | 6 | `ros2-obstacle-stop` | 12 | Stop for an obstacle (ROS 2) | `ros2_topic` |
+| 7 | `ros2-wall-stop` | 3 | Stop before the wall using a laser scan (ROS 2); students see it as **Assignment 1** | `ros2_topic` |
+| 8 | `ros2-turn-open-side` | 1 | Turn toward the open side using four distances (ROS 2); students see it as **Assignment 2** | `ros2_topic` |
+
+Assignments 1-6 are listed under **Old assignments** (`backend/assignments/catalog.json`).
+The study uses Assignments 7 and 8. Display numbers never change an assignment's
+ID, which stays the identity for attempts and research records.
 
 ## 6. Product rules (must always hold)
 
@@ -93,6 +103,7 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 - 📝 Drafts are scoped to **assignment ID + version**.
 - 🧑‍🎓 Student identity comes from the **server session**, never from the client.
 - 🤖 AI is **optional and off by default**. Grading, hints and submissions never depend on it.
+- 🎚️ Each student's **feedback mode is enforced by the server** and stored with every attempt; grading is identical in all modes.
 - 🧪 The demo is **memory-only and student-only**.
 - 🧱 There is **one generic assignment workflow**, with no assignment-specific screens.
 
@@ -101,7 +112,6 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 - Mobile-store apps and Android packaging.
 - Live robot hardware or 3D simulation in the browser.
 - Self-service sign-up. Accounts are created by instructors.
-- AI tutoring in a real study, until evaluation cases are approved.
 
 ## 8. How we know it works
 
@@ -116,6 +126,6 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 ## 9. Open questions for the owner
 
 - [ ] Should a separate **Researcher** role exist, apart from Instructor?
-- [ ] When should the **AI tutor** be turned on for a study, and with which model?
-- [ ] Are more **ROS 2 assignments** planned after 5 and 6?
+- [ ] Two or three study groups (see the study-design document), and how students are assigned to modes.
+- [ ] Should the three test accounts (`traditional`, `tdd`, `ai`) be deactivated before data collection?
 - [ ] Should students see a **class leaderboard** or only their own progress?

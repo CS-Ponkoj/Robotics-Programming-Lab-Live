@@ -6,7 +6,9 @@ A classroom and research platform for robotics programming. Students read
 short lessons, take topic quizzes, and complete versioned Python and ROS 2
 assignments in the browser. Every submission is graded by test cases on the
 server. Instructors manage assignments and accounts and review privacy-safe
-research analytics. AI tutoring is optional and off by default.
+research analytics. Each student account has an instructor-assigned feedback
+mode for the study: Traditional, TDD, or TDD + AI. AI tutoring is optional and
+off by default.
 
 **Live site:** <https://rpl.ponkoj.com/app>
 
@@ -23,7 +25,7 @@ Screenshots are from the live site using **Try the student demo**.
 | | |
 |---|---|
 | ![Sign-in page](docs/images/readme/login.png) | ![Home page with assignment cards](docs/images/readme/home.png) |
-| **Sign in or try the demo.** No account needed for the demo, and nothing is saved. | **Home.** A learning path, progress, and the six assignments. |
+| **Sign in or try the demo.** No account needed for the demo, and nothing is saved. | **Home.** A learning path, progress, and the current assignments. |
 | ![Instructions with a scenario diagram](docs/images/readme/instructions.png) | ![Try your own inputs dialog](docs/images/readme/try_inputs.png) |
 | **Instructions beside the code.** Scenario, task, and rules with to-scale diagrams. | **Try inputs.** Call your own function with chosen values. Not graded or saved. |
 | ![Course contents with six topics](docs/images/readme/contents.png) | ![Obstacle Avoidance lesson page](docs/images/readme/topic.png) |
@@ -36,9 +38,19 @@ Screenshots are from the live site using **Try the student demo**.
 
 ## What it does
 
-- **Six assignments:** four Python exercises (Bug algorithm routes, multi-floor
-  office navigation, a simplified Vector Field Histogram) and two ROS 2 Jazzy
-  exercises (drive and stop, stop for an obstacle).
+- **Two current ROS 2 Jazzy assignments,** shown to students as Assignments 1
+  and 2: stop before a wall using a laser scan (internal Assignment 7), and
+  turn toward the open side using four obstacle distances (internal
+  Assignment 8). Each has a 2D simulation replay. Six earlier assignments
+  (four Python exercises on Bug algorithms, multi-floor navigation and a
+  simplified Vector Field Histogram, and two ROS 2 exercises) stay under
+  **Old assignments**.
+- **Three feedback modes,** set per student on the Accounts page and enforced
+  by the server: **Traditional** (score and number of checks passed),
+  **TDD** (check names and messages, printed output, built-in hints, the
+  simulation) and **TDD + AI** (TDD plus the AI tutor). Grading is identical
+  in every mode, every attempt records its mode, and each mode has its own
+  gradient theme (blue, green, bronze; instructors keep teal).
 - **Test-case grading:** public and server-only hidden checks, with structured
   feedback and partial credit where the instructions state it. Grades never
   depend on AI.
@@ -52,7 +64,7 @@ Screenshots are from the live site using **Try the student demo**.
 - **Course content:** six topics with lessons, diagrams, exercises, and one
   10-question quiz each. Quizzes are graded on the server and stored
   separately from assignment scores.
-- **Instructor Studio:** assignment management and publishing, account management with per-account sign-in history,
+- **Instructor Studio:** assignment management and publishing, account management with feedback modes and per-account sign-in history,
   assignment-version analytics, data-health checks, and CSV/Excel research
   exports that use participant codes instead of login IDs.
 - **Student demo:** a **Try the student demo** button opens a temporary,
@@ -119,11 +131,11 @@ On the live PC the OpenAI key is a managed secret, not a `.env` line: run
 `scripts/set-live-secret.ps1` (hidden prompt; stored encrypted with Windows
 DPAPI for that Windows user under LocalAppData), then restart the stack.
 `run-live.ps1` gives the key to the API process only and prints whether it is
-configured, never the key. `-Remove` deletes it. AI answers need four things: an `OPENAI_API_KEY` on the server, AI tutoring
+configured, never the key. `-Remove` deletes it. AI answers need five things: an `OPENAI_API_KEY` on the server, AI tutoring
 turned on in Instructor Studio > AI tutor (off by default, with a daily limit
 per student), the assignment's AI test cases approved by a named instructor
-for its current version (`backend/ai_evaluation_cases`), and quota left for
-the student today. Otherwise students get the built-in hints and a short
+for its current version (`backend/ai_evaluation_cases`), a student account in
+the TDD + AI feedback mode, and quota left for the student today. Otherwise students get the built-in hints and a short
 reason.
 
 ## Verification

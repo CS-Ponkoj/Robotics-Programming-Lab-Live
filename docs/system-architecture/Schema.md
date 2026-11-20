@@ -5,8 +5,8 @@
 >
 > | Blueprint | [PRD](PRD.md) · [AppFlow](AppFlow.md) · [UI_Spec](UI_Spec.md) · [TRD](TRD.md) · [Schema](Schema.md) · [Plan](Plan.md) |
 > |---|---|
-> | Describes | Live release `3571938b` · source of truth: [`backend/models.py`](../../backend/models.py) |
-> | Last reviewed | 2026-10-26 |
+> | Describes | Live release `a69b89b3` · source of truth: [`backend/models.py`](../../backend/models.py) · latest migration `0010_feedback_modes` |
+> | Last reviewed | 2026-11-20 |
 
 ---
 
@@ -60,6 +60,7 @@ erDiagram
         string password_hash
         string role "student | instructor"
         string participant_code UK
+        string feedback_mode "traditional | tdd | tdd_ai"
         bool is_active
         bool is_demo
     }
@@ -78,6 +79,7 @@ erDiagram
         int assignment_version
         string user_id FK
         string mode "run | submit"
+        string feedback_mode "mode when it ran; null before 0010"
         string execution_status
         bool passed
         int score
@@ -156,25 +158,27 @@ erDiagram
 
 | Group | Table | One row means | Written by |
 |---|---|---|---|
-| 👤 **Identity** | `users` | One account | Instructor tools, seeding |
+| 👤 **Identity** | `users` | One account, with its instructor-set `feedback_mode` | Instructor tools, seeding |
 | | `auth_sessions` | One sign-in (token stored only as a hash) | Login |
 | | `password_reset_tokens` | One reset or invitation link | Feature-flagged reset |
 | 📘 **Course** | `assignments` | One assignment at its current version | Seed, Instructor Studio |
-| | `submissions` | One graded run or submit | Run / Submit |
+| | `submissions` | One graded run or submit, with the feedback mode it ran under | Run / Submit |
 | | `hint_interactions` | One hint shown for a submission | Get a hint |
 | | `code_drafts` | Latest draft per user + assignment + version | Autosave |
 | | `course_quiz_attempts` | One whole-quiz attempt | Quiz submit |
 | 🔬 **Research** | `study_sessions` | One active browser study session | Research tracker |
 | | `learning_events` | One allow-listed event (append-only) | Research tracker, server |
 | | `assignment_activities` | Active time and completion per assignment version | Heartbeats, grading |
-| 🛠️ **Operations** | `audit_events` | One sensitive admin action | Admin routes |
+| 🛠️ **Operations** | `audit_events` | One sensitive admin action, including each `student.feedback_mode_changed` (from, to, who, when) | Admin routes |
+| | `course_settings` | One course-wide setting, such as the AI tutor switch and daily limit | Instructor Studio |
 | | `page_feedback` | One feedback message | Feedback button |
 
 ### Allow-listed learning events
 
 `assignment_opened` · `ai_tutor_toggled` · `workspace_tab_changed` ·
 `workspace_file_selected` · `assignment_run` · `assignment_submitted` ·
-`hint_requested` · `solution_revealed` (full list in
+`hint_requested` · `solution_revealed` · `simulation_run`. Run and submit
+events also store `feedback_mode` (full list in
 [`data_contracts.py`](../../backend/data_contracts.py)).
 
 ## 4. Assignment definition (JSON shape)
@@ -223,6 +227,7 @@ Kept per signed-in user, as a cache only:
 | Timestamps are UTC | One clock for research analysis |
 | `learning_events` are append-only through the API | Research integrity |
 | Exports use `participant_code`, never `login_id`, and never source code | Participant privacy |
+| Each attempt keeps the feedback mode it ran under; a mode change never rewrites past rows | Study conditions stay correct per attempt |
 | Schema changes use an Alembic migration (`backend/migrations/`) | Safe, repeatable upgrades |
 | Seeding is idempotent and never overwrites instructor edits or student records | Live data stays safe |
 | The live database is dumped before every deploy | Recovery |
