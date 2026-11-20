@@ -20,20 +20,23 @@ repository first.
 
 ## Tour
 
-Screenshots are from the live site using **Try the student demo**.
+Screenshots are from the live site using **Try the student demo**, which uses
+the TDD feedback mode (green theme).
 
 | | |
 |---|---|
-| ![Sign-in page](docs/images/readme/login.png) | ![Home page with assignment cards](docs/images/readme/home.png) |
-| **Sign in or try the demo.** No account needed for the demo, and nothing is saved. | **Home.** A learning path, progress, and the current assignments. |
-| ![Instructions with a scenario diagram](docs/images/readme/instructions.png) | ![Try your own inputs dialog](docs/images/readme/try_inputs.png) |
-| **Instructions beside the code.** Scenario, task, and rules with to-scale diagrams. | **Try inputs.** Call your own function with chosen values. Not graded or saved. |
+| ![Sign-in page](docs/images/readme/login.png) | ![Home page with the two current assignments](docs/images/readme/home.png) |
+| **Sign in or try the demo.** No account needed for the demo, and nothing is saved. | **Home.** A learning path, progress, and the current assignments; earlier ones are under **Old assignments**. |
+| ![Instructions with a scenario diagram beside the code](docs/images/readme/instructions.png) | ![Simulation replay of a robot driving into a wall](docs/images/readme/simulation.png) |
+| **Instructions beside the code.** Scenario, task, and rules with to-scale diagrams. | **Simulation.** Press Simulate to watch your ROS 2 node drive the robot in a 2D world. Visual only, never graded. |
+| ![Simulation LiDAR view of the scan ranges](docs/images/readme/simulation_lidar.png) | ![Simulation charts of distance and speed over time](docs/images/readme/simulation_charts.png) |
+| **LiDAR view.** The scan your node received at each moment, beam by beam. | **Charts.** Distance ahead and the speeds your node published, over the whole run. |
 | ![Course contents with six topics](docs/images/readme/contents.png) | ![Obstacle Avoidance lesson page](docs/images/readme/topic.png) |
 | **Course contents.** Six topics, each with a lesson, exercises, and a quiz. | **Lessons.** Readable pages with a jump-to-section menu. |
 
 <p align="center">
   <img src="docs/images/readme/phone_workspace.png" alt="Workspace on a phone" width="260"><br>
-  <em>The same workspace on a phone: Code and Instructions tabs, terminal under the editor.</em>
+  <em>The same workspace on a phone: Code, Instructions and Simulation tabs, terminal under the editor.</em>
 </p>
 
 ## What it does
