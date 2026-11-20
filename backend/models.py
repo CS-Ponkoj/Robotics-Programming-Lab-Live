@@ -128,6 +128,8 @@ class Submission(Base):
         Integer, nullable=True
     )
     evidence: Mapped[dict] = mapped_column(JSON, default=dict)
+    # The account's feedback mode when this attempt ran; null before 0010.
+    feedback_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     assignment: Mapped[Assignment] = relationship(back_populates="submissions")
@@ -182,6 +184,10 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Study condition chosen by an instructor: traditional, tdd, or tdd_ai.
+    feedback_mode: Mapped[str] = mapped_column(
+        String(20), default="tdd", server_default="tdd"
+    )
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[str | None] = mapped_column(
         ForeignKey("users.id"), nullable=True

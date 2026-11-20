@@ -173,6 +173,8 @@ def student_analytics_payload(session: Session, user: User) -> dict[str, Any]:
     summary = {
         "participant_code": participant_label(user),
         "account_active": user.is_active,
+        # Current mode; each attempt row keeps the mode it ran under.
+        "feedback_mode": user.feedback_mode,
         "study_sessions": len([item for item in sessions if item.active_seconds > 0]),
         "median_session_active_seconds": _median(
             [item.active_seconds for item in sessions if item.active_seconds > 0]
@@ -690,6 +692,7 @@ def _attempt_row(submission: Submission, participant_code: str) -> dict[str, Any
             submission.execution_status, "Execution result"
         ),
         "mode": submission.mode,
+        "feedback_mode": submission.feedback_mode or "",
         "execution_succeeded": submission.execution_succeeded,
         "passed": submission.passed,
         "score": submission.score,

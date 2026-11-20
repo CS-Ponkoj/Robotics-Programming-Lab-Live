@@ -128,6 +128,16 @@ from analytics_service import (
 )
 from tutor import TutorService
 from ai_policy import ai_access, approved_assignments
+from feedback_modes import (
+    NO_HINTS_MESSAGE,
+    NO_SIMULATION_MESSAGE,
+    NO_TUTOR_MESSAGE,
+    allows_ai,
+    allows_hints,
+    allows_simulation,
+    feedback_mode_for,
+    shape_submission_response,
+)
 from assignment_insights import assignment_insights
 from course_settings import (
     AiTutorSettings,
@@ -565,6 +575,7 @@ def create_app(
             participant_code=user.participant_code,
             is_demo=user.is_demo if is_demo is None else is_demo,
             must_change_password=user.must_change_password,
+            feedback_mode=feedback_mode_for(user),
         ).model_dump()
 
     def demo_user_payload(user: User) -> dict:
@@ -674,6 +685,9 @@ def create_app(
             user_id=user.id,
             study_session_id=study_session.id if study_session else None,
             mode=mode,
+            feedback_mode=feedback_mode_for(
+                user, demo=is_ephemeral_demo(request, user)
+            ),
             code="",
             execution_succeeded=False,
             execution_status="rejected",
@@ -745,6 +759,9 @@ def create_app(
             user_id=user.id,
             study_session_id=study_session.id if study_session else None,
             mode=mode,
+            feedback_mode=feedback_mode_for(
+                user, demo=is_ephemeral_demo(request, user)
+            ),
             code=body.code,
             execution_succeeded=result.execution_succeeded,
             execution_status=result.execution_status.value,
@@ -852,6 +869,7 @@ def create_app(
                 "passed": submission.passed,
                 "score": submission.score,
                 "ai_tutor_requested": ai_tutor_requested,
+                "feedback_mode": submission.feedback_mode,
             },
         )
 
@@ -862,7 +880,8 @@ def create_app(
     ) -> dict:
         evidence = submission.evidence
         tests = evidence.get("tests", [])
-        if tutor_feedback is None and not submission.passed:
+        mode = submission.feedback_mode or "tdd"
+        if tutor_feedback is None and not submission.passed and allows_hints(mode):
             # Offer the first built-in hint without making an AI request or
             # recording a hint request the student did not initiate.
             tutor_feedback = TutorService(application.state.settings).feedback(
@@ -888,7 +907,7 @@ def create_app(
             error_frames=evidence.get("error_frames", []),
             tutor_feedback=tutor_feedback,
         )
-        return response.model_dump(by_alias=True)
+        return shape_submission_response(response.model_dump(by_alias=True), mode)
 
     @application.get("/health")
     def health():
@@ -1829,6 +1848,10 @@ def create_app(
             requests_per_minute=request.app.state.settings.execution_requests_per_minute,
         )
         require_code(body, request)
+        if not allows_simulation(
+            feedback_mode_for(user, demo=is_ephemeral_demo(request, user))
+        ):
+            raise HTTPException(403, NO_SIMULATION_MESSAGE)
         assignment = get_assignment_or_404(session, assignment_id)
         world = simulation_world(assignment)
         if world is None:
@@ -1992,7 +2015,11 @@ def create_app(
             study_session=study_session,
         )
         tutor_feedback = None
-        if body.use_ai_tutor and not result.passed:
+        if (
+            body.use_ai_tutor
+            and not result.passed
+            and allows_hints(submission.feedback_mode or "tdd")
+        ):
             access = ai_access(
                 request.app.state.settings, session, assignment, user,
                 demo=is_ephemeral_demo(request, user),
@@ -2067,6 +2094,8 @@ def create_app(
             raise HTTPException(404, "Submission not found.")
         if submission.student_id != user.login_id:
             raise HTTPException(404, "Submission not found.")
+        if not allows_hints(submission.feedback_mode or "tdd"):
+            raise HTTPException(403, NO_HINTS_MESSAGE)
         access = ai_access(
             request.app.state.settings, session, assignment, user,
             demo=is_ephemeral_demo(request, user),
@@ -2130,6 +2159,10 @@ def create_app(
         )
         if submission is None or submission.student_id != user.login_id:
             raise HTTPException(404, "Submission not found.")
+        if not allows_ai(
+            feedback_mode_for(user, demo=is_ephemeral_demo(request, user))
+        ):
+            raise HTTPException(403, NO_TUTOR_MESSAGE)
 
         access = ai_access(
             request.app.state.settings, session, assignment, user,
@@ -2614,6 +2647,8 @@ def create_app(
             )
         except ValueError as error:
             raise HTTPException(409, str(error)) from error
+        user.feedback_mode = body.feedback_mode
+        session.commit()
 
         email_sent = False
         if body.send_invitation_email:
@@ -2639,6 +2674,7 @@ def create_app(
                 "login_id": user.login_id,
                 "participant_code": user.participant_code,
                 "invitation_email": email_sent,
+                "feedback_mode": user.feedback_mode,
             },
         )
         return {
@@ -2694,9 +2730,26 @@ def create_app(
             user.participant_code = participant_code
         if body.active is not None:
             user.is_active = body.active
+        previous_mode = user.feedback_mode
+        if body.feedback_mode is not None:
+            user.feedback_mode = body.feedback_mode
         session.commit()
         if body.active is False:
             revoke_user_sessions(session, user.id)
+        if previous_mode != user.feedback_mode:
+            # Append-only history: past attempts keep the mode they ran under.
+            record_audit(
+                session,
+                action="student.feedback_mode_changed",
+                resource_type="user",
+                resource_id=user.id,
+                actor_user_id=actor.id if actor else None,
+                details={
+                    "login_id": user.login_id,
+                    "from": previous_mode,
+                    "to": user.feedback_mode,
+                },
+            )
         record_audit(
             session,
             action="student.updated",

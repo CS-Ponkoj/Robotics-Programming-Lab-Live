@@ -67,6 +67,7 @@ Future<Map<String, dynamic>> createAccount({
   String? email,
   String? participantCode,
   bool sendInvitationEmail = false,
+  String? feedbackMode,
 }) async {
   final response = await http
       .post(
@@ -81,6 +82,8 @@ Future<Map<String, dynamic>> createAccount({
           'participant_code': _nullIfEmpty(participantCode),
           'active': true,
           'send_invitation_email': sendInvitationEmail,
+          if (role == 'student' && feedbackMode != null)
+            'feedback_mode': feedbackMode,
         }),
       )
       .timeout(_studentAdminTimeout);
@@ -94,6 +97,7 @@ Future<Map<String, dynamic>> updateAccount(
   String? email,
   String? participantCode,
   bool? active,
+  String? feedbackMode,
 }) async {
   final response = await http
       .patch(
@@ -106,6 +110,7 @@ Future<Map<String, dynamic>> updateAccount(
           if (participantCode != null)
             'participant_code': _nullIfEmpty(participantCode),
           if (active != null) 'active': active,
+          if (feedbackMode != null) 'feedback_mode': feedbackMode,
         }),
       )
       .timeout(_studentAdminTimeout);

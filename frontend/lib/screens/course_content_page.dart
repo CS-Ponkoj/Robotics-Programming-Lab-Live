@@ -1079,7 +1079,7 @@ class _LoadError extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.menu_book_rounded,
                 size: 40,
                 color: AppColors.brandDark,

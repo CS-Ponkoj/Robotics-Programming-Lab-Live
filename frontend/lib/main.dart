@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/state/feedback_mode.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/navigation/browser_entry_stub.dart'
     if (dart.library.js_interop) 'package:iuse_demo/navigation/browser_entry_web.dart';
@@ -169,12 +170,25 @@ class _MyAppState extends State<MyApp> {
     setState(() => _user = user);
   }
 
+  /// Students see their feedback mode's colour; instructors keep the teal.
+  ThemeData _themeFor(AuthenticatedUser? user) {
+    final mode = user == null || user.isInstructor
+        ? FeedbackMode.tddAi
+        : FeedbackMode.fromWire(user.feedbackMode);
+    currentFeedbackMode.value = mode;
+    AppColors.usePalette(BrandPalettes.forAccount(
+      signedInStudent: user != null && !user.isInstructor,
+      mode: mode,
+    ));
+    return buildAppTheme();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Robotics Programming Lab',
       debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
+      theme: _themeFor(_user),
       navigatorKey: _navigatorKey,
       navigatorObservers: [feedbackPages],
       builder: (context, child) => Focus(

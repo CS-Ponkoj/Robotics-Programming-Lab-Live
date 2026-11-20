@@ -1,11 +1,75 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/state/feedback_mode.dart';
+
+/// One account's brand colours: the main colour, darker shades for headers,
+/// and a light tint for selected surfaces.
+class BrandPalette {
+  const BrandPalette({
+    required this.brand,
+    required this.dark,
+    required this.deep,
+    required this.tint,
+  });
+
+  final Color brand;
+  final Color dark;
+  final Color deep;
+  final Color tint;
+}
+
+/// Instructors keep the original teal; each student feedback mode has its
+/// own colour. None uses the violet reserved for AI-generated feedback.
+abstract final class BrandPalettes {
+  static const instructor = BrandPalette(
+    brand: Color(0xFF19778C),
+    dark: Color(0xFF0F4C5C),
+    deep: Color(0xFF0A3742),
+    tint: Color(0xFFDDEFF2),
+  );
+  static const traditional = BrandPalette(
+    brand: Color(0xFF2F5FA7),
+    dark: Color(0xFF1F4277),
+    deep: Color(0xFF132A4D),
+    tint: Color(0xFFDFE8F5),
+  );
+  static const tdd = BrandPalette(
+    brand: Color(0xFF2E7D4F),
+    dark: Color(0xFF1E5A37),
+    deep: Color(0xFF123B24),
+    tint: Color(0xFFDFF0E5),
+  );
+  static const tddAi = BrandPalette(
+    brand: Color(0xFFA4502A),
+    dark: Color(0xFF7A3A1D),
+    deep: Color(0xFF4F2411),
+    tint: Color(0xFFF6E6DC),
+  );
+
+  /// Signed out and instructors use the original teal.
+  static BrandPalette forAccount({
+    required bool signedInStudent,
+    required FeedbackMode mode,
+  }) {
+    if (!signedInStudent) return instructor;
+    return switch (mode) {
+      FeedbackMode.traditional => traditional,
+      FeedbackMode.tdd => tdd,
+      FeedbackMode.tddAi => tddAi,
+    };
+  }
+}
 
 abstract final class AppColors {
-  static const brandDark = Color(0xFF0F4C5C);
-  static const brand = Color(0xFF19778C);
-  static const brandDeep = Color(0xFF0A3742);
-  // Teal tint for selected and brand-highlight surfaces.
-  static const brandTint = Color(0xFFDDEFF2);
+  static BrandPalette _palette = BrandPalettes.instructor;
+
+  /// Switches the brand colours; rebuild the app theme afterwards.
+  static void usePalette(BrandPalette palette) => _palette = palette;
+
+  static Color get brandDark => _palette.dark;
+  static Color get brand => _palette.brand;
+  static Color get brandDeep => _palette.deep;
+  // Tint for selected and brand-highlight surfaces.
+  static Color get brandTint => _palette.tint;
   // Cool grey page so white cards stand out from it.
   static const pageBackground = Color(0xFFEDF1F5);
   static const ink = Color(0xFF16222E);
@@ -203,7 +267,7 @@ ThemeData buildAppTheme() {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       shape: const StadiumBorder(),
     ),
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: AppColors.brand,
       foregroundColor: Colors.white,
       elevation: 2,
@@ -284,7 +348,7 @@ ThemeData buildAppTheme() {
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
+    progressIndicatorTheme: ProgressIndicatorThemeData(
       color: AppColors.brand,
       linearMinHeight: 8,
     ),
@@ -297,7 +361,7 @@ ThemeData buildAppTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadii.sm),
-        borderSide: const BorderSide(color: AppColors.brand, width: 2),
+        borderSide: BorderSide(color: AppColors.brand, width: 2),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -311,9 +375,9 @@ ThemeData buildAppTheme() {
         ),
       ),
     ),
-    tooltipTheme: const TooltipThemeData(
-      waitDuration: Duration(milliseconds: 350),
-      textStyle: TextStyle(color: Colors.white, fontSize: 13),
+    tooltipTheme: TooltipThemeData(
+      waitDuration: const Duration(milliseconds: 350),
+      textStyle: const TextStyle(color: Colors.white, fontSize: 13),
       decoration: BoxDecoration(
         color: AppColors.brandDark,
         borderRadius: BorderRadius.all(Radius.circular(8)),

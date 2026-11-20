@@ -168,6 +168,7 @@ class SubmissionResponse(BaseModel):
     # Outermost call first, like a Python traceback; empty for older runs.
     error_frames: list[ErrorFrame] = Field(default_factory=list)
     tutor_feedback: TutorFeedback | None = None
+    feedback_mode: str = "tdd"
 
 
 class SimulationScan(BaseModel):
@@ -332,6 +333,7 @@ class AuthenticatedUser(BaseModel):
     participant_code: str | None = None
     is_demo: bool = False
     must_change_password: bool = False
+    feedback_mode: Literal["traditional", "tdd", "tdd_ai"] = "tdd"
 
 
 class LoginResponse(BaseModel):
@@ -365,12 +367,14 @@ class AdminStudentCreate(BaseModel):
     participant_code: str | None = Field(default=None, max_length=120)
     active: bool = True
     send_invitation_email: bool = False
+    feedback_mode: Literal["traditional", "tdd", "tdd_ai"] = "tdd"
 
 
 class AdminStudentUpdate(BaseModel):
     email: str | None = Field(default=None, max_length=320)
     participant_code: str | None = Field(default=None, max_length=120)
     active: bool | None = None
+    feedback_mode: Literal["traditional", "tdd", "tdd_ai"] | None = None
 
 
 class AdminPasswordReset(BaseModel):

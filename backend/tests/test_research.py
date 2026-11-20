@@ -128,6 +128,12 @@ def test_submission_hint_solution_and_ai_status_are_recorded(research_client):
     student = _login(
         research_client, "research-student", "Research-Student-4827"
     )
+    # Asking the tutor is part of the TDD + AI mode only.
+    assert research_client.patch(
+        f"/admin/students/{student['user']['id']}",
+        headers=_bearer(_login(research_client, "instructor", "instructor")),
+        json={"feedback_mode": "tdd_ai"},
+    ).status_code == 200
     study_session = _start(research_client, student, "browser-session-0002").json()
     assignment = research_client.get(
         "/assignments/1", headers=_bearer(student)

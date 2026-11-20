@@ -199,14 +199,16 @@ class IconTile extends StatelessWidget {
     super.key,
     required this.icon,
     this.size = 36,
-    this.color = AppColors.brandDark,
-    this.background = AppColors.brandTint,
+    this.color,
+    this.background,
   });
 
   final IconData icon;
   final double size;
-  final Color color;
-  final Color background;
+
+  /// Defaults follow the account's brand colours.
+  final Color? color;
+  final Color? background;
 
   @override
   Widget build(BuildContext context) {
@@ -214,10 +216,10 @@ class IconTile extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: background,
+        color: background ?? AppColors.brandTint,
         borderRadius: BorderRadius.circular(size * 0.28),
       ),
-      child: Icon(icon, size: size * 0.5, color: color),
+      child: Icon(icon, size: size * 0.5, color: color ?? AppColors.brandDark),
     );
   }
 }

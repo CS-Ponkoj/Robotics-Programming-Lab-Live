@@ -20,8 +20,8 @@ def session():
     Base.metadata.create_all(engine)
     with sessionmaker(bind=engine, expire_on_commit=False)() as value:
         value.add(Assignment(id=7, stable_id="ros2-wall-stop", version=3, title="A7"))
-        value.add(User(id="u1", login_id="student", password_hash="x", role="student"))
-        value.add(User(id="u2", login_id="other", password_hash="x", role="student"))
+        value.add(User(id="u1", login_id="student", password_hash="x", role="student", feedback_mode="tdd_ai"))
+        value.add(User(id="u2", login_id="other", password_hash="x", role="student", feedback_mode="tdd_ai"))
         value.commit()
         yield value
 
@@ -62,6 +62,10 @@ def test_gates_apply_in_order_with_student_words(session, monkeypatch):
     assert ai_access(settings(), session, assignment, user).reason == "not_reviewed"
     monkeypatch.setattr(ai_policy, "approved_assignments", lambda: frozenset({(7, 3)}))
     assert ai_access(settings(), session, assignment, user, demo=True).reason == "demo"
+    user.feedback_mode = "tdd"  # a TDD-only account never gets AI answers
+    blocked = ai_access(settings(), session, assignment, user)
+    assert (blocked.reason, blocked.message) == ("feedback_mode", ai_policy.MODE_WITHOUT_AI)
+    user.feedback_mode = "tdd_ai"
     access = ai_access(settings(), session, assignment, user)
     assert access.allowed and access.remaining_today == 2
 

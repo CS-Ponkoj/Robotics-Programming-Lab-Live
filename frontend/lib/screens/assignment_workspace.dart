@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/state/feedback_mode.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
@@ -442,6 +443,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   bool get _hasRobotSimulation =>
+      currentFeedbackMode.value.allowsSimulation &&
       _simulationConfig['enabled'] == true &&
       _simulationConfig['provider'] == 'ros2_2d';
 
@@ -991,21 +993,22 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ]),
             ),
-            SwitchListTile(
-              key: const Key('results-ai-toggle'),
-              title: const Text('AI tutoring'),
-              subtitle: Text(_aiTutorAvailable
-                  ? 'Off by default; built-in feedback remains available'
-                  : _aiTutorMessage),
-              value: _aiTutorOn,
-              onChanged: _aiTutorAvailable
-                  ? (value) {
-                      setState(() => _enableFeedback = value);
-                      unawaited(_trackWorkspaceEvent(
-                          'ai_tutor_toggled', {'enabled': value}));
-                    }
-                  : null,
-            ),
+            if (currentFeedbackMode.value.allowsAi)
+              SwitchListTile(
+                key: const Key('results-ai-toggle'),
+                title: const Text('AI tutoring'),
+                subtitle: Text(_aiTutorAvailable
+                    ? 'Off by default; built-in feedback remains available'
+                    : _aiTutorMessage),
+                value: _aiTutorOn,
+                onChanged: _aiTutorAvailable
+                    ? (value) {
+                        setState(() => _enableFeedback = value);
+                        unawaited(_trackWorkspaceEvent(
+                            'ai_tutor_toggled', {'enabled': value}));
+                      }
+                    : null,
+              ),
               Expanded(
                 child: _emptyCodeAttempted
                     ? EmptyCodeTestRunState(onRestore: _resetStarterCode)
@@ -3746,41 +3749,43 @@ class AssignmentPageHeader extends StatelessWidget
             label: const Text('Home'),
           ),
         const SizedBox(width: AppSpacing.xs),
-        _withUnavailableTooltip(
-          show: !aiTutorAvailable,
-          child: Semantics(
-            label: 'AI tutoring',
-            hint: aiTutorAvailable ? null : aiTutorMessage,
-            toggled: aiTutorAvailable && feedbackEnabled,
-            enabled: aiTutorAvailable,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.lightbulb_outline_rounded, size: 18),
-                if (showFeedbackLabel) ...[
+        // Only the TDD + AI feedback mode has an AI tutor to switch on.
+        if (currentFeedbackMode.value.allowsAi)
+          _withUnavailableTooltip(
+            show: !aiTutorAvailable,
+            child: Semantics(
+              label: 'AI tutoring',
+              hint: aiTutorAvailable ? null : aiTutorMessage,
+              toggled: aiTutorAvailable && feedbackEnabled,
+              enabled: aiTutorAvailable,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lightbulb_outline_rounded, size: 18),
+                  if (showFeedbackLabel) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    const Text('AI tutoring'),
+                  ],
+                  Switch(
+                    key: const Key('header-ai-toggle'),
+                    value: aiTutorAvailable && feedbackEnabled,
+                    onChanged: aiTutorAvailable ? onFeedbackChanged : null,
+                    activeColor: theme.colorScheme.primary,
+                    activeTrackColor: theme.colorScheme.onPrimary.withValues(
+                      alpha: 0.9,
+                    ),
+                    inactiveThumbColor: theme.colorScheme.onPrimary.withValues(
+                      alpha: 0.7,
+                    ),
+                    inactiveTrackColor: theme.colorScheme.onPrimary.withValues(
+                      alpha: 0.2,
+                    ),
+                  ),
                   const SizedBox(width: AppSpacing.sm),
-                  const Text('AI tutoring'),
                 ],
-                Switch(
-                  key: const Key('header-ai-toggle'),
-                  value: aiTutorAvailable && feedbackEnabled,
-                  onChanged: aiTutorAvailable ? onFeedbackChanged : null,
-                  activeColor: theme.colorScheme.primary,
-                  activeTrackColor: theme.colorScheme.onPrimary.withValues(
-                    alpha: 0.9,
-                  ),
-                  inactiveThumbColor: theme.colorScheme.onPrimary.withValues(
-                    alpha: 0.7,
-                  ),
-                  inactiveTrackColor: theme.colorScheme.onPrimary.withValues(
-                    alpha: 0.2,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-              ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -4110,6 +4115,8 @@ class Feedback extends StatelessWidget {
       if (weight == 0) requirementChecks++;
     }
     final vars = data.testedVals.map((value) => value.toString()).toList();
+    // Traditional accounts get the score and counts only (server-enforced).
+    final resultsOnly = data.feedbackMode == FeedbackMode.traditional.wire;
     final tutorAvailable = aiTutorEnabled && data.submissionId.isNotEmpty;
     final showHint = data.hint.isNotEmpty &&
         (aiTutorEnabled || data.tutorSource != 'openai');
@@ -4174,7 +4181,10 @@ class Feedback extends StatelessWidget {
           ),
           if (failed > 0 || !data.execSuccess) ...[
             const SizedBox(height: AppSpacing.sm),
-            _ResultNextStep(executionFailed: !data.execSuccess),
+            _ResultNextStep(
+              executionFailed: !data.execSuccess,
+              resultsOnly: resultsOnly,
+            ),
           ],
           const SizedBox(height: AppSpacing.sm),
           _TerminalOutput(data: data),
@@ -4187,25 +4197,27 @@ class Feedback extends StatelessWidget {
               questionRequester: tutorQuestionRequester ?? askTutorQuestion,
             ),
           ],
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            failed > 0 ? 'Test details · failed first' : 'Test details',
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (resultCards.isEmpty)
+          if (!resultsOnly) ...[
+            const SizedBox(height: AppSpacing.lg),
             Text(
-              'No individual test details were returned.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            )
-          else
-            ...resultCards.expand(
-              (card) => [card, const SizedBox(height: AppSpacing.sm)],
+              failed > 0 ? 'Test details · failed first' : 'Test details',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
+            const SizedBox(height: AppSpacing.sm),
+            if (resultCards.isEmpty)
+              Text(
+                'No individual test details were returned.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              )
+            else
+              ...resultCards.expand(
+                (card) => [card, const SizedBox(height: AppSpacing.sm)],
+              ),
+          ],
         ],
       ),
     );
@@ -4213,9 +4225,13 @@ class Feedback extends StatelessWidget {
 }
 
 class _ResultNextStep extends StatelessWidget {
-  const _ResultNextStep({required this.executionFailed});
+  const _ResultNextStep({
+    required this.executionFailed,
+    this.resultsOnly = false,
+  });
 
   final bool executionFailed;
+  final bool resultsOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -4238,7 +4254,9 @@ class _ResultNextStep extends StatelessWidget {
             child: Text(
               executionFailed
                   ? 'Next step: resolve the execution error below, then run the tests again.'
-                  : 'Next step: review the first failed check and compare that part of your code with the task instructions.',
+                  : resultsOnly
+                      ? 'Next step: compare your code with the task instructions, then run the tests again.'
+                      : 'Next step: review the first failed check and compare that part of your code with the task instructions.',
               style: theme.textTheme.bodySmall,
             ),
           ),

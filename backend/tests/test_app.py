@@ -382,10 +382,10 @@ def test_assignment_reports_ai_tutor_available_without_revealing_key(
         study_accounts_file=tmp_path / "study_accounts.json",
     )
     with TestClient(create_app(settings=settings, database_url="sqlite://")) as value:
-        token = value.post(
+        signed_in = value.post(
             "/auth/login", json={"login_id": "student", "password": "student"}
-        ).json()["token"]
-        student = {"Authorization": f"Bearer {token}"}
+        ).json()
+        student = {"Authorization": f"Bearer {signed_in['token']}"}
         instructor = {"X-Admin-Token": "test-admin"}
 
         def available():
@@ -408,6 +408,13 @@ def test_assignment_reports_ai_tutor_available_without_revealing_key(
         monkeypatch.setattr(
             ai_policy, "approved_assignments", lambda: frozenset({(1, version)})
         )
+        # Approved, but this account's feedback mode (TDD) has no AI tutor.
+        assert available() == (False, ai_policy.MODE_WITHOUT_AI)
+        assert value.patch(
+            f"/admin/students/{signed_in['user']['id']}",
+            json={"feedback_mode": "tdd_ai"},
+            headers=instructor,
+        ).status_code == 200
         response = value.get("/assignments/1", headers=student)
         # Students cannot change the course switch.
         assert value.put(
@@ -555,7 +562,21 @@ def test_progressive_hint_cannot_use_a_submission_from_another_assignment(client
     assert response.status_code == 404
 
 
+def use_ai_mode(client, login_id="student"):
+    """Asking the tutor is part of the TDD + AI feedback mode only."""
+    students = client.get(
+        "/admin/students", headers={"X-Admin-Token": "test-admin"}
+    ).json()["students"]
+    student_id = next(item["id"] for item in students if item["login_id"] == login_id)
+    assert client.patch(
+        f"/admin/students/{student_id}",
+        headers={"X-Admin-Token": "test-admin"},
+        json={"feedback_mode": "tdd_ai"},
+    ).status_code == 200
+
+
 def test_student_can_ask_tutor_about_owned_submission(client):
+    use_ai_mode(client)
     submission = client.post(
         "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
     ).json()
@@ -610,6 +631,7 @@ def test_tutor_question_rate_limit_returns_retry_guidance(tmp_path):
     settings = Settings(
         database_url="sqlite://",
         openai_api_key=None,
+        admin_api_token="test-admin",
         study_accounts_file=tmp_path / "study_accounts.json",
         tutor_requests_per_minute=1,
     )
@@ -618,6 +640,7 @@ def test_tutor_question_rate_limit_returns_retry_guidance(tmp_path):
             "/auth/login", json={"login_id": "student", "password": "student"}
         ).json()
         headers = {"Authorization": f"Bearer {login['token']}"}
+        use_ai_mode(value)
         submission = value.post(
             "/assignments/2/submit",
             headers=headers,

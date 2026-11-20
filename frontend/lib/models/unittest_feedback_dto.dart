@@ -74,6 +74,9 @@ class UnittestFeedbackDto {
   final bool execSuccess;
   final String hint;
   final String tutorSource;
+
+  /// The feedback mode this attempt ran under; traditional has no details.
+  final String feedbackMode;
   final String executionStatus;
   final Map<String, dynamic> tutorFeedback;
   final List<TestEvidenceDto> evidence;
@@ -95,6 +98,7 @@ class UnittestFeedbackDto {
       required this.execSuccess,
       required this.hint,
       this.tutorSource = '',
+      this.feedbackMode = 'tdd',
       this.executionStatus = '',
       this.tutorFeedback = const {},
       this.evidence = const [],
@@ -134,6 +138,7 @@ class UnittestFeedbackDto {
               ? ((json['tutor_feedback'] as Map)['source']?.toString() ?? '')
               : '',
           executionStatus: json['execution_status']?.toString() ?? '',
+          feedbackMode: json['feedback_mode']?.toString() ?? 'tdd',
           tutorFeedback: json['tutor_feedback'] is Map
               ? Map<String, dynamic>.from(json['tutor_feedback'] as Map)
               : const {},

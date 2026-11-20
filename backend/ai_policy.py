@@ -8,7 +8,8 @@ why in plain words. The order of the gates is also the order of the messages.
 2. An instructor switched AI tutoring on for the course.
 3. The assignment's instructor-authored evaluation cases are approved by a
    named instructor for this assignment version.
-4. The student has not used today's quota (counted in UTC).
+4. The account's feedback mode includes the AI tutor (feedback_modes).
+5. The student has not used today's quota (counted in UTC).
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from config import Settings
 from course_settings import AiTutorSettings, get_setting
+from feedback_modes import MODE_WITHOUT_AI, allows_ai, feedback_mode_for
 from instructor_dataset import ReviewStatus, load_instructor_datasets
 from models import Assignment, HintInteraction, Submission, User
 
@@ -92,6 +94,8 @@ def ai_access(
         return AiAccess(False, "not_reviewed", NOT_REVIEWED)
     if demo:
         return AiAccess(False, "demo", DEMO)
+    if not allows_ai(feedback_mode_for(user)):
+        return AiAccess(False, "feedback_mode", MODE_WITHOUT_AI)
     if not count_quota:
         return AiAccess(True)
     remaining = course.daily_limit - ai_uses_today(session, user)

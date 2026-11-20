@@ -129,7 +129,8 @@ backend/                          FastAPI application
   simulation_service.py / ros2_sim_world.py  Visual-only 2D robot replay (never graded)
   tutor.py / hinter.py            Deterministic and optional AI tutoring
   ros2_feedback.py                Observed causes and hint ladders for ROS 2 checks
-  ai_policy.py                    AI tutor gates: key, course switch, review, quota
+  ai_policy.py                    AI tutor gates: key, course switch, review, mode, quota
+  feedback_modes.py               Per-account study condition: traditional, tdd, tdd_ai
   course_settings.py              Instructor course settings (AI tutor, Old assignments)
   assignment_insights.py          Aggregate per-assignment insights for instructors
   research_service.py             Study sessions, events, summaries, and exports
@@ -504,8 +505,13 @@ Treat every submission as hostile input.
 - AI is an optional enhancement and remains off by default.
 - Route every AI call through `ai_policy.ai_access`: an AI answer needs a
   server key, the Instructor Studio course switch, approved AI evaluation
-  cases for the assignment version (named reviewer), and daily quota; demo
-  sessions never get AI. Otherwise answer with built-in hints and the reason.
+  cases for the assignment version (named reviewer), an account whose feedback
+  mode is `tdd_ai`, and daily quota; demo sessions never get AI.
+- Each student account has an instructor-assigned feedback mode
+  (`feedback_modes.py`: `traditional`, `tdd`, `tdd_ai`). Enforce it on the
+  server by trimming responses and refusing hint, tutor, and simulation
+  requests the mode excludes; never only by hiding Flutter controls. Store the
+  mode with every attempt and its events, and keep grading identical. Otherwise answer with built-in hints and the reason.
 - On RPL Live the OpenAI key is a managed secret (`scripts/set-live-secret.ps1`,
   DPAPI for the lab PC's Windows user) given to the API process only; never
   put it in `.env`, Git, logs, or the browser.

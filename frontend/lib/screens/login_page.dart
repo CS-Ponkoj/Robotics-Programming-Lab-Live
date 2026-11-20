@@ -551,7 +551,7 @@ class _CreditLink extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 2),
-                const Icon(
+                Icon(
                   Icons.open_in_new_rounded,
                   size: 13,
                   color: AppColors.brand,
@@ -609,7 +609,7 @@ class _BrandPanel extends StatelessWidget {
     return Container(
       width: double.infinity,
       constraints: compact ? null : const BoxConstraints.expand(),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

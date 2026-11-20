@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/state/feedback_mode.dart';
 import 'package:flutter/services.dart';
 import 'package:iuse_demo/screens/sign_in_history_page.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
@@ -63,6 +64,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     // Invite by email by default whenever real delivery is available.
     bool sendEmail = instructorEmailToolsEnabled && emailConfigured;
     String role = 'student';
+    var mode = FeedbackMode.tdd;
     bool saving = false;
     String? dialogError;
 
@@ -90,6 +92,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                   participantCode:
                       role == 'student' ? participantController.text : null,
                   sendInvitationEmail: sendEmail,
+                  feedbackMode: role == 'student' ? mode.wire : null,
                 );
                 if (dialogContext.mounted) {
                   Navigator.of(dialogContext).pop(created);
@@ -148,6 +151,13 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                   ),
                         ),
                         if (role == 'student') ...[
+                          const SizedBox(height: 14),
+                          FeedbackModeField(
+                            value: mode,
+                            enabled: !saving,
+                            onChanged: (value) =>
+                                setDialogState(() => mode = value),
+                          ),
                           const SizedBox(height: 14),
                           TextFormField(
                             controller: participantController,
@@ -358,6 +368,9 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
       text: student['participant_code']?.toString() ?? '',
     );
     final formKey = GlobalKey<FormState>();
+    final originalMode =
+        FeedbackMode.fromWire(student['feedback_mode']?.toString());
+    var mode = originalMode;
     bool saving = false;
     String? dialogError;
 
@@ -383,6 +396,10 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                 participantCode: student['role'] == 'student'
                     ? participantController.text
                     : null,
+                feedbackMode:
+                    student['role'] == 'student' && mode != originalMode
+                        ? mode.wire
+                        : null,
               );
               if (dialogContext.mounted) {
                 Navigator.of(dialogContext).pop(true);
@@ -404,6 +421,15 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (student['role'] == 'student') ...[
+                      FeedbackModeField(
+                        value: mode,
+                        enabled: !saving,
+                        onChanged: (value) =>
+                            setDialogState(() => mode = value),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     if (student['role'] == 'student')
                       TextFormField(
                         controller: participantController,
@@ -991,6 +1017,13 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                                   ? AppColors.success
                                                   : AppColors.inkMuted,
                                             ),
+                                            if (!instructor)
+                                              FeedbackModePill(
+                                                mode: FeedbackMode.fromWire(
+                                                  student['feedback_mode']
+                                                      ?.toString(),
+                                                ),
+                                              ),
                                             if (student['participant_code'] !=
                                                     null &&
                                                 '${student['participant_code']}'
@@ -1078,3 +1111,74 @@ String credentialsMessage({
     'Login ID: $loginId\n'
     'Temporary password: $password\n'
     'Please change your password after you sign in (account menu > My account).';
+
+
+/// What each feedback mode gives the student, in the instructor's words.
+String feedbackModeDescription(FeedbackMode mode) => switch (mode) {
+      FeedbackMode.traditional =>
+        'Score and number of checks passed only. Errors still show.',
+      FeedbackMode.tdd =>
+        'Check names and messages, output, built-in hints, and simulation.',
+      FeedbackMode.tddAi =>
+        'Everything in TDD plus the AI tutor, when the course allows it.',
+    };
+
+/// Instructor control for a student account's feedback mode.
+class FeedbackModeField extends StatelessWidget {
+  const FeedbackModeField({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.enabled = true,
+  });
+
+  final FeedbackMode value;
+  final ValueChanged<FeedbackMode> onChanged;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<FeedbackMode>(
+      key: const Key('feedback-mode-field'),
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'Feedback mode',
+        helperText: feedbackModeDescription(value),
+        helperMaxLines: 2,
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        for (final mode in FeedbackMode.values)
+          DropdownMenuItem(value: mode, child: Text(mode.label)),
+      ],
+      onChanged: enabled
+          ? (mode) {
+              if (mode != null) onChanged(mode);
+            }
+          : null,
+    );
+  }
+}
+
+/// The mode's own colour, matching the theme the student sees.
+class FeedbackModePill extends StatelessWidget {
+  const FeedbackModePill({super.key, required this.mode});
+
+  final FeedbackMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = BrandPalettes.forAccount(signedInStudent: true, mode: mode);
+    return Tooltip(
+      message: feedbackModeDescription(mode),
+      child: StatusPill(
+        key: Key('feedback-mode-pill-${mode.wire}'),
+        label: mode.label,
+        color: palette.brand,
+        background: palette.tint,
+        size: PillSize.small,
+      ),
+    );
+  }
+}

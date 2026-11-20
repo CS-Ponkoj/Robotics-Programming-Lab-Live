@@ -125,6 +125,7 @@ One row represents one deliberate code execution.
 | `passed`, `score` | Deterministic grader result |
 | `active_seconds_at_attempt` | Phase 1 active-time snapshot; null for attempts recorded before tracking |
 | `evidence` | Versioned test evidence and safe execution details |
+| `feedback_mode` | Feedback mode the account had when this attempt ran (`traditional`, `tdd`, `tdd_ai`); null for attempts before migration 0010 |
 | `created_at` | UTC attempt time |
 
 Standard `execution_status` values are:
@@ -281,6 +282,29 @@ For `hint_requested`, `interaction_type` distinguishes a progressive hint from
 a `student_question`. Question events store only the question length, hint
 level, and tutor source. The student's question text is not written to the
 learning-event record.
+
+`assignment_run` and `assignment_submitted` also store `feedback_mode`, the
+account's mode at that moment, so moving a student to another mode never
+changes the meaning of earlier events.
+
+### Feedback modes (`users.feedback_mode`)
+
+An instructor assigns each student account one study condition on the Accounts
+page. New and existing accounts start as `tdd`. Instructors always see
+`tdd_ai`, and the public demo is always `tdd`. The server enforces each mode;
+grading is identical in all three.
+
+| Value | Label | What the student receives |
+|---|---|---|
+| `traditional` | Traditional | Score, pass state, and how many checks passed. Build and runtime errors at the student's own line still show. No check names or messages, printed output, hints, tutor, or simulation |
+| `tdd` | TDD | Everything above plus check names and messages, printed output, the built-in hint ladder, and the simulation replay. No tutor questions or AI |
+| `tdd_ai` | TDD + AI | Everything in `tdd` plus the AI tutor and Ask the tutor, still subject to the AI policy gates |
+
+Each change is an append-only `student.feedback_mode_changed` audit event with
+the previous and new mode, the instructor, and the time. Research exports carry
+`feedback_mode` on each attempt row and the current mode on the student summary.
+The app shows each mode in its own theme colour for students (Traditional blue,
+TDD green, TDD + AI copper); instructors keep the original teal.
 
 `simulation_run` is recorded when a signed-in student in a study session presses
 Simulate on an assignment with a `ros2_2d` simulation. It stores only `outcome`

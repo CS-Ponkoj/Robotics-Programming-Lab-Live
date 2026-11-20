@@ -1,0 +1,119 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:iuse_demo/main.dart' as app;
+import 'package:iuse_demo/models/authenticated_user.dart';
+import 'package:iuse_demo/models/unittest_feedback_dto.dart';
+import 'package:iuse_demo/screens/student_accounts_page.dart';
+import 'package:iuse_demo/state/feedback_mode.dart';
+import 'package:iuse_demo/theme/app_theme.dart';
+
+UnittestFeedbackDto result(String mode) => UnittestFeedbackDto(
+      id: 7,
+      submissionId: 'mode-$mode',
+      testedVals: const [],
+      pass: false,
+      // A traditional reply has blank messages; counts still come through.
+      unittestFeedback:
+          mode == 'traditional' ? const ['', ''] : const ['Stops', 'Drives'],
+      unittestPassResults: const [true, false],
+      codeExecResult: '',
+      codeOutput: '',
+      execSuccess: true,
+      hint: mode == 'traditional' ? '' : 'Check the stop distance.',
+      tutorSource: mode == 'traditional' ? '' : 'fallback',
+      feedbackMode: mode,
+    );
+
+void main() {
+  tearDown(() {
+    currentFeedbackMode.value = FeedbackMode.tddAi;
+    AppColors.usePalette(BrandPalettes.instructor);
+  });
+
+  test('wire values map to modes and unknown values fall back to TDD', () {
+    expect(FeedbackMode.fromWire('traditional'), FeedbackMode.traditional);
+    expect(FeedbackMode.fromWire('tdd_ai'), FeedbackMode.tddAi);
+    expect(FeedbackMode.fromWire('bogus'), FeedbackMode.tdd);
+    expect(FeedbackMode.traditional.allowsSimulation, isFalse);
+    expect(FeedbackMode.tdd.allowsAi, isFalse);
+    expect(FeedbackMode.tddAi.allowsAi, isTrue);
+    expect(
+      AuthenticatedUser.fromJson(const {
+        'id': 'u',
+        'login_id': 'ai',
+        'role': 'student',
+        'feedback_mode': 'tdd_ai',
+      }).feedbackMode,
+      'tdd_ai',
+    );
+  });
+
+  test('each mode has its own colour and instructors keep the teal', () {
+    final colours = {
+      for (final mode in FeedbackMode.values)
+        BrandPalettes.forAccount(signedInStudent: true, mode: mode).brand,
+    };
+    expect(colours, hasLength(3));
+    expect(colours, isNot(contains(BrandPalettes.instructor.brand)));
+    expect(colours, isNot(contains(AppColors.ai)));
+    expect(
+      BrandPalettes.forAccount(
+        signedInStudent: false,
+        mode: FeedbackMode.traditional,
+      ),
+      BrandPalettes.instructor,
+    );
+    AppColors.usePalette(BrandPalettes.tdd);
+    expect(buildAppTheme().colorScheme.primary, BrandPalettes.tdd.brand);
+  });
+
+  testWidgets('traditional results show the score and counts only', (
+    tester,
+  ) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: app.Feedback(data: result('traditional'))),
+    ));
+    expect(find.byKey(const Key('result-summary')), findsOneWidget);
+    expect(find.textContaining('Test details'), findsNothing);
+    expect(find.byKey(const Key('guided-hint')), findsNothing);
+    expect(find.textContaining('compare your code with the task'),
+        findsOneWidget);
+  });
+
+  testWidgets('TDD results keep test details and the built-in hint', (
+    tester,
+  ) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: app.Feedback(data: result('tdd'))),
+    ));
+    expect(find.textContaining('Test details'), findsOneWidget);
+    expect(find.byKey(const Key('guided-hint')), findsOneWidget);
+  });
+
+  testWidgets('the instructor picks a mode and sees its pill', (tester) async {
+    var chosen = FeedbackMode.tdd;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: StatefulBuilder(
+          builder: (context, setState) => Column(children: [
+            FeedbackModeField(
+              value: chosen,
+              onChanged: (mode) => setState(() => chosen = mode),
+            ),
+            FeedbackModePill(mode: chosen),
+          ]),
+        ),
+      ),
+    ));
+    expect(find.byKey(const Key('feedback-mode-pill-tdd')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('feedback-mode-field')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Traditional').last);
+    await tester.pumpAndSettle();
+    expect(chosen, FeedbackMode.traditional);
+    expect(
+      find.byKey(const Key('feedback-mode-pill-traditional')),
+      findsOneWidget,
+    );
+  });
+}

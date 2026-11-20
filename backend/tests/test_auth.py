@@ -481,6 +481,8 @@ def test_students_cannot_access_each_others_submission_feedback_or_solution(
             json={
                 "login_id": login_id,
                 "temporary_password": "Study-Password-4827",
+                # Asking the tutor is part of the TDD + AI mode only.
+                "feedback_mode": "tdd_ai",
             },
         )
         assert created.status_code == 201

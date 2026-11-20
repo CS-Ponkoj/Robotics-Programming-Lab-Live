@@ -656,7 +656,7 @@ class ProgressSummary extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.flag_rounded,
+                    Icon(Icons.flag_rounded,
                         size: 18, color: AppColors.brandDark),
                     const SizedBox(width: 6),
                     Text(

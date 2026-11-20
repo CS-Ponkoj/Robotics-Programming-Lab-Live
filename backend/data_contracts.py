@@ -477,6 +477,9 @@ class SubmissionEventData(ContractModel):
     passed: bool
     score: int = Field(ge=0, le=100)
     ai_tutor_requested: bool
+    feedback_mode: str | None = Field(
+        default=None, pattern="^(traditional|tdd|tdd_ai)$"
+    )
 
 
 class HintRequestedEventData(ContractModel):
