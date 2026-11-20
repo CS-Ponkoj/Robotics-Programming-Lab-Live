@@ -38,11 +38,11 @@ abstract final class BrandPalettes {
     deep: Color(0xFF123B24),
     tint: Color(0xFFDFF0E5),
   );
-  // Gold: the lightest shade that keeps white text at 4.5:1 contrast.
+  // Gold (dark goldenrod), chosen by the owner; white text is 3.25:1 on it.
   static const tddAi = BrandPalette(
-    brand: Color(0xFF96700A),
-    dark: Color(0xFF7A5B05),
-    deep: Color(0xFF4F3B00),
+    brand: Color(0xFFB8860B),
+    dark: Color(0xFF946C08),
+    deep: Color(0xFF5E4505),
     tint: Color(0xFFFBF0D2),
   );
 
