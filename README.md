@@ -50,8 +50,9 @@ the TDD feedback mode (green theme).
   **Old assignments**.
 - **Three feedback modes,** set per student on the Accounts page and enforced
   by the server: **Traditional** (score and number of checks passed),
-  **TDD** (check names and messages, printed output, built-in hints, the
-  simulation) and **TDD + AI** (TDD plus the AI tutor). Grading is identical
+  **TDD** (check names and messages, printed output, the simulation; no
+  hints) and **TDD + AI** (TDD plus hints: the AI tutor with the built-in
+  hint ladder as its fallback). Grading is identical
   in every mode, every attempt records its mode, and each mode has its own
   gradient theme (blue, green, bronze; instructors keep teal).
 - **Test-case grading:** public and server-only hidden checks, with structured

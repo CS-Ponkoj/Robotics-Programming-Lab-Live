@@ -71,8 +71,8 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 | F12 | Instructor Studio: create, validate, publish | ✅ | |
 | F13 | Account management and CSV import | ✅ | Each student card shows its feedback mode |
 | F14 | Research dashboard and export | ✅ | Uses participant codes, never login IDs, and never exports source code |
-| F15 | AI tutor | ✅ | Live for TDD + AI accounts on Assignments 7 and 8 (evaluation cases approved by a named instructor). Gated by key, course switch, review, feedback mode and a daily quota; built-in hints always remain |
-| F18 | Feedback modes (study conditions) | ✅ | Traditional (score and counts), TDD (details, hints, simulation), TDD + AI. Set per account, enforced on the server, recorded with every attempt; each mode has its own gradient theme |
+| F15 | AI tutor | ✅ | Live for TDD + AI accounts on Assignments 7 and 8 (evaluation cases approved by a named instructor). Gated by key, course switch, review, feedback mode and a daily quota; built-in hints remain its fallback |
+| F18 | Feedback modes (study conditions) | ✅ | Traditional (score and counts), TDD (details and simulation, no hints), TDD + AI (adds hints and the tutor). Set per account, enforced on the server, recorded with every attempt; each mode has its own gradient theme |
 | F19 | 2D simulation replay (ROS 2) | ✅ | Visual only, never graded; TDD and TDD + AI modes |
 | F16 | Self-service password reset and email | 🟡 | Behind feature flags |
 | F17 | Mobile app (Android/iOS) | ⬜ | Out of scope for now |

@@ -518,6 +518,7 @@ def test_official_solution_passes_every_modular_grader(client, assignment_id):
 
 
 def test_incorrect_submission_returns_structured_progressive_feedback(client):
+    use_ai_mode(client)  # hints belong to the TDD + AI mode
     response = client.post(
         "/assignments/2/submit",
         json={"code": INCORRECT_ASSIGNMENT_2, "use_ai_tutor": True},
@@ -663,6 +664,7 @@ def test_tutor_question_rate_limit_returns_retry_guidance(tmp_path):
 
 
 def test_ai_tutoring_is_opt_in_for_fast_default_grading(client):
+    use_ai_mode(client)  # hints belong to the TDD + AI mode
     response = client.post(
         "/assignments/2/submit",
         json={"code": INCORRECT_ASSIGNMENT_2},

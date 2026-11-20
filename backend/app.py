@@ -877,11 +877,17 @@ def create_app(
         assignment: Assignment,
         submission: Submission,
         tutor_feedback=None,
+        *,
+        demo: bool = False,
     ) -> dict:
         evidence = submission.evidence
         tests = evidence.get("tests", [])
         mode = submission.feedback_mode or "tdd"
-        if tutor_feedback is None and not submission.passed and allows_hints(mode):
+        if (
+            tutor_feedback is None
+            and not submission.passed
+            and allows_hints(mode, demo=demo)
+        ):
             # Offer the first built-in hint without making an AI request or
             # recording a hint request the student did not initiate.
             tutor_feedback = TutorService(application.state.settings).feedback(
@@ -907,7 +913,9 @@ def create_app(
             error_frames=evidence.get("error_frames", []),
             tutor_feedback=tutor_feedback,
         )
-        return shape_submission_response(response.model_dump(by_alias=True), mode)
+        return shape_submission_response(
+            response.model_dump(by_alias=True), mode, demo=demo
+        )
 
     @application.get("/health")
     def health():
@@ -1828,7 +1836,9 @@ def create_app(
             submission=submission,
             ai_tutor_requested=body.use_ai_tutor,
         )
-        return response_for(assignment, submission)
+        return response_for(
+            assignment, submission, demo=is_ephemeral_demo(request, user)
+        )
 
     @application.post(
         "/assignments/{assignment_id}/simulate", response_model=SimulationResponse
@@ -2018,7 +2028,10 @@ def create_app(
         if (
             body.use_ai_tutor
             and not result.passed
-            and allows_hints(submission.feedback_mode or "tdd")
+            and allows_hints(
+                submission.feedback_mode or "tdd",
+                demo=is_ephemeral_demo(request, user),
+            )
         ):
             access = ai_access(
                 request.app.state.settings, session, assignment, user,
@@ -2046,7 +2059,10 @@ def create_app(
             submission=submission,
             ai_tutor_requested=body.use_ai_tutor,
         )
-        return response_for(assignment, submission, tutor_feedback)
+        return response_for(
+            assignment, submission, tutor_feedback,
+            demo=is_ephemeral_demo(request, user),
+        )
 
     @application.post("/assignments/{assignment_id}/submit")
     def submit_assignment(
@@ -2094,7 +2110,10 @@ def create_app(
             raise HTTPException(404, "Submission not found.")
         if submission.student_id != user.login_id:
             raise HTTPException(404, "Submission not found.")
-        if not allows_hints(submission.feedback_mode or "tdd"):
+        if not allows_hints(
+            submission.feedback_mode or "tdd",
+            demo=is_ephemeral_demo(request, user),
+        ):
             raise HTTPException(403, NO_HINTS_MESSAGE)
         access = ai_access(
             request.app.state.settings, session, assignment, user,

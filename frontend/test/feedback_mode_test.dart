@@ -20,8 +20,9 @@ UnittestFeedbackDto result(String mode) => UnittestFeedbackDto(
       codeExecResult: '',
       codeOutput: '',
       execSuccess: true,
-      hint: mode == 'traditional' ? '' : 'Check the stop distance.',
-      tutorSource: mode == 'traditional' ? '' : 'fallback',
+      // Only TDD + AI replies carry a hint; the server blanks it otherwise.
+      hint: mode == 'tdd_ai' ? 'Check the stop distance.' : '',
+      tutorSource: mode == 'tdd_ai' ? 'fallback' : '',
       feedbackMode: mode,
     );
 
@@ -105,13 +106,21 @@ void main() {
     expect(texts, isNot(contains('(no printed output)')));
   });
 
-  testWidgets('TDD results keep test details and the built-in hint', (
+  testWidgets('TDD results keep test details without a hint', (
     tester,
   ) async {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(body: app.Feedback(data: result('tdd'))),
     ));
     expect(find.textContaining('Test details'), findsOneWidget);
+    expect(find.byKey(const Key('guided-hint')), findsNothing);
+    expect(FeedbackMode.tdd.allowsHints, isFalse);
+  });
+
+  testWidgets('TDD + AI results show the hint', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: app.Feedback(data: result('tdd_ai'))),
+    ));
     expect(find.byKey(const Key('guided-hint')), findsOneWidget);
   });
 

@@ -7,11 +7,14 @@ never the only barrier. Grading is identical in every mode.
 traditional  Knowledge of results: score, pass state, and how many checks
              passed. Build and runtime errors at the student's own line stay
              visible so a broken node is not a dead end.
-tdd          Rule-based elaborated feedback: check names and messages, the
-             program's printed output, built-in hints, and the simulation.
-tdd_ai       Everything in tdd plus the AI tutor (still gated by ai_policy).
+tdd          Test-based feedback: check names and messages, the program's
+             printed output, and the simulation. No hints (see
+             TDD_BUILT_IN_HINTS).
+tdd_ai       Everything in tdd plus hints: the AI tutor (still gated by
+             ai_policy) with the built-in hint ladder as its fallback.
 
-Instructors always see tdd_ai, and the public demo is always tdd.
+Instructors always see tdd_ai. The public demo is tdd but keeps the built-in
+hints, because it is a showcase, not a study condition.
 """
 from __future__ import annotations
 
@@ -30,6 +33,11 @@ NO_TUTOR_MESSAGE = "The tutor is not part of this account's feedback."
 NO_SIMULATION_MESSAGE = "The simulation is not part of this account's feedback."
 MODE_WITHOUT_AI = "Not part of this account's feedback. Built-in hints still work."
 
+# Owner decision (2026-11-20): the tdd condition gives test feedback only, so
+# each mode adds one feedback level (score -> test details -> hints). The
+# built-in hint code is kept; set this to True to give tdd its hints back.
+TDD_BUILT_IN_HINTS = False
+
 
 def feedback_mode_for(user: User, *, demo: bool = False) -> str:
     """The mode that governs this request; unknown values fall back to tdd."""
@@ -41,8 +49,10 @@ def feedback_mode_for(user: User, *, demo: bool = False) -> str:
     return mode if mode in FEEDBACK_MODES else DEFAULT_FEEDBACK_MODE
 
 
-def allows_hints(mode: str) -> bool:
-    return mode != TRADITIONAL
+def allows_hints(mode: str, *, demo: bool = False) -> bool:
+    if demo or mode == TDD_AI:
+        return True
+    return mode == TDD and TDD_BUILT_IN_HINTS
 
 
 def allows_simulation(mode: str) -> bool:
@@ -53,9 +63,13 @@ def allows_ai(mode: str) -> bool:
     return mode == TDD_AI
 
 
-def shape_submission_response(payload: dict[str, Any], mode: str) -> dict[str, Any]:
+def shape_submission_response(
+    payload: dict[str, Any], mode: str, *, demo: bool = False
+) -> dict[str, Any]:
     """Remove the feedback a mode does not include from a run/submit response."""
     shaped = {**payload, "feedback_mode": mode}
+    if not allows_hints(mode, demo=demo):
+        shaped.update({"hint": "", "tutor_feedback": None})
     if mode != TRADITIONAL:
         return shaped
     passes = list(payload.get("unittest_pass_results") or [])

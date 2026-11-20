@@ -102,18 +102,17 @@ def test_traditional_gets_only_knowledge_of_results(app_client, accounts):
     assert simulate.status_code == 403
 
 
-def test_tdd_gets_check_feedback_and_built_in_hints_but_no_tutor(app_client, accounts):
+def test_tdd_gets_check_feedback_but_no_hints_or_tutor(app_client, accounts):
     _, client = app_client
     result = run_starter(client, accounts["tdd"])
     assert result["feedback_mode"] == "tdd"
     assert any(result["unittest_results"]) and result["evidence"]
-    assert result["hint"]
-    assert result["tutor_feedback"]["source"] == "fallback"
+    assert result["hint"] == "" and result["tutor_feedback"] is None
     hint = client.post(
         "/assignments/1/hint", headers=bearer(accounts["tdd"]),
         json={"submission_id": result["submission_id"], "hint_level": 2, "use_ai_tutor": True},
     )
-    assert hint.status_code == 200 and hint.json()["source"] == "fallback"
+    assert hint.status_code == 403
     tutor = client.post(
         "/assignments/1/tutor", headers=bearer(accounts["tdd"]),
         json={"submission_id": result["submission_id"], "question": "Why?", "hint_level": 1},
@@ -121,10 +120,26 @@ def test_tdd_gets_check_feedback_and_built_in_hints_but_no_tutor(app_client, acc
     assert tutor.status_code == 403
 
 
+def test_tdd_hints_come_back_when_the_switch_is_on(app_client, accounts, monkeypatch):
+    import feedback_modes
+
+    monkeypatch.setattr(feedback_modes, "TDD_BUILT_IN_HINTS", True)
+    _, client = app_client
+    result = run_starter(client, accounts["tdd"])
+    assert result["hint"] and result["tutor_feedback"]["source"] == "fallback"
+    hint = client.post(
+        "/assignments/1/hint", headers=bearer(accounts["tdd"]),
+        json={"submission_id": result["submission_id"], "hint_level": 2},
+    )
+    assert hint.status_code == 200 and hint.json()["source"] == "fallback"
+
+
 def test_ai_mode_may_ask_the_tutor(app_client, accounts):
     _, client = app_client
     result = run_starter(client, accounts["ai"])
     assert result["feedback_mode"] == "tdd_ai" and result["evidence"]
+    # The built-in hint ladder is the AI mode's fallback.
+    assert result["hint"] and result["tutor_feedback"]["source"] == "fallback"
     tutor = client.post(
         "/assignments/1/tutor", headers=bearer(accounts["ai"]),
         json={"submission_id": result["submission_id"], "question": "Why does it fail?", "hint_level": 1},
@@ -206,4 +221,6 @@ def test_demo_is_tdd_and_instructors_see_everything():
     assert feedback_mode_for(student, demo=True) == "tdd"
     assert feedback_mode_for(teacher) == "tdd_ai"
     assert feedback_mode_for(User(login_id="u", password_hash="x", role="student", feedback_mode="bogus")) == "tdd"
-    assert shape_submission_response({"hint": "h"}, "tdd")["hint"] == "h"
+    assert shape_submission_response({"hint": "h"}, "tdd")["hint"] == ""
+    assert shape_submission_response({"hint": "h"}, "tdd", demo=True)["hint"] == "h"
+    assert shape_submission_response({"hint": "h"}, "tdd_ai")["hint"] == "h"

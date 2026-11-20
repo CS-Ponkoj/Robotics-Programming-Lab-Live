@@ -14,7 +14,10 @@ enum FeedbackMode {
   final String wire;
   final String label;
 
-  bool get allowsHints => this != traditional;
+  /// Hints belong to TDD + AI only (owner decision 2026-11-20). The server
+  /// switch `TDD_BUILT_IN_HINTS` in feedback_modes.py gives TDD its built-in
+  /// hints back; change this getter with it.
+  bool get allowsHints => this == tddAi;
   bool get allowsSimulation => this != traditional;
   bool get allowsAi => this == tddAi;
 

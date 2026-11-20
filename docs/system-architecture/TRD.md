@@ -92,9 +92,11 @@ flowchart TD
     SCORE --> SAVE[(Submission<br/>with assignment_version<br/>+ feedback_mode)]
     SAVE --> MODE{Account's feedback mode}
     MODE -->|Traditional| RT1[Score, pass, counts,<br/>error at the student's line]
-    MODE -->|TDD / TDD + AI| RT2[Checks, messages, output,<br/>built-in hint]
+    MODE -->|TDD| RT2[Checks, messages, output]
+    MODE -->|TDD + AI| RT3[Checks, messages, output,<br/>hint ladder]
     RT1 --> RESP[Response — never hidden values]
     RT2 --> RESP
+    RT3 --> RESP
 ```
 
 **Execution outcomes** (`execution_status`): `completed` · `syntax_error` ·

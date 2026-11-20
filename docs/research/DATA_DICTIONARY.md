@@ -297,8 +297,8 @@ grading is identical in all three.
 | Value | Label | What the student receives |
 |---|---|---|
 | `traditional` | Traditional | Score, pass state, and how many checks passed. Build and runtime errors at the student's own line still show. No check names or messages, printed output, hints, tutor, or simulation |
-| `tdd` | TDD | Everything above plus check names and messages, printed output, the built-in hint ladder, and the simulation replay. No tutor questions or AI |
-| `tdd_ai` | TDD + AI | Everything in `tdd` plus the AI tutor and Ask the tutor, still subject to the AI policy gates |
+| `tdd` | TDD | Everything above plus check names and messages, printed output, and the simulation replay. No hints (since 2026-11-20; the server switch `TDD_BUILT_IN_HINTS` restores the built-in hint ladder), no tutor questions or AI. The public demo is `tdd` but keeps built-in hints |
+| `tdd_ai` | TDD + AI | Everything in `tdd` plus hints: the AI tutor and Ask the tutor, still subject to the AI policy gates, with the built-in hint ladder as the fallback |
 
 Each change is an append-only `student.feedback_mode_changed` audit event with
 the previous and new mode, the instructor, and the time. Research exports carry
