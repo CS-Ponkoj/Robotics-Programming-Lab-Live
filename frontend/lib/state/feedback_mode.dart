@@ -18,7 +18,9 @@ enum FeedbackMode {
   /// switch `TDD_BUILT_IN_HINTS` in feedback_modes.py gives TDD its built-in
   /// hints back; change this getter with it.
   bool get allowsHints => this == tddAi;
-  bool get allowsSimulation => this != traditional;
+  /// Every mode gets the replay; Traditional's has no beam probe or links
+  /// from failed checks (server-trimmed).
+  bool get allowsSimulation => true;
   bool get allowsAi => this == tddAi;
 
   static FeedbackMode fromWire(String? value) => FeedbackMode.values.firstWhere(

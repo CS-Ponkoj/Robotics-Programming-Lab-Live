@@ -6,9 +6,12 @@ never the only barrier. Grading is identical in every mode.
 
 traditional  Knowledge of results: score, pass state, and how many checks
              passed. Build and runtime errors at the student's own line stay
-             visible so a broken node is not a dead end.
+             visible so a broken node is not a dead end. The plain simulation
+             replay is part of the lab for every mode (owner decision
+             2026-11-20); its diagnostic parts (beam probe, printed output,
+             links from failed checks) are not.
 tdd          Test-based feedback: check names and messages, the program's
-             printed output, and the simulation. No hints (see
+             printed output, and the full simulation. No hints (see
              TDD_BUILT_IN_HINTS).
 tdd_ai       Everything in tdd plus hints: the AI tutor (still gated by
              ai_policy) with the built-in hint ladder as its fallback.
@@ -56,7 +59,20 @@ def allows_hints(mode: str, *, demo: bool = False) -> bool:
 
 
 def allows_simulation(mode: str) -> bool:
-    return mode != TRADITIONAL
+    return mode in FEEDBACK_MODES
+
+
+def shape_simulation_response(payload: dict[str, Any], mode: str) -> dict[str, Any]:
+    """Traditional sees the plain replay, not the beam probe or printed output."""
+    if mode != TRADITIONAL:
+        return payload
+    shaped = {**payload, "output": ""}
+    replay = shaped.get("simulation")
+    if isinstance(replay, dict):
+        shaped["simulation"] = {
+            key: value for key, value in replay.items() if key != "sensitivity"
+        }
+    return shaped
 
 
 def allows_ai(mode: str) -> bool:

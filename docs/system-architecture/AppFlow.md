@@ -196,9 +196,9 @@ flowchart TD
 ```mermaid
 flowchart LR
     I([Instructor]) -->|Accounts page| M[Student's feedback mode]
-    M --> T[Traditional<br/>score + counts]
-    M --> D[TDD<br/>details, hints, simulation]
-    M --> A[TDD + AI<br/>TDD + AI tutor]
+    M --> T[Traditional<br/>score + counts,<br/>plain replay]
+    M --> D[TDD<br/>details, full simulation]
+    M --> A[TDD + AI<br/>TDD + hints, AI tutor]
     T & D & A --> G[Same grader, same score]
     G --> R[(Attempt saved with<br/>its feedback mode)]
 ```

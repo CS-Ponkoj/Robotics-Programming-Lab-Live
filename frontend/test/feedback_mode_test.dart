@@ -36,7 +36,7 @@ void main() {
     expect(FeedbackMode.fromWire('traditional'), FeedbackMode.traditional);
     expect(FeedbackMode.fromWire('tdd_ai'), FeedbackMode.tddAi);
     expect(FeedbackMode.fromWire('bogus'), FeedbackMode.tdd);
-    expect(FeedbackMode.traditional.allowsSimulation, isFalse);
+    expect(FeedbackMode.traditional.allowsSimulation, isTrue);
     expect(FeedbackMode.tdd.allowsAi, isFalse);
     expect(FeedbackMode.tddAi.allowsAi, isTrue);
     expect(

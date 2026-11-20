@@ -49,9 +49,9 @@ the TDD feedback mode (green theme).
   simplified Vector Field Histogram, and two ROS 2 exercises) stay under
   **Old assignments**.
 - **Three feedback modes,** set per student on the Accounts page and enforced
-  by the server: **Traditional** (score and number of checks passed),
-  **TDD** (check names and messages, printed output, the simulation; no
-  hints) and **TDD + AI** (TDD plus hints: the AI tutor with the built-in
+  by the server: **Traditional** (score, number of checks passed, and the
+  plain simulation replay), **TDD** (check names and messages, printed
+  output, the full simulation; no hints) and **TDD + AI** (TDD plus hints: the AI tutor with the built-in
   hint ladder as its fallback). Grading is identical
   in every mode, every attempt records its mode, and each mode has its own
   gradient theme (blue, green, bronze; instructors keep teal).

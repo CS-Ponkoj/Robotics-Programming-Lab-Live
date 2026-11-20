@@ -6,7 +6,11 @@ from sqlalchemy import select
 
 from app import create_app
 from config import Settings
-from feedback_modes import feedback_mode_for, shape_submission_response
+from feedback_modes import (
+    feedback_mode_for,
+    shape_simulation_response,
+    shape_submission_response,
+)
 from models import AuditEvent, HintInteraction, LearningEvent, Submission, User
 
 PASSWORD = "Study-Password-4827"
@@ -99,7 +103,8 @@ def test_traditional_gets_only_knowledge_of_results(app_client, accounts):
         "/assignments/7/simulate", headers=bearer(accounts["traditional"]),
         json={"code": "x = 1", "use_ai_tutor": False},
     )
-    assert simulate.status_code == 403
+    # The plain replay is part of the lab for every mode.
+    assert simulate.status_code != 403
 
 
 def test_tdd_gets_check_feedback_but_no_hints_or_tutor(app_client, accounts):
@@ -224,3 +229,14 @@ def test_demo_is_tdd_and_instructors_see_everything():
     assert shape_submission_response({"hint": "h"}, "tdd")["hint"] == ""
     assert shape_submission_response({"hint": "h"}, "tdd", demo=True)["hint"] == "h"
     assert shape_submission_response({"hint": "h"}, "tdd_ai")["hint"] == "h"
+
+
+def test_traditional_simulation_is_the_plain_replay():
+    reply = {
+        "success": True, "error": "", "output": "printed",
+        "simulation": {"frames": [1], "sensitivity": {"status": "ok", "beams": [3]}},
+    }
+    plain = shape_simulation_response(reply, "traditional")
+    assert plain["output"] == "" and plain["simulation"] == {"frames": [1]}
+    assert shape_simulation_response(reply, "tdd") == reply
+    assert reply["simulation"]["sensitivity"]  # the input is not changed

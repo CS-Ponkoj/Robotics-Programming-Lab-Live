@@ -136,6 +136,7 @@ from feedback_modes import (
     allows_hints,
     allows_simulation,
     feedback_mode_for,
+    shape_simulation_response,
     shape_submission_response,
 )
 from assignment_insights import assignment_insights
@@ -1858,9 +1859,8 @@ def create_app(
             requests_per_minute=request.app.state.settings.execution_requests_per_minute,
         )
         require_code(body, request)
-        if not allows_simulation(
-            feedback_mode_for(user, demo=is_ephemeral_demo(request, user))
-        ):
+        mode = feedback_mode_for(user, demo=is_ephemeral_demo(request, user))
+        if not allows_simulation(mode):
             raise HTTPException(403, NO_SIMULATION_MESSAGE)
         assignment = get_assignment_or_404(session, assignment_id)
         world = simulation_world(assignment)
@@ -1892,7 +1892,7 @@ def create_app(
                     "duration_seconds": replay["duration_seconds"] if replay else 0.0,
                 },
             )
-        return result
+        return shape_simulation_response(result, mode)
 
     def playground_input_error(problems: list[dict], error_type: str) -> JSONResponse:
         """Use the API's standard validation shape; parameter_index is additive."""
