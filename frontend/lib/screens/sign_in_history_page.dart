@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/services/auth_api.dart';
@@ -89,6 +90,7 @@ class _SignInHistoryPageState extends State<SignInHistoryPage> {
     final pages = (_total / _pageSize).ceil();
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
         title: Text('${widget.loginId}: sign-ins'),
         actions: [
           IconButton(

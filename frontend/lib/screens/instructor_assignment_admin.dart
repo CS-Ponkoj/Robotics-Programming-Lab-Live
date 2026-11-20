@@ -68,7 +68,9 @@ class InstructorAssignmentAdmin extends StatelessWidget {
       ),
     ];
     return Scaffold(
-      appBar: AppBar(title: const Text('Instructor Studio')),
+      appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
+        title: const Text('Instructor Studio')),
       body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
@@ -246,6 +248,7 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
 
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
         title: const Text('Assignment management'),
       ),
       body: ScrollableCenter(
@@ -801,6 +804,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
 
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
         title: Text(_saved?['title']?.toString() ?? 'New assignment'),
         actions: MediaQuery.sizeOf(context).width < 600
             // Phones keep the title readable with icon-only actions.
@@ -828,6 +832,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                 FilledButton.icon(
                   onPressed: _busy != null ? null : _publish,
                   style: FilledButton.styleFrom(
+                    backgroundBuilder: plainButtonBackground,
                     backgroundColor: Colors.white,
                     foregroundColor: AppColors.brandDark,
                     minimumSize: const Size(0, 40),

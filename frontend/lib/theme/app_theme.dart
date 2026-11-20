@@ -9,12 +9,19 @@ class BrandPalette {
     required this.dark,
     required this.deep,
     required this.tint,
+    required this.gradientStart,
+    required this.gradientEnd,
   });
 
   final Color brand;
   final Color dark;
   final Color deep;
   final Color tint;
+
+  /// Headers and main buttons run from [gradientStart] to [gradientEnd].
+  /// Both keep white text at 4.5:1 contrast or better.
+  final Color gradientStart;
+  final Color gradientEnd;
 }
 
 /// Instructors keep the original teal; each student feedback mode has its
@@ -25,25 +32,33 @@ abstract final class BrandPalettes {
     dark: Color(0xFF0F4C5C),
     deep: Color(0xFF0A3742),
     tint: Color(0xFFDDEFF2),
+    gradientStart: Color(0xFF0F4C5C), // white text 9.5:1
+    gradientEnd: Color(0xFF1A7F8E), // 4.7:1
   );
   static const traditional = BrandPalette(
     brand: Color(0xFF2F5FA7),
     dark: Color(0xFF1F4277),
     deep: Color(0xFF132A4D),
     tint: Color(0xFFDFE8F5),
+    gradientStart: Color(0xFF1F4277), // 10.0:1
+    gradientEnd: Color(0xFF3567B5), // 5.6:1
   );
   static const tdd = BrandPalette(
     brand: Color(0xFF2E7D4F),
     dark: Color(0xFF1E5A37),
     deep: Color(0xFF123B24),
     tint: Color(0xFFDFF0E5),
+    gradientStart: Color(0xFF1E5A37), // 8.2:1
+    gradientEnd: Color(0xFF2F8554), // 4.6:1
   );
-  // Gold (dark goldenrod), chosen by the owner; white text is 3.25:1 on it.
+  // Bronze, between gold and copper.
   static const tddAi = BrandPalette(
-    brand: Color(0xFFB8860B),
-    dark: Color(0xFF946C08),
-    deep: Color(0xFF5E4505),
-    tint: Color(0xFFFBF0D2),
+    brand: Color(0xFFA8661A),
+    dark: Color(0xFF8A4B12),
+    deep: Color(0xFF5C300A),
+    tint: Color(0xFFF7E9D7),
+    gradientStart: Color(0xFF7A3F0E), // 8.3:1
+    gradientEnd: Color(0xFFA8661A), // 4.6:1
   );
 
   /// Signed out and instructors use the original teal.
@@ -71,6 +86,13 @@ abstract final class AppColors {
   static Color get brandDeep => _palette.deep;
   // Tint for selected and brand-highlight surfaces.
   static Color get brandTint => _palette.tint;
+
+  /// The account's header and main-button gradient, left to right.
+  static LinearGradient get brandGradient => LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [_palette.gradientStart, _palette.gradientEnd],
+      );
   // Cool grey page so white cards stand out from it.
   static const pageBackground = Color(0xFFEDF1F5);
   static const ink = Color(0xFF16222E);
@@ -93,6 +115,29 @@ abstract final class AppColors {
   static const practiceSurface = Color(0xFFFFF5E6);
   static const insightSurface = Color(0xFFF5F2FC);
 }
+
+/// Fills an app bar with the account's brand gradient.
+class BrandHeaderGradient extends StatelessWidget {
+  const BrandHeaderGradient({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Depending on the theme rebuilds this when the account's palette changes.
+    Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(gradient: AppColors.brandGradient),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+/// Keeps a button's own flat colour (tonal and custom-coloured buttons).
+Widget plainButtonBackground(
+  BuildContext context,
+  Set<WidgetState> states,
+  Widget? child,
+) =>
+    child ?? const SizedBox.shrink();
 
 /// A plain page behind the work, so white cards read as separate layers.
 class LearningBackdrop extends StatelessWidget {
@@ -347,6 +392,20 @@ ThemeData buildAppTheme() {
           borderRadius: BorderRadius.circular(AppRadii.sm),
         ),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
+      ).copyWith(
+        // Main buttons use the brand gradient; disabled ones stay flat grey.
+        backgroundBuilder: (context, states, child) {
+          if (states.contains(WidgetState.disabled)) {
+            return child ?? const SizedBox.shrink();
+          }
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: AppColors.brandGradient,
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+            ),
+            child: child,
+          );
+        },
       ),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(

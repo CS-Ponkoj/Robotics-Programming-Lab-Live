@@ -32,7 +32,9 @@ class _StudentResearchPageState extends State<StudentResearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My study progress')),
+      appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
+        title: const Text('My study progress')),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _data,
         builder: (context, snapshot) {
@@ -152,6 +154,7 @@ class _InstructorResearchDashboardState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
         title: const Text('Research study dashboard'),
         actions: [
           PopupMenuButton<String>(
@@ -398,7 +401,9 @@ class _ResearchStudentDetailPageState extends State<ResearchStudentDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Participant detail')),
+      appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
+        title: const Text('Participant detail')),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _data,
         builder: (context, snapshot) {
@@ -1073,7 +1078,9 @@ class _ResearchError extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           const Text('Study data is temporarily unavailable.'),
           const SizedBox(height: AppSpacing.sm),
-          FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
+          FilledButton.tonal(
+            style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
+            onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );

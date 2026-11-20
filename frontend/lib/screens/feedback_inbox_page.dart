@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/services/feedback_api.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
 
@@ -85,6 +86,7 @@ class _FeedbackInboxPageState extends State<FeedbackInboxPage> {
     final pages = (_total / _pageSize).ceil();
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
         title: const Text('Feedback'),
         actions: [
           IconButton(

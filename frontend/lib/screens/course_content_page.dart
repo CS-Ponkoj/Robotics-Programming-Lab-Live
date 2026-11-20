@@ -932,7 +932,8 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
       );
       return forward
           ? FilledButton.tonalIcon(
-              key: const Key('next-section'),
+            style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
+            key: const Key('next-section'),
               onPressed: () => widget.onOpen(section),
               icon: const Icon(Icons.arrow_forward_rounded),
               iconAlignment: IconAlignment.end,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/services/feedback_api.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 
@@ -215,6 +216,7 @@ class _FeedbackDialogState extends State<FeedbackDialog> {
       return Dialog.fullscreen(
         child: Scaffold(
           appBar: AppBar(
+            flexibleSpace: const BrandHeaderGradient(),
             leading: IconButton(
               tooltip: 'Cancel',
               onPressed: _sending ? null : () => Navigator.of(context).pop(),

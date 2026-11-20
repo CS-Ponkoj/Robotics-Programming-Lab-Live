@@ -835,6 +835,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
     );
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
         title: const Text('Account management'),
       ),
       body: Center(

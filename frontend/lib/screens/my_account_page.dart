@@ -124,7 +124,9 @@ class _MyAccountPageState extends State<MyAccountPage> {
         );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My account')),
+      appBar: AppBar(
+        flexibleSpace: const BrandHeaderGradient(),
+        title: const Text('My account')),
       body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),

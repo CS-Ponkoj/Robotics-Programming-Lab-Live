@@ -2196,6 +2196,7 @@ class _SolutionSection extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 FilledButton.tonalIcon(
+                  style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
                   key: const Key('reveal-solution-button'),
                   onPressed: canReveal ? () => _requestReveal(context) : null,
                   icon: Icon(
@@ -3662,6 +3663,7 @@ class AssignmentPageHeader extends StatelessWidget
     final showFeedbackLabel = MediaQuery.sizeOf(context).width >= 600;
 
     return AppBar(
+      flexibleSpace: const BrandHeaderGradient(),
       toolbarHeight: preferredSize.height,
       automaticallyImplyLeading: false,
       backgroundColor: theme.colorScheme.primary,
@@ -3904,6 +3906,7 @@ class EmptyCodeTestRunState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             FilledButton.tonalIcon(
+              style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
               key: const Key('restore-starter-from-results'),
               onPressed: onRestore,
               icon: const Icon(Icons.restart_alt_rounded),
@@ -5099,6 +5102,7 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
                 style: Theme.of(context).textTheme.labelMedium,
               ),
               FilledButton.tonalIcon(
+                style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
                 key: const Key('next-hint-button'),
                 onPressed:
                     _loading || _hintLevel >= 4 ? null : _requestNextHint,

@@ -34,18 +34,7 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       foregroundColor: Colors.white,
       backgroundColor: Colors.transparent,
-      flexibleSpace: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.brandDark,
-              AppColors.brand,
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-        ),
-      ),
+      flexibleSpace: const BrandHeaderGradient(),
       title: Row(
         children: [
           Container(

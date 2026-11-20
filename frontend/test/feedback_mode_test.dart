@@ -68,6 +68,21 @@ void main() {
     expect(buildAppTheme().colorScheme.primary, BrandPalettes.tdd.brand);
   });
 
+  test('white text stays readable on every gradient stop (4.5:1)', () {
+    double contrast(Color colour) =>
+        1.05 / (colour.computeLuminance() + 0.05);
+    for (final palette in [
+      BrandPalettes.instructor,
+      BrandPalettes.traditional,
+      BrandPalettes.tdd,
+      BrandPalettes.tddAi,
+    ]) {
+      expect(contrast(palette.gradientStart), greaterThanOrEqualTo(4.5));
+      expect(contrast(palette.gradientEnd), greaterThanOrEqualTo(4.5));
+      expect(contrast(palette.brand), greaterThanOrEqualTo(4.5));
+    }
+  });
+
   testWidgets('traditional results show the score and counts only', (
     tester,
   ) async {
