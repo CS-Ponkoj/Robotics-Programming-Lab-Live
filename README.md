@@ -67,7 +67,8 @@ the TDD feedback mode (green theme).
   view of the result.
 - **Course content:** the current topic, ROS 2 for Mobile Robots, prepares
   students for the two ROS 2 assignments with a lesson, copyable code
-  examples, animations that play on request, interactive "Try it" tools,
+  examples, animations that play on their own with a Stop button,
+  interactive "Try it" tools,
   exercises, math practice, and a 15-question quiz. The six earlier topics
   stay available under Old contents. Quizzes are graded on the server and
   stored separately from assignment scores.

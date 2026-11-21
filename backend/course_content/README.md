@@ -22,8 +22,9 @@ Formatting the builder understands, beyond plain Word text:
 - shaded paragraphs in a code font (Consolas, Courier New, ...) become one
   code block; runs in a code font become inline code;
 - a shaded one-cell table whose first line is bold becomes a note box;
-- a GIF becomes an animation that starts as a still image (its first frame,
-  written with Pillow) until the reader presses Play;
+- a GIF becomes an animation that plays on its own with a Stop button; its
+  first frame (written with Pillow) is the still shown when stopped or when
+  the device asks for reduced motion;
 - a paragraph `[interactive:<name>]` places one of the app's "Try it" tools
   (`scan-index`, `twist-path`, `wheel-speeds`);
 - captions start with "Figure" or "Animation".

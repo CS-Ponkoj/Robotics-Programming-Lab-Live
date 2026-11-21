@@ -97,18 +97,36 @@ void main() {
         tester.widget<LessonAnimation>(find.byType(LessonAnimation));
     expect(animation.stillUrl, 'still.png');
     expect(animation.animationUrl, 'moving.gif');
-    expect(find.text('Play animation'), findsOneWidget);
+    // Animations play on their own, with a Stop button always shown.
+    expect(find.text('Stop animation'), findsOneWidget);
     expect(
-        find.bySemanticsLabel(RegExp('A beam sweeps a room. Animation stopped.')),
+        find.bySemanticsLabel(RegExp('A beam sweeps a room. Animation playing.')),
         findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('lesson-animation-toggle')));
     await tester.tap(find.byKey(const Key('lesson-animation-toggle')));
     await tester.pump();
-    expect(find.text('Stop animation'), findsOneWidget);
+    expect(find.text('Play animation'), findsOneWidget);
     expect(
-        find.bySemanticsLabel(RegExp('Animation playing.')), findsOneWidget);
+        find.bySemanticsLabel(RegExp('Animation stopped.')), findsOneWidget);
     await tester.tap(find.byKey(const Key('lesson-animation-toggle')));
     await tester.pump();
+    expect(find.text('Stop animation'), findsOneWidget);
+  });
+
+  testWidgets('animations stay still when the device asks for reduced motion',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+        home: MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: Scaffold(
+                body: LessonAnimation(
+                    stillUrl: 'still.png',
+                    animationUrl: 'moving.gif',
+                    description: 'A beam sweeps a room.')))));
+    await tester.pump();
     expect(find.text('Play animation'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('lesson-animation-toggle')));
+    await tester.pump();
+    expect(find.text('Stop animation'), findsOneWidget);
   });
 }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 
-/// A lesson animation that starts as a still image and plays only when the
-/// reader asks, so moving content can always be stopped (WCAG 2.2.2).
+/// A lesson animation that plays on its own and always offers a Stop button,
+/// so moving content can be stopped (WCAG 2.2.2). Readers whose device asks
+/// for reduced motion see the still image until they press Play.
 class LessonAnimation extends StatefulWidget {
   const LessonAnimation({
     super.key,
@@ -20,18 +21,25 @@ class LessonAnimation extends StatefulWidget {
 }
 
 class _LessonAnimationState extends State<LessonAnimation> {
-  bool _playing = false;
+  /// The reader's own choice; until they press a button, the device setting decides.
+  bool? _chosen;
 
   @override
   Widget build(BuildContext context) {
-    final url = _playing ? widget.animationUrl : widget.stillUrl;
+    final reducedMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final playing = _chosen ?? !reducedMotion;
+    return _frame(playing);
+  }
+
+  Widget _frame(bool playing) {
+    final url = playing ? widget.animationUrl : widget.stillUrl;
     return Column(mainAxisSize: MainAxisSize.min, children: [
       ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720, maxHeight: 460),
         child: Semantics(
           image: true,
           label: '${widget.description} '
-              '${_playing ? 'Animation playing.' : 'Animation stopped.'}',
+              '${playing ? 'Animation playing.' : 'Animation stopped.'}',
           child: ExcludeSemantics(
             child: Image.network(
               url,
@@ -50,9 +58,9 @@ class _LessonAnimationState extends State<LessonAnimation> {
       const SizedBox(height: 8),
       TextButton.icon(
         key: const Key('lesson-animation-toggle'),
-        onPressed: () => setState(() => _playing = !_playing),
-        icon: Icon(_playing ? Icons.stop_rounded : Icons.play_arrow_rounded),
-        label: Text(_playing ? 'Stop animation' : 'Play animation'),
+        onPressed: () => setState(() => _chosen = !playing),
+        icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded),
+        label: Text(playing ? 'Stop animation' : 'Play animation'),
       ),
     ]);
   }
