@@ -104,7 +104,7 @@ def test_bad_commands_are_treated_as_stop():
 def test_assignment_7_world_is_a_valid_ros2_2d_simulation():
     config = SimulationConfig.model_validate(SOURCE["simulation_config"])
     assert config.provider == "ros2_2d" and config.enabled
-    assert SOURCE["version"] == 3
+    assert SOURCE["version"] == 4
     assert "Press <strong>Simulate</strong>" in SOURCE["assignment_html"]
     with pytest.raises(ValidationError):
         SimulationConfig.model_validate({"enabled": True, "provider": "ros2_2d"})
