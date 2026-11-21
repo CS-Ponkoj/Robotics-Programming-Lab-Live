@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
@@ -124,9 +125,9 @@ class _MyAccountPageState extends State<MyAccountPage> {
         );
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
-        title: const Text('My account')),
+        title: const Text('My account'))),
       body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),

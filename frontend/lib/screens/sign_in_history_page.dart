@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:iuse_demo/api_config.dart';
@@ -89,7 +90,7 @@ class _SignInHistoryPageState extends State<SignInHistoryPage> {
     final theme = Theme.of(context);
     final pages = (_total / _pageSize).ceil();
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
         title: Text('${widget.loginId}: sign-ins'),
         actions: [
@@ -99,7 +100,7 @@ class _SignInHistoryPageState extends State<SignInHistoryPage> {
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
-      ),
+      )),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 80),
         children: [

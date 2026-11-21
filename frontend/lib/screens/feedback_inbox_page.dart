@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/services/feedback_api.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
@@ -85,7 +86,7 @@ class _FeedbackInboxPageState extends State<FeedbackInboxPage> {
     final theme = Theme.of(context);
     final pages = (_total / _pageSize).ceil();
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
         title: const Text('Feedback'),
         actions: [
@@ -95,7 +96,7 @@ class _FeedbackInboxPageState extends State<FeedbackInboxPage> {
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
-      ),
+      )),
       body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900),

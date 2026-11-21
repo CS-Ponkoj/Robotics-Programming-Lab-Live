@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
@@ -62,9 +63,9 @@ class _AssignmentInsightsPageState extends State<AssignmentInsightsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
-        title: Text('Insights · ${widget.title}')),
+        title: Text('Insights · ${widget.title}'))),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _insights,
         builder: (context, snap) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/state/feedback_mode.dart';
 import 'package:flutter/services.dart';
 import 'package:iuse_demo/screens/sign_in_history_page.dart';
@@ -834,10 +835,10 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
       ],
     );
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
         title: const Text('Account management'),
-      ),
+      )),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1050),

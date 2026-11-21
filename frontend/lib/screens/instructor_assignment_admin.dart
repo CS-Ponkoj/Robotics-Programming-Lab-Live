@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/screens/ai_tutor_settings_page.dart';
 import 'package:iuse_demo/screens/assignment_insights_page.dart';
 import 'package:iuse_demo/screens/assignment_workspace.dart'
@@ -68,9 +69,9 @@ class InstructorAssignmentAdmin extends StatelessWidget {
       ),
     ];
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
-        title: const Text('Instructor Studio')),
+        title: const Text('Instructor Studio'))),
       body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
@@ -247,10 +248,10 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
         title: const Text('Assignment management'),
-      ),
+      )),
       body: ScrollableCenter(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
@@ -803,7 +804,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
         );
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
         title: Text(_saved?['title']?.toString() ?? 'New assignment'),
         actions: MediaQuery.sizeOf(context).width < 600
@@ -842,7 +843,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                 ),
                 const SizedBox(width: 16),
               ],
-      ),
+      )),
       body: Form(
         key: _formKey,
         child: _withStatusBar(

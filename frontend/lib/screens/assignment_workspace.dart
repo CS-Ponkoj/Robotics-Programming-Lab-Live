@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/state/feedback_mode.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
@@ -3662,16 +3664,16 @@ class AssignmentPageHeader extends StatelessWidget
     final theme = Theme.of(context);
     final showFeedbackLabel = MediaQuery.sizeOf(context).width >= 600;
 
-    return AppBar(
+    return FloatingAppBar(barHeight: 58, AppBar(
       flexibleSpace: const BrandHeaderGradient(),
-      toolbarHeight: preferredSize.height,
+      toolbarHeight: 58,
       automaticallyImplyLeading: false,
       backgroundColor: theme.colorScheme.primary,
       leadingWidth: showFeedbackLabel ? 64 : 48,
       leading: IconButton(
         tooltip: 'Back to assignments',
         onPressed: onBack,
-        icon: const Icon(Icons.arrow_back_rounded),
+        icon: const Icon(LucideIcons.arrowLeft),
       ),
       titleSpacing: 0,
       title: Row(
@@ -3728,7 +3730,7 @@ class AssignmentPageHeader extends StatelessWidget
             style: TextButton.styleFrom(
               foregroundColor: theme.colorScheme.onPrimary,
             ),
-            icon: const Icon(Icons.fact_check_outlined, size: 20),
+            icon: const Icon(LucideIcons.clipboardCheck, size: 19),
             label: const Text('Results'),
           )
         else
@@ -3736,7 +3738,7 @@ class AssignmentPageHeader extends StatelessWidget
             key: const Key('open-results-button'),
             tooltip: 'Open results',
             onPressed: onResultsOpen,
-            icon: const Icon(Icons.fact_check_outlined),
+            icon: const Icon(LucideIcons.clipboardCheck),
           ),
         // On phones Back already returns to the assignment list, so the
         // title keeps the space a duplicate Home icon would take.
@@ -3747,7 +3749,7 @@ class AssignmentPageHeader extends StatelessWidget
             style: TextButton.styleFrom(
               foregroundColor: theme.colorScheme.onPrimary,
             ),
-            icon: const Icon(Icons.home_rounded, size: 20),
+            icon: const Icon(LucideIcons.house, size: 19),
             label: const Text('Home'),
           ),
         const SizedBox(width: AppSpacing.xs),
@@ -3789,7 +3791,7 @@ class AssignmentPageHeader extends StatelessWidget
             ),
           ),
       ],
-    );
+    ));
   }
 }
 

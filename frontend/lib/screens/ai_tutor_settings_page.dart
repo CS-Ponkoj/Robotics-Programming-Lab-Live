@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
@@ -101,9 +102,9 @@ class _AiTutorSettingsPageState extends State<AiTutorSettingsPage> {
     final theme = Theme.of(context);
     final status = _status;
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
-        title: const Text('AI tutor')),
+        title: const Text('AI tutor'))),
       body: _error != null
           ? Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [

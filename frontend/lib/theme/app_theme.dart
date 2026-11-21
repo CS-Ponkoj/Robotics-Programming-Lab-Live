@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:iuse_demo/state/feedback_mode.dart';
 
 /// One account's brand colours: the main colour, darker shades for headers,
@@ -275,6 +276,9 @@ ThemeData buildAppTheme() {
       thickness: 1,
       space: 1,
     ),
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (_) => const Icon(LucideIcons.arrowLeft),
+    ),
     appBarTheme: AppBarTheme(
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -295,7 +299,7 @@ ThemeData buildAppTheme() {
       clipBehavior: Clip.antiAlias,
       margin: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.md),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
         side: const BorderSide(color: AppColors.border),
       ),
     ),

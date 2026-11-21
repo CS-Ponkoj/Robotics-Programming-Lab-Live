@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
@@ -32,9 +33,9 @@ class _StudentResearchPageState extends State<StudentResearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
-        title: const Text('My study progress')),
+        title: const Text('My study progress'))),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _data,
         builder: (context, snapshot) {
@@ -153,7 +154,7 @@ class _InstructorResearchDashboardState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
         title: const Text('Research study dashboard'),
         actions: [
@@ -204,7 +205,7 @@ class _InstructorResearchDashboardState
                 : const Icon(Icons.download_rounded),
           ),
         ],
-      ),
+      )),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _data,
         builder: (context, snapshot) {
@@ -409,9 +410,9 @@ class _ResearchStudentDetailPageState extends State<ResearchStudentDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: FloatingAppBar(AppBar(
         flexibleSpace: const BrandHeaderGradient(),
-        title: const Text('Participant detail')),
+        title: const Text('Participant detail'))),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _data,
         builder: (context, snapshot) {

@@ -14,7 +14,7 @@ class AppSurface extends StatelessWidget {
     this.margin,
     this.borderColor,
     this.color,
-    this.radius = AppRadii.md,
+    this.radius = AppRadii.lg,
     this.elevated = true,
   });
 
@@ -78,7 +78,7 @@ class AppPanel extends StatelessWidget {
       margin: margin,
       padding: EdgeInsets.zero,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadii.md - 1),
+        borderRadius: BorderRadius.circular(AppRadii.lg - 1),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,

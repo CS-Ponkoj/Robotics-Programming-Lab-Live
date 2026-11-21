@@ -6,6 +6,7 @@ import 'package:iuse_demo/screens/my_account_page.dart';
 import 'package:iuse_demo/screens/instructor_assignment_admin.dart';
 import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/floating_app_bar.dart';
 
 /// The home header: a compact, floating, rounded brand card on the page.
 class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -37,28 +38,8 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
         bottom: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(side, 10, side, 8),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: AppColors.brandGradient,
-              borderRadius: BorderRadius.circular(AppRadii.xl),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.brandDeep.withValues(alpha: 0.22),
-                  blurRadius: 22,
-                  offset: const Offset(0, 8),
-                ),
-                const BoxShadow(
-                  color: Color(0x1416222E),
-                  blurRadius: 2,
-                  offset: Offset(0, 1),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadii.xl),
-              child: _bar(context, compact),
-            ),
+          child: FloatingHeaderCard(
+            child: _bar(context, compact),
           ),
         ),
       ),
