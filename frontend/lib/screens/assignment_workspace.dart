@@ -116,8 +116,8 @@ class _MyHomePageState extends State<MyHomePage> {
   // The code the terminal's simulation lines describe, when it shows one.
   String? _terminalSimulatedCode;
   // The square Simulation panel: docked above the instructions or floating.
-  // Its own floating window by default; it can dock above the instructions.
-  SimPanelMode _simMode = SimPanelMode.floating;
+  // Docked above the instructions by default; it can float as its own window.
+  SimPanelMode _simMode = SimPanelMode.docked;
   // Starts collapsed so the empty panel does not cover the instructions;
   // the first Simulate opens it.
   bool _simCollapsed = true;

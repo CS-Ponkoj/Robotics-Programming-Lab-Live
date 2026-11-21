@@ -564,10 +564,11 @@ Treat every submission as hostile input.
   Results overlay and never replaces it; build its lines only from the run
   result and the student's code, never from protected tests.
 - A square Simulation panel (owner-approved 2026-11-17) shows the visual-only
-  robot replay for assignments with a `ros2_2d` simulation. It opens as its
-  own movable, resizable window by default, can dock above the instructions
-  (sharing the column through a draggable divider, picture beside the
-  readings), open full screen, or collapse to a strip of live readings, and is
+  robot replay for assignments with a `ros2_2d` simulation. It is docked
+  above the instructions and minimized by default (owner direction
+  2026-11-21; it shares the column through a draggable divider, picture
+  beside the readings), can pop out as its own movable, resizable window,
+  open full screen, or collapse to a strip of live readings, and is
   its own tab on phones. Its Arena, LiDAR, Charts, and Ranges views and
   telemetry cards draw only the recorded replay and the grader's beam probe
   (which beams the node reacts to). It starts collapsed until the first

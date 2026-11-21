@@ -447,8 +447,22 @@ void main() {
         await tester.pumpAndSettle();
         final panel = find.byKey(const Key('robot-sim-panel'));
         expect(panel, findsOneWidget);
-        // Its own window at the top right, with a drag grip, collapsed to
-        // its header so it does not cover the instructions before a run.
+        // Docked above the instructions by default, minimized to its header.
+        expect(find.byKey(const Key('robot-sim-grip')), findsNothing);
+        expect(
+            tester.getRect(panel).bottom,
+            lessThanOrEqualTo(tester
+                    .getRect(
+                        find.byKey(const Key('assignment-instructions-panel')))
+                    .top +
+                1));
+        expect(find.text('Watch your robot'), findsNothing);
+        await tester.tap(find.byKey(const Key('robot-sim-pop-out')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('robot-sim-collapse')));
+        await tester.pumpAndSettle();
+        // Popped out and minimized: its own window at the top right, with a
+        // drag grip, collapsed to its header.
         expect(find.byKey(const Key('robot-sim-grip')), findsOneWidget);
         expect(tester.getRect(panel).right, closeTo(1400 - 24, 2));
         expect(tester.getSize(panel).height, 48);
@@ -515,6 +529,9 @@ void main() {
       addTearDown(clearProgress);
       await http.runWithClient(() async {
         await tester.pumpWidget(workspace());
+        await tester.pumpAndSettle();
+        // It starts docked; pop it out into its own window first.
+        await tester.tap(find.byKey(const Key('robot-sim-pop-out')));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('simulate-button')));
         await tester.pumpAndSettle();
