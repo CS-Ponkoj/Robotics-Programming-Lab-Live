@@ -217,7 +217,8 @@ def test_assignment_7_starter_and_answer_pass_import_validation():
 def test_assignment_7_explains_the_infinity_rule_and_measured_numbers():
     html = SOURCE["assignment_html"]
     for text in (
-        "This is different from Assignment 6",
+        "This follows the usual ROS convention (REP 117)",
+        "above 0.3 m and at most 1.0 m",
         "between 0.1 and 0.3 m/s",
         "Distances between 0.3 m and 1.0 m are not tested",
         "Each situation lasts 1 second",
