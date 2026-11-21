@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1379,8 +1380,8 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byIcon(Icons.memory_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.admin_panel_settings_outlined), findsNothing);
+    expect(find.byIcon(LucideIcons.cpu), findsOneWidget);
+    expect(find.byIcon(LucideIcons.layoutDashboard), findsNothing);
   });
 
   testWidgets('account menu waits for logout without leaving a popup route', (
@@ -1450,7 +1451,7 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.admin_panel_settings_outlined), findsOneWidget);
+    expect(find.byIcon(LucideIcons.layoutDashboard), findsOneWidget);
     expect(find.text('instructor'), findsOneWidget);
   });
 

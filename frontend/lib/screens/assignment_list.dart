@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/models/assignment_progress.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
@@ -80,23 +81,48 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
     Widget panelChip(
         HomePanel panel, String keyName, IconData icon, String label) {
       final selected = _panel == panel;
-      return ChoiceChip(
-        key: Key(keyName),
+      final color = selected ? Colors.white : AppColors.inkMuted;
+      return Semantics(
         selected: selected,
-        showCheckmark: false,
-        onSelected: (_) => setState(() => _panel = panel),
-        avatar: Icon(icon,
-            size: 18,
-            color: selected
-                ? theme.colorScheme.onPrimary
-                : theme.colorScheme.primary),
-        label: Text(label,
-            style: TextStyle(
-                color: selected
-                    ? theme.colorScheme.onPrimary
-                    : theme.colorScheme.primary)),
-        selectedColor: theme.colorScheme.primary,
-        side: BorderSide.none,
+        button: true,
+        child: Material(
+          key: Key(keyName),
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+            onTap: () => setState(() => _panel = panel),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: selected ? AppColors.brandGradient : null,
+                borderRadius: BorderRadius.circular(AppRadii.pill),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.brandDeep.withValues(alpha: 0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 17, color: color),
+                  const SizedBox(width: 7),
+                  Text(label,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                          color: selected ? Colors.white : AppColors.ink,
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+        ),
       );
     }
 
@@ -106,38 +132,32 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
       onHome: () => setState(() => _panel = HomePanel.assignments),
       body: Column(
         children: [
-          Material(
-            color: theme.colorScheme.surface,
-            shape: const Border(bottom: BorderSide(color: AppColors.border)),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        panelChip(HomePanel.assignments, 'open-assignments',
-                            Icons.code_rounded, 'Assignments'),
-                        panelChip(
-                            HomePanel.oldAssignments,
-                            'open-old-assignments',
-                            Icons.inventory_2_outlined,
-                            'Old assignments'),
-                        panelChip(HomePanel.contents, 'open-course-contents',
-                            Icons.menu_book_rounded, 'Contents'),
-                        panelChip(
-                            HomePanel.oldContents,
-                            'open-old-course-contents',
-                            Icons.auto_stories_outlined,
-                            'Old contents'),
-                      ],
-                    ),
-                  ),
-                ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadii.xl + 4),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: appCardShadow,
+                ),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    panelChip(HomePanel.assignments, 'open-assignments',
+                        LucideIcons.codeXml, 'Assignments'),
+                    panelChip(HomePanel.oldAssignments, 'open-old-assignments',
+                        LucideIcons.archive, 'Old assignments'),
+                    panelChip(HomePanel.contents, 'open-course-contents',
+                        LucideIcons.bookOpen, 'Contents'),
+                    panelChip(HomePanel.oldContents, 'open-old-course-contents',
+                        LucideIcons.libraryBig, 'Old contents'),
+                  ],
+                ),
               ),
             ),
           ),

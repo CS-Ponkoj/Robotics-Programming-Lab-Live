@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iuse_demo/widgets/lesson_reader.dart';
 import 'package:http/http.dart' as http;
@@ -201,7 +202,7 @@ void main() {
     await tester.tap(find.text('Open catalog'));
     await tester.pumpAndSettle();
     expect(find.text('Robotics Programming Lab'), findsOneWidget);
-    expect(find.byIcon(Icons.memory_rounded), findsOneWidget);
+    expect(find.byIcon(LucideIcons.cpu), findsOneWidget);
     expect(find.text('student'), findsOneWidget);
     await tester.tap(find.byKey(const Key('course-home-button')));
     await tester.pumpAndSettle();
