@@ -153,16 +153,21 @@ The older draft is never loaded into the newer workspace automatically.
 
 ```mermaid
 flowchart LR
-    T[Contents tab<br/>current topic<br/>Old contents: 6 earlier topics] --> TP[Topic page<br/>lesson · exercises · quiz · math]
-    TP --> SEC[Section reader]
+    T[Contents tab<br/>current topic<br/>Old contents: 6 earlier topics] --> TP[Topic page<br/>pre-test · lesson · exercises · quiz · math]
+    TP --> PT[Pre-test<br/>opens first until taken]
+    PT -->|POST /contents/topic/pretest/submit<br/>once| PG[Server grades it<br/>score only, no answers]
+    TP --> SEC[Section reader<br/>Show answer on exercises and math]
     TP --> Q[Topic quiz]
     Q -->|POST /contents/topic/quiz/submit| GR[Server grades the whole quiz]
-    GR --> RES[Score + per-question review]
-    GR -->|real student only| DB[(CourseQuizAttempt<br/>with quiz version)]
+    GR --> RES[Score + correct answers + why<br/>first attempt is the quiz score]
+    GR -->|real student only| DB[(CourseQuizAttempt<br/>assessment, version,<br/>answers, feedback mode)]
+    PG -->|real student only| DB
 ```
 
-The answer keys stay in `backend/course_content/quiz_answers.json`. Demo and
-instructor previews are not stored.
+The answer keys stay in `backend/course_content/quiz_answers.json` and the
+explanations in `quiz_explanations.json`; both are sent only after a complete
+quiz submit, and never for the pre-test. Demo and instructor previews are not
+stored.
 
 ## 5. Instructor flows
 

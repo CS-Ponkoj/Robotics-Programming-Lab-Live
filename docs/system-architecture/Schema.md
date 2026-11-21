@@ -31,7 +31,7 @@ flowchart LR
 |---|---|---|
 | **PostgreSQL** | Accounts, sessions, assignments, attempts, drafts, quizzes, research events, feedback | Authoritative |
 | **Assignment JSON** (`backend/assignments/`) | Assignment definitions, including server-only grader config and solutions | Server only |
-| **Course content** (`backend/course_content/`) | Lessons, exercises, `quiz_answers.json` | Lessons public to signed-in users; answer keys server only |
+| **Course content** (`backend/course_content/`) | Lessons, exercises, `quiz_answers.json`, `quiz_explanations.json`, `worked_answers.json` | Lessons public to signed-in users; keys, explanations and worked answers server only until a submit or a Show answer request |
 | **Browser storage** | A cache of the student's own drafts and scores | Untrusted, rebuilt from the server at sign-in |
 | **Demo** | Everything in memory | Discarded on refresh |
 
@@ -102,8 +102,11 @@ erDiagram
         string id PK
         string user_id FK
         string topic_id
+        string assessment "quiz or pretest"
         string quiz_version
         int score_percent
+        string feedback_mode
+        json answers
     }
     STUDY_SESSION {
         string id PK
@@ -165,7 +168,7 @@ erDiagram
 | | `submissions` | One graded run or submit, with the feedback mode it ran under | Run / Submit |
 | | `hint_interactions` | One hint shown for a submission | Get a hint |
 | | `code_drafts` | Latest draft per user + assignment + version | Autosave |
-| | `course_quiz_attempts` | One whole-quiz attempt | Quiz submit |
+| | `course_quiz_attempts` | One whole-quiz or pre-test attempt, with its answers | Quiz or pre-test submit |
 | 🔬 **Research** | `study_sessions` | One active browser study session | Research tracker |
 | | `learning_events` | One allow-listed event (append-only) | Research tracker, server |
 | | `assignment_activities` | Active time and completion per assignment version | Heartbeats, grading |

@@ -59,7 +59,7 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 |---|---|---|---|
 | F1 | Sign-in with login ID and password | ✅ | Server sessions last 12 h. A sign-in that has expired shows a "Please sign in again" dialog |
 | F2 | Student demo (memory-only) | ✅ | Server-issued temporary session. It writes no auth, submission, hint, audit or research rows |
-| F3 | Course contents: lessons, exercises, quizzes | ✅ | ROS 2 for Mobile Robots, plus 6 earlier topics under Old contents. Whole quizzes are graded on the server |
+| F3 | Course contents: lessons, exercises, quizzes | ✅ | ROS 2 for Mobile Robots (pre-test, lesson, exercises, math, quiz), plus 6 earlier topics under Old contents. Whole quizzes are graded on the server; the first attempt is the quiz score and the pre-test is one attempt |
 | F4 | Assignment list with progress | ✅ | Best and latest score, attempt count, restored from the server at sign-in |
 | F5 | Assignment workspace: instructions, editor, terminal, results | ✅ | See [UI_Spec](UI_Spec.md) |
 | F6 | Run tests (graded, saved) | ✅ | Python sandbox or ROS 2 container |

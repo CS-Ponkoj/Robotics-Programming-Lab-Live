@@ -41,7 +41,7 @@ tell apart from what is already live.
 flowchart LR
     subgraph Done[✅ Live now]
         A1[2 current ROS 2 assignments<br/>7 and 8, shown as 1 and 2<br/>+ 6 old assignments]
-        A2[Course contents<br/>6 topics + quizzes]
+        A2[Course contents<br/>ROS 2 topic: pre-test, lesson,<br/>exercises, math, quiz<br/>+ 6 old topics]
         A3[Workspace: editor, terminal,<br/>results, hints, 2D simulation]
         A4[Instructor Studio<br/>+ research dashboard + insights]
         A5[Self-hosted on the lab PC<br/>Cloudflare Tunnel]

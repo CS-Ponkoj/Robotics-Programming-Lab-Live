@@ -69,10 +69,12 @@ the TDD feedback mode (green theme).
   students for the two ROS 2 assignments with a lesson, copyable code
   examples, animations that play on their own with a Stop button,
   interactive "Try it" tools,
-  exercises and math practice with worked answers shown on request, and a
-  15-question quiz. The six earlier topics stay available under Old contents.
-  Quizzes are graded on the server and stored separately from assignment
-  scores; after a submit, each question shows its correct answer.
+  exercises and math practice with worked answers shown on request, a
+  one-attempt 15-question pre-test before the lesson, and a 15-question quiz.
+  The six earlier topics stay available under Old contents. Quizzes are graded
+  on the server and stored separately from assignment scores; the first
+  submitted attempt is the quiz score, later attempts are practice, and after
+  a submit each question shows its correct answer.
 - **Instructor Studio:** assignment management and publishing, account management with feedback modes and per-account sign-in history,
   assignment-version analytics, data-health checks, and CSV/Excel research
   exports that use participant codes instead of login IDs.

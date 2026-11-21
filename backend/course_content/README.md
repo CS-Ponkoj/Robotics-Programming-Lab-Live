@@ -37,3 +37,9 @@ Formatting the builder understands, beyond plain Word text:
 
 Topics listed in `OLD_TOPICS` in the builder are flagged `old` in
 `catalog.json`, and the app shows them under Old contents.
+
+A `pretest.docx` in a topic folder, in the same format as `quiz.docx`, becomes
+the topic's Pre-test section. Its key is stored in `quiz_answers.json` under
+`<topic>/pretest`; the app grades it once per student and never shows its
+answers. Pre-test question k should test the same concept as quiz question k
+with different wording or values, so the pre-test does not rehearse the quiz.

@@ -55,8 +55,12 @@ functionality and must never depend on OpenAI.
 - Derive student identity from the authenticated server session. Never trust a
   client-supplied student ID for ownership or authorization.
 - Grade complete course quizzes on the server. Store student scores with the
-  exact quiz version, separately from coding-assignment scores. Demo and
-  instructor previews must not create persistent quiz-attempt records.
+  exact quiz version, each answer, and the feedback mode, separately from
+  coding-assignment scores. A topic's quiz score is its first submitted
+  attempt; retakes are practice. Correct answers are shown only after a
+  complete submit. A topic pre-test is one attempt, taken before the lesson,
+  and shows only its score. Demo and instructor previews must not create
+  persistent quiz or pre-test records.
 - Keep student and instructor capabilities separated and tested.
 - Preserve local development and production deployment from the same source
   code. Environment values may differ; application logic must not be forked.
@@ -119,6 +123,7 @@ backend/                          FastAPI application
   auth_service.py                 Authentication and password/session behavior
   assignment_repository.py       Assignment loading and persistence
   course_content_repository.py   Student-safe course-page and whole-quiz grading
+  course_assessments.py          Pre-test, first-attempt quiz score, gain (research)
   course_content/                Generated lessons and server-only quiz keys
   graders/                        Modular AssignmentGrader implementations
   sandbox.py                      Sandbox client and execution policies

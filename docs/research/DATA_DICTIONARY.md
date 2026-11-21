@@ -326,11 +326,20 @@ never counted.
 
 ### `course_quiz_attempts`
 
-One row stores the score for one complete course-quiz submission by a
-persistent student account. The server grades every quiz against the
-server-only answer key in `backend/course_content/quiz_answers.json`; the
-browser never receives the correct answers. Quiz scores are kept separate from
-coding-assignment `submissions`.
+One row stores one complete course-quiz or pre-test submission by a
+persistent student account. The server grades it against the server-only
+answer key in `backend/course_content/quiz_answers.json`. A quiz page never
+carries the answers; after a complete quiz submit the response names each
+correct option and, where the topic provides one, an explanation from
+`quiz_explanations.json`. A pre-test response returns only the score. Scores
+are kept separate from coding-assignment `submissions`.
+
+**Scoring rule.** A topic's quiz score is the student's first submitted
+attempt of the current quiz version, taken before any correct answers were
+shown; later attempts are practice and never replace it. The pre-test is one
+attempt per student and topic, taken before the lesson (a second submit is
+rejected with 409). The learning gain for a topic is the first-attempt quiz
+score minus the pre-test score.
 
 | Field | Meaning |
 |---|---|
@@ -342,16 +351,31 @@ coding-assignment `submissions`.
 | `total_questions` | Questions in that quiz version (at least `10`) |
 | `score_percent` | `correct_count / total_questions` as a rounded whole percentage, `0`–`100` |
 | `submitted_at` | UTC submission time |
+| `assessment` | `quiz` (after the lesson) or `pretest` (one attempt, before the lesson); rows from before migration `0011` are `quiz` |
+| `feedback_mode` | The student's feedback mode (`traditional`, `tdd`, `tdd_ai`) at submission; null on rows from before migration `0011` |
+| `answers` | JSON list in question order: `{"question_id", "choice", "correct"}`; null on rows from before migration `0011` |
+| `data_schema_version` | Version of the `answers` format; currently `1` |
 
-Only scores are stored. The chosen answers for each question are not written
-to the database. Every question must be answered before the server grades the
-quiz.
+Every question must be answered before the server grades the quiz or
+pre-test.
 
 Demo sessions and instructor previews are graded but return `saved: false` and
 never create rows; demo quiz progress lives only in the server's in-memory demo
-session. Students can read their own 20 most recent attempts per topic through
-`GET /contents/{topic_id}/quiz/attempts`. Quiz attempts are not currently part
-of the research exports or the Phase 1 analytics metrics.
+session. Students can read their own 20 most recent quiz attempts per topic,
+each marked `scored` when it is the first attempt of its version, and the
+current `learning_score`, through `GET /contents/{topic_id}/quiz/attempts`;
+`GET /contents/{topic_id}/pretest` reports whether they have taken the
+pre-test and its score.
+
+The research export adds two sheets built from this table:
+`course_assessment_attempts` (one row per attempt: participant code, topic,
+assessment, quiz version, attempt number, `scored`, feedback mode, counts,
+score, `choices` such as `B,C,A,...`, `correct_pattern` such as `1101...`,
+submission time, `data_schema_version`) and `course_learning_summary` (per
+participant and topic: `pretest_score`, `quiz_score` from the first attempt,
+`learning_gain`, `quiz_attempts`, `best_quiz_score`, and the feedback mode of
+the first attempt). The instructor's participant page shows the same summary.
+Quiz attempts are not part of the Phase 1 analytics metrics.
 
 ### `page_feedback`
 

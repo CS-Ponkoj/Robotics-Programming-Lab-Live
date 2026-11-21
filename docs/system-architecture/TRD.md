@@ -70,7 +70,8 @@ backend/
   course_settings.py         instructor course settings (AI tutor, Old assignments)
   ros2_feedback.py           observed causes and hint ladders for ROS 2 checks
   research_service.py        study sessions, events, exports
-  course_content_repository.py   lessons + server-side quiz grading
+  course_content_repository.py   lessons + server-side quiz and pre-test grading
+  course_assessments.py      pre-test, first-attempt quiz score and gain for research
   migrations/                Alembic schema history
 ```
 
@@ -113,7 +114,7 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 | **Auth** | `POST /auth/login` · `POST /auth/demo` · 🔐 `GET /auth/me` · 🔐 `POST /auth/logout` · 🔐 `POST /auth/change-password` · `POST /auth/forgot-password`* · `POST /auth/reset-password`* |
 | **Assignments** 🔐 | `GET /assignments` · `GET /assignments/{id}` · `GET/PUT/DELETE /assignments/{id}/draft` · `POST …/format` · `POST …/run` · `POST …/submit` · `POST …/playground` · `POST …/simulate` (ROS 2D replay, visual only) · `POST …/hint` · `POST …/tutor` · `POST …/solution` · legacy `POST /grade/{id}` |
 | **Progress** 🔐 | `GET /me/assignment-progress` |
-| **Course content** 🔐 | `GET /contents` · `GET /contents/{topic}` · `GET /contents/{topic}/sections/{section}` · `POST /contents/{topic}/quiz/submit` · `GET /contents/{topic}/quiz/attempts` · `GET /content-assets/{name}` · `GET /images/{id}` |
+| **Course content** 🔐 | `GET /contents` · `GET /contents/{topic}` · `GET /contents/{topic}/sections/{section}` · `POST /contents/{topic}/quiz/submit` · `GET /contents/{topic}/quiz/attempts` · `GET /contents/{topic}/pretest` · `POST /contents/{topic}/pretest/submit` · `GET /contents/{topic}/sections/{section}/answer` · `GET /content-assets/{name}` · `GET /images/{id}` |
 | **Research** 🔐 | `POST /research/sessions` · `POST …/{sid}/heartbeat` · `POST …/{sid}/events` · `POST …/{sid}/end` · `GET /research/me` · `GET /research/me/attempts` · `GET /research/metrics` |
 | **Feedback** | 🔐 `POST /feedback` · 🛡️ `GET /admin/feedback` · 🛡️ `PATCH /admin/feedback/{id}` |
 | **Admin: assignments** 🛡️ | `GET/POST /admin/assignments` · `PUT /admin/assignments/{id}` · `POST …/{id}/validate` · `POST …/{id}/publish` |

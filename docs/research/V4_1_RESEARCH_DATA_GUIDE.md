@@ -41,7 +41,10 @@ grading but is excluded from research dashboards and exports.
 - Raw staging database: Neon SQL Editor for authorized technical inspection
 - Shared staging database: Neon SQL Editor or an approved PostgreSQL client
 - Export: student summary CSV, assignment attempts CSV, learning events CSV,
-  or a three-sheet Excel workbook
+  course pre-test and quiz scores CSV (`course_learning_summary`: pre-test,
+  first-attempt quiz score, gain), course pre-test and quiz attempts CSV
+  (`course_assessment_attempts`: every attempt with its answer pattern), or an
+  Excel workbook with every sheet
 
 For storage definitions, standard execution statuses, and event payload rules,
 see [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). The ignored
