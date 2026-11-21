@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:iuse_demo/widgets/lesson_animation.dart';
 import 'package:iuse_demo/widgets/lesson_reader.dart';
 
 void main() {
@@ -72,5 +73,42 @@ void main() {
         lessonStyles(dom.Element.tag('span')..classes.add('math-expression'));
     expect(math?['font-style'], 'italic');
     expect(lessonStyles(dom.Element.tag('div')), isNull);
+  });
+
+  testWidgets(
+      'code blocks copy, tools appear in place, animations start stopped',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: const Scaffold(
+            body: SingleChildScrollView(
+                child: LessonReader(
+                    html: '<p>Before</p>'
+                        '<pre><code>def build_node():\n    return node</code></pre>'
+                        '<div class="lesson-interactive" data-interactive="wheel-speeds"></div>'
+                        '<figure class="lesson-animation"><img src="still.png" '
+                        'data-animation="moving.gif" alt="A beam sweeps a room." />'
+                        '<figcaption>Animation 4.</figcaption></figure>')))));
+    await tester.pump();
+    expect(find.byKey(const Key('lesson-code-copy')), findsOneWidget);
+    expect(find.text('def build_node():\n    return node'), findsOneWidget);
+    expect(find.byKey(const Key('try-wheel-speeds')), findsOneWidget);
+    final animation =
+        tester.widget<LessonAnimation>(find.byType(LessonAnimation));
+    expect(animation.stillUrl, 'still.png');
+    expect(animation.animationUrl, 'moving.gif');
+    expect(find.text('Play animation'), findsOneWidget);
+    expect(
+        find.bySemanticsLabel(RegExp('A beam sweeps a room. Animation stopped.')),
+        findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('lesson-animation-toggle')));
+    await tester.tap(find.byKey(const Key('lesson-animation-toggle')));
+    await tester.pump();
+    expect(find.text('Stop animation'), findsOneWidget);
+    expect(
+        find.bySemanticsLabel(RegExp('Animation playing.')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('lesson-animation-toggle')));
+    await tester.pump();
+    expect(find.text('Play animation'), findsOneWidget);
   });
 }

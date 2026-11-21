@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 CONTENT_ROOT = Path(__file__).resolve().parent / "course_content"
-ASSET_NAME = re.compile(r"^[0-9a-f]{20}\.(?:png|jpg|jpeg)$")
+ASSET_NAME = re.compile(r"^[0-9a-f]{20}\.(?:png|jpg|jpeg|gif)$")
 
 
 class CourseContentRepository:

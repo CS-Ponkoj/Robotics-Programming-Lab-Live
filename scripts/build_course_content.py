@@ -1,7 +1,8 @@
-"""Build student-safe web pages from the six source content folders.
+"""Build student-safe web pages from the source content folders.
 
-Run with a Python environment containing python-docx 1.2.0. Generated pages
-are checked into backend/course_content; python-docx is not needed at runtime.
+Run with a Python environment containing scripts/requirements-course-content.txt
+(python-docx, and Pillow for the still frames of animated GIFs). Generated pages
+are checked into backend/course_content; neither package is needed at runtime.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import html
 import json
 import re
 from collections import defaultdict
+from io import BytesIO
 from pathlib import Path
 
 from docx import Document
@@ -27,6 +29,11 @@ OUTPUT = ROOT / "backend" / "course_content"
 ASSETS = OUTPUT / "assets"
 
 TOPICS = {
+    "ROS 2 for Mobile Robots": (
+        "ros2-mobile-robots",
+        "ROS 2 for Mobile Robots",
+        "Write ROS 2 nodes that read a laser scan and command a mobile robot.",
+    ),
     "Obstacle Avoidance": (
         "obstacle-avoidance",
         "Obstacle Avoidance",
@@ -59,6 +66,15 @@ TOPICS = {
     ),
 }
 
+# Earlier topics, listed under Old contents in the app, as old assignments are.
+OLD_TOPICS = {
+    "obstacle-avoidance", "path-planning", "sensor-fusion", "range-sensors",
+    "locomotion", "hybrid-navigation-gps",
+}
+
+# A paragraph "[interactive:<name>]" places one of the app's interactive tools.
+INTERACTIVE = re.compile(r"^\[interactive:([a-z0-9-]+)\]$")
+
 # Practice exercises whose graded, possibly simplified version is an app assignment.
 GRADED_ASSIGNMENTS = {
     ("obstacle-avoidance", "assignment-bug-algorithm-scenario-1"): 1,
@@ -69,11 +85,22 @@ GRADED_ASSIGNMENTS = {
 
 # Readable titles where a folder name is only an abbreviation.
 SECTION_TITLES = {
+    ("ros2-mobile-robots", "exercises-exercise-1"): "Exercise 1. Fix the broken node",
+    ("ros2-mobile-robots", "exercises-exercise-2"): "Exercise 2. Classify the readings",
+    ("ros2-mobile-robots", "exercises-exercise-3"): "Exercise 3. Command card",
+    ("ros2-mobile-robots", "exercises-exercise-4"): "Exercise 4. A decision table",
     ("obstacle-avoidance", "assignment-oa"): "Multi-Floor Office Navigation",
     ("obstacle-avoidance", "assignment-vfh"): "Simplified VFH",
 }
 
-IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+IMAGE_TYPES = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+}
+# Runs in these fonts are code. The older source documents use none of them.
+MONO_FONTS = {
+    "consolas", "courier new", "courier", "menlo", "monaco", "lucida console",
+    "cascadia mono", "cascadia code",
+}
 ANSWER_START = re.compile(
     r"^(?:(?:answer|solution|solutions)\s*(?::|$)|solution outline\b|instructor notes?\b)",
     re.I,
@@ -93,6 +120,36 @@ def write_json(path: Path, payload: object) -> None:
 
 def slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+def run_is_code(run: Run) -> bool:
+    name = run.font.name or (run.style.font.name if run.style is not None else None)
+    return bool(name) and name.lower() in MONO_FONTS
+
+
+def code_paragraph(paragraph: Paragraph) -> bool:
+    """A line of a code block: shaded, and every run is in a code font."""
+    properties = paragraph._p.pPr
+    runs = paragraph.runs
+    return (properties is not None and properties.find(qn("w:shd")) is not None
+            and bool(runs) and all(run_is_code(run) for run in runs))
+
+
+def poster_name(animation: str) -> str:
+    """The still image shown until a reader chooses to play an animation."""
+    return f"{hashlib.sha256(animation.encode('utf-8')).hexdigest()[:20]}.png"
+
+
+def write_poster(blob: bytes, destination: Path) -> None:
+    try:
+        from PIL import Image
+    except ImportError as error:  # authoring environment only
+        raise SystemExit(
+            "Animated lesson images need Pillow (scripts/requirements-course-content.txt)"
+        ) from error
+    with Image.open(BytesIO(blob)) as animation:
+        animation.seek(0)
+        animation.convert("RGB").save(destination, format="PNG", optimize=True)
 
 
 def student_source(path: Path) -> bool:
@@ -136,18 +193,25 @@ def image_names(document: Document, paragraph: Paragraph) -> list[str]:
         destination = ASSETS / name
         if not destination.exists():
             destination.write_bytes(blob)
+        if extension == ".gif" and not (ASSETS / poster_name(name)).exists():
+            write_poster(blob, ASSETS / poster_name(name))
         names.append(name)
     return names
 
 
 def figure_html(names: list[str], alt: str, caption: str = "") -> str:
+    alt_text = html.escape(alt, quote=True)
     images = "".join(
-        f'<img src="/content-assets/{name}" alt="{html.escape(alt, quote=True)}" '
-        'loading="lazy" />'
+        # An animation starts as a still image; the reader chooses to play it.
+        f'<img src="/content-assets/{poster_name(name)}" '
+        f'data-animation="/content-assets/{name}" alt="{alt_text}" loading="lazy" />'
+        if name.endswith(".gif") else
+        f'<img src="/content-assets/{name}" alt="{alt_text}" loading="lazy" />'
         for name in names
     )
     caption_html = f"<figcaption>{caption}</figcaption>" if caption else ""
-    return f"<figure>{images}{caption_html}</figure>"
+    kind = ' class="lesson-animation"' if any(name.endswith(".gif") for name in names) else ""
+    return f"<figure{kind}>{images}{caption_html}</figure>"
 
 
 def local_name(element) -> str:
@@ -215,6 +279,8 @@ def inline_html(paragraph: Paragraph) -> str:
             text = html.escape(run.text).replace("\n", "<br />")
             if not text:
                 continue
+            if run_is_code(run):
+                text = f"<code>{text}</code>"
             if run.font.subscript:
                 text = f"<sub>{text}</sub>"
             elif run.font.superscript:
@@ -294,7 +360,7 @@ def heading_level(paragraph: Paragraph, styled_document: bool) -> int | None:
         return None
     runs = [run for run in paragraph.runs if run.text.strip()]
     text = paragraph.text.strip()
-    if not runs or not all(run.bold for run in runs):
+    if not runs or not all(run.bold for run in runs) or any(run_is_code(run) for run in runs):
         return None
     if len(text) > 90 or text.endswith(".") or any(mark in text for mark in "=\\|"):
         return None
@@ -320,13 +386,50 @@ def split_blank_lines(text_html: str) -> list[str]:
     return [part for part in parts if part]
 
 
-CAPTION = re.compile(r"^(?:fig\.?|figure|image from)\b", re.I)
-CAPTION_PREFIX = re.compile(r"^(?:figure|fig\.?)\s*\d*\s*[:.]?\s*", re.I)
+CAPTION = re.compile(r"^(?:fig\.?|figure|animation|image from)\b", re.I)
+CAPTION_PREFIX = re.compile(r"^(?:figure|fig\.?|animation)\s*\d*\s*[:.]?\s*", re.I)
+
+
+def cell_shaded(cell) -> bool:
+    properties = cell._tc.tcPr
+    return properties is not None and properties.find(qn("w:shd")) is not None
+
+
+def note_html(table: Table) -> str | None:
+    """A shaded one-cell box whose first line is bold is a note, not a table."""
+    if len(table.rows) != 1 or len(table.columns) != 1:
+        return None
+    cell = table.rows[0].cells[0]
+    paragraphs = [paragraph for paragraph in cell.paragraphs if paragraph.text.strip()]
+    if not cell_shaded(cell) or len(paragraphs) < 2:
+        return None
+    title_runs = [run for run in paragraphs[0].runs if run.text.strip()]
+    if not title_runs or not all(run.bold for run in title_runs):
+        return None
+    body = "".join(f"<p>{inline_html(paragraph)}</p>" for paragraph in paragraphs[1:])
+    title = html.escape(paragraphs[0].text.strip())
+    return f'<div class="lesson-note"><p><strong>{title}</strong></p>{body}</div>'
 
 
 def table_html(table: Table) -> str:
-    rows = [[html.escape(cell.text).replace("\n", "<br />") for cell in row.cells]
-            for row in table.rows]
+    note = note_html(table)
+    if note is not None:
+        return note
+    # Tables that contain code keep their inline formatting; older tables stay plain text.
+    rich = any(
+        run_is_code(run)
+        for row in table.rows for cell in row.cells
+        for paragraph in cell.paragraphs for run in paragraph.runs
+    )
+
+    def cell_text(cell) -> str:
+        if rich:
+            return "<br />".join(
+                inline_html(paragraph) for paragraph in cell.paragraphs if paragraph.text.strip()
+            )
+        return html.escape(cell.text).replace("\n", "<br />")
+
+    rows = [[cell_text(cell) for cell in row.cells] for row in table.rows]
     if not rows:
         return ""
     header, body = rows[0], rows[1:]
@@ -398,8 +501,22 @@ def document_html(path: Path, *, strip_answers: bool = False) -> str:
     while index < len(content):
         block = content[index]
         index += 1
+        if isinstance(block, Paragraph) and code_paragraph(block):
+            # Consecutive shaded code-font lines form one code block.
+            lines = [block.text]
+            while (index < len(content) and isinstance(content[index], Paragraph)
+                   and code_paragraph(content[index])):
+                lines.append(content[index].text)
+                index += 1
+            code = "\n".join(line.rstrip() for line in lines).strip("\n")
+            blocks.append(("block", f"<pre><code>{html.escape(code)}</code></pre>"))
+            continue
         if isinstance(block, Table):
             blocks.append(("block", table_html(block)))
+            continue
+        tool = INTERACTIVE.match(block.text.strip())
+        if tool:
+            blocks.append(("block", f'<div class="lesson-interactive" data-interactive="{tool.group(1)}"></div>'))
             continue
         text_html = inline_html(block)
         images = image_names(document, block)
@@ -614,6 +731,7 @@ def build() -> None:
                 old_page.unlink()
         catalog.append({
             "id": topic_id, "title": title, "summary": summary,
+            "old": topic_id in OLD_TOPICS,
             "section_counts": {
                 kind: sum(section["kind"] == kind for section in sections)
                 for kind in ("lesson", "exercise", "quiz", "math")

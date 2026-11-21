@@ -1,0 +1,8 @@
+{
+  "id": "exercises-exercise-3",
+  "title": "Exercise 3. Command card",
+  "kind": "exercise",
+  "topic_id": "ros2-mobile-robots",
+  "html": "<ol>\n<li>Give <code>linear.x</code> and <code>angular.z</code> (all other fields zero) to drive backward at 0.1 m/s.\n</li>\n<li>Write the values to turn right on the spot at 0.4 rad/s.\n</li>\n<li>Write the values to stop.\n</li>\n<li>Describe in words what <code>(linear.x, angular.z) = (0.15, +0.3)</code> asks the robot to do.\n</li>\n<li>In the ideal model the robot turns at exactly +0.4 rad/s. How long does it take to turn 90 degrees to the left?\n</li></ol>",
+  "questions": []
+}

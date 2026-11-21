@@ -32,7 +32,7 @@ the TDD feedback mode (green theme).
 | ![Simulation LiDAR view of the scan ranges](docs/images/readme/simulation_lidar.png) | ![Simulation charts of distance and speed over time](docs/images/readme/simulation_charts.png) |
 | **LiDAR view.** The scan your node received at each moment, beam by beam. | **Charts.** Distance ahead and the speeds your node published, over the whole run. |
 | ![Course contents with six topics](docs/images/readme/contents.png) | ![Obstacle Avoidance lesson page](docs/images/readme/topic.png) |
-| **Course contents.** Six topics, each with a lesson, exercises, and a quiz. | **Lessons.** Readable pages with a jump-to-section menu. |
+| **Course contents.** Each topic has a lesson, exercises, math practice, and a quiz. | **Lessons.** Readable pages with a jump-to-section menu. |
 
 <p align="center">
   <img src="docs/images/readme/phone_workspace.png" alt="Workspace on a phone" width="260"><br>
@@ -65,9 +65,12 @@ the TDD feedback mode (green theme).
 - **Try inputs playground:** students call their own function with labelled
   inputs (ungraded, never saved) and see a to-scale route map or a polar VFH
   view of the result.
-- **Course content:** six topics with lessons, diagrams, exercises, and one
-  10-question quiz each. Quizzes are graded on the server and stored
-  separately from assignment scores.
+- **Course content:** the current topic, ROS 2 for Mobile Robots, prepares
+  students for the two ROS 2 assignments with a lesson, copyable code
+  examples, animations that play on request, interactive "Try it" tools,
+  exercises, math practice, and a 15-question quiz. The six earlier topics
+  stay available under Old contents. Quizzes are graded on the server and
+  stored separately from assignment scores.
 - **Instructor Studio:** assignment management and publishing, account management with feedback modes and per-account sign-in history,
   assignment-version analytics, data-health checks, and CSV/Excel research
   exports that use participant codes instead of login IDs.

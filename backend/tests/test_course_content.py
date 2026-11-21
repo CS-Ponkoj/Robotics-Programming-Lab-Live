@@ -79,7 +79,13 @@ def test_demo_catalog_progress_is_temporary_and_session_isolated(client):
     assert progress['attempt_count'] == 0
 
 
-def test_course_content_requires_login_and_has_all_six_topics(client):
+OLD_TOPICS = {
+    "obstacle-avoidance", "path-planning", "sensor-fusion",
+    "range-sensors", "locomotion", "hybrid-navigation-gps",
+}
+
+
+def test_course_content_requires_login_and_has_all_seven_topics(client):
     assert client.get("/contents").status_code == 401
     assert client.get("/contents/path-planning/quiz/attempts").status_code == 401
     assert client.post("/contents/path-planning/quiz/submit", json={
@@ -87,11 +93,10 @@ def test_course_content_requires_login_and_has_all_six_topics(client):
     }).status_code == 401
     login(client)
     topics = client.get("/contents").json()["topics"]
-    assert len(topics) == 6
-    assert {topic["id"] for topic in topics} == {
-        "obstacle-avoidance", "path-planning", "sensor-fusion",
-        "range-sensors", "locomotion", "hybrid-navigation-gps",
-    }
+    assert len(topics) == 7
+    assert {topic["id"] for topic in topics} == OLD_TOPICS | {"ros2-mobile-robots"}
+    # The earlier topics are listed under Old contents, like old assignments.
+    assert {topic["id"] for topic in topics if topic["old"]} == OLD_TOPICS
     assert all("reference" not in str(topic).lower() for topic in topics)
 
 
@@ -115,8 +120,11 @@ def test_every_topic_has_lesson_and_student_safe_sections(client):
                 assert len(data["questions"]) >= 10
                 assert len(data["version"]) == 16
                 assert all("answer" not in question for question in data["questions"])
-            if data["kind"] in {"exercise", "math"}:
+            if data["kind"] in {"exercise", "math"} and topic_id in OLD_TOPICS:
+                # Older practice pages have no code examples; a code block there
+                # would be leaked solution code.
                 assert "<pre><code>" not in data["html"]
+            if data["kind"] in {"exercise", "math"}:
                 for line in data["html"].splitlines():
                     visible_line = re.sub(r"<[^>]+>", "", line).strip()
                     assert visible_line.lower().rstrip(": ") not in {
@@ -161,10 +169,12 @@ def test_quiz_submits_once_and_saves_score_without_returning_answer_key(client):
 
 def test_every_quiz_has_exactly_one_correct_choice_and_demo_is_not_saved(client):
     login(client)
-    for topic in client.get("/contents").json()["topics"]:
+    topics = client.get("/contents").json()["topics"]
+    for topic in topics:
         topic_id = topic["id"]
         quiz = client.get(f"/contents/{topic_id}/sections/quiz").json()
-        assert len(quiz["questions"]) == 10
+        total = len(quiz["questions"])
+        assert total == (15 if topic_id == "ros2-mobile-robots" else 10)
         # The server-side key can be inspected here, but is never in the response.
         repository = CourseContentRepository()
         answers = repository._read(repository.root / "quiz_answers.json")[f"{topic_id}/quiz"]
@@ -177,9 +187,9 @@ def test_every_quiz_has_exactly_one_correct_choice_and_demo_is_not_saved(client)
             for q in quiz["questions"]
         }
         half = dict(wrong)
-        for question_id in list(answers)[:5]:
+        for question_id in list(answers)[:total // 2]:
             half[question_id] = answers[question_id]
-        for choices, score in ((wrong, 0), (half, 50)):
+        for choices, score in ((wrong, 0), (half, round(total // 2 * 100 / total))):
             response = client.post(f"/contents/{topic_id}/quiz/submit", json={
                 "quiz_version": quiz["version"], "choices": choices,
             })
@@ -197,7 +207,7 @@ def test_every_quiz_has_exactly_one_correct_choice_and_demo_is_not_saved(client)
     assert response.status_code == 200 and response.json()["saved"] is False
     assert client.get("/contents/path-planning/quiz/attempts").json() == {"attempts": []}
     with client.app.state.SessionLocal() as session:
-        assert len(session.scalars(select(CourseQuizAttempt)).all()) == 18
+        assert len(session.scalars(select(CourseQuizAttempt)).all()) == 3 * len(topics)
 
 
 def test_quiz_returns_per_question_flags_without_answer_key(client):
@@ -359,3 +369,51 @@ def test_course_pages_hide_instructor_notes_and_point_to_graded_assignments():
     }.items():
         html = repository.section("obstacle-avoidance", section_id)["html"]
         assert f"original practice version of Assignment {number}" in html
+
+
+def test_ros2_topic_has_every_section_kind_and_no_instructor_material(client):
+    login(client)
+    sections = client.get("/contents/ros2-mobile-robots").json()["sections"]
+    kinds = [section["kind"] for section in sections]
+    assert kinds.count("lesson") == 1 and kinds.count("quiz") == 1
+    assert kinds.count("exercise") == 4 and kinds.count("math") == 1
+    pages = {
+        section["id"]: client.get(
+            f"/contents/ros2-mobile-robots/sections/{section['id']}"
+        ).json()
+        for section in sections
+    }
+    lesson = pages["lesson"]["html"]
+    assert lesson.count('data-interactive="') == 3
+    for tool in ("scan-index", "twist-path", "wheel-speeds"):
+        assert f'data-interactive="{tool}"' in lesson
+    # Animations start as a still PNG and name their GIF separately.
+    animations = re.findall(r'<img src="/content-assets/([0-9a-f]{20}\.png)" '
+                            r'data-animation="/content-assets/([0-9a-f]{20}\.gif)"', lesson)
+    assert len(animations) == 6
+    assert "<pre><code>" in lesson and '<div class="lesson-note">' in lesson
+    everything = "".join(page["html"] for page in pages.values())
+    for leak in ("Instructor answer key", "Notes for the reviewer", "GPT", "Draft for review",
+                 "instructor answer", "Answer:"):
+        assert leak not in everything
+    # Worked answers of the math page and the exercises stay out of the pages.
+    math = pages["math-exercises-for-ros-2"]["html"]
+    assert "Question 1: Index and angle" in math and "Question 2: Wheel speeds" in math
+    assert "13.6" not in math and "0.16 m/s" not in math
+    assert "no scan argument" not in pages["exercises-exercise-1"]["html"]
+    quiz = pages["quiz"]
+    assert len(quiz["questions"]) == 15
+    assert all(not re.match(r"^\d+\.", q["prompt"]) for q in quiz["questions"])
+
+
+def test_ros2_lesson_animation_assets_are_served(client):
+    login(client)
+    lesson = client.get("/contents/ros2-mobile-robots/sections/lesson").json()["html"]
+    still, animation = re.findall(
+        r'src="/content-assets/([0-9a-f]{20}\.png)" data-animation="/content-assets/([0-9a-f]{20}\.gif)"',
+        lesson,
+    )[0]
+    gif = client.get(f"/content-assets/{animation}")
+    assert gif.status_code == 200 and gif.headers["content-type"] == "image/gif"
+    assert gif.content[:6] in {b"GIF87a", b"GIF89a"}
+    assert client.get(f"/content-assets/{still}").headers["content-type"] == "image/png"

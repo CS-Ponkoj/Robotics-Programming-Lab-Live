@@ -16,3 +16,17 @@ python scripts/build_course_content.py
 ```
 
 Commit the regenerated files together with the source change.
+
+Formatting the builder understands, beyond plain Word text:
+
+- shaded paragraphs in a code font (Consolas, Courier New, ...) become one
+  code block; runs in a code font become inline code;
+- a shaded one-cell table whose first line is bold becomes a note box;
+- a GIF becomes an animation that starts as a still image (its first frame,
+  written with Pillow) until the reader presses Play;
+- a paragraph `[interactive:<name>]` places one of the app's "Try it" tools
+  (`scan-index`, `twist-path`, `wheel-speeds`);
+- captions start with "Figure" or "Animation".
+
+Topics listed in `OLD_TOPICS` in the builder are flagged `old` in
+`catalog.json`, and the app shows them under Old contents.

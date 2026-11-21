@@ -107,6 +107,7 @@ void main() {
         'open-assignments',
         'open-old-assignments',
         'open-course-contents',
+        'open-old-course-contents',
       ]) {
         final rect = tester.getRect(find.byKey(Key(key)));
         expect(rect.left, greaterThanOrEqualTo(0));

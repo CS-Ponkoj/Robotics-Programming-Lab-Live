@@ -28,8 +28,12 @@ class CourseCatalogPage extends StatefulWidget {
     required this.user,
     required this.onLogout,
     this.embedded = false,
+    this.oldTopics = false,
   });
   final bool embedded;
+
+  /// Show the earlier topics (Old contents) instead of the current ones.
+  final bool oldTopics;
   final AuthenticatedUser user;
   final Future<void> Function() onLogout;
 
@@ -57,7 +61,10 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final topics = snapshot.data!;
+        // Topics without the flag (older API responses) count as current.
+        final topics = snapshot.data!
+            .where((topic) => (topic['old'] == true) == widget.oldTopics)
+            .toList();
         return ScrollableCenter(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1160),
@@ -65,7 +72,7 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
               padding: const EdgeInsets.all(24),
               children: [
                 Text(
-                  'COURSE CONTENTS',
+                  widget.oldTopics ? 'OLD CONTENTS' : 'COURSE CONTENTS',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: AppColors.brand,
                     letterSpacing: 1.1,
@@ -74,13 +81,18 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Learn the ideas, then practice them',
+                  widget.oldTopics
+                      ? 'Earlier topics, still available'
+                      : 'Learn the ideas, then practice them',
                   style: theme.textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Six robotics topics with lessons, exercises, and submitted quizzes. '
-                  'Quiz scores are saved separately from coding assignment scores.',
+                  widget.oldTopics
+                      ? 'Topics from earlier in the course. Their lessons, exercises '
+                          'and quizzes still work, and quiz scores are saved as before.'
+                      : 'Lessons, exercises, math practice, and submitted quizzes. '
+                          'Quiz scores are saved separately from coding assignment scores.',
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -265,6 +277,7 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
 
 /// A recognizable icon for each course topic.
 IconData topicIcon(String topicId) => switch (topicId) {
+      'ros2-mobile-robots' => Icons.smart_toy_rounded,
       'obstacle-avoidance' => Icons.alt_route_rounded,
       'path-planning' => Icons.route_rounded,
       'sensor-fusion' => Icons.hub_rounded,

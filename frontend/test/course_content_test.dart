@@ -568,4 +568,37 @@ void main() {
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
+
+  testWidgets('earlier topics are listed under Old contents only',
+      (tester) async {
+    CourseContentApi.testClient = MockClient((request) async =>
+        http.Response(
+            jsonEncode({
+              'topics': [
+                {'id': 'ros2-mobile-robots', 'title': 'ROS 2 for Mobile Robots',
+                  'summary': 'Current', 'old': false},
+                {'id': 'locomotion', 'title': 'Locomotion',
+                  'summary': 'Earlier', 'old': true},
+              ],
+            }),
+            200));
+    addTearDown(() => CourseContentApi.testClient = null);
+    await tester.pumpWidget(MaterialApp(
+        home: CourseCatalogPage(user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('content-topic-ros2-mobile-robots')),
+        findsOneWidget);
+    expect(find.byKey(const Key('content-topic-locomotion')), findsNothing);
+    await tester.pumpWidget(MaterialApp(
+        home: CourseCatalogPage(
+            key: const ValueKey('old'),
+            user: _student,
+            onLogout: _logout,
+            oldTopics: true)));
+    await tester.pumpAndSettle();
+    expect(find.text('OLD CONTENTS'), findsOneWidget);
+    expect(find.byKey(const Key('content-topic-locomotion')), findsOneWidget);
+    expect(find.byKey(const Key('content-topic-ros2-mobile-robots')),
+        findsNothing);
+  });
 }

@@ -1,0 +1,42 @@
+{
+  "id": "ros2-mobile-robots",
+  "title": "ROS 2 for Mobile Robots",
+  "summary": "Write ROS 2 nodes that read a laser scan and command a mobile robot.",
+  "sections": [
+    {
+      "id": "lesson",
+      "title": "Lesson",
+      "kind": "lesson"
+    },
+    {
+      "id": "exercises-exercise-1",
+      "title": "Exercise 1. Fix the broken node",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-exercise-2",
+      "title": "Exercise 2. Classify the readings",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-exercise-3",
+      "title": "Exercise 3. Command card",
+      "kind": "exercise"
+    },
+    {
+      "id": "exercises-exercise-4",
+      "title": "Exercise 4. A decision table",
+      "kind": "exercise"
+    },
+    {
+      "id": "quiz",
+      "title": "Quiz",
+      "kind": "quiz"
+    },
+    {
+      "id": "math-exercises-for-ros-2",
+      "title": "Math exercises for ROS 2",
+      "kind": "math"
+    }
+  ]
+}

@@ -1,0 +1,340 @@
+{
+  "id": "quiz",
+  "title": "Quiz",
+  "kind": "quiz",
+  "topic_id": "ros2-mobile-robots",
+  "html": "",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "What does build_node() return in the lab?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The message to publish"
+        },
+        {
+          "id": "B",
+          "text": "The configured node"
+        },
+        {
+          "id": "C",
+          "text": "Nothing; it calls rclpy.spin() itself"
+        },
+        {
+          "id": "D",
+          "text": "The topic name"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "prompt": "Which line registers the callback correctly?",
+      "options": [
+        {
+          "id": "A",
+          "text": "node.create_subscription(LaserScan, '/scan', handle_scan(), 10)"
+        },
+        {
+          "id": "B",
+          "text": "node.create_subscription(LaserScan, '/scan', 'handle_scan', 10)"
+        },
+        {
+          "id": "C",
+          "text": "node.create_subscription(LaserScan, '/scan', handle_scan, 10)"
+        },
+        {
+          "id": "D",
+          "text": "node.create_subscription(handle_scan, '/scan', LaserScan, 10)"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "prompt": "What does one call of a scan callback receive?",
+      "options": [
+        {
+          "id": "A",
+          "text": "One reading"
+        },
+        {
+          "id": "B",
+          "text": "All scans since the program started"
+        },
+        {
+          "id": "C",
+          "text": "Ten scans, because the depth is 10"
+        },
+        {
+          "id": "D",
+          "text": "One whole LaserScan message"
+        }
+      ]
+    },
+    {
+      "id": "q4",
+      "prompt": "Using the stated values angle_min = -0.5 and angle_increment = 0.2, what is the angle of index 3?",
+      "options": [
+        {
+          "id": "A",
+          "text": "+0.1 rad"
+        },
+        {
+          "id": "B",
+          "text": "−0.1 rad"
+        },
+        {
+          "id": "C",
+          "text": "+0.6 rad"
+        },
+        {
+          "id": "D",
+          "text": "+1.1 rad"
+        }
+      ]
+    },
+    {
+      "id": "q5",
+      "prompt": "If scan.ranges holds at least two readings, what does scan.ranges[-1] select, whatever the scan's angles?",
+      "options": [
+        {
+          "id": "A",
+          "text": "An IndexError"
+        },
+        {
+          "id": "B",
+          "text": "The reading straight ahead"
+        },
+        {
+          "id": "C",
+          "text": "The last reading"
+        },
+        {
+          "id": "D",
+          "text": "The first reading"
+        }
+      ]
+    },
+    {
+      "id": "q6",
+      "prompt": "Under REP 117, what does +inf in a range reading mean?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The reading is invalid"
+        },
+        {
+          "id": "B",
+          "text": "Nothing was detected within range"
+        },
+        {
+          "id": "C",
+          "text": "Something is too close to measure"
+        },
+        {
+          "id": "D",
+          "text": "The sensor is switched off"
+        }
+      ]
+    },
+    {
+      "id": "q7",
+      "prompt": "Under REP 117, what does -inf mean?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Something was detected but is too close to measure"
+        },
+        {
+          "id": "B",
+          "text": "Nothing was detected"
+        },
+        {
+          "id": "C",
+          "text": "The reading is behind the robot"
+        },
+        {
+          "id": "D",
+          "text": "The scan has ended"
+        }
+      ]
+    },
+    {
+      "id": "q8",
+      "prompt": "For a Python float d, which test detects NaN?",
+      "options": [
+        {
+          "id": "A",
+          "text": "d == math.nan"
+        },
+        {
+          "id": "B",
+          "text": "d is None"
+        },
+        {
+          "id": "C",
+          "text": "math.isnan(d)"
+        },
+        {
+          "id": "D",
+          "text": "d < 0"
+        }
+      ]
+    },
+    {
+      "id": "q9",
+      "prompt": "The message definition says values below range_min or above range_max should be discarded. Is a finite reading exactly equal to range_max discarded by that rule?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Yes, always"
+        },
+        {
+          "id": "B",
+          "text": "No: the limits are inclusive, so only a value greater than range_max is discarded at the top"
+        },
+        {
+          "id": "C",
+          "text": "Only if it is also NaN"
+        },
+        {
+          "id": "D",
+          "text": "Only in Assignment 1"
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "prompt": "In which units are linear.x and angular.z?",
+      "options": [
+        {
+          "id": "A",
+          "text": "km/h and degrees per second"
+        },
+        {
+          "id": "B",
+          "text": "cm/s and rad/s"
+        },
+        {
+          "id": "C",
+          "text": "m/s and degrees per second"
+        },
+        {
+          "id": "D",
+          "text": "m/s and rad/s"
+        }
+      ]
+    },
+    {
+      "id": "q11",
+      "prompt": "What does linear.x = 0.0, angular.z = +0.4 ask the lab's robot to do?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Turn left on the spot"
+        },
+        {
+          "id": "B",
+          "text": "Turn right on the spot"
+        },
+        {
+          "id": "C",
+          "text": "Drive forward slowly"
+        },
+        {
+          "id": "D",
+          "text": "Stop"
+        }
+      ]
+    },
+    {
+      "id": "q12",
+      "prompt": "According to REP 103, which way does the y axis of a robot's body frame point?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Forward"
+        },
+        {
+          "id": "B",
+          "text": "Up"
+        },
+        {
+          "id": "C",
+          "text": "Right"
+        },
+        {
+          "id": "D",
+          "text": "Left"
+        }
+      ]
+    },
+    {
+      "id": "q13",
+      "prompt": "On the lab's /cmd_vel, is publishing nothing the same as publishing a Twist with all zeros?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Yes, the robot always stops"
+        },
+        {
+          "id": "B",
+          "text": "No: only the all-zero command asks for zero velocity"
+        },
+        {
+          "id": "C",
+          "text": "Yes, if the queue depth is 10"
+        },
+        {
+          "id": "D",
+          "text": "No: publishing nothing reverses the robot"
+        }
+      ]
+    },
+    {
+      "id": "q14",
+      "prompt": "What does the 10 in create_publisher(Twist, '/cmd_vel', 10) set?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The publishing rate, 10 times per second"
+        },
+        {
+          "id": "B",
+          "text": "The maximum speed"
+        },
+        {
+          "id": "C",
+          "text": "The history depth: keep the last 10 messages"
+        },
+        {
+          "id": "D",
+          "text": "The number of subscribers allowed"
+        }
+      ]
+    },
+    {
+      "id": "q15",
+      "prompt": "A Flbr message has msg.left = NaN. What does the course define this to mean?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The left-sector distance is unavailable"
+        },
+        {
+          "id": "B",
+          "text": "The left side is clear"
+        },
+        {
+          "id": "C",
+          "text": "An obstacle is touching the robot"
+        },
+        {
+          "id": "D",
+          "text": "The message is broken and must be ignored"
+        }
+      ]
+    }
+  ],
+  "version": "150ffbf01130ac5e"
+}

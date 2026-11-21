@@ -49,7 +49,7 @@ Future<List<AssignmentDto>> fetchAssignments() async {
 }
 
 /// The three home-page panels.
-enum HomePanel { assignments, oldAssignments, contents }
+enum HomePanel { assignments, oldAssignments, contents, oldContents }
 
 class _AssignmentListPageState extends State<AssignmentListPage> {
   late Future<List<AssignmentDto>> assignments;
@@ -74,6 +74,7 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
       HomePanel.assignments => 'Home: Assignments',
       HomePanel.oldAssignments => 'Home: Old assignments',
       HomePanel.contents => 'Home: Contents',
+      HomePanel.oldContents => 'Home: Old contents',
     };
 
     Widget panelChip(
@@ -128,6 +129,11 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
                             'Old assignments'),
                         panelChip(HomePanel.contents, 'open-course-contents',
                             Icons.menu_book_rounded, 'Contents'),
+                        panelChip(
+                            HomePanel.oldContents,
+                            'open-old-course-contents',
+                            Icons.auto_stories_outlined,
+                            'Old contents'),
                       ],
                     ),
                   ),
@@ -136,11 +142,14 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
             ),
           ),
           Expanded(
-              child: _panel == HomePanel.contents
+              child: _panel == HomePanel.contents ||
+                      _panel == HomePanel.oldContents
                   ? CourseCatalogPage(
+                      key: ValueKey(_panel),
                       user: widget.user,
                       onLogout: widget.onLogout,
-                      embedded: true)
+                      embedded: true,
+                      oldTopics: _panel == HomePanel.oldContents)
                   : FutureBuilder<List<AssignmentDto>>(
                       future: assignments,
                       builder: (context, snap) {

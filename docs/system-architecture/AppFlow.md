@@ -153,7 +153,7 @@ The older draft is never loaded into the newer workspace automatically.
 
 ```mermaid
 flowchart LR
-    T[Contents tab<br/>6 topics] --> TP[Topic page<br/>lesson · exercises · math]
+    T[Contents tab<br/>current topic<br/>Old contents: 6 earlier topics] --> TP[Topic page<br/>lesson · exercises · quiz · math]
     TP --> SEC[Section reader]
     TP --> Q[Topic quiz]
     Q -->|POST /contents/topic/quiz/submit| GR[Server grades the whole quiz]
