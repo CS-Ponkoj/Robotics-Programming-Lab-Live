@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' show parseFragment;
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/lesson_animation.dart';
+import 'package:iuse_demo/widgets/lesson_code_block.dart';
 import 'package:iuse_demo/widgets/lesson_interactives.dart';
 
 /// Adds navigation to authored headings, without rewriting lesson content.
 class LessonReader extends StatefulWidget {
-  const LessonReader({super.key, required this.html});
+  const LessonReader({super.key, required this.html, this.outline = true});
   final String html;
+
+  /// Show the "On this page" list when the page has several headings.
+  final bool outline;
 
   @override
   State<LessonReader> createState() => _LessonReaderState();
@@ -177,7 +180,7 @@ class _LessonReaderState extends State<LessonReader> {
     final indent = _headings.any((heading) => heading.level == 2) &&
         _headings.any((heading) => heading.level == 3);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      if (_headings.length > 1) ...[
+      if (widget.outline && _headings.length > 1) ...[
         Material(
             color: AppColors.learningSurface,
             borderRadius: BorderRadius.circular(12),
@@ -215,66 +218,5 @@ class _LessonReaderState extends State<LessonReader> {
         customWidgetBuilder: lessonWidgets,
       ),
     ]);
-  }
-}
-
-/// A code example that keeps its line breaks, scrolls sideways on narrow
-/// screens, and can be copied.
-class LessonCodeBlock extends StatefulWidget {
-  const LessonCodeBlock({super.key, required this.code});
-  final String code;
-
-  @override
-  State<LessonCodeBlock> createState() => _LessonCodeBlockState();
-}
-
-class _LessonCodeBlockState extends State<LessonCodeBlock> {
-  bool _copied = false;
-
-  Future<void> _copy() async {
-    await Clipboard.setData(ClipboardData(text: widget.code));
-    if (!mounted) return;
-    setState(() => _copied = true);
-    await Future<void>.delayed(const Duration(seconds: 2));
-    if (mounted) setState(() => _copied = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(0, 6, 0, 16),
-      decoration: BoxDecoration(
-        color: AppColors.learningSurface,
-        border: const Border(
-            left: BorderSide(color: AppColors.borderStrong, width: 3)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Stack(children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(14, 12, 48, 12),
-          child: SelectableText(
-            widget.code,
-            style: const TextStyle(
-              fontFamily: 'Courier-New',
-              fontSize: 14,
-              height: 1.45,
-              color: AppColors.ink,
-            ),
-          ),
-        ),
-        Positioned(
-          top: 2,
-          right: 2,
-          child: IconButton(
-            key: const Key('lesson-code-copy'),
-            tooltip: _copied ? 'Copied' : 'Copy code',
-            icon: Icon(_copied ? Icons.check_rounded : Icons.copy_rounded,
-                size: 18),
-            onPressed: _copy,
-          ),
-        ),
-      ]),
-    );
   }
 }

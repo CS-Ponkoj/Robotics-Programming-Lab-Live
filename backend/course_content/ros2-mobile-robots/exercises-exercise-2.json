@@ -2,6 +2,7 @@
   "id": "exercises-exercise-2",
   "title": "Exercise 2. Classify the readings",
   "kind": "exercise",
+  "has_answer": true,
   "topic_id": "ros2-mobile-robots",
   "html": "<p>A scan has <code>range_min = 0.12</code> and <code>range_max = 3.5</code>. For each reading, say whether Example 3 would count it as usable (a finite reading inside the range limits) and, if not, why: 0.5, <code>-inf</code>, <code>NaN</code>, 3.5, 3.6, <code>+inf</code>, 0.1.</p>",
   "questions": []

@@ -11,22 +11,26 @@
     {
       "id": "exercises-exercise-1",
       "title": "Exercise 1. Fix the broken node",
-      "kind": "exercise"
+      "kind": "exercise",
+      "has_answer": true
     },
     {
       "id": "exercises-exercise-2",
       "title": "Exercise 2. Classify the readings",
-      "kind": "exercise"
+      "kind": "exercise",
+      "has_answer": true
     },
     {
       "id": "exercises-exercise-3",
       "title": "Exercise 3. Command card",
-      "kind": "exercise"
+      "kind": "exercise",
+      "has_answer": true
     },
     {
       "id": "exercises-exercise-4",
       "title": "Exercise 4. A decision table",
-      "kind": "exercise"
+      "kind": "exercise",
+      "has_answer": true
     },
     {
       "id": "quiz",
@@ -36,7 +40,8 @@
     {
       "id": "math-exercises-for-ros-2",
       "title": "Math exercises for ROS 2",
-      "kind": "math"
+      "kind": "math",
+      "has_answer": true
     }
   ]
 }

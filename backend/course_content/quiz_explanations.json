@@ -1,0 +1,19 @@
+{
+  "ros2-mobile-robots/quiz": {
+    "q1": "main() spins the node that build_node() returns (Section 3.1).",
+    "q2": "The callback is passed as a function, without parentheses (Section 3.5).",
+    "q3": "One callback receives one whole scan; ranges holds its readings (Section 4.1).",
+    "q4": "−0.5 + 3 × 0.2 = +0.1 rad, using the stated values (Section 4.2).",
+    "q5": "A negative index counts from the end of an indexable sequence such as scan.ranges (Section 4.5).",
+    "q6": "REP 117: +inf means no detection within range (Section 4.3).",
+    "q7": "REP 117: −inf means too close to measure (Section 4.3).",
+    "q8": "math.isnan(d) detects NaN; == cannot, because NaN does not equal itself (Section 4.3).",
+    "q9": "The rule discards values below range_min or above range_max; a value equal to range_max is neither (Section 4.1).",
+    "q10": "REP 103 uses SI units: m/s and rad/s (Section 5.2).",
+    "q11": "Positive angular.z is counterclockwise seen from above: a left turn (Section 5.2).",
+    "q12": "REP 103 body frame: x forward, y left, z up (Section 5.2).",
+    "q13": "An all-zero Twist requests zero velocity; sending nothing makes no new request (Section 5.5).",
+    "q14": "A number selects keep-last history with that depth; it is not a rate (Section 3.4).",
+    "q15": "The Flbr definition: NaN indicates that the sector is unavailable (Section 6)."
+  }
+}

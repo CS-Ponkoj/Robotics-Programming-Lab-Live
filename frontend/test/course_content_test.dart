@@ -601,4 +601,114 @@ void main() {
     expect(find.byKey(const Key('content-topic-ros2-mobile-robots')),
         findsNothing);
   });
+
+  testWidgets('after a submit each question shows its correct answer and why',
+      (tester) async {
+    final shared = client;
+    final reviewClient = MockClient((request) async {
+      if (request.url.path.endsWith('/quiz/submit')) {
+        return http.Response(
+            jsonEncode({
+              'score_percent': 0,
+              'correct_count': 0,
+              'total_questions': 1,
+              'saved': true,
+              'results': [
+                {
+                  'question_id': 'q1',
+                  'correct': false,
+                  'correct_option': 'B',
+                  'explanation': 'Positive linear.x drives forward.',
+                },
+              ],
+            }),
+            200);
+      }
+      return shared.get(request.url);
+    });
+    CourseContentApi.testClient = reviewClient;
+    addTearDown(reviewClient.close);
+    await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: CourseTopicPage(
+            topicId: 'obstacle-avoidance', user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Quiz'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('quiz-review-q1')), findsNothing);
+    await tester.ensureVisible(find.text('A. Backward'));
+    await tester.tap(find.text('A. Backward'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Submit quiz'));
+    await tester.tap(find.text('Submit quiz'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Score: 0%'), findsOneWidget);
+    expect(find.text('The correct answer is B. Forward'), findsOneWidget);
+    expect(find.text('Why: Positive linear.x drives forward.'), findsOneWidget);
+    // Changing the answer hides the review until the next submit.
+    await tester.ensureVisible(find.text('B. Forward'));
+    await tester.tap(find.text('B. Forward'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('quiz-review-q1')), findsNothing);
+  });
+
+  testWidgets('practice pages with a worked answer show it only on request',
+      (tester) async {
+    var answerRequests = 0;
+    final shared = client;
+    final answerClient = MockClient((request) async {
+      final path = request.url.path;
+      if (path.endsWith('/sections/practice')) {
+        return http.Response(
+            jsonEncode({
+              'id': 'practice',
+              'title': 'Practice',
+              'kind': 'exercise',
+              'html': '<p>Try the exercise</p>',
+              'questions': [],
+              'has_answer': true,
+            }),
+            200);
+      }
+      if (path.endsWith('/sections/practice/answer')) {
+        answerRequests++;
+        return http.Response(
+            jsonEncode({'html': '<p>Turn left at 0.4 rad/s.</p>'}), 200);
+      }
+      return shared.get(request.url);
+    });
+    CourseContentApi.testClient = answerClient;
+    addTearDown(answerClient.close);
+    await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: CourseTopicPage(
+            topicId: 'obstacle-avoidance', user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Exercises'));
+    await tester.pumpAndSettle();
+    expect(find.text('Try it yourself first, then check your answer.'),
+        findsOneWidget);
+    expect(answerRequests, 0);
+    await tester.ensureVisible(find.byKey(const Key('show-worked-answer')));
+    await tester.tap(find.byKey(const Key('show-worked-answer')));
+    await tester.pumpAndSettle();
+    expect(answerRequests, 1);
+    expect(find.byKey(const Key('worked-answer')), findsOneWidget);
+    expect(find.text('Hide answer'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('show-worked-answer')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('worked-answer')), findsNothing);
+  });
+
+  testWidgets('practice pages without a worked answer have no answer button',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: CourseTopicPage(
+            topicId: 'obstacle-avoidance', user: _student, onLogout: _logout)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Exercises'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('show-worked-answer')), findsNothing);
+  });
 }

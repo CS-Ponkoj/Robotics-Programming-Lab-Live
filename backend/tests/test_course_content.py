@@ -210,7 +210,7 @@ def test_every_quiz_has_exactly_one_correct_choice_and_demo_is_not_saved(client)
         assert len(session.scalars(select(CourseQuizAttempt)).all()) == 3 * len(topics)
 
 
-def test_quiz_returns_per_question_flags_without_answer_key(client):
+def test_quiz_review_after_submit_names_each_correct_option(client):
     repository = CourseContentRepository()
     answers = repository._read(repository.root / "quiz_answers.json")["path-planning/quiz"]
 
@@ -220,21 +220,19 @@ def test_quiz_returns_per_question_flags_without_answer_key(client):
         assert body["saved"] is saved
         results = body["results"]
         assert [r["question_id"] for r in results] == [q["id"] for q in quiz["questions"]]
-        assert all(set(r) == {"question_id", "correct"} for r in results)
+        # After a complete submit, each result names the correct option.
+        assert all(set(r) == {"question_id", "correct", "correct_option"} for r in results)
         assert [r["correct"] for r in results] == [
             choices[q["id"]] == answers[q["id"]] for q in quiz["questions"]
+        ]
+        assert [r["correct_option"] for r in results] == [
+            answers[q["id"]] for q in quiz["questions"]
         ]
         assert body["correct_count"] == sum(r["correct"] for r in results)
         assert set(body) <= {
             "topic_id", "quiz_version", "correct_count", "total_questions",
             "score_percent", "results", "saved", "attempt_id",
         }
-        # Wrongly answered questions must not leak the correct option's text.
-        for question in quiz["questions"]:
-            if choices[question["id"]] != answers[question["id"]]:
-                key_text = next(o["text"] for o in question["options"]
-                                if o["id"] == answers[question["id"]])
-                assert key_text not in response.text
 
     def mixed_choices(quiz):
         choices = {
@@ -417,3 +415,52 @@ def test_ros2_lesson_animation_assets_are_served(client):
     assert gif.status_code == 200 and gif.headers["content-type"] == "image/gif"
     assert gif.content[:6] in {b"GIF87a", b"GIF89a"}
     assert client.get(f"/content-assets/{still}").headers["content-type"] == "image/png"
+
+
+def test_ros2_quiz_review_explains_each_answer_and_stores_only_the_score(client):
+    login(client)
+    quiz = client.get("/contents/ros2-mobile-robots/sections/quiz").json()
+    # Before a submit, the quiz page carries no answers or explanations.
+    assert "correct_option" not in str(quiz) and "explanation" not in str(quiz)
+    choices = {q["id"]: "A" for q in quiz["questions"]}
+    body = client.post("/contents/ros2-mobile-robots/quiz/submit", json={
+        "quiz_version": quiz["version"], "choices": choices,
+    }).json()
+    assert body["saved"] is True
+    assert all(r["correct_option"] in "ABCD" and r["explanation"] for r in body["results"])
+    assert "Section 4.5" in body["results"][4]["explanation"]
+    with client.app.state.SessionLocal() as session:
+        attempt = session.scalars(select(CourseQuizAttempt)).one()
+        assert attempt.score_percent == body["score_percent"]
+
+
+def test_worked_answers_are_only_for_practice_pages_that_have_one(client):
+    assert client.get(
+        "/contents/ros2-mobile-robots/sections/exercises-exercise-1/answer"
+    ).status_code == 401
+    login(client)
+    sections = client.get("/contents/ros2-mobile-robots").json()["sections"]
+    with_answer = [s["id"] for s in sections if s.get("has_answer")]
+    assert set(with_answer) == {
+        "exercises-exercise-1", "exercises-exercise-2", "exercises-exercise-3",
+        "exercises-exercise-4", "math-exercises-for-ros-2",
+    }
+    for section_id in with_answer:
+        response = client.get(f"/contents/ros2-mobile-robots/sections/{section_id}/answer")
+        assert response.status_code == 200 and response.json()["html"]
+        # The page itself never contains the worked answer.
+        page = client.get(f"/contents/ros2-mobile-robots/sections/{section_id}").json()["html"]
+        assert response.json()["html"] not in page
+    first = client.get("/contents/ros2-mobile-robots/sections/exercises-exercise-1/answer").json()
+    assert "no scan argument" in first["html"]
+    math = client.get(
+        "/contents/ros2-mobile-robots/sections/math-exercises-for-ros-2/answer"
+    ).json()["html"]
+    assert "13.6" in math and "0.16 m/s" in math
+    for path in ("ros2-mobile-robots/sections/lesson", "ros2-mobile-robots/sections/quiz",
+                 "locomotion/sections/exercises-question-1", "nope/sections/lesson"):
+        assert client.get(f"/contents/{path}/answer").status_code == 404
+    # Earlier topics publish no worked answers.
+    for topic in OLD_TOPICS:
+        sections = client.get(f"/contents/{topic}").json()["sections"]
+        assert not any(s.get("has_answer") for s in sections)

@@ -5,7 +5,13 @@ source documents in `course_materials/content/`, which is the source of truth.
 
 `scripts/build_course_content.py` converts the reviewed source documents into
 the student-safe pages served by the API. `quiz_answers.json` is the
-server-only quiz answer key; it is never sent to the browser.
+server-only quiz answer key; it is never sent with a quiz page. After a
+student submits a complete quiz, the result names each correct option and,
+from `quiz_explanations.json` (an "Explanation:" line after a question's
+"Answer:" line in the quiz source), why it is correct. `worked_answers.json`
+holds the worked answer of a practice page, built from a `*_solution.docx`
+beside its exercise or math document; the app fetches it only when a student
+presses Show answer.
 
 After a reviewed source-document change, rebuild from the repository root in
 a separate content-authoring Python environment with

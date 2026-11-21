@@ -2,6 +2,7 @@
   "id": "math-exercises-for-ros-2",
   "title": "Math exercises for ROS 2",
   "kind": "math",
+  "has_answer": true,
   "topic_id": "ros2-mobile-robots",
   "html": "<h3>Question 1: Index and angle</h3>\n<p>A scan has <code>angle_min = -1.5</code>, <code>angle_increment = 0.25</code> and 13 readings.</p>\n<ol>\n<li>What is the angle of index 4?\n</li>\n<li>What is the angle of the last reading?\n</li>\n<li>Which index points straight ahead?\n</li>\n<li>Which index is nearest to +0.6 radians, and what is its angle?\n</li>\n<li>What should a program do if asked for the reading at +1.9 radians?\n</li></ol>\n<h3>Question 2: Wheel speeds</h3>\n<p>An ideal differential-drive robot has L = 0.30 m. It receives <code>linear.x = 0.10</code> and <code>angular.z = -0.40</code>. Find the ground speed of each wheel, v_right and v_left, in m/s, and say which way the robot curves.</p>",
   "questions": []

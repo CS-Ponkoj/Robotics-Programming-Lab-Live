@@ -564,15 +564,20 @@ def text_html(path: Path) -> str:
     )
 
 
-def quiz_questions(path: Path) -> tuple[list[dict], dict[str, str]]:
+def quiz_questions(path: Path) -> tuple[list[dict], dict[str, str], dict[str, str]]:
     document = Document(path)
     questions: list[dict] = []
     answers: dict[str, str] = {}
+    explanations: dict[str, str] = {}
     prompt: list[str] = []
     options: list[dict] = []
     for paragraph in document.paragraphs:
         value = paragraph.text.strip()
         if not value:
+            continue
+        explanation = re.match(r"^Explanation\s*:\s*(.+)", value, re.I | re.S)
+        if explanation and questions and not prompt and not options:
+            explanations[questions[-1]["id"]] = explanation.group(1).strip()
             continue
         answer = re.match(r"^Answer\s*:\s*([A-D])\b", value, re.I)
         if answer:
@@ -594,7 +599,7 @@ def quiz_questions(path: Path) -> tuple[list[dict], dict[str, str]]:
                 prompt.append(line.strip())
     if prompt or options or len(questions) != len(answers):
         raise ValueError(f"Incomplete answer key in {path}")
-    return questions, answers
+    return questions, answers, explanations
 
 
 def label_for_group(path: Path, topic_root: Path) -> str:
@@ -609,6 +614,9 @@ def build() -> None:
     ASSETS.mkdir(parents=True, exist_ok=True)
     catalog: list[dict] = []
     answer_key: dict[str, dict[str, str]] = {}
+    # Server-only: shown to a student after a quiz submit or on request.
+    quiz_explanations: dict[str, dict[str, str]] = {}
+    worked_answers: dict[str, str] = {}
     authored_quizzes = json.loads(
         (ROOT / "scripts" / "course_quiz_bank.json").read_text(encoding="utf-8")
     )
@@ -627,8 +635,14 @@ def build() -> None:
         sections: list[dict] = []
 
         def add_section(section_id: str, name: str, kind: str, body: str,
-                        questions: list[dict] | None = None) -> None:
+                        questions: list[dict] | None = None,
+                        answer: Path | None = None) -> None:
             metadata = {"id": section_id, "title": name, "kind": kind}
+            if answer is not None:
+                # A *_solution.docx beside a practice page is its worked answer,
+                # kept on the server until a student asks to see it.
+                worked_answers[f"{topic_id}/{section_id}"] = document_html(answer)
+                metadata["has_answer"] = True
             sections.append(metadata)
             write_json(topic_dir / f"{section_id}.json", {
                 **metadata, "topic_id": topic_id, "html": body,
@@ -673,13 +687,19 @@ def build() -> None:
                     pieces.append(text_html(path))
                 else:
                     pieces.append(text_html(path))
-            add_section(section_id, name, "exercise", "\n".join(pieces))
+            solutions = sorted(
+                path for path in directory.glob("*_solution.docx")
+                if "reference" not in str(path.relative_to(SOURCE)).lower()
+            )
+            add_section(section_id, name, "exercise", "\n".join(pieces),
+                        answer=solutions[0] if len(solutions) == 1 else None)
 
         source_quiz = next(
             (path for path in direct_docs if path.stem.lower() == "quiz"), None
         )
+        explanations: dict[str, str] = {}
         if source_quiz is not None:
-            questions, answers = quiz_questions(source_quiz)
+            questions, answers, explanations = quiz_questions(source_quiz)
         else:
             rows = authored_quizzes[topic_id]
             questions, answers = [], {}
@@ -711,13 +731,17 @@ def build() -> None:
         quiz_payload["version"] = version
         write_json(quiz_file, quiz_payload)
         answer_key[f"{topic_id}/{section_id}"] = answers
+        if explanations:
+            quiz_explanations[f"{topic_id}/{section_id}"] = explanations
 
         for path in direct_docs:
             if path == lessons[0] or "quiz" in path.stem.lower():
                 continue
+            solution = path.with_name(f"{path.stem}_solution.docx")
             add_section(
                 slug(path.stem), path.stem.replace("_", " "),
                 "math", document_html(path, strip_answers=True),
+                answer=solution if solution.exists() else None,
             )
 
         write_json(topic_dir / "index.json", {
@@ -739,6 +763,8 @@ def build() -> None:
         })
     write_json(OUTPUT / "catalog.json", {"topics": catalog})
     write_json(OUTPUT / "quiz_answers.json", answer_key)
+    write_json(OUTPUT / "quiz_explanations.json", quiz_explanations)
+    write_json(OUTPUT / "worked_answers.json", worked_answers)
     print(f"Built {len(catalog)} topics and {sum(len(v) for v in answer_key.values())} quiz questions")
 
 

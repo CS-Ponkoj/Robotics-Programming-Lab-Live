@@ -17,6 +17,16 @@ class CourseContentRepository:
     def _read(path: Path) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def _optional(self, path: Path) -> dict:
+        return self._read(path) if path.is_file() else {}
+
+    def worked_answer(self, topic_id: str, section_id: str) -> str | None:
+        """A practice page's worked answer, for a student who asks to see it."""
+        section = self.section(topic_id, section_id)
+        if section is None or section.get("kind") not in {"exercise", "math"}:
+            return None
+        return self._optional(self.root / "worked_answers.json").get(f"{topic_id}/{section_id}")
+
     def topics(self) -> list[dict]:
         return self._read(self.root / "catalog.json")["topics"]
 
@@ -46,12 +56,22 @@ class CourseContentRepository:
             if choices[question["id"]] not in valid:
                 raise ValueError("The quiz contains an invalid choice.")
         answers = self._read(self.root / "quiz_answers.json")[f"{topic_id}/quiz"]
-        # Per-question flags in quiz order; never the correct option itself.
-        results = [
-            {"question_id": question["id"],
-             "correct": choices[question["id"]] == answers.get(question["id"])}
-            for question in questions
-        ]
+        explanations = self._optional(self.root / "quiz_explanations.json").get(
+            f"{topic_id}/quiz", {}
+        )
+        # Graded only after a complete submission, so each result may name the
+        # correct option and, when the topic provides one, why it is correct.
+        results = []
+        for question in questions:
+            question_id = question["id"]
+            result = {
+                "question_id": question_id,
+                "correct": choices[question_id] == answers.get(question_id),
+                "correct_option": answers.get(question_id),
+            }
+            if question_id in explanations:
+                result["explanation"] = explanations[question_id]
+            results.append(result)
         correct = sum(result["correct"] for result in results)
         total = len(questions)
         return {

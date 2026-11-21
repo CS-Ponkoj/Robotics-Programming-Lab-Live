@@ -2337,6 +2337,16 @@ def create_app(
             raise HTTPException(404, "Section not found.")
         return section
 
+    @application.get("/contents/{topic_id}/sections/{section_id}/answer")
+    def get_content_worked_answer(
+        topic_id: str, section_id: str, _user: User = Depends(current_user)
+    ):
+        """The worked answer of a practice page, shown when a student asks."""
+        answer = COURSE_CONTENT.worked_answer(topic_id, section_id)
+        if answer is None:
+            raise HTTPException(404, "This page has no worked answer.")
+        return {"topic_id": topic_id, "section_id": section_id, "html": answer}
+
     @application.post("/contents/{topic_id}/quiz/submit")
     def submit_content_quiz(
         topic_id: str,

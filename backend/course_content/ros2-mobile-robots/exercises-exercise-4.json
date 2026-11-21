@@ -2,6 +2,7 @@
   "id": "exercises-exercise-4",
   "title": "Exercise 4. A decision table",
   "kind": "exercise",
+  "has_answer": true,
   "topic_id": "ros2-mobile-robots",
   "html": "<p>Rule: &quot;Light the left-clearance lamp when the left sector is 0.25 m or closer. If the left sector is unavailable, light the lamp.&quot; Write the table of cases for <code>msg.left</code> values 0.24, 0.25, 0.26, 1.00 and <code>NaN</code>, as in Section 7.1. Then say which comparison the rule needs for finite readings, <code>&lt;</code> or <code>&lt;=</code>.</p>",
   "questions": []

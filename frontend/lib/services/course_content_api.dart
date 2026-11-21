@@ -62,6 +62,13 @@ class CourseContentApi {
         jsonDecode(utf8.decode(response.bodyBytes)) as Map);
   }
 
+  /// The worked answer of an exercise or math page, loaded only when asked.
+  static Future<String> workedAnswer(String topicId, String sectionId) async {
+    final result = await _get('/contents/${Uri.encodeComponent(topicId)}'
+        '/sections/${Uri.encodeComponent(sectionId)}/answer');
+    return result['html'] as String;
+  }
+
   static Future<List<Map<String, dynamic>>> quizAttempts(String topicId) async {
     final result =
         await _get('/contents/${Uri.encodeComponent(topicId)}/quiz/attempts');
@@ -72,8 +79,7 @@ class CourseContentApi {
 }
 
 /// Per-question flags from a graded quiz submit, keyed by question ID.
-/// The server sends only whether each answer was correct, never the key;
-/// an older server without `results` yields an empty map.
+/// An older server without `results` yields an empty map.
 Map<String, bool> quizResultMarks(Map<String, dynamic> result) {
   final results = result['results'];
   if (results is! List) return const {};
@@ -83,5 +89,25 @@ Map<String, bool> quizResultMarks(Map<String, dynamic> result) {
           item['question_id'] is String &&
           item['correct'] is bool)
         item['question_id'] as String: item['correct'] as bool,
+  };
+}
+
+/// The correct option and, when the topic gives one, the explanation of
+/// each question, which the server sends only after a complete submit.
+Map<String, ({String option, String? explanation})> quizResultReview(
+    Map<String, dynamic> result) {
+  final results = result['results'];
+  if (results is! List) return const {};
+  return {
+    for (final item in results)
+      if (item is Map &&
+          item['question_id'] is String &&
+          item['correct_option'] is String)
+        item['question_id'] as String: (
+          option: item['correct_option'] as String,
+          explanation: item['explanation'] is String
+              ? item['explanation'] as String
+              : null,
+        ),
   };
 }

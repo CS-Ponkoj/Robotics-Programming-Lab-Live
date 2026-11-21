@@ -603,8 +603,10 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
   // Lets an incomplete submission scroll to the first unanswered question.
   final Map<String, GlobalKey> _questionKeys = {};
   Map<String, dynamic>? _result;
-  // Per-question marks from the last submit: true = correct. Never the key.
+  // Per-question marks from the last submit: true = correct.
   final Map<String, bool> _marks = {};
+  // The correct option and explanation, sent by the server after a submit.
+  final Map<String, ({String option, String? explanation})> _review = {};
   bool _submitting = false;
   String? _quizError;
   Future<List<Map<String, dynamic>>>? _attempts;
@@ -668,6 +670,9 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
           _marks
             ..clear()
             ..addAll(quizResultMarks(result));
+          _review
+            ..clear()
+            ..addAll(quizResultReview(result));
           _attempts = CourseContentApi.quizAttempts(widget.topicId);
         });
       }
@@ -807,6 +812,12 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
             ],
             if (html.isNotEmpty)
               LessonReader(html: html, key: const Key('course-section-html')),
+            if (practice && section['has_answer'] == true)
+              _WorkedAnswer(
+                key: ValueKey('worked-answer-${widget.sectionId}'),
+                topicId: widget.topicId,
+                sectionId: widget.sectionId,
+              ),
             if (kind == 'quiz') ..._quiz(context, section, questions),
           ],
         ),
@@ -890,6 +901,7 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
             onPressed: () => setState(() {
               _choices.clear();
               _marks.clear();
+              _review.clear();
               _result = null;
               _quizError = null;
             }),
@@ -1035,8 +1047,18 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
                         _quizError = null;
                         // A changed answer needs a fresh submit to be graded.
                         _marks.remove(id);
+                        _review.remove(id);
                         _result = null;
                       }),
+            ),
+          if (_review[id] case final review?)
+            _QuizReview(
+              key: Key('quiz-review-$id'),
+              correct: mark ?? false,
+              option: options.firstWhere(
+                  (option) => option['id'] == review.option,
+                  orElse: () => {'id': review.option, 'text': ''}),
+              explanation: review.explanation,
             ),
         ],
       ),
@@ -1044,8 +1066,49 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
   }
 }
 
-/// Correct/Incorrect status for one submitted question. It never shows
-/// which option is right.
+/// After a submit: the correct option of one question and, when the topic
+/// gives one, why it is correct.
+class _QuizReview extends StatelessWidget {
+  const _QuizReview({
+    super.key,
+    required this.correct,
+    required this.option,
+    required this.explanation,
+  });
+
+  final bool correct;
+  final Map option;
+  final String? explanation;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4, bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.learningSurface,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(
+          correct
+              ? 'Correct answer: ${option['id']}. ${option['text']}'
+              : 'The correct answer is ${option['id']}. ${option['text']}',
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        if (explanation != null) ...[
+          const SizedBox(height: 4),
+          Text('Why: $explanation', style: theme.textTheme.bodyMedium),
+        ],
+      ]),
+    );
+  }
+}
+
+/// Correct/Incorrect status for one submitted question.
 class _QuizMark extends StatelessWidget {
   const _QuizMark({required this.number, required this.correct});
   final int number;
@@ -1123,4 +1186,101 @@ class _LoadError extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// "Show answer" for a practice page: the worked answer is fetched from the
+/// server only when the student asks for it.
+class _WorkedAnswer extends StatefulWidget {
+  const _WorkedAnswer({
+    super.key,
+    required this.topicId,
+    required this.sectionId,
+  });
+
+  final String topicId;
+  final String sectionId;
+
+  @override
+  State<_WorkedAnswer> createState() => _WorkedAnswerState();
+}
+
+class _WorkedAnswerState extends State<_WorkedAnswer> {
+  Future<String>? _answer;
+  bool _open = false;
+
+  void _toggle() => setState(() {
+        _open = !_open;
+        _answer ??=
+            CourseContentApi.workedAnswer(widget.topicId, widget.sectionId);
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Divider(height: 32),
+      Text('Try it yourself first, then check your answer.',
+          style: theme.textTheme.bodyMedium),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: FilledButton.tonalIcon(
+          style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
+          key: const Key('show-worked-answer'),
+          onPressed: _toggle,
+          icon: Icon(_open
+              ? Icons.visibility_off_rounded
+              : Icons.lightbulb_outline_rounded),
+          label: Text(_open ? 'Hide answer' : 'Show answer'),
+        ),
+      ),
+      if (_open)
+        FutureBuilder<String>(
+          future: _answer,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Row(children: [
+                  const Expanded(
+                      child: Text('The answer could not be loaded.')),
+                  TextButton(
+                    onPressed: () => setState(() => _answer =
+                        CourseContentApi.workedAnswer(
+                            widget.topicId, widget.sectionId)),
+                    child: const Text('Retry'),
+                  ),
+                ]),
+              );
+            }
+            if (!snapshot.hasData) {
+              return const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: LinearProgressIndicator(),
+              );
+            }
+            return Container(
+              key: const Key('worked-answer'),
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.learningSurface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Worked answer', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    LessonReader(
+                      outline: false,
+                      html: snapshot.data!.replaceAll(
+                          '/content-assets/', '$apiBaseUrl/content-assets/'),
+                    ),
+                  ]),
+            );
+          },
+        ),
+    ]);
+  }
 }

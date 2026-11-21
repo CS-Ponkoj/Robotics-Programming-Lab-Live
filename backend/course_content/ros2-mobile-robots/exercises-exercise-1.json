@@ -2,6 +2,7 @@
   "id": "exercises-exercise-1",
   "title": "Exercise 1. Fix the broken node",
   "kind": "exercise",
+  "has_answer": true,
   "topic_id": "ros2-mobile-robots",
   "html": "<p>This <code>build_node()</code> should publish <code>True</code> on <code>/scan_seen</code> for every scan it receives. Assume <code>rclpy</code>, <code>Bool</code> and <code>LaserScan</code> are already imported and the lab&#x27;s <code>main()</code> calls <code>build_node()</code>. It has three mistakes. Find and fix them.</p>\n<pre><code>def build_node():\n    node = rclpy.create_node(&#x27;scan_seen&#x27;)\n    publisher = node.create_publisher(Bool, &#x27;/scan_seen&#x27;, 10)\n\n    def handle_scan(scan):\n        return Bool(data=True)\n\n    node.create_subscription(LaserScan, &#x27;/scan&#x27;, handle_scan(), 10)</code></pre>",
   "questions": []
