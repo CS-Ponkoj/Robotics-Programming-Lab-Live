@@ -628,7 +628,7 @@ def build() -> None:
         )
         lessons = [
             path for path in direct_docs
-            if "quiz" not in path.stem.lower() and "math" not in path.stem.lower()
+            if not any(word in path.stem.lower() for word in ("quiz", "math", "pretest"))
         ]
         if len(lessons) != 1:
             raise ValueError(f"Expected one lesson document for {folder_name}: {lessons}")
@@ -734,8 +734,26 @@ def build() -> None:
         if explanations:
             quiz_explanations[f"{topic_id}/{section_id}"] = explanations
 
+        # An optional pre-test: taken once, before the lesson, graded on the
+        # server like the quiz but with no answers shown to the student.
+        pretest_source = topic_root / "pretest.docx"
+        if pretest_source.exists():
+            questions, answers, explanations = quiz_questions(pretest_source)
+            if len(questions) < 10:
+                raise ValueError(f"Expected at least 10 pre-test questions for {topic_id}")
+            add_section("pretest", "Pre-test", "pretest", "", questions)
+            pretest_file = topic_dir / "pretest.json"
+            pretest_payload = json.loads(pretest_file.read_text(encoding="utf-8"))
+            pretest_payload["version"] = hashlib.sha256(
+                json.dumps([questions, answers], ensure_ascii=False, sort_keys=True).encode("utf-8")
+            ).hexdigest()[:16]
+            write_json(pretest_file, pretest_payload)
+            answer_key[f"{topic_id}/pretest"] = answers
+            if explanations:
+                quiz_explanations[f"{topic_id}/pretest"] = explanations
+
         for path in direct_docs:
-            if path == lessons[0] or "quiz" in path.stem.lower():
+            if path == lessons[0] or "quiz" in path.stem.lower() or path.stem.lower() == "pretest":
                 continue
             solution = path.with_name(f"{path.stem}_solution.docx")
             add_section(
@@ -758,7 +776,7 @@ def build() -> None:
             "old": topic_id in OLD_TOPICS,
             "section_counts": {
                 kind: sum(section["kind"] == kind for section in sections)
-                for kind in ("lesson", "exercise", "quiz", "math")
+                for kind in ("pretest", "lesson", "exercise", "quiz", "math")
             },
         })
     write_json(OUTPUT / "catalog.json", {"topics": catalog})

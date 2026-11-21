@@ -110,6 +110,14 @@ def build_research_dataset(session: Session) -> dict[str, list[dict[str, Any]]]:
         "assignment_summary": assignment_rows,
         "class_assignment_summary": assignment_catalog(session, payloads),
         "learning_events": event_rows,
+        # Course pre-test and quiz: one row per attempt, and per-topic scores
+        # (pre-test, first quiz attempt, and the gain between them).
+        "course_assessment_attempts": [
+            row for payload in payloads for row in payload["course_assessments"]
+        ],
+        "course_learning_summary": [
+            row for payload in payloads for row in payload["course_learning"]
+        ],
     }
 
 

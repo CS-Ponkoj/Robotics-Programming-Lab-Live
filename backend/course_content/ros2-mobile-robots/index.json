@@ -38,6 +38,11 @@
       "kind": "quiz"
     },
     {
+      "id": "pretest",
+      "title": "Pre-test",
+      "kind": "pretest"
+    },
+    {
       "id": "math-exercises-for-ros-2",
       "title": "Math exercises for ROS 2",
       "kind": "math",

@@ -6,6 +6,7 @@
       "summary": "Write ROS 2 nodes that read a laser scan and command a mobile robot.",
       "old": false,
       "section_counts": {
+        "pretest": 1,
         "lesson": 1,
         "exercise": 4,
         "quiz": 1,
@@ -18,6 +19,7 @@
       "summary": "Detect obstacles and choose safe routes around them.",
       "old": true,
       "section_counts": {
+        "pretest": 0,
         "lesson": 1,
         "exercise": 4,
         "quiz": 1,
@@ -30,6 +32,7 @@
       "summary": "Explore search algorithms and robot routes through constrained spaces.",
       "old": true,
       "section_counts": {
+        "pretest": 0,
         "lesson": 1,
         "exercise": 3,
         "quiz": 1,
@@ -42,6 +45,7 @@
       "summary": "Combine readings from multiple sensors to estimate robot state.",
       "old": true,
       "section_counts": {
+        "pretest": 0,
         "lesson": 1,
         "exercise": 2,
         "quiz": 1,
@@ -54,6 +58,7 @@
       "summary": "Compare distance sensors and interpret obstacle measurements.",
       "old": true,
       "section_counts": {
+        "pretest": 0,
         "lesson": 1,
         "exercise": 2,
         "quiz": 1,
@@ -66,6 +71,7 @@
       "summary": "Study robot mobility, stability, and motion calculations.",
       "old": true,
       "section_counts": {
+        "pretest": 0,
         "lesson": 1,
         "exercise": 4,
         "quiz": 1,
@@ -78,6 +84,7 @@
       "summary": "Navigate when satellite positioning is unreliable or unavailable.",
       "old": true,
       "section_counts": {
+        "pretest": 0,
         "lesson": 1,
         "exercise": 5,
         "quiz": 1,

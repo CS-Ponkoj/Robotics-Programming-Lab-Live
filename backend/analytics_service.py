@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from data_contracts import CURRENT_DATA_SCHEMA_VERSION
+from course_assessments import course_assessment_rows, course_learning_summary
 from models import (
     Assignment,
     AssignmentActivity,
@@ -206,6 +207,9 @@ def student_analytics_payload(session: Session, user: User) -> dict[str, Any]:
         "assignment_summaries": summaries,
         "attempts": [_attempt_row(item, participant_label(user)) for item in submissions],
         "events": [_event_row(item, participant_label(user)) for item in events],
+        # Pre-test and first-attempt quiz scores per course topic.
+        "course_learning": course_learning_summary(session, user, participant_label(user)),
+        "course_assessments": course_assessment_rows(session, user, participant_label(user)),
     }
 
 

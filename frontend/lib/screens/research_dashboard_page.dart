@@ -182,6 +182,14 @@ class _InstructorResearchDashboardState
                 value: 'assignment_attempts:csv',
                 child: Text('Assignment attempts CSV'),
               ),
+              PopupMenuItem(
+                value: 'course_learning_summary:csv',
+                child: Text('Course pre-test and quiz scores CSV'),
+              ),
+              PopupMenuItem(
+                value: 'course_assessment_attempts:csv',
+                child: Text('Course pre-test and quiz attempts CSV'),
+              ),
               PopupMenuDivider(),
               PopupMenuItem(
                 value: 'all:xlsx',
@@ -439,6 +447,14 @@ class _ResearchStudentDetailPageState extends State<ResearchStudentDetailPage> {
               _AssignmentAnalyticsList(
                 rows: _listOfMaps(data['assignment_summaries']),
               ),
+              const SizedBox(height: AppSpacing.xl),
+              const _SectionTitle(
+                title: 'Course pre-test and quiz',
+                subtitle: 'The quiz score is the first submitted attempt; '
+                    'later attempts are practice.',
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _CourseLearningList(rows: _listOfMaps(data['course_learning'])),
               const SizedBox(height: AppSpacing.xl),
               _SectionTitle(
                 key: _attemptsKey,
@@ -1223,4 +1239,55 @@ String _scoreDistribution(Object? value) {
   return distribution.entries
       .map((entry) => '${entry.key}: ${entry.value}')
       .join(' · ');
+}
+
+/// Per topic: pre-test score, first-attempt quiz score, and the gain.
+class _CourseLearningList extends StatelessWidget {
+  const _CourseLearningList({required this.rows});
+
+  final List<Map<String, dynamic>> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    if (rows.isEmpty) {
+      return const Text('No course pre-test or quiz attempts yet.',
+          key: Key('course-learning-empty'));
+    }
+    String score(Object? value) => value == null ? '—' : '$value%';
+    String gain(Object? value) => value == null
+        ? '—'
+        : (value is num && value > 0 ? '+$value' : '$value');
+    return Column(
+      key: const Key('course-learning-list'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final row in rows)
+          Card(
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(row['topic_id'].toString(),
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: AppSpacing.xs),
+                  Wrap(
+                    spacing: AppSpacing.md,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      Text('Pre-test: ${score(row['pretest_score'])}'),
+                      Text('Quiz (first attempt): ${score(row['quiz_score'])}'),
+                      Text('Gain: ${gain(row['learning_gain'])} points'),
+                      Text('Quiz attempts: ${row['quiz_attempts'] ?? 0}'),
+                      Text('Best quiz: ${score(row['best_quiz_score'])}'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

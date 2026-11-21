@@ -41,8 +41,13 @@ class CourseContentRepository:
             return None
         return self._read(self.root / topic_id / f"{section_id}.json")
 
-    def grade_quiz(self, topic_id: str, version: str, choices: dict[str, str]) -> dict | None:
-        section = self.section(topic_id, "quiz")
+    def grade_quiz(
+        self, topic_id: str, version: str, choices: dict[str, str], section_id: str = "quiz"
+    ) -> dict | None:
+        """Grade a complete quiz or pre-test (section_id "quiz" or "pretest")."""
+        if section_id not in {"quiz", "pretest"}:
+            return None
+        section = self.section(topic_id, section_id)
         if section is None:
             return None
         if section["version"] != version:
@@ -55,9 +60,9 @@ class CourseContentRepository:
             valid = {option["id"] for option in question["options"]}
             if choices[question["id"]] not in valid:
                 raise ValueError("The quiz contains an invalid choice.")
-        answers = self._read(self.root / "quiz_answers.json")[f"{topic_id}/quiz"]
+        answers = self._read(self.root / "quiz_answers.json")[f"{topic_id}/{section_id}"]
         explanations = self._optional(self.root / "quiz_explanations.json").get(
-            f"{topic_id}/quiz", {}
+            f"{topic_id}/{section_id}", {}
         )
         # Graded only after a complete submission, so each result may name the
         # correct option and, when the topic provides one, why it is correct.
@@ -81,6 +86,13 @@ class CourseContentRepository:
             "total_questions": total,
             "score_percent": round(correct * 100 / total),
             "results": results,
+            # Stored with the attempt for research; never returned for a pre-test.
+            "answers": [
+                {"question_id": result["question_id"],
+                 "choice": choices[result["question_id"]],
+                 "correct": result["correct"]}
+                for result in results
+            ],
         }
 
     def asset(self, name: str) -> Path | None:

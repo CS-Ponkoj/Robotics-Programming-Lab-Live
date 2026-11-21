@@ -2281,10 +2281,12 @@ def create_app(
         session: Session = Depends(session_dependency),
     ):
         summaries = {}
+        pretests: dict[str, int] = {}
         demo = demo_session_record(request)
         if demo is not None:
             with request.app.state.demo_session_lock:
                 summaries = dict(demo[1].get("quiz_progress", {}))
+                pretests = dict(demo[1].get("pretests", {}))
         elif user.role == "student":
             rows = session.execute(
                 select(
@@ -2292,21 +2294,34 @@ def create_app(
                     CourseQuizAttempt.quiz_version,
                     func.count(CourseQuizAttempt.id),
                     func.max(CourseQuizAttempt.score_percent),
-                ).where(CourseQuizAttempt.user_id == user.id)
+                ).where(CourseQuizAttempt.user_id == user.id,
+                        CourseQuizAttempt.assessment == "quiz")
                 .group_by(CourseQuizAttempt.topic_id, CourseQuizAttempt.quiz_version)
             ).all()
             for topic_id, version, count, best in rows:
-                latest = session.scalar(
+                ordered = (
                     select(CourseQuizAttempt.score_percent)
                     .where(CourseQuizAttempt.user_id == user.id,
+                           CourseQuizAttempt.assessment == "quiz",
                            CourseQuizAttempt.topic_id == topic_id,
                            CourseQuizAttempt.quiz_version == version)
-                    .order_by(CourseQuizAttempt.submitted_at.desc(), CourseQuizAttempt.id.desc())
-                    .limit(1)
                 )
+                latest = session.scalar(ordered.order_by(
+                    CourseQuizAttempt.submitted_at.desc(), CourseQuizAttempt.id.desc()
+                ).limit(1))
+                first = session.scalar(ordered.order_by(
+                    CourseQuizAttempt.submitted_at, CourseQuizAttempt.id
+                ).limit(1))
                 summaries[(topic_id, version)] = {
                     "attempt_count": count, "best_score": best, "latest_score": latest,
+                    "first_score": first,
                 }
+            for topic_id, score in session.execute(
+                select(CourseQuizAttempt.topic_id, CourseQuizAttempt.score_percent)
+                .where(CourseQuizAttempt.user_id == user.id,
+                       CourseQuizAttempt.assessment == "pretest")
+            ).all():
+                pretests[topic_id] = score
         topics = []
         for topic in COURSE_CONTENT.topics():
             quiz = COURSE_CONTENT.section(topic["id"], "quiz")
@@ -2317,6 +2332,9 @@ def create_app(
                 "attempt_count": progress.get("attempt_count", 0),
                 "best_score": progress.get("best_score"),
                 "latest_score": progress.get("latest_score"),
+                # The first submitted attempt is the topic's quiz score.
+                "first_score": progress.get("first_score"),
+                "pretest_score": pretests.get(topic["id"]),
                 "temporary": demo is not None,
             }})
         return {"topics": topics}
@@ -2369,25 +2387,46 @@ def create_app(
             raise HTTPException(400, str(error)) from error
         if result is None:
             raise HTTPException(404, "Quiz not found.")
+        answers = result.pop("answers")
         demo = demo_session_record(request)
         if demo is not None:
             with request.app.state.demo_session_lock:
                 progress = demo[1].setdefault("quiz_progress", {})
                 key = (topic_id, result["quiz_version"])
                 previous = progress.get(key, {})
+                first = previous.get("first_score", result["score_percent"])
                 progress[key] = {
                     "attempt_count": previous.get("attempt_count", 0) + 1,
                     "latest_score": result["score_percent"],
                     "best_score": max(previous.get("best_score", 0), result["score_percent"]),
+                    "first_score": first,
                 }
-            return {**result, "saved": False}
+            return {**result, "saved": False, "scored": not previous,
+                    "learning_score": first}
         if user.role == "instructor":
-            return {**result, "saved": False}
+            return {**result, "saved": False, "scored": False, "learning_score": None}
+        earlier = session.scalar(
+            select(CourseQuizAttempt)
+            .where(CourseQuizAttempt.user_id == user.id,
+                   CourseQuizAttempt.assessment == "quiz",
+                   CourseQuizAttempt.topic_id == topic_id,
+                   CourseQuizAttempt.quiz_version == result["quiz_version"])
+            .order_by(CourseQuizAttempt.submitted_at, CourseQuizAttempt.id)
+            .limit(1)
+        )
         stored = {key: value for key, value in result.items() if key != "results"}
-        attempt = CourseQuizAttempt(user_id=user.id, **stored)
+        attempt = CourseQuizAttempt(
+            user_id=user.id, **stored, assessment="quiz",
+            feedback_mode=user.feedback_mode, answers=answers, data_schema_version=1,
+        )
         session.add(attempt)
         session.commit()
-        return {**result, "saved": True, "attempt_id": attempt.id}
+        return {
+            **result, "saved": True, "attempt_id": attempt.id,
+            # Only the first submitted attempt counts; later ones are practice.
+            "scored": earlier is None,
+            "learning_score": (earlier or attempt).score_percent,
+        }
 
     @application.get("/contents/{topic_id}/quiz/attempts")
     def content_quiz_attempts(
@@ -2399,24 +2438,119 @@ def create_app(
         if COURSE_CONTENT.section(topic_id, "quiz") is None:
             raise HTTPException(404, "Quiz not found.")
         if user.role == "instructor" or is_ephemeral_demo(request, user):
-            return {"attempts": []}
-        rows = session.scalars(
+            return {"attempts": [], "learning_score": None}
+        mine = (
             select(CourseQuizAttempt)
             .where(CourseQuizAttempt.user_id == user.id)
             .where(CourseQuizAttempt.topic_id == topic_id)
-            .order_by(CourseQuizAttempt.submitted_at.desc(), CourseQuizAttempt.id.desc())
+            .where(CourseQuizAttempt.assessment == "quiz")
+        )
+        rows = session.scalars(
+            mine.order_by(CourseQuizAttempt.submitted_at.desc(), CourseQuizAttempt.id.desc())
             .limit(20)
         ).all()
-        return {"attempts": [
-            {
-                "quiz_version": row.quiz_version,
-                "correct_count": row.correct_count,
-                "total_questions": row.total_questions,
-                "score_percent": row.score_percent,
-                "submitted_at": row.submitted_at.isoformat(),
-            }
-            for row in rows
-        ]}
+        firsts = {}
+        for row in session.scalars(
+            mine.order_by(CourseQuizAttempt.submitted_at, CourseQuizAttempt.id)
+        ).all():
+            firsts.setdefault(row.quiz_version, row.id)
+        current = COURSE_CONTENT.section(topic_id, "quiz")["version"]
+        first_current = session.get(CourseQuizAttempt, firsts[current]) if current in firsts else None
+        return {
+            # The first submitted attempt of the current quiz is the score.
+            "learning_score": first_current.score_percent if first_current else None,
+            "attempts": [
+                {
+                    "quiz_version": row.quiz_version,
+                    "correct_count": row.correct_count,
+                    "total_questions": row.total_questions,
+                    "score_percent": row.score_percent,
+                    "submitted_at": row.submitted_at.isoformat(),
+                    "scored": firsts.get(row.quiz_version) == row.id,
+                }
+                for row in rows
+            ],
+        }
+
+    @application.get("/contents/{topic_id}/pretest")
+    def content_pretest_status(
+        topic_id: str,
+        request: Request,
+        user: User = Depends(current_user),
+        session: Session = Depends(session_dependency),
+    ):
+        """Whether this student has taken the topic's pre-test, and the score."""
+        if COURSE_CONTENT.section(topic_id, "pretest") is None:
+            raise HTTPException(404, "This topic has no pre-test.")
+        demo = demo_session_record(request)
+        if demo is not None:
+            with request.app.state.demo_session_lock:
+                score = demo[1].get("pretests", {}).get(topic_id)
+            return {"taken": score is not None, "score_percent": score}
+        if user.role == "instructor":
+            return {"taken": False, "score_percent": None}
+        row = session.scalar(
+            select(CourseQuizAttempt)
+            .where(CourseQuizAttempt.user_id == user.id,
+                   CourseQuizAttempt.topic_id == topic_id,
+                   CourseQuizAttempt.assessment == "pretest")
+            .limit(1)
+        )
+        return {"taken": row is not None, "score_percent": row.score_percent if row else None}
+
+    @application.post("/contents/{topic_id}/pretest/submit")
+    def submit_content_pretest(
+        topic_id: str,
+        submission: QuizSubmission,
+        request: Request,
+        user: User = Depends(current_user),
+        session: Session = Depends(session_dependency),
+    ):
+        """One attempt per student; graded on the server, no answers returned."""
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="quiz",
+            requests_per_minute=request.app.state.settings.general_requests_per_minute,
+        )
+        try:
+            result = COURSE_CONTENT.grade_quiz(
+                topic_id, submission.quiz_version, submission.choices, section_id="pretest"
+            )
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from error
+        if result is None:
+            raise HTTPException(404, "This topic has no pre-test.")
+        summary = {key: result[key] for key in (
+            "topic_id", "quiz_version", "correct_count", "total_questions", "score_percent",
+        )}
+        demo = demo_session_record(request)
+        if demo is not None:
+            with request.app.state.demo_session_lock:
+                pretests = demo[1].setdefault("pretests", {})
+                if topic_id in pretests:
+                    raise HTTPException(409, "You have already taken this pre-test.")
+                pretests[topic_id] = result["score_percent"]
+            return {**summary, "saved": False}
+        if user.role == "instructor":
+            return {**summary, "saved": False}
+        taken = session.scalar(
+            select(CourseQuizAttempt.id)
+            .where(CourseQuizAttempt.user_id == user.id,
+                   CourseQuizAttempt.topic_id == topic_id,
+                   CourseQuizAttempt.assessment == "pretest")
+            .limit(1)
+        )
+        if taken is not None:
+            raise HTTPException(409, "You have already taken this pre-test.")
+        attempt = CourseQuizAttempt(
+            user_id=user.id, **summary, assessment="pretest",
+            feedback_mode=user.feedback_mode, answers=result["answers"],
+            data_schema_version=1,
+        )
+        session.add(attempt)
+        session.commit()
+        return {**summary, "saved": True, "attempt_id": attempt.id}
 
     @application.get("/content-assets/{asset_name}")
     def serve_content_asset(asset_name: str):

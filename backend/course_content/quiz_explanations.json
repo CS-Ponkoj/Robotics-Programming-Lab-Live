@@ -15,5 +15,22 @@
     "q13": "An all-zero Twist requests zero velocity; sending nothing makes no new request (Section 5.5).",
     "q14": "A number selects keep-last history with that depth; it is not a rate (Section 3.4).",
     "q15": "The Flbr definition: NaN indicates that the sector is unavailable (Section 6)."
+  },
+  "ros2-mobile-robots/pretest": {
+    "q1": "main() spins the node that build_node() returns (Section 3.1).",
+    "q2": "Pass the message type, the topic name, the function itself (without parentheses) and the depth (Sections 3.3 and 3.5).",
+    "q3": "One callback receives one whole message; a Flbr message holds front, left, back and right (Sections 3.3 and 6).",
+    "q4": "-1.0 + 6 × 0.25 = +0.5 rad (Section 4.2).",
+    "q5": "Negative indexes count from the end: -1 is the last reading and -2 the one before it (Section 4.5).",
+    "q6": "The scan was received; that beam reported no detection within range (Section 4.3).",
+    "q7": "REP 117: -inf means too close to measure (Section 4.3).",
+    "q8": "math.isnan(d) selects NaN only; == never matches NaN, and not math.isfinite(d) also selects both infinities (Section 4.3).",
+    "q9": "Only values below range_min or above range_max are discarded; a value equal to a limit is kept (Section 4.1).",
+    "q10": "REP 103 uses SI units, so a forward speed is in m/s and a turning rate in rad/s (Section 5.2).",
+    "q11": "Negative angular.z is clockwise seen from above: a right turn, and linear.x = 0 means on the spot (Sections 5.2 and 5.3).",
+    "q12": "REP 103 body frame: x forward, y left, z up (Section 5.2).",
+    "q13": "Sending nothing makes no new request; an all-zero Twist requests zero velocity (Section 5.5).",
+    "q14": "A number selects keep-last history with that depth; it is not a rate (Section 3.4).",
+    "q15": "The course uses NaN to mark an unavailable sector (Section 6)."
   }
 }

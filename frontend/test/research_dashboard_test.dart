@@ -163,6 +163,35 @@ void main() {
     expect(find.text('P-042'), findsOneWidget);
     expect(find.text('Assignment analytics'), findsOneWidget);
     expect(find.textContaining('Obstacle avoidance'), findsWidgets);
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('course-learning-empty')), 300,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Course pre-test and quiz'), findsOneWidget);
+  });
+
+  testWidgets('participant detail shows pre-test, first quiz score and gain',
+      (tester) async {
+    final data = _studentData()
+      ..['course_learning'] = [
+        {
+          'topic_id': 'ros2-mobile-robots',
+          'pretest_score': 40,
+          'quiz_score': 80,
+          'learning_gain': 40,
+          'quiz_attempts': 3,
+          'best_quiz_score': 100,
+        },
+      ];
+    await tester.pumpWidget(_app(
+        ResearchStudentDetailPage(studentId: 'student-uuid', initialData: data)));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('course-learning-list')), 300,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Pre-test: 40%'), findsOneWidget);
+    expect(find.text('Quiz (first attempt): 80%'), findsOneWidget);
+    expect(find.text('Gain: +40 points'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('classroom number cards open the participants they count',

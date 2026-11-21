@@ -247,6 +247,17 @@ class CourseQuizAttempt(Base):
     total_questions: Mapped[int] = mapped_column(Integer)
     score_percent: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    # "quiz" (after the lesson; the first attempt is the scored one) or
+    # "pretest" (one attempt, before the lesson).
+    assessment: Mapped[str] = mapped_column(
+        String(20), default="quiz", server_default="quiz", index=True
+    )
+    feedback_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # [{"question_id", "choice", "correct"}] in quiz order; null on older rows.
+    answers: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    data_schema_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1"
+    )
 
     user: Mapped[User] = relationship(back_populates="course_quiz_attempts")
 

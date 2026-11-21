@@ -1,0 +1,340 @@
+{
+  "id": "pretest",
+  "title": "Pre-test",
+  "kind": "pretest",
+  "topic_id": "ros2-mobile-robots",
+  "html": "",
+  "questions": [
+    {
+      "id": "q1",
+      "prompt": "A student's build_node() creates a node, a publisher and a subscription. Which object must it hand back to the lab's unchanged main()?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The publisher"
+        },
+        {
+          "id": "B",
+          "text": "The subscription"
+        },
+        {
+          "id": "C",
+          "text": "The callback function"
+        },
+        {
+          "id": "D",
+          "text": "The configured node"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "prompt": "report is a function that takes one Flbr message. Which line registers it to process messages on /flbr?",
+      "options": [
+        {
+          "id": "A",
+          "text": "node.create_subscription(Flbr, '/flbr', report, 10)"
+        },
+        {
+          "id": "B",
+          "text": "node.create_subscription(Flbr, '/flbr', report(), 10)"
+        },
+        {
+          "id": "C",
+          "text": "node.create_subscription(Flbr, '/flbr', 'report', 10)"
+        },
+        {
+          "id": "D",
+          "text": "node.create_subscription(report, '/flbr', Flbr, 10)"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "prompt": "A node subscribes to /flbr. What does one call of its callback receive?",
+      "options": [
+        {
+          "id": "A",
+          "text": "One Flbr message with all four distances"
+        },
+        {
+          "id": "B",
+          "text": "Only the front distance"
+        },
+        {
+          "id": "C",
+          "text": "Every Flbr message since the program started"
+        },
+        {
+          "id": "D",
+          "text": "Ten messages, because the depth is 10"
+        }
+      ]
+    },
+    {
+      "id": "q4",
+      "prompt": "Using the stated values angle_min = -1.0 and angle_increment = 0.25, what is the angle of index 6?",
+      "options": [
+        {
+          "id": "A",
+          "text": "-0.5 rad"
+        },
+        {
+          "id": "B",
+          "text": "+0.5 rad"
+        },
+        {
+          "id": "C",
+          "text": "+1.5 rad"
+        },
+        {
+          "id": "D",
+          "text": "+0.25 rad"
+        }
+      ]
+    },
+    {
+      "id": "q5",
+      "prompt": "scan.ranges contains at least three readings. Which reading does scan.ranges[-2] select?",
+      "options": [
+        {
+          "id": "A",
+          "text": "The second reading"
+        },
+        {
+          "id": "B",
+          "text": "The last reading"
+        },
+        {
+          "id": "C",
+          "text": "The second-to-last reading"
+        },
+        {
+          "id": "D",
+          "text": "No reading; it raises an IndexError"
+        }
+      ]
+    },
+    {
+      "id": "q6",
+      "prompt": "A scan-reporting node receives a reading of +inf. Which description matches REP 117?",
+      "options": [
+        {
+          "id": "A",
+          "text": "No return was detected within the sensor's range"
+        },
+        {
+          "id": "B",
+          "text": "A valid return at exactly range_max"
+        },
+        {
+          "id": "C",
+          "text": "An invalid measurement"
+        },
+        {
+          "id": "D",
+          "text": "No scan message was received"
+        }
+      ]
+    },
+    {
+      "id": "q7",
+      "prompt": "Which value does REP 117 use for \"something was detected, but it is too close to measure\"?",
+      "options": [
+        {
+          "id": "A",
+          "text": "NaN"
+        },
+        {
+          "id": "B",
+          "text": "+inf"
+        },
+        {
+          "id": "C",
+          "text": "-inf"
+        },
+        {
+          "id": "D",
+          "text": "0.0"
+        }
+      ]
+    },
+    {
+      "id": "q8",
+      "prompt": "A sector report should print \"unavailable\" only when the Python float d is NaN. Which condition should trigger that branch?",
+      "options": [
+        {
+          "id": "A",
+          "text": "d == float('nan')"
+        },
+        {
+          "id": "B",
+          "text": "math.isnan(d)"
+        },
+        {
+          "id": "C",
+          "text": "math.isinf(d)"
+        },
+        {
+          "id": "D",
+          "text": "not math.isfinite(d)"
+        }
+      ]
+    },
+    {
+      "id": "q9",
+      "prompt": "A LaserScan reports range_min = 0.25 and range_max = 4.0. Under the message definition, is a finite reading of exactly 0.25 discarded?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Yes, because it equals the lower limit"
+        },
+        {
+          "id": "B",
+          "text": "No, because it is within the inclusive limits"
+        },
+        {
+          "id": "C",
+          "text": "Yes, because a reading must be strictly above the lower limit"
+        },
+        {
+          "id": "D",
+          "text": "The message definition does not say"
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "prompt": "A log shows a Twist with linear.x = 0.18 and angular.z = -0.30. Which units belong to those two values, in that order?",
+      "options": [
+        {
+          "id": "A",
+          "text": "m/s and rad/s"
+        },
+        {
+          "id": "B",
+          "text": "m/s and degrees per second"
+        },
+        {
+          "id": "C",
+          "text": "cm/s and rad/s"
+        },
+        {
+          "id": "D",
+          "text": "m and rad"
+        }
+      ]
+    },
+    {
+      "id": "q11",
+      "prompt": "Using (linear.x, angular.z), which Twist asks the lab's robot to turn right on the spot?",
+      "options": [
+        {
+          "id": "A",
+          "text": "(0.0, +0.4)"
+        },
+        {
+          "id": "B",
+          "text": "(0.0, -0.4)"
+        },
+        {
+          "id": "C",
+          "text": "(0.2, 0.0)"
+        },
+        {
+          "id": "D",
+          "text": "(-0.2, 0.0)"
+        }
+      ]
+    },
+    {
+      "id": "q12",
+      "prompt": "Under REP 103, which way does the x axis of a robot's body frame point?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Left"
+        },
+        {
+          "id": "B",
+          "text": "Up"
+        },
+        {
+          "id": "C",
+          "text": "Forward"
+        },
+        {
+          "id": "D",
+          "text": "Backward"
+        }
+      ]
+    },
+    {
+      "id": "q13",
+      "prompt": "After sending a movement command, what should your node publish on /cmd_vel to explicitly request zero velocity?",
+      "options": [
+        {
+          "id": "A",
+          "text": "Nothing"
+        },
+        {
+          "id": "B",
+          "text": "The text \"stop\""
+        },
+        {
+          "id": "C",
+          "text": "A Twist with linear.x = -1.0"
+        },
+        {
+          "id": "D",
+          "text": "A Twist with all six components set to 0.0"
+        }
+      ]
+    },
+    {
+      "id": "q14",
+      "prompt": "In create_subscription(LaserScan, '/scan', handle_scan, 10), what does the 10 set?",
+      "options": [
+        {
+          "id": "A",
+          "text": "How many scans arrive per second"
+        },
+        {
+          "id": "B",
+          "text": "The history depth: keep the last 10 messages"
+        },
+        {
+          "id": "C",
+          "text": "The laser's range in metres"
+        },
+        {
+          "id": "D",
+          "text": "How many callbacks run at once"
+        }
+      ]
+    },
+    {
+      "id": "q15",
+      "prompt": "The helper node has no usable distance for the right sector. What does the course's Flbr convention put in msg.right?",
+      "options": [
+        {
+          "id": "A",
+          "text": "0.0"
+        },
+        {
+          "id": "B",
+          "text": "+inf"
+        },
+        {
+          "id": "C",
+          "text": "-inf"
+        },
+        {
+          "id": "D",
+          "text": "NaN"
+        }
+      ]
+    }
+  ],
+  "version": "19ddae1b82798e95"
+}

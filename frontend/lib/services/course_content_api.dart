@@ -11,6 +11,11 @@ class ContentSessionExpired implements Exception {
   const ContentSessionExpired();
 }
 
+/// The server already has this student's single pre-test attempt.
+class PretestAlreadyTaken implements Exception {
+  const PretestAlreadyTaken();
+}
+
 class CourseContentApi {
   @visibleForTesting
   static http.Client? testClient;
@@ -67,6 +72,31 @@ class CourseContentApi {
     final result = await _get('/contents/${Uri.encodeComponent(topicId)}'
         '/sections/${Uri.encodeComponent(sectionId)}/answer');
     return result['html'] as String;
+  }
+
+  /// Whether the student has taken the topic's pre-test, and the score.
+  static Future<Map<String, dynamic>> pretestStatus(String topicId) =>
+      _get('/contents/${Uri.encodeComponent(topicId)}/pretest');
+
+  /// Submits the one-attempt pre-test; the server returns only the score.
+  static Future<Map<String, dynamic>> submitPretest(
+      String topicId, String version, Map<String, String> choices) async {
+    final uri = Uri.parse(
+        '$apiBaseUrl/contents/${Uri.encodeComponent(topicId)}/pretest/submit');
+    final headers = AuthApi.authorizedHeaders(json: true);
+    final body = jsonEncode({'quiz_version': version, 'choices': choices});
+    final response =
+        await (testClient?.post(uri, headers: headers, body: body) ??
+                http.post(uri, headers: headers, body: body))
+            .timeout(_contentTimeout);
+    if (response.statusCode == 409) {
+      throw const PretestAlreadyTaken();
+    }
+    if (response.statusCode != 200) {
+      throw Exception('Could not submit the pre-test. Please try again.');
+    }
+    return Map<String, dynamic>.from(
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map);
   }
 
   static Future<List<Map<String, dynamic>>> quizAttempts(String topicId) async {

@@ -299,6 +299,9 @@ class _QuizProgress extends StatelessWidget {
     final count = progress['attempt_count'] as int? ?? 0;
     final latest = progress['latest_score'] as num?;
     final best = progress['best_score'] as num?;
+    // The first submitted attempt is the topic's quiz score.
+    final first = progress['first_score'] as num?;
+    final pretest = progress['pretest_score'] as num?;
     final color = latest == null
         ? Theme.of(context).colorScheme.outline
         : performanceColor(latest);
@@ -329,6 +332,12 @@ class _QuizProgress extends StatelessWidget {
           runSpacing: 8,
           children: [
             badge('Attempted: $count', neutral, icon: Icons.science_outlined),
+            if (first != null)
+              badge('Quiz score: $first% (first try)', performanceColor(first),
+                  icon: Icons.verified_outlined),
+            if (pretest != null)
+              badge('Pre-test: $pretest%', neutral,
+                  icon: Icons.assignment_turned_in_outlined),
             badge(
               'Best score: ${best == null ? '—' : '$best%'}',
               best == null ? neutral : performanceColor(best),
@@ -369,16 +378,31 @@ class CourseTopicPage extends StatefulWidget {
 }
 
 class _CourseTopicPageState extends State<CourseTopicPage> {
-  late Future<Map<String, dynamic>> _topic = CourseContentApi.topic(
-    widget.topicId,
-  );
+  late Future<Map<String, dynamic>> _topic = _load();
   String _kind = 'lesson';
   String? _sectionId;
+  bool _chosen = false;
 
-  void _retry() =>
-      setState(() => _topic = CourseContentApi.topic(widget.topicId));
+  /// Loads the topic; a topic with an untaken pre-test opens on it.
+  Future<Map<String, dynamic>> _load() async {
+    final topic = await CourseContentApi.topic(widget.topicId);
+    final hasPretest =
+        (topic['sections'] as List).any((s) => (s as Map)['kind'] == 'pretest');
+    if (hasPretest && !_chosen) {
+      try {
+        final status = await CourseContentApi.pretestStatus(widget.topicId);
+        if (status['taken'] != true && !_chosen) _kind = 'pretest';
+      } catch (_) {
+        // Without the status, open the lesson as before.
+      }
+    }
+    return topic;
+  }
+
+  void _retry() => setState(() => _topic = _load());
 
   void _open(Map<String, dynamic> section) => setState(() {
+        _chosen = true;
         _kind = section['kind'] as String;
         _sectionId = section['id'] as String;
       });
@@ -531,9 +555,10 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
   }
 }
 
-const _kindOrder = ['lesson', 'exercise', 'quiz', 'math'];
+const _kindOrder = ['pretest', 'lesson', 'exercise', 'quiz', 'math'];
 
 String _kindLabel(String kind) => switch (kind) {
+      'pretest' => 'Pre-test',
       'lesson' => 'Lesson',
       'exercise' => 'Exercises',
       'quiz' => 'Quiz',
@@ -556,7 +581,9 @@ Map<String, String> _sectionLabels(List<Map<String, dynamic>> sections) {
   return {
     for (final section in sections)
       section['id'] as String: () {
-        if (kind == 'lesson' || kind == 'quiz') return _kindLabel(kind);
+        if (kind == 'lesson' || kind == 'quiz' || kind == 'pretest') {
+          return _kindLabel(kind);
+        }
         var title = section['title'] as String;
         if (shared) title = title.substring(prefix.length);
         if (RegExp(r'^\d+$').hasMatch(title)) return 'Exercise $title';
@@ -819,6 +846,12 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
                 sectionId: widget.sectionId,
               ),
             if (kind == 'quiz') ..._quiz(context, section, questions),
+            if (kind == 'pretest')
+              _Pretest(
+                key: ValueKey('pretest-${widget.topicId}'),
+                topicId: widget.topicId,
+                section: section,
+              ),
           ],
         ),
       ),
@@ -834,6 +867,23 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
     final answered =
         questions.where((q) => _choices.containsKey(q['id'])).length;
     return [
+      Container(
+        key: const Key('quiz-score-rule'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.learningSurface,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          'Your first submitted attempt is your score for this quiz. After '
+          'submitting you will see the correct answers, and you can retake '
+          'the quiz as often as you like for practice; retakes do not change '
+          'your score.',
+          style: theme.textTheme.bodyMedium,
+        ),
+      ),
       Text(
         '${questions.length} questions. Choose one answer for each, then submit.',
         style: theme.textTheme.bodyMedium?.copyWith(
@@ -889,6 +939,16 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
           key: const Key('course-quiz-score'),
           style: theme.textTheme.titleLarge,
         ),
+        if (_result!['learning_score'] is num)
+          Text(
+            _result!['scored'] == true
+                ? 'This first attempt is your quiz score: '
+                    '${_result!['learning_score']}%.'
+                : 'Practice retake. Your quiz score stays '
+                    '${_result!['learning_score']}% (your first attempt).',
+            key: const Key('course-quiz-learning-score'),
+            style: theme.textTheme.titleSmall,
+          ),
         Text(
           _result!['saved'] == true
               ? 'Score saved. This does not change your coding assignment score.'
@@ -938,6 +998,7 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
               for (final attempt in history.data!)
                 Text(
                   '${attempt['score_percent']}% · ${attempt['correct_count']}/${attempt['total_questions']} correct'
+                  '${attempt['scored'] == true ? ' · your quiz score (first attempt)' : ''}'
                   '${attempt['quiz_version'] == section['version'] ? '' : ' · earlier quiz version'}',
                 ),
             ],
@@ -1282,5 +1343,161 @@ class _WorkedAnswerState extends State<_WorkedAnswer> {
           },
         ),
     ]);
+  }
+}
+
+/// The topic's pre-test: one attempt, before the lesson, with no answers or
+/// per-question marks shown; the student sees only the score.
+class _Pretest extends StatefulWidget {
+  const _Pretest({super.key, required this.topicId, required this.section});
+
+  final String topicId;
+  final Map<String, dynamic> section;
+
+  @override
+  State<_Pretest> createState() => _PretestState();
+}
+
+class _PretestState extends State<_Pretest> {
+  late Future<Map<String, dynamic>> _status =
+      CourseContentApi.pretestStatus(widget.topicId);
+  final Map<String, String> _choices = {};
+  bool _submitting = false;
+  String? _error;
+  Map<String, dynamic>? _result;
+
+  Future<void> _submit(int total) async {
+    if (_choices.length < total) {
+      setState(() => _error = 'Answer every question before submitting.');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final result = await CourseContentApi.submitPretest(
+          widget.topicId, widget.section['version'] as String, _choices);
+      if (mounted) setState(() => _result = result);
+    } on PretestAlreadyTaken {
+      if (mounted) {
+        setState(() =>
+            _status = CourseContentApi.pretestStatus(widget.topicId));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error =
+            'Could not submit the pre-test. Your answers are still here; try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Widget _done(BuildContext context, num? score, bool saved) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const Key('pretest-done'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.learningSurface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Pre-test done', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 6),
+        if (score != null)
+          Text('Your pre-test score: $score%', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 6),
+        Text(
+          saved
+              ? 'Now read the lesson, practise, and take the quiz. The pre-test '
+                  'can be taken only once and does not affect any grade.'
+              : 'Preview only: demo and instructor pre-tests are not saved.',
+        ),
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final questions = (widget.section['questions'] as List).cast<Map>();
+    if (_result != null) {
+      return _done(context, _result!['score_percent'] as num?,
+          _result!['saved'] == true);
+    }
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _status,
+      builder: (context, status) {
+        if (!status.hasData && !status.hasError) {
+          return const LinearProgressIndicator();
+        }
+        if (status.data?['taken'] == true) {
+          return _done(context, status.data!['score_percent'] as num?, true);
+        }
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(
+            key: const Key('pretest-intro'),
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AppColors.learningSurface,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              'Take this short pre-test before reading the lesson. Answer from '
+              'what you know now; guessing is fine. You can take it only once, '
+              'you will see only your score (no answers), and it does not '
+              'affect any grade.',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+          for (final (index, question) in questions.indexed) ...[
+            Text('QUESTION ${index + 1} OF ${questions.length}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.brand, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(question['prompt'] as String,
+                style: theme.textTheme.titleMedium),
+            RadioGroup<String>(
+              groupValue: _choices[question['id']],
+              onChanged: (value) {
+                if (_submitting || value == null) return;
+                setState(() {
+                  _choices[question['id'] as String] = value;
+                  _error = null;
+                });
+              },
+              child: Column(children: [
+                for (final option in (question['options'] as List).cast<Map>())
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${option['id']}. ${option['text']}'),
+                    value: option['id'] as String,
+                  ),
+              ]),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_error != null)
+            Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton(
+              key: const Key('submit-pretest'),
+              onPressed:
+                  _submitting ? null : () => _submit(questions.length),
+              child: Text(_submitting ? 'Submitting…' : 'Submit pre-test'),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text('${_choices.length} of ${questions.length} answered',
+              style: theme.textTheme.bodySmall),
+        ]);
+      },
+    );
   }
 }

@@ -183,7 +183,7 @@
     },
     {
       "id": "q9",
-      "prompt": "The message definition says values below range_min or above range_max should be discarded. Is a finite reading exactly equal to range_max discarded by that rule?",
+      "prompt": "Under the LaserScan message definition, is a finite reading exactly equal to range_max discarded?",
       "options": [
         {
           "id": "A",
@@ -336,5 +336,5 @@
       ]
     }
   ],
-  "version": "150ffbf01130ac5e"
+  "version": "e817557b2b27a5c1"
 }
