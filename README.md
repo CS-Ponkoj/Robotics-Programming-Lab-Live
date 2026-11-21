@@ -54,7 +54,7 @@ the TDD feedback mode (green theme).
   output, the full simulation; no hints) and **TDD + AI** (TDD plus hints: the AI tutor with the built-in
   hint ladder as its fallback). Grading is identical
   in every mode, every attempt records its mode, and each mode has its own
-  gradient theme (blue, green, bronze; instructors keep teal).
+  gradient theme (blue, green, teal; instructors use bronze).
 - **Test-case grading:** public and server-only hidden checks, with structured
   feedback and partial credit where the instructions state it. Grades never
   depend on AI.

@@ -122,17 +122,17 @@ mode cannot use. Grading is the same in every mode.
 
 **Brand palettes.** `brand`, `brandDark`, `brandDeep`, `brandTint` and the
 header/button gradient come from the signed-in account
-(`BrandPalettes.forAccount`). Signed out and instructors use teal; students use
-their feedback mode's palette. Headers (`BrandHeaderGradient`) and filled
+(`BrandPalettes.forAccount`). Instructors use bronze, the signed-out sign-in
+page uses teal, and students use their feedback mode's palette. Headers (`BrandHeaderGradient`) and filled
 buttons run left to right from the gradient start to its end; tonal and
 custom-coloured buttons stay flat.
 
 | Palette | `brand` | Gradient | Tint |
 |---|---|---|---|
-| Instructor and signed out (teal) | `#19778C` | `#0F4C5C` → `#1A7F8E` | `#DDEFF2` |
 | Traditional (blue) | `#2F5FA7` | `#1F4277` → `#3567B5` | `#DFE8F5` |
 | TDD (green; also the demo) | `#2E7D4F` | `#1E5A37` → `#2F8554` | `#DFF0E5` |
-| TDD + AI (bronze) | `#A8661A` | `#7A3F0E` → `#A8661A` | `#F7E9D7` |
+| TDD + AI and signed out (teal) | `#19778C` | `#0F4C5C` → `#1A7F8E` | `#DDEFF2` |
+| Instructor (bronze) | `#985B16` | `#7A3F0E` → `#985B16` | `#F7E9D7` |
 
 White text is at least 4.5:1 on every gradient stop and every `brand`; a test
 in `frontend/test/feedback_mode_test.dart` enforces it.

@@ -25,17 +25,19 @@ class BrandPalette {
   final Color gradientEnd;
 }
 
-/// Instructors keep the original teal; each student feedback mode has its
+/// Instructors use bronze; each student feedback mode has its
 /// own colour. None uses the violet reserved for AI-generated feedback.
 abstract final class BrandPalettes {
+  // Bronze, between gold and copper.
   static const instructor = BrandPalette(
-    brand: Color(0xFF19778C),
-    dark: Color(0xFF0F4C5C),
-    deep: Color(0xFF0A3742),
-    tint: Color(0xFFDDEFF2),
-    gradientStart: Color(0xFF0F4C5C), // white text 9.5:1
-    gradientEnd: Color(0xFF1A7F8E), // 4.7:1
+    brand: Color(0xFF985B16),
+    dark: Color(0xFF8A4B12),
+    deep: Color(0xFF5C300A),
+    tint: Color(0xFFF7E9D7),
+    gradientStart: Color(0xFF7A3F0E), // 8.3:1
+    gradientEnd: Color(0xFF985B16), // 5.5:1
   );
+
   static const traditional = BrandPalette(
     brand: Color(0xFF2F5FA7),
     dark: Color(0xFF1F4277),
@@ -52,17 +54,20 @@ abstract final class BrandPalettes {
     gradientStart: Color(0xFF1E5A37), // 8.2:1
     gradientEnd: Color(0xFF2F8554), // 4.6:1
   );
-  // Bronze, between gold and copper.
+  // Teal.
   static const tddAi = BrandPalette(
-    brand: Color(0xFFA8661A),
-    dark: Color(0xFF8A4B12),
-    deep: Color(0xFF5C300A),
-    tint: Color(0xFFF7E9D7),
-    gradientStart: Color(0xFF7A3F0E), // 8.3:1
-    gradientEnd: Color(0xFFA8661A), // 4.6:1
+    brand: Color(0xFF19778C),
+    dark: Color(0xFF0F4C5C),
+    deep: Color(0xFF0A3742),
+    tint: Color(0xFFDDEFF2),
+    gradientStart: Color(0xFF0F4C5C), // white text 9.5:1
+    gradientEnd: Color(0xFF1A7F8E), // 4.7:1
   );
 
-  /// Signed out and instructors use the original teal.
+  /// The sign-in page keeps the original teal.
+  static const signedOut = tddAi;
+
+  /// Instructors use bronze; students use their feedback mode's colour.
   static BrandPalette forAccount({
     required bool signedInStudent,
     required FeedbackMode mode,
@@ -210,7 +215,7 @@ ThemeData buildAppTheme() {
     primary: AppColors.brand,
     onPrimary: Colors.white,
     // Explicit tints replace the generated light cyan so every highlight
-    // reads as the same teal brand.
+    // reads as the same brand colour.
     primaryContainer: AppColors.brandTint,
     onPrimaryContainer: AppColors.brandDeep,
     secondary: const Color(0xFF3D5A73),

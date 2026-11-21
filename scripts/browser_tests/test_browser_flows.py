@@ -62,11 +62,18 @@ def open_app(page: Page) -> None:
 
 
 def show_old_assignments(page: Page) -> None:
-    """Assignments 1-6 are listed under Old assignments; these flows use them."""
-    chip = page.get_by_role("button", name="Old assignments").or_(
-        page.get_by_role("checkbox", name="Old assignments")
-    )
-    chip.first.click()
+    """Assignments 1-6 are listed under Old assignments; these flows use them.
+
+    Old assignments is the last tile of the Assignments page, so scroll to it.
+    """
+    tile = page.get_by_role("button", name="Old assignments")
+    for _ in range(20):
+        if tile.count():
+            break
+        page.mouse.move(page.viewport_size["width"] / 2, page.viewport_size["height"] / 2)
+        page.mouse.wheel(0, 600)
+        page.wait_for_timeout(200)
+    tile.first.click()
     expect(page.get_by_role("group", name=re.compile(r"^01 ")).first).to_be_visible(
         timeout=30_000
     )

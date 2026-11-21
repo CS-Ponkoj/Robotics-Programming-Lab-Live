@@ -100,8 +100,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Answer every question before submitting.'), findsOneWidget);
     expect(log.where((l) => l.endsWith('/pretest/submit')), isEmpty);
-    await tester.tap(find.text('A. q1 first'));
-    await tester.tap(find.text('B. q2 second'));
+    await tester.tap(find.text('q1 first'));
+    await tester.tap(find.text('q2 second'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('submit-pretest')));
     await tester.pumpAndSettle();
@@ -130,8 +130,8 @@ void main() {
     await tester.tap(find.text('Quiz'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('quiz-score-rule')), findsOneWidget);
-    await tester.tap(find.text('A. q1 first'));
-    await tester.tap(find.text('A. q2 first'));
+    await tester.tap(find.text('q1 first'));
+    await tester.tap(find.text('q2 first'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Submit quiz'));
     await tester.tap(find.text('Submit quiz'));

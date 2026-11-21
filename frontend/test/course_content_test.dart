@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/widgets/lesson_reader.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -428,9 +429,9 @@ void main() {
     expect(find.text('Answer question 1 before submitting.'), findsOneWidget);
     expect(find.text('QUESTION 1 OF 1'), findsOneWidget);
     expect(find.text('0 of 1 answered'), findsOneWidget);
-    await tester.ensureVisible(find.text('B. Forward'));
+    await tester.ensureVisible(find.text('Forward'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('B. Forward'));
+    await tester.tap(find.text('Forward'));
     await tester.pump();
     expect(find.text('1 of 1 answered'), findsOneWidget);
     await tester.ensureVisible(find.text('Submit quiz'));
@@ -527,8 +528,8 @@ void main() {
     }
 
     expect(find.byKey(const Key('quiz-mark-1')), findsNothing);
-    await tapVisible(find.text('A. q1 first'));
-    await tapVisible(find.text('B. q2 second'));
+    await tapVisible(find.text('q1 first'));
+    await tapVisible(find.text('q2 second'));
     await tapVisible(find.text('Submit quiz'));
 
     expect(submissions.single, {'q1': 'A', 'q2': 'B'});
@@ -540,15 +541,13 @@ void main() {
     expect(find.bySemanticsLabel('Question 1: correct'), findsOneWidget);
     expect(find.bySemanticsLabel('Question 2: incorrect'), findsOneWidget);
     // The student's choices stay selected, and the right option is not shown.
-    final radios = tester
-        .widgetList<RadioListTile<String>>(find.byType(RadioListTile<String>))
+    final options = tester
+        .widgetList<AnswerOption>(find.byType(AnswerOption))
         .toList();
-    // ignore: deprecated_member_use
-    expect(radios.map((r) => r.groupValue), ['A', 'A', 'B', 'B']);
-    // ignore: deprecated_member_use
-    expect(radios.every((r) => r.onChanged != null), isTrue);
+    expect(options.map((o) => o.selected), [true, false, false, true]);
+    expect(options.every((o) => o.onTap != null), isTrue);
 
-    await tapVisible(find.text('A. q2 first'));
+    await tapVisible(find.text('q2 first'));
     expect(find.byKey(const Key('quiz-mark-2')), findsNothing);
     expect(find.byKey(const Key('quiz-mark-1')), findsOneWidget);
     expect(find.textContaining('Score:'), findsNothing);
@@ -637,8 +636,8 @@ void main() {
     await tester.tap(find.text('Quiz'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('quiz-review-q1')), findsNothing);
-    await tester.ensureVisible(find.text('A. Backward'));
-    await tester.tap(find.text('A. Backward'));
+    await tester.ensureVisible(find.text('Backward'));
+    await tester.tap(find.text('Backward'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Submit quiz'));
     await tester.tap(find.text('Submit quiz'));
@@ -647,8 +646,8 @@ void main() {
     expect(find.text('The correct answer is B. Forward'), findsOneWidget);
     expect(find.text('Why: Positive linear.x drives forward.'), findsOneWidget);
     // Changing the answer hides the review until the next submit.
-    await tester.ensureVisible(find.text('B. Forward'));
-    await tester.tap(find.text('B. Forward'));
+    await tester.ensureVisible(find.text('Forward'));
+    await tester.tap(find.text('Forward'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('quiz-review-q1')), findsNothing);
   });

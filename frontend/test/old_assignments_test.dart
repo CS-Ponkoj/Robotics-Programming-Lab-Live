@@ -65,9 +65,15 @@ void main() {
       expect(find.text('0 of 1 assignments completed'), findsOneWidget);
       expect(find.byKey(const Key('old-assignments-note')), findsNothing);
 
+      // Old assignments is the last tile of the Assignments page.
+      await tester.scrollUntilVisible(
+          find.byKey(const Key('open-old-assignments')), 200);
+      await tester.ensureVisible(find.byKey(const Key('open-old-assignments')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('open-old-assignments')));
       await tester.pumpAndSettle();
       expect(find.text('Old assignments'), findsWidgets);
+      expect(find.byKey(const Key('open-old-assignments')), findsNothing);
       expect(find.byKey(const Key('old-assignments-note')), findsOneWidget);
       expect(find.byKey(const Key('up-next-panel')), findsNothing);
       for (var id = 1; id <= 6; id++) {
@@ -76,14 +82,14 @@ void main() {
       expect(find.text('Stop Before the Wall'), findsNothing);
       expect(find.text('Start assignment'), findsNWidgets(5));
 
-      await tester.tap(find.byKey(const Key('open-assignments')));
+      await tester.tap(find.text('Back to assignments'));
       await tester.pumpAndSettle();
       expect(find.text('Stop Before the Wall'), findsOneWidget);
       expect(tester.takeException(), isNull);
     }, () => client);
   });
 
-  testWidgets('the three panel chips fit a phone', (tester) async {
+  testWidgets('the panel tabs and the Old assignments tile fit a phone', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final client = MockClient((_) async => http.Response(
@@ -99,20 +105,22 @@ void main() {
       await tester.pumpWidget(MaterialApp(
           home: AssignmentListPage(user: _student, onLogout: _logout)));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('open-old-assignments')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('open-old-assignments')));
+      await tester.scrollUntilVisible(
+          find.byKey(const Key('open-old-assignments')), 200);
+      await tester.ensureVisible(find.byKey(const Key('open-old-assignments')));
       await tester.pumpAndSettle();
-      expect(find.text('Old task 1'), findsOneWidget);
       for (final key in [
         'open-assignments',
         'open-old-assignments',
         'open-course-contents',
-        'open-old-course-contents',
       ]) {
         final rect = tester.getRect(find.byKey(Key(key)));
         expect(rect.left, greaterThanOrEqualTo(0));
         expect(rect.right, lessThanOrEqualTo(390));
       }
+      await tester.tap(find.byKey(const Key('open-old-assignments')));
+      await tester.pumpAndSettle();
+      expect(find.text('Old task 1'), findsOneWidget);
       // A 13 px overflow elsewhere on this page predates the Old assignments
       // panel (logged as SQA defect UI-390-01); consume it so this test checks
       // only the panel chips.

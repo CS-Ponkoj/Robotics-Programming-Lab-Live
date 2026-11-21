@@ -78,51 +78,18 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
       HomePanel.oldContents => 'Home: Old contents',
     };
 
-    Widget panelChip(
+    PillTabData panelTab(
         HomePanel panel, String keyName, IconData icon, String label) {
-      final selected = _panel == panel;
-      final color = selected ? Colors.white : AppColors.inkMuted;
-      return Semantics(
+      final selected = _panel == panel ||
+          (panel == HomePanel.assignments &&
+              _panel == HomePanel.oldAssignments) ||
+          (panel == HomePanel.contents && _panel == HomePanel.oldContents);
+      return PillTabData(
+        key: Key(keyName),
+        label: label,
+        icon: icon,
         selected: selected,
-        button: true,
-        child: Material(
-          key: Key(keyName),
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.pill),
-            onTap: () => setState(() => _panel = panel),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                gradient: selected ? AppColors.brandGradient : null,
-                borderRadius: BorderRadius.circular(AppRadii.pill),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.brandDeep.withValues(alpha: 0.25),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 17, color: color),
-                  const SizedBox(width: 7),
-                  Text(label,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                          color: selected ? Colors.white : AppColors.ink,
-                          fontWeight:
-                              selected ? FontWeight.w700 : FontWeight.w600)),
-                ],
-              ),
-            ),
-          ),
-        ),
+        onTap: () => setState(() => _panel = panel),
       );
     }
 
@@ -135,30 +102,12 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
             child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppRadii.xl + 4),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: appCardShadow,
-                ),
-                child: Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [
-                    panelChip(HomePanel.assignments, 'open-assignments',
-                        LucideIcons.codeXml, 'Assignments'),
-                    panelChip(HomePanel.oldAssignments, 'open-old-assignments',
-                        LucideIcons.archive, 'Old assignments'),
-                    panelChip(HomePanel.contents, 'open-course-contents',
-                        LucideIcons.bookOpen, 'Contents'),
-                    panelChip(HomePanel.oldContents, 'open-old-course-contents',
-                        LucideIcons.libraryBig, 'Old contents'),
-                  ],
-                ),
-              ),
+              child: PillTabBar(tabs: [
+                panelTab(HomePanel.assignments, 'open-assignments',
+                    LucideIcons.codeXml, 'Assignments'),
+                panelTab(HomePanel.contents, 'open-course-contents',
+                    LucideIcons.bookOpen, 'Contents'),
+              ]),
             ),
           ),
           Expanded(
@@ -169,7 +118,11 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
                       user: widget.user,
                       onLogout: widget.onLogout,
                       embedded: true,
-                      oldTopics: _panel == HomePanel.oldContents)
+                      oldTopics: _panel == HomePanel.oldContents,
+                      onToggleOld: () => setState(() => _panel =
+                          _panel == HomePanel.oldContents
+                              ? HomePanel.contents
+                              : HomePanel.oldContents))
                   : FutureBuilder<List<AssignmentDto>>(
                       future: assignments,
                       builder: (context, snap) {
@@ -193,6 +146,11 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
                           child: AssignmentCollection(
                             assignments: list,
                             oldAssignments: old,
+                            oldCount:
+                                snap.data!.where((a) => a.isOld).length,
+                            onToggleOld: () => setState(() => _panel = old
+                                ? HomePanel.assignments
+                                : HomePanel.oldAssignments),
                             theme: theme,
                             onReturn: () {
                               // Rebuild when coming back so progress and scores refresh.
@@ -371,7 +329,15 @@ class AssignmentCollection extends StatelessWidget {
     required this.theme,
     required this.onReturn,
     this.oldAssignments = false,
+    this.oldCount = 0,
+    this.onToggleOld,
   });
+
+  /// How many old assignments the last tile opens (0 hides it).
+  final int oldCount;
+
+  /// Opens the old list from the current one, and returns from it.
+  final VoidCallback? onToggleOld;
 
   @override
   Widget build(BuildContext context) {
@@ -394,11 +360,29 @@ class AssignmentCollection extends StatelessWidget {
         final rosCount = assignments.length - pythonCount;
 
         return CustomScrollView(
+          // The old and current lists each start at the top.
+          key: ValueKey(oldAssignments),
           slivers: [
             if (oldAssignments)
-              const SliverPadding(
-                padding: EdgeInsets.only(top: 28),
-                sliver: SliverToBoxAdapter(child: OldAssignmentsNote()),
+              SliverPadding(
+                padding: const EdgeInsets.only(top: 20),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (onToggleOld != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 20, 4),
+                          child: BackToCurrentLink(
+                            key: const Key('back-to-assignments'),
+                            label: 'Back to assignments',
+                            onTap: onToggleOld!,
+                          ),
+                        ),
+                      const OldAssignmentsNote(),
+                    ],
+                  ),
+                ),
               )
             else
             SliverPadding(
@@ -443,8 +427,7 @@ class AssignmentCollection extends StatelessWidget {
             ),
             if (useGrid)
               SliverPadding(
-                // Room below the last card for the floating Feedback button.
-                padding: const EdgeInsets.only(bottom: 96),
+                padding: const EdgeInsets.only(bottom: 8),
                 sliver: SliverGrid(
                   key: const Key('assignment-grid'),
                   delegate: assignmentDelegate,
@@ -456,13 +439,29 @@ class AssignmentCollection extends StatelessWidget {
               )
             else
               SliverPadding(
-                // Room below the last card for the floating Feedback button.
-                padding: const EdgeInsets.only(bottom: 96),
+                padding: const EdgeInsets.only(bottom: 8),
                 sliver: SliverList(
                   key: const Key('assignment-list'),
                   delegate: assignmentDelegate,
                 ),
               ),
+            if (!oldAssignments && oldCount > 0 && onToggleOld != null)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: OldCollectionTile(
+                    key: const Key('open-old-assignments'),
+                    icon: LucideIcons.archive,
+                    title: 'Old assignments',
+                    subtitle: '$oldCount earlier '
+                        '${oldCount == 1 ? 'assignment' : 'assignments'}, '
+                        'still open for practice',
+                    onTap: onToggleOld!,
+                  ),
+                ),
+              ),
+            // Room below the last card for the floating Feedback button.
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
           ],
         );
       },

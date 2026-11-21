@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/services/course_content_api.dart';
@@ -29,11 +30,15 @@ class CourseCatalogPage extends StatefulWidget {
     required this.onLogout,
     this.embedded = false,
     this.oldTopics = false,
+    this.onToggleOld,
   });
   final bool embedded;
 
   /// Show the earlier topics (Old contents) instead of the current ones.
   final bool oldTopics;
+
+  /// Opens Old contents from the current list, and returns from it.
+  final VoidCallback? onToggleOld;
   final AuthenticatedUser user;
   final Future<void> Function() onLogout;
 
@@ -65,12 +70,23 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
         final topics = snapshot.data!
             .where((topic) => (topic['old'] == true) == widget.oldTopics)
             .toList();
+        final oldCount =
+            snapshot.data!.where((topic) => topic['old'] == true).length;
         return ScrollableCenter(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1160),
             child: ListView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
               children: [
+                if (widget.oldTopics && widget.onToggleOld != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: BackToCurrentLink(
+                      key: const Key('back-to-course-contents'),
+                      label: 'Back to contents',
+                      onTap: widget.onToggleOld!,
+                    ),
+                  ),
                 Text(
                   widget.oldTopics ? 'OLD CONTENTS' : 'COURSE CONTENTS',
                   style: theme.textTheme.labelMedium?.copyWith(
@@ -257,6 +273,18 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
                     );
                   },
                 ),
+                if (!widget.oldTopics &&
+                    oldCount > 0 &&
+                    widget.onToggleOld != null)
+                  OldCollectionTile(
+                    key: const Key('open-old-course-contents'),
+                    icon: LucideIcons.libraryBig,
+                    title: 'Old contents',
+                    subtitle: '$oldCount earlier '
+                        '${oldCount == 1 ? 'topic' : 'topics'}, still open '
+                        'with their lessons and quizzes',
+                    onTap: widget.onToggleOld!,
+                  ),
               ],
             ),
           ),
@@ -277,15 +305,15 @@ class _CourseCatalogPageState extends State<CourseCatalogPage> {
 
 /// A recognizable icon for each course topic.
 IconData topicIcon(String topicId) => switch (topicId) {
-      'ros2-mobile-robots' => Icons.smart_toy_rounded,
-      'obstacle-avoidance' => Icons.alt_route_rounded,
-      'path-planning' => Icons.route_rounded,
-      'sensor-fusion' => Icons.hub_rounded,
-      'range-sensors' => Icons.sensors_rounded,
-      'locomotion' => Icons.precision_manufacturing_rounded,
+      'ros2-mobile-robots' => LucideIcons.bot,
+      'obstacle-avoidance' => LucideIcons.waypoints,
+      'path-planning' => LucideIcons.route,
+      'sensor-fusion' => LucideIcons.network,
+      'range-sensors' => LucideIcons.radar,
+      'locomotion' => LucideIcons.cog,
       'hybrid-navigation-gps' ||
       'hybrid-navigation-and-gps' =>
-        Icons.satellite_alt_rounded,
+        LucideIcons.satellite,
       _ => Icons.menu_book_rounded,
     };
 
@@ -515,36 +543,34 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
           ),
         ),
         const SizedBox(height: 14),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: PillTabBar(tabs: [
             for (final kind in kinds)
-              ChoiceChip(
+              PillTabData(
                 key: Key('content-tab-$kind'),
-                label: Text(_kindLabel(kind)),
+                label: _kindLabel(kind),
+                icon: _kindIcon(kind),
                 selected: selectedKind == kind,
-                onSelected: (_) => setState(() {
+                onTap: () => setState(() {
                   _kind = kind;
                   _sectionId = null;
                 }),
               ),
-          ],
+          ]),
         ),
         // Wrapping keeps the selected exercise visible at every width.
         if (visible.length > 1) ...[
           const SizedBox(height: 10),
-          Wrap(
+          PillTabBar(
             key: const Key('content-section-picker'),
-            spacing: 8,
-            runSpacing: 8,
-            children: [
+            compact: true,
+            tabs: [
               for (final section in visible)
-                ChoiceChip(
-                  label: Text(labels[section['id']] ?? ''),
-                  showCheckmark: false,
+                PillTabData(
+                  label: labels[section['id']] ?? '',
                   selected: sectionId == section['id'],
-                  onSelected: (_) =>
+                  onTap: () =>
                       setState(() => _sectionId = section['id'] as String),
                 ),
             ],
@@ -556,6 +582,14 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
 }
 
 const _kindOrder = ['pretest', 'lesson', 'exercise', 'quiz', 'math'];
+
+IconData _kindIcon(String kind) => switch (kind) {
+      'pretest' => LucideIcons.clipboardList,
+      'lesson' => LucideIcons.bookOpen,
+      'exercise' => LucideIcons.pencilLine,
+      'quiz' => LucideIcons.listChecks,
+      _ => LucideIcons.sigma,
+    };
 
 String _kindLabel(String kind) => switch (kind) {
       'pretest' => 'Pre-test',
@@ -1095,16 +1129,16 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
             style: theme.textTheme.titleMedium?.copyWith(height: 1.4),
           ),
           const SizedBox(height: 4),
+          const SizedBox(height: 6),
           for (final option in options)
-            RadioListTile<String>(
-              contentPadding: EdgeInsets.zero,
-              title: Text('${option['id']}. ${option['text']}'),
-              value: option['id'] as String,
-              groupValue: _choices[id],
-              onChanged: _submitting
+            AnswerOption(
+              letter: option['id'] as String,
+              text: option['text'] as String,
+              selected: _choices[id] == option['id'],
+              onTap: _submitting
                   ? null
-                  : (value) => setState(() {
-                        _choices[id] = value!;
+                  : () => setState(() {
+                        _choices[id] = option['id'] as String;
                         _quizError = null;
                         // A changed answer needs a fresh submit to be graded.
                         _marks.remove(id);
@@ -1461,24 +1495,20 @@ class _PretestState extends State<_Pretest> {
             const SizedBox(height: 4),
             Text(question['prompt'] as String,
                 style: theme.textTheme.titleMedium),
-            RadioGroup<String>(
-              groupValue: _choices[question['id']],
-              onChanged: (value) {
-                if (_submitting || value == null) return;
-                setState(() {
-                  _choices[question['id'] as String] = value;
-                  _error = null;
-                });
-              },
-              child: Column(children: [
-                for (final option in (question['options'] as List).cast<Map>())
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('${option['id']}. ${option['text']}'),
-                    value: option['id'] as String,
-                  ),
-              ]),
-            ),
+            const SizedBox(height: 8),
+            for (final option in (question['options'] as List).cast<Map>())
+              AnswerOption(
+                letter: option['id'] as String,
+                text: option['text'] as String,
+                selected: _choices[question['id']] == option['id'],
+                onTap: _submitting
+                    ? null
+                    : () => setState(() {
+                          _choices[question['id'] as String] =
+                              option['id'] as String;
+                          _error = null;
+                        }),
+              ),
             const SizedBox(height: 12),
           ],
           if (_error != null)

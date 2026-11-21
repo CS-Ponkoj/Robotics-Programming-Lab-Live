@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 
 /// Shared building blocks so every screen draws cards, pills, numbers and
@@ -447,6 +448,292 @@ class SectionHeader extends StatelessWidget {
         ),
         if (trailing != null) trailing!,
       ],
+    );
+  }
+}
+
+/// The last tile of a list that opens its earlier ("old") items.
+class OldCollectionTile extends StatelessWidget {
+  const OldCollectionTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: true,
+      label: title,
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          side: const BorderSide(color: AppColors.borderStrong, width: 1),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            child: Row(
+              children: [
+                IconTile(icon: icon),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.inkMuted)),
+                    ],
+                  ),
+                ),
+                const Icon(LucideIcons.chevronRight, color: AppColors.inkMuted),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Returns from an "old" list to the current one.
+class BackToCurrentLink extends StatelessWidget {
+  const BackToCurrentLink({super.key, required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: onTap,
+          icon: const Icon(LucideIcons.arrowLeft, size: 18),
+          label: Text(label),
+        ),
+      );
+}
+
+/// One tab of a [PillTabBar].
+class PillTabData {
+  const PillTabData({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+    this.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final Key? key;
+}
+
+/// A row of rounded tabs in a white track; the selected one is filled with
+/// the brand gradient. [compact] draws smaller tabs without the track, for
+/// a second level such as Exercise 1, 2, 3.
+class PillTabBar extends StatelessWidget {
+  const PillTabBar({super.key, required this.tabs, this.compact = false});
+
+  final List<PillTabData> tabs;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final wrap = Wrap(
+      spacing: compact ? 8 : 4,
+      runSpacing: compact ? 8 : 4,
+      children: [for (final tab in tabs) _PillTab(tab: tab, compact: compact)],
+    );
+    if (compact) return wrap;
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.xl + 4),
+        border: Border.all(color: AppColors.border),
+        boxShadow: appCardShadow,
+      ),
+      child: wrap,
+    );
+  }
+}
+
+class _PillTab extends StatelessWidget {
+  const _PillTab({required this.tab, required this.compact});
+
+  final PillTabData tab;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final selected = tab.selected;
+    final Color fg;
+    final BoxDecoration decoration;
+    if (compact) {
+      fg = selected ? AppColors.brandDeep : AppColors.ink;
+      decoration = BoxDecoration(
+        color: selected ? AppColors.brandTint : Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        border: Border.all(
+          color: selected ? AppColors.brand : AppColors.border,
+        ),
+      );
+    } else {
+      fg = selected ? Colors.white : AppColors.ink;
+      decoration = BoxDecoration(
+        gradient: selected ? AppColors.brandGradient : null,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: AppColors.brandDeep.withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : null,
+      );
+    }
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Material(
+        key: tab.key,
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+          onTap: tab.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.symmetric(
+                horizontal: compact ? 12 : 14, vertical: compact ? 6 : 8),
+            decoration: decoration,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (tab.icon != null) ...[
+                  Icon(tab.icon,
+                      size: 17,
+                      color: selected && !compact ? Colors.white : fg),
+                  const SizedBox(width: 7),
+                ],
+                Text(tab.label,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                        color: fg,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w600)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One choice of a multiple-choice question: a rounded tile with a letter
+/// badge that fills with the brand colour when chosen.
+class AnswerOption extends StatelessWidget {
+  const AnswerOption({
+    super.key,
+    required this.letter,
+    required this.text,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String letter;
+  final String text;
+  final bool selected;
+
+  /// Null while the answer cannot change (for example while submitting).
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Semantics(
+        inMutuallyExclusiveGroup: true,
+        checked: selected,
+        enabled: onTap != null,
+        label: '$letter. $text',
+        excludeSemantics: true,
+        child: Material(
+          color: selected ? AppColors.brandTint : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.md),
+            side: BorderSide(
+              color: selected ? AppColors.brand : AppColors.border,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selected ? AppColors.brand : Colors.white,
+                      border: Border.all(
+                        color: selected ? AppColors.brand : AppColors.borderStrong,
+                      ),
+                    ),
+                    child: Text(
+                      letter,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: selected ? Colors.white : AppColors.inkMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      text,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: AppColors.ink,
+                        fontWeight: selected ? FontWeight.w600 : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -102,9 +102,12 @@ Map<String, String>? lessonStyles(dom.Element element) {
       },
     'a' => {'color': _hex(AppColors.brand)},
     'code' => {
-        // The app bundles this font for its code editor.
-        'font-family': 'Courier-New, monospace',
-        'color': _hex(AppColors.ink),
+        // Inline code reads as a soft tinted chip, in the same bundled font
+        // as the code blocks.
+        'font-family': 'Lotion, Courier-New, monospace',
+        'font-size': '0.92em',
+        'color': _hex(AppColors.brandDeep),
+        'background-color': _hex(AppColors.brandTint),
       },
     _ => null,
   };

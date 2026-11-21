@@ -208,7 +208,7 @@ flowchart LR
     G --> R[(Attempt saved with<br/>its feedback mode)]
 ```
 
-The student sees their mode as the app's theme colour (blue, green or bronze)
+The student sees their mode as the app's theme colour (blue, green or teal)
 and only the tools it includes; they cannot change it themselves.
 
 ## 7. Demo flow (public visitors)

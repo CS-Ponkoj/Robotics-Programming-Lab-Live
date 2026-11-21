@@ -170,16 +170,19 @@ class _MyAppState extends State<MyApp> {
     setState(() => _user = user);
   }
 
-  /// Students see their feedback mode's colour; instructors keep the teal.
+  /// Students see their feedback mode's colour; instructors use bronze and
+  /// the sign-in page teal.
   ThemeData _themeFor(AuthenticatedUser? user) {
     final mode = user == null || user.isInstructor
         ? FeedbackMode.tddAi
         : FeedbackMode.fromWire(user.feedbackMode);
     currentFeedbackMode.value = mode;
-    AppColors.usePalette(BrandPalettes.forAccount(
-      signedInStudent: user != null && !user.isInstructor,
-      mode: mode,
-    ));
+    AppColors.usePalette(user == null
+        ? BrandPalettes.signedOut
+        : BrandPalettes.forAccount(
+            signedInStudent: !user.isInstructor,
+            mode: mode,
+          ));
     return buildAppTheme();
   }
 

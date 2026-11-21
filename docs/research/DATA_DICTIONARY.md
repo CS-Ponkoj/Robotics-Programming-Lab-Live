@@ -304,7 +304,7 @@ Each change is an append-only `student.feedback_mode_changed` audit event with
 the previous and new mode, the instructor, and the time. Research exports carry
 `feedback_mode` on each attempt row and the current mode on the student summary.
 The app shows each mode in its own theme colour for students (Traditional blue,
-TDD green, TDD + AI bronze, each as a gradient); instructors keep the original teal.
+TDD green, TDD + AI teal, each as a gradient); instructors use bronze.
 
 `simulation_run` is recorded when a signed-in student in a study session presses
 Simulate on an assignment with a `ros2_2d` simulation. It stores only `outcome`

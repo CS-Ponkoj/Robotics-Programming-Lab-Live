@@ -50,7 +50,7 @@ void main() {
     );
   });
 
-  test('each mode has its own colour and instructors keep the teal', () {
+  test('each mode has its own colour and instructors use bronze', () {
     final colours = {
       for (final mode in FeedbackMode.values)
         BrandPalettes.forAccount(signedInStudent: true, mode: mode).brand,
