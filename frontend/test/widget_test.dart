@@ -643,7 +643,7 @@ void main() {
     expect(find.text('01'), findsOneWidget);
     expect(find.text('Obstacle Avoidance'), findsOneWidget);
     expect(find.text('Not submitted'), findsOneWidget);
-    expect(find.text('AI tutoring'), findsOneWidget);
+    expect(find.text('AI'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Back to assignments'));
     expect(backCount, 1);
@@ -654,7 +654,7 @@ void main() {
     await tester.tap(find.byKey(const Key('open-results-button')));
     expect(resultsCount, 1);
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byType(app.AiToggle));
     expect(feedbackEnabled, isTrue);
   });
 
@@ -790,7 +790,7 @@ void main() {
       await tester.pumpWidget(assignmentWorkspaceApp());
       await tester.pumpAndSettle();
 
-      final headerSwitch = tester.widget<Switch>(
+      final headerSwitch = tester.widget<app.AiToggle>(
         find.byKey(const Key('header-ai-toggle')),
       );
       expect(headerSwitch.value, isFalse);
@@ -830,7 +830,7 @@ void main() {
       await tester.pumpWidget(assignmentWorkspaceApp());
       await tester.pumpAndSettle();
 
-      final headerSwitch = tester.widget<Switch>(
+      final headerSwitch = tester.widget<app.AiToggle>(
         find.byKey(const Key('header-ai-toggle')),
       );
       expect(headerSwitch.value, isFalse);
@@ -838,7 +838,7 @@ void main() {
       headerSwitch.onChanged!(true);
       await tester.pump();
       expect(
-        tester.widget<Switch>(find.byKey(const Key('header-ai-toggle'))).value,
+        tester.widget<app.AiToggle>(find.byKey(const Key('header-ai-toggle'))).value,
         isTrue,
       );
 

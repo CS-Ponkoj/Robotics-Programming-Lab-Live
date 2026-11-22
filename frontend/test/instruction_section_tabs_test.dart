@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:iuse_demo/screens/assignment_workspace.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 
@@ -57,5 +58,56 @@ void main() {
     expect(nav.current, 0);
     // The tabs stay in the header, outside the scrolled content.
     expect(find.byKey(const Key('instruction-tab-0')), findsOneWidget);
+  });
+
+  test('bold-only paragraphs and h3 headings get the heading colour', () {
+    final doc = html_parser.parseFragment(
+        '<p><strong>Rules</strong></p><p>Use <strong>one</strong> scan.</p>'
+        '<h3>Approach</h3>');
+    final strongs = doc.querySelectorAll('strong');
+    expect(instructionHeadingStyles(strongs[0])?['color'], isNotNull);
+    // Bold words inside a sentence stay body text.
+    expect(instructionHeadingStyles(strongs[1]), isNull);
+    expect(instructionHeadingStyles(doc.querySelector('h3')!), isNotNull);
+    expect(instructionHeadingStyles(doc.querySelector('p')!), isNull);
+  });
+
+  testWidgets('the workspace header shows status cards, score card and AI',
+      (tester) async {
+    tester.view.physicalSize = const Size(1400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var ai = false;
+    await tester.pumpWidget(MaterialApp(
+      theme: buildAppTheme(),
+      home: StatefulBuilder(
+        builder: (context, setState) => Scaffold(
+          appBar: AssignmentPageHeader(
+            title: 'Assignment 7: Stop Before the Wall',
+            assignmentId: 7,
+            status: 'Attempted',
+            lastScore: 60,
+            solutionViewed: true,
+            feedbackEnabled: ai,
+            onBack: () {},
+            onHome: () {},
+            onResultsOpen: () {},
+            onFeedbackChanged: (value) => setState(() => ai = value),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('header-status-chip')), findsOneWidget);
+    expect(find.byKey(const Key('header-solution-viewed')), findsOneWidget);
+    expect(find.byKey(const Key('header-score-card')), findsOneWidget);
+    expect(find.textContaining('60%', findRichText: true), findsOneWidget);
+    // The AI button turns on, animates briefly, and settles.
+    await tester.tap(find.byType(AiToggle));
+    await tester.pumpAndSettle();
+    expect(ai, isTrue);
+    expect(tester.widget<AiToggle>(find.byType(AiToggle)).value, isTrue);
+    expect(tester.takeException(), isNull);
   });
 }

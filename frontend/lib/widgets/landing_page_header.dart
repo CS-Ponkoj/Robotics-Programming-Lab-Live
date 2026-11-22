@@ -143,86 +143,124 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
           ),
         Padding(
           padding: EdgeInsets.only(left: 4, right: compact ? 8 : 12),
-          child: PopupMenuButton<String>(
-            tooltip: 'Account menu',
-            position: PopupMenuPosition.under,
-            onSelected: (value) async {
-              if (value == 'my-account' && context.mounted) {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    settings: const RouteSettings(
-                        arguments: FeedbackPage('My account')),
-                    builder: (_) =>
-                        MyAccountPage(user: user, onSignedOut: onLogout),
-                  ),
-                );
-              }
-              if (value == 'study-data' && context.mounted) {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    settings: const RouteSettings(
-                        arguments: FeedbackPage('Study data')),
-                    builder: (_) => user.isInstructor
-                        ? const InstructorResearchDashboard()
-                        : const StudentResearchPage(),
-                  ),
-                );
-              }
-              if (value == 'logout') {
-                await Future<void>.delayed(Duration.zero);
-                await onLogout();
-                if (context.mounted) {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                }
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem<String>(
-                enabled: false,
-                child: Text(
-                  user.isDemo
-                      ? 'Demo student (temporary)'
-                      : '${user.loginId} (${user.role})',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
+          child: AccountMenuButton(
+              user: user, onLogout: onLogout, compact: compact),
+        ),
+      ],
+    );
+  }
+}
+
+/// The account pill with its menu: My account, study data, and Sign out.
+/// Shared by the home header and the assignment workspace header.
+class AccountMenuButton extends StatelessWidget {
+  const AccountMenuButton({
+    super.key,
+    required this.user,
+    required this.onLogout,
+    this.compact = false,
+    this.avatarOnly = false,
+  });
+
+  final AuthenticatedUser user;
+  final Future<void> Function() onLogout;
+  final bool compact;
+
+  /// Shows only the letter avatar, for very tight headers.
+  final bool avatarOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'Account menu',
+      position: PopupMenuPosition.under,
+      onSelected: (value) async {
+        if (value == 'my-account' && context.mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              settings: const RouteSettings(
+                  arguments: FeedbackPage('My account')),
+              builder: (_) =>
+                  MyAccountPage(user: user, onSignedOut: onLogout),
+            ),
+          );
+        }
+        if (value == 'study-data' && context.mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              settings: const RouteSettings(
+                  arguments: FeedbackPage('Study data')),
+              builder: (_) => user.isInstructor
+                  ? const InstructorResearchDashboard()
+                  : const StudentResearchPage(),
+            ),
+          );
+        }
+        if (value == 'logout') {
+          await Future<void>.delayed(Duration.zero);
+          await onLogout();
+          if (context.mounted) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          }
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          enabled: false,
+          child: Text(
+            user.isDemo
+                ? 'Demo student (temporary)'
+                : '${user.loginId} (${user.role})',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+        const PopupMenuDivider(),
+        if (!user.isDemo)
+          const PopupMenuItem<String>(
+            key: Key('my-account-menu-item'),
+            value: 'my-account',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(LucideIcons.userRoundCog, size: 20),
+              title: Text('My account'),
+            ),
+          ),
+        if (!user.isDemo)
+          PopupMenuItem<String>(
+            value: 'study-data',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(LucideIcons.chartLine, size: 20),
+              title: Text(
+                user.isInstructor
+                    ? 'Research dashboard'
+                    : 'My study progress',
               ),
-              const PopupMenuDivider(),
-              if (!user.isDemo)
-                const PopupMenuItem<String>(
-                  key: Key('my-account-menu-item'),
-                  value: 'my-account',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(LucideIcons.userRoundCog, size: 20),
-                    title: Text('My account'),
-                  ),
-                ),
-              if (!user.isDemo)
-                PopupMenuItem<String>(
-                  value: 'study-data',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(LucideIcons.chartLine, size: 20),
-                    title: Text(
-                      user.isInstructor
-                          ? 'Research dashboard'
-                          : 'My study progress',
-                    ),
-                  ),
-                ),
-              const PopupMenuItem<String>(
-                value: 'logout',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(LucideIcons.logOut, size: 20),
-                  title: Text('Sign out'),
-                ),
-              ),
-            ],
-            child: _AccountPill(user: user, compact: compact),
+            ),
+          ),
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(LucideIcons.logOut, size: 20),
+            title: Text('Sign out'),
           ),
         ),
       ],
+      child: avatarOnly
+          ? CircleAvatar(
+              radius: 16,
+              backgroundColor: Colors.white,
+              child: Text(
+                (user.isDemo ? 'D' : user.loginId).characters.first
+                    .toUpperCase(),
+                style: TextStyle(
+                  color: AppColors.brandDark,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          : _AccountPill(user: user, compact: compact),
     );
   }
 }

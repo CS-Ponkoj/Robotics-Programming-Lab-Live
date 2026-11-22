@@ -3,10 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:iuse_demo/widgets/floating_app_bar.dart';
+import 'package:iuse_demo/widgets/landing_page_header.dart';
+import 'package:iuse_demo/state/current_session.dart';
 import 'package:iuse_demo/state/feedback_mode.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:html/dom.dart' as dom;
 import 'package:iuse_demo/editor/indent_guides.dart';
 import 'package:iuse_demo/editor/editor_tools.dart';
 import 'package:iuse_demo/api_config.dart';
@@ -1083,19 +1086,15 @@ class _MyHomePageState extends State<MyHomePage> {
           serverDraft.trim().isNotEmpty &&
           serverDraft != _starterCode,
     );
-    final submissionStatus = lastAttemptAccuracy.containsKey(widget.id)
-        ? _hasUnrunChanges
-            ? '${progressState.label} • Code changed • Previous score: ${lastAttemptAccuracy[widget.id]}%'
-            : '${progressState.label} • Last score: ${lastAttemptAccuracy[widget.id]}%'
-        : progressState.label;
-    final assignmentStatus = solutionRevealedAssignments.contains(widget.id)
-        ? '$submissionStatus • Solution viewed'
-        : submissionStatus;
+    final lastScore = lastAttemptAccuracy[widget.id];
     final appBar = AssignmentPageHeader(
       title: widget.title,
       assignmentId: widget.id,
       displayNumber: widget.displayNumber,
-      status: assignmentStatus,
+      status: progressState.label,
+      lastScore: lastScore,
+      codeChangedSinceScore: lastScore != null && _hasUnrunChanges,
+      solutionViewed: solutionRevealedAssignments.contains(widget.id),
       feedbackEnabled: _aiTutorOn,
       aiTutorAvailable: _aiTutorAvailable,
       aiTutorMessage: _aiTutorMessage,
@@ -2057,6 +2056,7 @@ class _InstructionSectionCard extends StatelessWidget {
                         title,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
+                          color: AppColors.brandDark,
                         ),
                       ),
                       Text(
@@ -2083,8 +2083,9 @@ class _InstructionSectionCard extends StatelessWidget {
             ],
             if (checklistItems.isNotEmpty) ...[
               Text('What to complete',
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(fontWeight: FontWeight.w700)),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.brandDark)),
               const SizedBox(height: AppSpacing.sm),
               ...checklistItems.asMap().entries.map((entry) => Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -2121,6 +2122,7 @@ class _InstructionSectionCard extends StatelessWidget {
                     _showDiagram(context, image.sources.first.url, image.alt);
                   }
                 },
+                customStylesBuilder: instructionHeadingStyles,
                 textStyle: theme.textTheme.bodyMedium?.copyWith(
                   height: 1.65,
                 ),
@@ -2136,6 +2138,31 @@ class _InstructionSectionCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _cssHex(Color color) =>
+    '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+
+/// Instruction subheadings ("What Run Tests checks", "How scoring works",
+/// h3/h4) in the brand colour, so they stand apart from the body text. A
+/// subheading is a paragraph whose only content is bold text.
+Map<String, String>? instructionHeadingStyles(dom.Element element) {
+  final heading = {
+    'color': _cssHex(AppColors.brandDark),
+    'font-weight': '700',
+  };
+  final tag = element.localName;
+  if (tag == 'h2' || tag == 'h3' || tag == 'h4') return heading;
+  if (tag == 'strong' || tag == 'b') {
+    final parent = element.parent;
+    if (parent != null &&
+        parent.localName == 'p' &&
+        parent.children.length == 1 &&
+        parent.text.trim() == element.text.trim()) {
+      return {...heading, 'font-size': '1.08em'};
+    }
+  }
+  return null;
 }
 
 class _SolutionSection extends StatelessWidget {
@@ -3765,7 +3792,16 @@ class AssignmentPageHeader extends StatelessWidget
 
   /// The course number students see; null shows the ID.
   final int? displayNumber;
+
+  /// Progress state label, such as Not started or Attempted.
   final String status;
+
+  /// Percentage of the latest scored run; null before any run.
+  final int? lastScore;
+
+  /// The code was edited after [lastScore], so it is the previous score.
+  final bool codeChangedSinceScore;
+  final bool solutionViewed;
   final bool feedbackEnabled;
 
   /// False when the server has no AI provider: the switch stays off and
@@ -3782,6 +3818,9 @@ class AssignmentPageHeader extends StatelessWidget
     required this.assignmentId,
     this.displayNumber,
     required this.status,
+    this.lastScore,
+    this.codeChangedSinceScore = false,
+    this.solutionViewed = false,
     required this.feedbackEnabled,
     this.aiTutorAvailable = true,
     required this.onBack,
@@ -3808,23 +3847,93 @@ class AssignmentPageHeader extends StatelessWidget
       show ? Tooltip(message: aiTutorMessage, child: child) : child;
 
   @override
-  Size get preferredSize => const Size.fromHeight(76);
+  Size get preferredSize => const Size.fromHeight(82);
+
+  (Color, Color) get _statusColors => switch (status) {
+        'Completed' => (AppColors.successContainer, AppColors.success),
+        'Attempted' => (const Color(0xFFDFE8F5), const Color(0xFF1F4277)),
+        'In progress' => (const Color(0xFFDDEFF2), const Color(0xFF0F4C5C)),
+        _ => (const Color(0xFFEDF1F5), AppColors.inkMuted),
+      };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final showFeedbackLabel = MediaQuery.sizeOf(context).width >= 600;
+    final wide = MediaQuery.sizeOf(context).width >= 600;
+    final session = currentSession;
+    final (statusBackground, statusForeground) = _statusColors;
 
-    return FloatingAppBar(barHeight: 58, AppBar(
+    Widget chip(String text, Color background, Color foreground,
+            {Key? key, IconData? icon}) =>
+        Container(
+          key: key,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (icon != null) ...[
+              Icon(icon, size: 13, color: foreground),
+              const SizedBox(width: 4),
+            ],
+            Text(text,
+                style: theme.textTheme.labelSmall?.copyWith(
+                    color: foreground, fontWeight: FontWeight.w700)),
+          ]),
+        );
+
+    final statusCards = [
+      chip(status, statusBackground, statusForeground,
+          key: const Key('header-status-chip')),
+      if (solutionViewed) ...[
+        const SizedBox(width: 6),
+        chip('Solution viewed', AppColors.warningContainer,
+            AppColors.performanceMid,
+            key: const Key('header-solution-viewed'),
+            icon: LucideIcons.eye),
+      ],
+    ];
+
+    final scoreCard = lastScore == null
+        ? null
+        : Container(
+            key: const Key('header-score-card'),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+            ),
+            child: Text.rich(TextSpan(children: [
+              TextSpan(
+                text: codeChangedSinceScore
+                    ? 'Previous score (code changed)  '
+                    : 'Last score  ',
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: AppColors.inkMuted),
+              ),
+              TextSpan(
+                text: '$lastScore%',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: performanceColor(lastScore!),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ])),
+          );
+
+    return FloatingAppBar(barHeight: 64, AppBar(
       flexibleSpace: const BrandHeaderGradient(),
-      toolbarHeight: 58,
+      toolbarHeight: 64,
       automaticallyImplyLeading: false,
       backgroundColor: theme.colorScheme.primary,
-      leadingWidth: showFeedbackLabel ? 64 : 48,
-      leading: IconButton(
-        tooltip: 'Back to assignments',
-        onPressed: onBack,
-        icon: const Icon(LucideIcons.arrowLeft),
+      leadingWidth: wide ? 60 : 50,
+      leading: Center(
+        child: HeaderIconButton(
+          tooltip: 'Back to assignments',
+          onPressed: onBack,
+          icon: LucideIcons.arrowLeft,
+        ),
       ),
       titleSpacing: 0,
       title: Row(
@@ -3834,115 +3943,254 @@ class AssignmentPageHeader extends StatelessWidget
             height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(AppRadii.sm),
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(AppRadii.md),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
             ),
             child: Text(
               (displayNumber ?? assignmentId).toString().padLeft(2, '0'),
               style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.onPrimary,
+                color: Colors.white,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
-          SizedBox(width: showFeedbackLabel ? AppSpacing.md : AppSpacing.sm),
+          SizedBox(width: wide ? 12 : AppSpacing.sm),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _displayTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.w700,
+                // First row: the title, then progress and solution cards.
+                Row(children: [
+                  Flexible(
+                    child: Text(
+                      _displayTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  status,
-                  maxLines: 1,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.76),
+                  if (wide) ...[
+                    const SizedBox(width: 8),
+                    ...statusCards,
+                  ],
+                ]),
+                // Second row: the score as its own card (and, on phones,
+                // the status cards, which do not fit beside the title).
+                if (scoreCard != null || !wide) ...[
+                  const SizedBox(height: 4),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: [
+                      if (!wide) ...statusCards,
+                      if (!wide && scoreCard != null)
+                        const SizedBox(width: 6),
+                      if (scoreCard != null) scoreCard,
+                    ]),
                   ),
-                ),
+                ],
               ],
             ),
           ),
         ],
       ),
       actions: [
-        if (showFeedbackLabel)
-          TextButton.icon(
-            key: const Key('open-results-button'),
-            onPressed: onResultsOpen,
-            style: TextButton.styleFrom(
-              foregroundColor: theme.colorScheme.onPrimary,
+        if (wide)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: TextButton.icon(
+              key: const Key('open-results-button'),
+              onPressed: onResultsOpen,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.white.withValues(alpha: 0.12),
+                minimumSize: const Size(40, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+                ),
+              ),
+              icon: const Icon(LucideIcons.clipboardCheck, size: 18),
+              label: const Text('Results'),
             ),
-            icon: const Icon(LucideIcons.clipboardCheck, size: 19),
-            label: const Text('Results'),
           )
         else
-          IconButton(
+          HeaderIconButton(
             key: const Key('open-results-button'),
             tooltip: 'Open results',
             onPressed: onResultsOpen,
-            icon: const Icon(LucideIcons.clipboardCheck),
+            icon: LucideIcons.clipboardCheck,
           ),
         // On phones Back already returns to the assignment list, so the
         // title keeps the space a duplicate Home icon would take.
-        if (showFeedbackLabel)
-          TextButton.icon(
+        if (wide)
+          HeaderIconButton(
             key: const Key('assignment-home-button'),
+            tooltip: 'Home',
             onPressed: onHome,
-            style: TextButton.styleFrom(
-              foregroundColor: theme.colorScheme.onPrimary,
-            ),
-            icon: const Icon(LucideIcons.house, size: 19),
-            label: const Text('Home'),
+            icon: LucideIcons.house,
           ),
-        const SizedBox(width: AppSpacing.xs),
         // Only the TDD + AI feedback mode has an AI tutor to switch on.
         if (currentFeedbackMode.value.allowsAi)
           _withUnavailableTooltip(
             show: !aiTutorAvailable,
-            child: Semantics(
-              label: 'AI tutoring',
-              hint: aiTutorAvailable ? null : aiTutorMessage,
-              toggled: aiTutorAvailable && feedbackEnabled,
-              enabled: aiTutorAvailable,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.lightbulb_outline_rounded, size: 18),
-                  if (showFeedbackLabel) ...[
-                    const SizedBox(width: AppSpacing.sm),
-                    const Text('AI tutoring'),
-                  ],
-                  Switch(
-                    key: const Key('header-ai-toggle'),
-                    value: aiTutorAvailable && feedbackEnabled,
-                    onChanged: aiTutorAvailable ? onFeedbackChanged : null,
-                    activeColor: theme.colorScheme.primary,
-                    activeTrackColor: theme.colorScheme.onPrimary.withValues(
-                      alpha: 0.9,
-                    ),
-                    inactiveThumbColor: theme.colorScheme.onPrimary.withValues(
-                      alpha: 0.7,
-                    ),
-                    inactiveTrackColor: theme.colorScheme.onPrimary.withValues(
-                      alpha: 0.2,
-                    ),
+            child: AiToggle(
+              key: const Key('header-ai-toggle'),
+              value: aiTutorAvailable && feedbackEnabled,
+              onChanged: aiTutorAvailable ? onFeedbackChanged : null,
+            ),
+          ),
+        if (session != null)
+          Padding(
+            padding: EdgeInsets.only(left: 4, right: wide ? 12 : 8),
+            child: AccountMenuButton(
+              user: session.user,
+              onLogout: session.onLogout,
+              compact: !wide,
+              avatarOnly: !wide,
+            ),
+          )
+        else
+          const SizedBox(width: AppSpacing.sm),
+      ],
+    ));
+  }
+}
+
+/// The AI tutor switch as a small "AI" button: the sparkles move while it is
+/// on, and the button fades while it is off.
+class AiToggle extends StatefulWidget {
+  const AiToggle({super.key, required this.value, required this.onChanged});
+
+  final bool value;
+
+  /// Null when the course has no AI tutor available.
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  State<AiToggle> createState() => _AiToggleState();
+}
+
+class _AiToggleState extends State<AiToggle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 450),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(AiToggle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  bool? _wasOn;
+
+  /// Switching on plays a short burst of pulses; the button then stays lit.
+  void _sync() {
+    final on = widget.value;
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (on && _wasOn == false && !reduceMotion) {
+      unawaited(_burst());
+    } else if (!on) {
+      _pulse
+        ..stop()
+        ..value = 0;
+    }
+    _wasOn = on;
+  }
+
+  Future<void> _burst() async {
+    for (var i = 0; i < 3 && mounted && widget.value; i++) {
+      await _pulse.forward(from: 0).orCancel.catchError((_) {});
+      if (!mounted || !widget.value) return;
+      await _pulse.reverse().orCancel.catchError((_) {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final on = widget.value;
+    final enabled = widget.onChanged != null;
+    return Semantics(
+      label: 'AI tutoring',
+      toggled: on,
+      enabled: enabled,
+      button: true,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: on ? 'AI tutoring is on' : 'AI tutoring is off',
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 250),
+            opacity: on ? 1 : (enabled ? 0.55 : 0.35),
+            child: Material(
+              color: Colors.white.withValues(alpha: on ? 0.22 : 0.08),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.md),
+                side: BorderSide(
+                  color: Colors.white.withValues(alpha: on ? 0.55 : 0.18),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: enabled ? () => widget.onChanged!(!on) : null,
+                child: SizedBox(
+                  height: 40,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      AnimatedBuilder(
+                        animation: _pulse,
+                        builder: (context, child) => Transform.rotate(
+                          angle: (_pulse.value - 0.5) * 0.5,
+                          child: Transform.scale(
+                            scale: 1 + _pulse.value * 0.18,
+                            child: child,
+                          ),
+                        ),
+                        child: Icon(
+                          LucideIcons.sparkles,
+                          size: 18,
+                          color: on ? const Color(0xFFFFE08A) : Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'AI',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ]),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                ],
+                ),
               ),
             ),
           ),
-      ],
-    ));
+        ),
+      ),
+    );
   }
 }
 

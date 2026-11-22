@@ -11,6 +11,7 @@ import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
+import 'package:iuse_demo/state/current_session.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/feedback_button.dart';
@@ -188,6 +189,8 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    final user = _user;
+    currentSession = user == null ? null : CurrentSession(user, _logout);
     return MaterialApp(
       title: 'Robotics Programming Lab',
       debugShowCheckedModeBanner: false,

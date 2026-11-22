@@ -103,7 +103,7 @@ mode cannot use. Grading is the same in every mode.
 | Printed output (terminal says it is not part of the feedback) | — | ✅ | ✅ | ✅ |
 | Built-in hint ladder | — | ✅ | ✅ | ✅ |
 | Simulate button and Simulation panel | — | ✅ | ✅ | ✅ |
-| AI tutoring switch, AI hint, Ask the tutor | — | — | ✅ | ✅ |
+| AI button (tutoring on/off), AI hint, Ask the tutor | — | — | ✅ | ✅ |
 
 ## 4. Responsive breakpoints
 
