@@ -7,6 +7,7 @@ import 'package:iuse_demo/screens/instructor_assignment_admin.dart';
 import 'package:iuse_demo/screens/research_dashboard_page.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/floating_app_bar.dart';
+import 'package:iuse_demo/widgets/app_blocks.dart';
 
 /// The home header: a compact, floating, rounded brand card on the page.
 class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -15,11 +16,15 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
     required this.user,
     required this.onLogout,
     this.onHome,
+    this.navigation,
   });
 
   final AuthenticatedUser user;
   final Future<void> Function() onLogout;
   final VoidCallback? onHome;
+
+  /// Section tabs shown in the header, such as Assignments and Contents.
+  final Widget? navigation;
 
   /// Height of the card itself; the margin around it is added on top.
   static const double barHeight = 60;
@@ -120,6 +125,11 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        if (navigation != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: navigation,
+          ),
         if (onHome != null)
           HeaderIconButton(
             key: const Key('course-home-button'),
@@ -147,6 +157,69 @@ class LandingPageHeader extends StatelessWidget implements PreferredSizeWidget {
               user: user, onLogout: onLogout, compact: compact),
         ),
       ],
+    );
+  }
+}
+
+/// Section tabs on the coloured header: a translucent group with the
+/// selected tab in white.
+class HeaderNavTabs extends StatelessWidget {
+  const HeaderNavTabs({super.key, required this.tabs});
+
+  final List<PillTabData> tabs;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const Key('header-nav-tabs'),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        for (final tab in tabs)
+          Semantics(
+            key: tab.key,
+            button: true,
+            selected: tab.selected,
+            label: tab.label,
+            excludeSemantics: true,
+            child: Material(
+              color: tab.selected ? Colors.white : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadii.pill),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadii.pill),
+                onTap: tab.onTap,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (tab.icon != null) ...[
+                      Icon(tab.icon,
+                          size: 16,
+                          color: tab.selected
+                              ? AppColors.brandDark
+                              : Colors.white),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      tab.label,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color:
+                            tab.selected ? AppColors.brandDark : Colors.white,
+                        fontWeight:
+                            tab.selected ? FontWeight.w800 : FontWeight.w600,
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+      ]),
     );
   }
 }

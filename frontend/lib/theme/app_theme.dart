@@ -112,6 +112,10 @@ abstract final class AppColors {
   static const aiContainer = Color(0xFFEEEAFB);
   static const success = Color(0xFF18794E);
   static const successContainer = Color(0xFFE7F6ED);
+  // A soft amber callout, such as the next check to fix.
+  static const amberSurface = Color(0xFFFFF6E5);
+  static const amberBorder = Color(0xFFF0D9AE);
+  static const amberInk = Color(0xFF6B4510);
   static const performanceLow = Color(0xFFC62828);
   static const performanceMid = Color(0xFF9A5A00);
   static const warningContainer = Color(0xFFFFF3DA);

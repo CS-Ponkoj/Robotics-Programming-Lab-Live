@@ -392,7 +392,9 @@ def test_ros2_topic_has_every_section_kind_and_no_instructor_material(client):
         for section in sections
     }
     lesson = pages["lesson"]["html"]
-    assert lesson.count('data-interactive="') == 3
+    # Three "Try it" tools plus one ungraded quick check per section.
+    assert lesson.count('data-interactive="') == 3 + 7
+    assert lesson.count('data-interactive="quick-check"') == 7
     for tool in ("scan-index", "twist-path", "wheel-speeds"):
         assert f'data-interactive="{tool}"' in lesson
     # Animations start as a still PNG and name their GIF separately.
@@ -474,3 +476,41 @@ def test_worked_answers_are_only_for_practice_pages_that_have_one(client):
     for topic in OLD_TOPICS:
         sections = client.get(f"/contents/{topic}").json()["sections"]
         assert not any(s.get("has_answer") for s in sections)
+
+
+def test_lesson_extras_match_lesson_headings_and_never_repeat_graded_questions():
+    """Each authored goal box and quick check lands under a real heading,
+    has a valid answer, and asks nothing the quiz or pre-test asks."""
+    import json
+    from course_content_repository import LESSON_EXTRAS, _H2, _plain
+
+    repository = CourseContentRepository(extras=None)
+    extras = json.loads(LESSON_EXTRAS.read_text(encoding="utf-8"))["topics"]
+    for topic_id, entry in extras.items():
+        lesson = repository.section(topic_id, "lesson")["html"]
+        headings = {_plain(match.group(1)) for match in _H2.finditer(lesson)}
+        graded = set()
+        for section_id in ("quiz", "pretest"):
+            section = repository.section(topic_id, section_id)
+            if section:
+                graded |= {_plain(q["prompt"]).lower() for q in section["questions"]}
+        for item in entry["sections"]:
+            assert _plain(item["heading"]) in headings, item["heading"]
+            check = item["quick_check"]
+            assert 0 <= check["answer"] < len(check["options"])
+            assert _plain(check["prompt"]).lower() not in graded
+
+
+def test_served_lesson_carries_goals_and_quick_checks_in_order(client):
+    login(client)
+    lesson = client.get("/contents/ros2-mobile-robots/sections/lesson").json()["html"]
+    goals = lesson.count('class="lesson-goals"')
+    checks = lesson.count('data-interactive="quick-check"')
+    assert goals == checks == 7
+    # Goals sit right under their heading; the check closes the section.
+    section = lesson.split("<h2>3. Your first nodes</h2>", 1)[1].split("<h2>", 1)[0]
+    assert section.startswith('<div class="lesson-goals">')
+    assert section.rstrip().endswith("</div>") and "quick-check" in section
+    # The generated lesson file itself is unchanged.
+    plain = CourseContentRepository(extras=None).section("ros2-mobile-robots", "lesson")
+    assert "lesson-goals" not in plain["html"]

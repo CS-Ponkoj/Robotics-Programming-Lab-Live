@@ -60,7 +60,7 @@ void main() {
           home: AssignmentListPage(user: _student, onLogout: _logout)));
       await tester.pumpAndSettle();
 
-      expect(find.text('Stop Before the Wall'), findsOneWidget);
+      expect(find.text('Stop Before the Wall'), findsNWidgets(2));
       expect(find.text('Old task 1'), findsNothing);
       expect(find.text('0 of 1 assignments completed'), findsOneWidget);
       expect(find.byKey(const Key('old-assignments-note')), findsNothing);
@@ -84,7 +84,7 @@ void main() {
 
       await tester.tap(find.text('Back to assignments'));
       await tester.pumpAndSettle();
-      expect(find.text('Stop Before the Wall'), findsOneWidget);
+      expect(find.text('Stop Before the Wall'), findsNWidgets(2));
       expect(tester.takeException(), isNull);
     }, () => client);
   });

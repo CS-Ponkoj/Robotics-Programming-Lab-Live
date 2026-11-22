@@ -125,6 +125,7 @@ backend/                          FastAPI application
   course_content_repository.py   Student-safe course-page and whole-quiz grading
   course_assessments.py          Pre-test, first-attempt quiz score, gain (research)
   course_content/                Generated lessons and server-only quiz keys
+  course_lesson_extras.json      Authored section goals and ungraded quick checks
   graders/                        Modular AssignmentGrader implementations
   sandbox.py                      Sandbox client and execution policies
   sandbox_service.py              Dedicated execution service

@@ -7,6 +7,7 @@ import 'package:iuse_demo/widgets/lesson_animation.dart';
 import 'package:iuse_demo/widgets/lesson_code_block.dart';
 import 'package:iuse_demo/widgets/lesson_interactives.dart';
 import 'package:iuse_demo/widgets/page_outline.dart';
+import 'package:iuse_demo/widgets/quick_check.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Adds navigation to authored headings, without rewriting lesson content.
@@ -43,6 +44,21 @@ Map<String, String>? lessonStyles(dom.Element element) {
       'background-color': _hex(AppColors.learningSurface),
       'border-left': '4px solid ${_hex(AppColors.brand)}',
       'border-radius': '8px',
+    };
+  }
+  if (element.classes.contains('lesson-goals')) {
+    return {
+      'margin': '0.2em 0 1.2em 0',
+      'padding': '12px 16px',
+      'background-color': _hex(AppColors.learningSurface),
+      'border-radius': '12px',
+    };
+  }
+  if (element.classes.contains('section-meta')) {
+    return {
+      'margin': '-0.2em 0 1em 0',
+      'font-size': '0.82em',
+      'color': _hex(AppColors.inkMuted),
     };
   }
   if (element.classes.contains('math-expression')) {
@@ -129,6 +145,9 @@ Map<String, String>? lessonStyles(dom.Element element) {
 Widget? lessonWidgets(dom.Element element) {
   if (element.localName == 'pre') return LessonCodeBlock(code: element.text);
   final tool = element.attributes['data-interactive'];
+  if (tool == 'quick-check') {
+    return QuickCheck.fromAttribute(element.attributes['data-check']);
+  }
   if (tool != null) return lessonInteractive(tool);
   final animation = element.attributes['data-animation'];
   final still = element.attributes['src'];
@@ -186,6 +205,7 @@ class _LessonReaderState extends State<LessonReader> {
         level: heading.localName == 'h3' ? 3 : 2,
       ));
     }
+    _addSectionGuides(document);
     // List main sections only, unless a page has too few of them to navigate.
     final main = all.where((heading) => heading.level == 2).toList();
     _headings = main.length >= 2 ? main : all;
@@ -206,6 +226,81 @@ class _LessonReaderState extends State<LessonReader> {
         if (mounted) outline.setEntries(entries);
       });
     }
+  }
+
+  /// Under each main heading, "Section 2 of 8 · about 4 min"; before each
+  /// next main heading, a button to it. References are not a section.
+  static void _addSectionGuides(dom.DocumentFragment document) {
+    bool isReferences(dom.Element heading) =>
+        heading.text.trim().toLowerCase() == 'references';
+    final headings = document
+        .querySelectorAll('h2')
+        .where((heading) =>
+            heading.text.trim().isNotEmpty && !isReferences(heading))
+        .toList();
+    if (headings.length < 2) return;
+    final wordPattern = RegExp(r'[A-Za-z0-9]+');
+    for (final (index, heading) in headings.indexed) {
+      var words = 0;
+      for (var node = heading.nextElementSibling;
+          node != null && node.localName != 'h2';
+          node = node.nextElementSibling) {
+        words += wordPattern.allMatches(node.text).length;
+      }
+      final minutes = (words / 200).ceil().clamp(1, 120);
+      final meta = dom.Element.tag('p')
+        ..classes.add('section-meta')
+        ..text = 'Section ${index + 1} of ${headings.length} · '
+            'about $minutes min';
+      final siblings = heading.parentNode!.nodes;
+      siblings.insert(siblings.indexOf(heading) + 1, meta);
+      if (index == 0) continue;
+      final next = dom.Element.tag('div')
+        ..attributes['data-interactive'] = 'next-section'
+        ..attributes['data-target'] = heading.id
+        ..attributes['data-title'] = heading.text.trim();
+      heading.parentNode!.insertBefore(next, heading);
+    }
+  }
+
+  /// The end-of-section button that moves on to the next main heading.
+  Widget? _nextSection(dom.Element element) {
+    if (element.attributes['data-interactive'] != 'next-section') return null;
+    final target = element.attributes['data-target'] ?? '';
+    final title = element.attributes['data-title'] ?? '';
+    if (target.isEmpty) return null;
+    return Padding(
+      key: Key('lesson-next-$target'),
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text('Finished this section?',
+              style: TextStyle(color: AppColors.inkMuted, fontSize: 14)),
+          OutlinedButton.icon(
+            onPressed: () => _jumpTo(target),
+            icon: const Icon(LucideIcons.arrowDown, size: 18),
+            label: Text('Next: $title'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _jumpTo(String id) {
+    final key = _headingKeys[id];
+    final target = key?.currentContext;
+    if (widget.pageOutline != null && target != null) {
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
+    _htmlKey.currentState?.scrollToAnchor(id);
   }
 
   /// With a side outline, headings are drawn here so each has a key to
@@ -288,9 +383,10 @@ class _LessonReaderState extends State<LessonReader> {
         textStyle: theme.textTheme.bodyLarge
             ?.copyWith(fontSize: 17, height: 1.7, color: AppColors.ink),
         customStylesBuilder: lessonStyles,
-        customWidgetBuilder: widget.pageOutline == null
-            ? lessonWidgets
-            : (element) => _heading(element) ?? lessonWidgets(element),
+        customWidgetBuilder: (element) =>
+            _nextSection(element) ??
+            (widget.pageOutline == null ? null : _heading(element)) ??
+            lessonWidgets(element),
       ),
     ]);
   }

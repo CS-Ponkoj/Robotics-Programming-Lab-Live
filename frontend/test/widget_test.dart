@@ -1756,8 +1756,10 @@ void main() {
       ),
     );
 
-    expect(find.text('Assignment 1 · Stop Before the Wall with ROS 2'),
-        findsOneWidget);
+    expect(
+        tester.widget<Text>(find.byKey(const Key('up-next-meta'))).data,
+        'Assignment 1');
+    expect(find.text('Stop Before the Wall with ROS 2'), findsNWidgets(2));
     expect(find.text('01'), findsOneWidget);
     expect(find.text('07'), findsNothing);
   });
@@ -1787,7 +1789,10 @@ void main() {
     );
 
     expect(find.text('Up next'), findsOneWidget);
-    expect(find.text('Assignment 2 · Planning'), findsOneWidget);
+    expect(find.text('Planning'), findsOneWidget);
+    expect(
+        tester.widget<Text>(find.byKey(const Key('up-next-meta'))).data,
+        'Assignment 2');
     expect(find.text('0%'), findsOneWidget);
     // Nothing completed yet is shown neutrally, not as a failing grade.
     expect(tester.widget<Text>(find.text('0%')).style?.color, AppColors.brand);

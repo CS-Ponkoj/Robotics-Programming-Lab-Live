@@ -12,15 +12,21 @@ enum TerminalLineKind {
   source,
   info,
   success,
+
+  /// The next thing to fix, such as the first failed check.
+  todo,
 }
 
 /// One line in the run terminal. [line] is set on clickable error locations.
 class TerminalLine {
-  const TerminalLine(this.text, this.kind, {this.line});
+  const TerminalLine(this.text, this.kind, {this.line, this.failing});
 
   final String text;
   final TerminalLineKind kind;
   final int? line;
+
+  /// On the summary line: how many checks still fail.
+  final int? failing;
 }
 
 final _errorPattern = RegExp(
@@ -200,8 +206,22 @@ List<TerminalLine> buildRunTerminalLines({
       total > 0 && passed == total
           ? TerminalLineKind.success
           : TerminalLineKind.info,
+      failing: total - passed,
     ),
   );
+  // The first failed check by its public name, except for Traditional
+  // accounts, which see counts only.
+  if (passed < total && data.feedbackMode != 'traditional') {
+    for (var index = 0; index < total; index++) {
+      if (data.unittestPassResults[index]) continue;
+      final label =
+          index < data.evidence.length ? data.evidence[index].label : '';
+      if (label.isNotEmpty) {
+        lines.add(TerminalLine('First to fix: $label', TerminalLineKind.todo));
+      }
+      break;
+    }
+  }
   return lines;
 }
 
@@ -217,6 +237,7 @@ Color _lineColor(TerminalLineKind kind) => switch (kind) {
       TerminalLineKind.source => const Color(0xFFCE9178),
       TerminalLineKind.info => const Color(0xFFA6B5BD),
       TerminalLineKind.success => const Color(0xFF89D185),
+      TerminalLineKind.todo => const Color(0xFFFFCB6B),
     };
 
 /// A terminal panel under the code editor, like the one in VS Code. It opens
@@ -269,7 +290,17 @@ class RunTerminalPanel extends StatelessWidget {
     if (lines.any((line) => line.kind == TerminalLineKind.error)) {
       return 'Error';
     }
-    if (lines.last.kind == TerminalLineKind.success) return 'All checks passed';
+    if (lines.any((line) => line.kind == TerminalLineKind.success) &&
+        !lines.any((line) => (line.failing ?? 0) > 0)) {
+      return 'All checks passed';
+    }
+    final failing = lines
+        .lastWhere((line) => line.failing != null,
+            orElse: () => const TerminalLine('', TerminalLineKind.info))
+        .failing;
+    if (failing != null && failing > 0) {
+      return '$failing ${failing == 1 ? 'check' : 'checks'} to fix';
+    }
     return 'Finished';
   }
 
@@ -295,7 +326,9 @@ class RunTerminalPanel extends StatelessWidget {
             ? const Color(0xFFF07178)
             : lines.isNotEmpty && lines.last.kind == TerminalLineKind.success
                 ? const Color(0xFFC3E88D)
-                : const Color(0xFFA6B5BD);
+                : lines.any((line) => (line.failing ?? 0) > 0)
+                    ? const Color(0xFFFFCB6B)
+                    : const Color(0xFFA6B5BD);
     final header = Container(
       height: 38,
       color: _headerBackground,

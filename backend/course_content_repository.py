@@ -1,17 +1,73 @@
 """Read the reviewed, generated course pages without exposing source documents."""
 
+import html
 import json
 import re
 from pathlib import Path
 
 
 CONTENT_ROOT = Path(__file__).resolve().parent / "course_content"
+# Authored section goals and ungraded quick checks, added to a lesson when it
+# is served so the generated lesson files stay as the builder wrote them.
+LESSON_EXTRAS = Path(__file__).resolve().parent / "course_lesson_extras.json"
+_H2 = re.compile(r"<h2(?:\s[^>]*)?>(.*?)</h2>", re.S)
+
+
+def _plain(fragment: str) -> str:
+    text = html.unescape(re.sub(r"<[^>]+>", "", fragment))
+    return " ".join(text.split())
+
+
+def _goals_html(goals: list[str]) -> str:
+    items = "".join(f"<li>{html.escape(goal)}</li>" for goal in goals)
+    return (
+        '<div class="lesson-goals"><p><strong>In this section you will</strong></p>'
+        f"<ul>{items}</ul></div>"
+    )
+
+
+def _quick_check_html(check: dict) -> str:
+    payload = json.dumps(
+        {
+            "prompt": str(check["prompt"]),
+            "options": [str(option) for option in check["options"]],
+            "answer": int(check["answer"]),
+            "explanation": str(check.get("explanation", "")),
+        },
+        ensure_ascii=False,
+    )
+    return (
+        '<div data-interactive="quick-check" '
+        f'data-check="{html.escape(payload, quote=True)}"></div>'
+    )
+
+
+def add_lesson_extras(lesson_html: str, sections: list[dict]) -> str:
+    """Puts each section's goals under its heading and its quick check at the
+    end of the section. Sections are matched by their heading text."""
+    by_heading = {_plain(item["heading"]): item for item in sections}
+    matches = list(_H2.finditer(lesson_html))
+    if not matches or not by_heading:
+        return lesson_html
+    pieces = [lesson_html[: matches[0].start()]]
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(lesson_html)
+        body = lesson_html[match.end():end]
+        extra = by_heading.get(_plain(match.group(1)))
+        pieces.append(match.group(0))
+        if extra and extra.get("goals"):
+            pieces.append(_goals_html(extra["goals"]))
+        pieces.append(body)
+        if extra and extra.get("quick_check"):
+            pieces.append(_quick_check_html(extra["quick_check"]))
+    return "".join(pieces)
 ASSET_NAME = re.compile(r"^[0-9a-f]{20}\.(?:png|jpg|jpeg|gif)$")
 
 
 class CourseContentRepository:
-    def __init__(self, root: Path = CONTENT_ROOT):
+    def __init__(self, root: Path = CONTENT_ROOT, extras: Path | None = LESSON_EXTRAS):
         self.root = root
+        self.extras = extras
 
     @staticmethod
     def _read(path: Path) -> dict:
@@ -39,7 +95,15 @@ class CourseContentRepository:
         topic = self.topic(topic_id)
         if topic is None or section_id not in {s["id"] for s in topic["sections"]}:
             return None
-        return self._read(self.root / topic_id / f"{section_id}.json")
+        section = self._read(self.root / topic_id / f"{section_id}.json")
+        if section.get("kind") == "lesson" and self.extras is not None:
+            extras = self._optional(self.extras).get("topics", {}).get(topic_id, {})
+            if extras.get("sections"):
+                section = {
+                    **section,
+                    "html": add_lesson_extras(section.get("html", ""), extras["sections"]),
+                }
+        return section
 
     def grade_quiz(
         self, topic_id: str, version: str, choices: dict[str, str], section_id: str = "quiz"

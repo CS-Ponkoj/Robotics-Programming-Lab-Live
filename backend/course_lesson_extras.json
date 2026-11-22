@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "status": "draft",
+  "review_note": "Drafted from the existing lesson text for owner review. Quick checks are ungraded, are answered in the browser and are never stored; none repeats a quiz or pre-test question.",
+  "reviewer": null,
+  "topics": {
+    "ros2-mobile-robots": {
+      "sections": [
+        {
+          "heading": "2. What ROS 2 is",
+          "goals": [
+            "describe what a node is, with an example from a robot",
+            "explain how nodes share data through topics and messages"
+          ],
+          "quick_check": {
+            "prompt": "Two nodes both need the laser scans. What lets both of them receive every scan?",
+            "options": [
+              "Each node opens the laser driver itself",
+              "Both subscribe to the topic the laser driver publishes on",
+              "The laser driver calls a function in each node"
+            ],
+            "answer": 1,
+            "explanation": "A topic can have many subscriptions. Each subscription receives the messages published on that topic."
+          }
+        },
+        {
+          "heading": "3. Your first nodes",
+          "goals": [
+            "read the main() the lab gives you, line by line",
+            "write a publisher with a timer and a subscription with a callback"
+          ],
+          "quick_check": {
+            "prompt": "In the lab's main(), how many times does build_node() run?",
+            "options": [
+              "Once, before rclpy.spin() starts",
+              "Once for every message that arrives",
+              "Once for every timer tick"
+            ],
+            "answer": 0,
+            "explanation": "main() calls build_node() once to set up the node. After that, rclpy.spin() calls your callbacks."
+          }
+        },
+        {
+          "heading": "4. Reading a LaserScan",
+          "goals": [
+            "turn the index of a reading into its direction",
+            "test a reading for +inf, -inf and NaN before using it"
+          ],
+          "quick_check": {
+            "prompt": "A scan has 91 readings that sweep evenly from -135 to +135 degrees. Which index points straight ahead?",
+            "options": ["0", "45", "90"],
+            "answer": 1,
+            "explanation": "The middle reading, len(scan.ranges) // 2 = 45, is at 0 degrees: straight ahead."
+          }
+        },
+        {
+          "heading": "5. Commanding motion with Twist",
+          "goals": [
+            "choose linear.x and angular.z for driving, turning and stopping",
+            "use SI units and the REP 103 signs"
+          ],
+          "quick_check": {
+            "prompt": "Using (linear.x, angular.z), which command drives forward slowly while turning left?",
+            "options": ["(0.2, +0.3)", "(0.2, -0.3)", "(-0.2, +0.3)"],
+            "answer": 0,
+            "explanation": "A positive linear.x drives forward, and a positive angular.z turns counter-clockwise, which is to the left."
+          }
+        },
+        {
+          "heading": "6. Custom messages: the course's Flbr",
+          "goals": [
+            "read the four fields of a Flbr message",
+            "treat a NaN sector as having no usable distance"
+          ],
+          "quick_check": {
+            "prompt": "A Flbr message has msg.front = 0.6 and msg.left = 2.0. Which sector has the closer obstacle?",
+            "options": ["Front", "Left", "You cannot tell from these values"],
+            "answer": 0,
+            "explanation": "Each value is the closest usable distance in that sector, in metres. The smaller value is the closer obstacle."
+          }
+        },
+        {
+          "heading": "7. From a rule to code",
+          "goals": [
+            "turn a written rule into a table of cases",
+            "test values just below, at and just above every limit"
+          ],
+          "quick_check": {
+            "prompt": "Rule: \"Warn when the temperature is 60 degrees or above.\" Which test matches the rule?",
+            "options": ["t > 60", "t >= 60", "t == 60"],
+            "answer": 1,
+            "explanation": "\"Or above\" includes the limit itself, so exactly 60 must warn: the comparison is >=."
+          }
+        },
+        {
+          "heading": "8. Before you start the assignments",
+          "goals": [
+            "check that each processed message gets one fresh command",
+            "go through the checklist before you run the tests"
+          ],
+          "quick_check": {
+            "prompt": "The wall stays close for several messages in a row. What should your callback publish for each of them?",
+            "options": [
+              "Nothing, because it already sent a stop",
+              "A stop command, every time",
+              "The last drive command"
+            ],
+            "answer": 1,
+            "explanation": "Each processed message gets one command decided from that message alone. Repeating a stop many times is normal."
+          }
+        }
+      ]
+    }
+  }
+}

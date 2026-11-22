@@ -13,14 +13,21 @@ class CheckSummary {
     required this.passed,
     required this.total,
     this.nextFailing = '',
+    this.at = 0,
   });
 
   final int passed;
   final int total;
   final String nextFailing;
 
+  /// When the run finished, in milliseconds since the epoch (0 = unknown).
+  final int at;
+
+  CheckSummary withTime(int at) => CheckSummary(
+      passed: passed, total: total, nextFailing: nextFailing, at: at);
+
   Map<String, Object> toJson() =>
-      {'passed': passed, 'total': total, 'next': nextFailing};
+      {'passed': passed, 'total': total, 'next': nextFailing, 'at': at};
 
   static CheckSummary? fromJson(Object? json) {
     if (json is! Map) return null;
@@ -31,6 +38,7 @@ class CheckSummary {
       passed: passed.round().clamp(0, total.round()),
       total: total.round(),
       nextFailing: (json['next'] ?? '').toString(),
+      at: json['at'] is num ? (json['at'] as num).round() : 0,
     );
   }
 }

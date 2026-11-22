@@ -6,6 +6,7 @@ import 'package:iuse_demo/models/assignment_progress.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/screens/assignment_workspace.dart';
 import 'package:iuse_demo/screens/course_content_page.dart';
+import 'package:iuse_demo/services/course_content_api.dart';
 import 'package:iuse_demo/widgets/landing_page_header.dart';
 export 'package:iuse_demo/widgets/landing_page_header.dart';
 import 'package:iuse_demo/services/auth_api.dart';
@@ -58,10 +59,28 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
   late Future<List<AssignmentDto>> assignments;
   HomePanel _panel = HomePanel.assignments;
 
+  /// The current course topics, for the course path and card hints.
+  List<({String id, String title})> _topics = const [];
+
   @override
   void initState() {
     super.initState();
     assignments = fetchAssignments();
+    _loadTopics();
+  }
+
+  Future<void> _loadTopics() async {
+    try {
+      final topics = await CourseContentApi.topics();
+      if (!mounted) return;
+      setState(() => _topics = [
+            for (final topic in topics)
+              if (topic['old'] != true)
+                (id: '${topic['id']}', title: '${topic['title']}'),
+          ]);
+    } on Object {
+      // The path then lists assignments only.
+    }
   }
 
   void _retryAssignments() {
@@ -95,23 +114,29 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
       );
     }
 
+    final tabs = [
+      panelTab(HomePanel.assignments, 'open-assignments', LucideIcons.codeXml,
+          'Assignments'),
+      panelTab(HomePanel.contents, 'open-course-contents', LucideIcons.bookOpen,
+          'Contents'),
+    ];
+    // Wide screens carry the tabs in the header; phones keep them below.
+    final tabsInHeader = MediaQuery.sizeOf(context).width >= 900;
+
     return LandingPageFrame(
       user: widget.user,
       onLogout: widget.onLogout,
       onHome: () => setState(() => _panel = HomePanel.assignments),
+      navigation: tabsInHeader ? HeaderNavTabs(tabs: tabs) : null,
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-            child: Center(
-              child: PillTabBar(tabs: [
-                panelTab(HomePanel.assignments, 'open-assignments',
-                    LucideIcons.codeXml, 'Assignments'),
-                panelTab(HomePanel.contents, 'open-course-contents',
-                    LucideIcons.bookOpen, 'Contents'),
-              ]),
-            ),
-          ),
+          if (!tabsInHeader)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+              child: Center(child: PillTabBar(tabs: tabs)),
+            )
+          else
+            const SizedBox(height: 8),
           Expanded(
               child: _panel == HomePanel.contents ||
                       _panel == HomePanel.oldContents
@@ -150,6 +175,7 @@ class _AssignmentListPageState extends State<AssignmentListPage> {
                             oldAssignments: old,
                             oldCount:
                                 snap.data!.where((a) => a.isOld).length,
+                            topics: _topics,
                             onToggleOld: () => setState(() => _panel = old
                                 ? HomePanel.assignments
                                 : HomePanel.oldAssignments),
@@ -334,7 +360,11 @@ class AssignmentCollection extends StatelessWidget {
     this.oldAssignments = false,
     this.oldCount = 0,
     this.onToggleOld,
+    this.topics = const [],
   });
+
+  /// The current course topics, for the course path and card hints.
+  final List<({String id, String title})> topics;
 
   /// How many old assignments the last tile opens (0 hides it).
   final int oldCount;
@@ -348,12 +378,21 @@ class AssignmentCollection extends StatelessWidget {
       builder: (context, constraints) {
         final useGrid = constraints.maxWidth >= 900 &&
             MediaQuery.textScalerOf(context).scale(16) <= 20;
+        // Unstarted assignments point at a lesson not yet read.
+        final unread = topics.where((topic) => !(learningProgress
+                .topicProgress[topic.id]?.doneKinds
+                .contains('lesson') ??
+            false));
+        final suggestion = unread.isEmpty
+            ? null
+            : 'Suggested after the ${unread.first.title} lesson';
         final assignmentDelegate = SliverChildBuilderDelegate(
           (context, index) => AssignmentCard(
             a: assignments[index],
             theme: theme,
             onReturn: onReturn,
             fillHeight: useGrid,
+            suggestion: oldAssignments ? null : suggestion,
           ),
           childCount: assignments.length,
         );
@@ -395,6 +434,8 @@ class AssignmentCollection extends StatelessWidget {
                   totalAssignments: assignments.length,
                   assignmentIds: {for (final item in assignments) item.id},
                   nextAssignment: next,
+                  pathAssignments: assignments,
+                  topics: topics,
                   onOpenNext: next == null
                       ? null
                       : () => openAssignment(context, next, onReturn),
@@ -620,19 +661,28 @@ class LandingPageFrame extends StatelessWidget {
   final Future<void> Function() onLogout;
   final VoidCallback? onHome;
 
+  /// Tabs shown inside the header, on wide screens.
+  final Widget? navigation;
+
   const LandingPageFrame({
     super.key,
     required this.body,
     required this.user,
     required this.onLogout,
     this.onHome,
+    this.navigation,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('landing-page-scaffold'),
-      appBar: LandingPageHeader(user: user, onLogout: onLogout, onHome: onHome),
+      appBar: LandingPageHeader(
+        user: user,
+        onLogout: onLogout,
+        onHome: onHome,
+        navigation: navigation,
+      ),
       backgroundColor: landingPageBackgroundColor,
       body: LearningBackdrop(child: body),
     );
@@ -690,12 +740,20 @@ class ProgressSummary extends StatelessWidget {
   final AssignmentDto? nextAssignment;
   final VoidCallback? onOpenNext;
 
+  /// The current assignments, in order, for the course path.
+  final List<AssignmentDto> pathAssignments;
+
+  /// The current course topics (id and title), for the course path.
+  final List<({String id, String title})> topics;
+
   const ProgressSummary({
     super.key,
     required this.totalAssignments,
     this.assignmentIds,
     this.nextAssignment,
     this.onOpenNext,
+    this.pathAssignments = const [],
+    this.topics = const [],
   });
 
   @override
@@ -717,205 +775,390 @@ class ProgressSummary extends StatelessWidget {
     final allDone =
         totalAssignments > 0 && completedAssignments == totalAssignments;
 
-    final summary = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'YOUR LEARNING PATH',
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: AppColors.brand,
-            letterSpacing: 1.1,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          allDone
-              ? 'Every assignment complete. Great work!'
-              : completedAssignments == 0
-                  ? 'Start building your robotics skills'
-                  : 'Keep building your robotics skills',
-          style: theme.textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 14),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '$percentage%',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                color: progressColor,
-                fontWeight: FontWeight.w800,
-                height: 1,
-              ),
+    final path = AppSurface(
+      key: const Key('course-path-card'),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'YOUR COURSE PATH',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: AppColors.brand,
+              letterSpacing: 1.1,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 2),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            allDone
+                ? 'Every assignment complete. Great work!'
+                : completedAssignments == 0
+                    ? 'Start building your robotics skills'
+                    : 'Keep building your robotics skills',
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$percentage%',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: progressColor,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
                 child: Text(
                   '$completedAssignments of $totalAssignments assignments completed',
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.pill),
-          child: LinearProgressIndicator(
-            value: progress,
-            color: progressColor,
-            minHeight: 10,
-            backgroundColor: AppColors.neutralContainer,
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+            child: LinearProgressIndicator(
+              value: progress,
+              color: progressColor,
+              minHeight: 8,
+              backgroundColor: AppColors.neutralContainer,
+            ),
+          ),
+          if (topics.isNotEmpty || pathAssignments.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            for (final topic in topics)
+              _PathStep(
+                key: Key('path-topic-${topic.id}'),
+                label: topic.title,
+                detail: _topicDetail(topic.id),
+                state: _topicState(topic.id),
+                percent: learningProgress.topicProgress[topic.id]
+                    ?.lessonPercent,
+              ),
+            for (final (index, assignment) in pathAssignments.indexed)
+              _PathStep(
+                key: Key('path-assignment-${assignment.id}'),
+                label: 'Assignment ${assignment.shownNumber}',
+                detail: learningProgress
+                    .assignmentState(
+                      assignment.id,
+                      assignmentVersion: assignment.version,
+                      starterCode: assignment.code,
+                      hasServerDraft: assignment.hasSavedDraft,
+                    )
+                    .label,
+                number: index + 1,
+                percent: learningProgress.bestScores[assignment.id],
+                state: (learningProgress.bestScores[assignment.id] ?? 0) == 100
+                    ? _PathState.done
+                    : learningProgress.hasAttempted(assignment.id) ||
+                            assignment.hasSavedDraft
+                        ? _PathState.active
+                        : _PathState.todo,
+              ),
+          ],
+        ],
+      ),
     );
 
     final next = nextAssignment;
-    final upNext = next == null
-        ? null
-        : Container(
-            key: const Key('up-next-panel'),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppColors.brandTint,
-              borderRadius: BorderRadius.circular(AppRadii.md),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+    final hero = next == null ? null : _hero(context, next);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (hero == null) return path;
+          if (constraints.maxWidth < 720) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [hero, const SizedBox(height: 16), path],
+            );
+          }
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Icon(LucideIcons.flag,
-                        size: 18, color: AppColors.brandDark),
-                    const SizedBox(width: 6),
-                    Text(
-                      learningProgress.hasAttempted(next.id)
-                          ? 'Pick up where you left off'
-                          : 'Up next',
-                      style: theme.textTheme.labelLarge
-                          ?.copyWith(color: AppColors.brandDark),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Assignment ${next.shownNumber} · ${assignmentDisplayTitle(next)}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: AppColors.brandDeep,
-                  ),
-                ),
-                if (learningProgress.bestScores[next.id] case final best?
-                    when learningProgress.hasAttempted(next.id)) ...[
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    ScoreRing(
-                      key: const Key('up-next-score-ring'),
-                      score: best,
-                      color: performanceColor(best),
-                      size: 56,
-                      stroke: 5,
-                      label: 'best',
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (learningProgress.checkSummaries[next.id]
-                              case final checks?) ...[
-                            ChecksMeter(
-                              passed: checks.passed,
-                              total: checks.total,
-                              width: 110,
-                            ),
-                            if (checks.nextFailing.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text.rich(
-                                key: const Key('up-next-fix'),
-                                TextSpan(children: [
-                                  const TextSpan(
-                                    text: 'Next to fix: ',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.w700),
-                                  ),
-                                  TextSpan(text: checks.nextFailing),
-                                ]),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(color: AppColors.brandDeep),
-                              ),
-                            ],
-                          ] else
-                            Text(
-                              '${learningProgress.attemptCounts[next.id] ?? 0} '
-                              'runs so far',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: AppColors.brandDeep),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ]),
-                ],
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  key: const Key('up-next-button'),
-                  onPressed: onOpenNext,
-                  icon: const Icon(LucideIcons.play, size: 20),
-                  label: Text(learningProgress.hasAttempted(next.id)
-                      ? 'Continue learning'
-                      : 'Begin'),
-                ),
+                Expanded(flex: 3, child: hero),
+                const SizedBox(width: 20),
+                Expanded(flex: 2, child: path),
               ],
             ),
           );
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      // About 5% shorter than uniform padding, for a less bulky card.
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.lg - 5,
+        },
       ),
+    );
+  }
+
+  String _topicDetail(String topicId) {
+    final progress = learningProgress.topicProgress[topicId];
+    if (progress == null) return 'Not started';
+    if (progress.doneKinds.contains('quiz')) return 'Quiz done';
+    if (progress.doneKinds.contains('lesson')) return 'Lesson read';
+    if (progress.lessonPercent > 0) {
+      return 'Lesson ${progress.lessonPercent}% read';
+    }
+    if (progress.doneKinds.contains('pretest')) return 'Pre-test done';
+    return 'Not started';
+  }
+
+  _PathState _topicState(String topicId) {
+    final progress = learningProgress.topicProgress[topicId];
+    if (progress == null) return _PathState.todo;
+    if (progress.doneKinds.contains('quiz')) return _PathState.done;
+    if (progress.lessonPercent > 0 || progress.doneKinds.isNotEmpty) {
+      return _PathState.active;
+    }
+    return _PathState.todo;
+  }
+
+  Widget _hero(BuildContext context, AssignmentDto next) {
+    final theme = Theme.of(context);
+    final attempted = learningProgress.hasAttempted(next.id);
+    final best = learningProgress.bestScores[next.id];
+    final checks = learningProgress.checkSummaries[next.id];
+    final meta = [
+      'Assignment ${next.shownNumber}',
+      if (checks != null) '${checks.passed} of ${checks.total} checks passing',
+      if (checks != null && checks.at > 0) 'last run ${timeAgo(checks.at)}',
+      if (checks == null && attempted)
+        '${learningProgress.attemptCounts[next.id] ?? 0} runs so far',
+    ].join(' · ');
+    return Container(
+      key: const Key('up-next-panel'),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadii.lg),
         border: Border.all(color: AppColors.border),
         boxShadow: appCardShadow,
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (upNext == null) return summary;
-          if (constraints.maxWidth < 720) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [summary, const SizedBox(height: 20), upNext],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(flex: 3, child: summary),
-              const SizedBox(width: 28),
-              Expanded(flex: 2, child: upNext),
-            ],
-          );
-        },
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (attempted && best != null) ...[
+            ScoreRing(
+              key: const Key('up-next-score-ring'),
+              score: best,
+              color: performanceColor(best),
+              size: 104,
+              stroke: 9,
+              label: 'best',
+            ),
+            const SizedBox(width: AppSpacing.lg),
+          ] else ...[
+            Container(
+              width: 104,
+              height: 104,
+              decoration: BoxDecoration(
+                color: AppColors.brandTint,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(LucideIcons.rocket,
+                  size: 40, color: AppColors.brandDark),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(children: [
+                  Icon(LucideIcons.flag, size: 16, color: AppColors.brand),
+                  const SizedBox(width: 6),
+                  Text(
+                    attempted ? 'Pick up where you left off' : 'Up next',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: AppColors.brand,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 6),
+                Text(
+                  assignmentDisplayTitle(next),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  meta,
+                  key: const Key('up-next-meta'),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                if (checks != null && checks.nextFailing.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    key: const Key('up-next-fix'),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.amberSurface,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      border: Border.all(color: AppColors.amberBorder),
+                    ),
+                    child: Row(children: [
+                      const Icon(LucideIcons.circleAlert,
+                          size: 18, color: AppColors.amberInk),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(children: [
+                            const TextSpan(
+                              text: 'Next check to fix: ',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            TextSpan(text: checks.nextFailing),
+                          ]),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.ink),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  key: const Key('up-next-button'),
+                  onPressed: onOpenNext,
+                  icon: const Icon(LucideIcons.play, size: 20),
+                  label: Text(attempted ? 'Continue learning' : 'Begin'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
+}
+
+enum _PathState { done, active, todo }
+
+/// One line of the course path: a status circle, a name and its state.
+class _PathStep extends StatelessWidget {
+  const _PathStep({
+    super.key,
+    required this.label,
+    required this.detail,
+    required this.state,
+    this.number,
+    this.percent,
+  });
+
+  final String label;
+  final String detail;
+  final _PathState state;
+  final int? number;
+  final int? percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final Widget marker = switch (state) {
+      _PathState.done => Container(
+          width: 26,
+          height: 26,
+          decoration: const BoxDecoration(
+              color: AppColors.success, shape: BoxShape.circle),
+          child: const Icon(LucideIcons.check, size: 15, color: Colors.white),
+        ),
+      _PathState.active => SizedBox.square(
+          dimension: 26,
+          child: Stack(alignment: Alignment.center, children: [
+            CircularProgressIndicator(
+              value: (percent ?? 0) / 100,
+              strokeWidth: 2.5,
+              color: AppColors.performanceMid,
+              backgroundColor: AppColors.amberBorder,
+            ),
+            Text(
+              number == null ? '' : '$number',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppColors.amberInk,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ]),
+        ),
+      _PathState.todo => Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.borderStrong, width: 1.5),
+          ),
+          child: number == null
+              ? const Icon(LucideIcons.bookOpen,
+                  size: 13, color: AppColors.inkMuted)
+              : Text(
+                  '$number',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.inkMuted,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+        ),
+    };
+    return Semantics(
+      label: '$label, $detail',
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(children: [
+          marker,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                  text: label,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                TextSpan(
+                  text: ' · $detail',
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// "just now", "5 min ago", "2 hours ago", "yesterday", "3 days ago".
+String timeAgo(int millisecondsSinceEpoch, {DateTime? now}) {
+  final then = DateTime.fromMillisecondsSinceEpoch(millisecondsSinceEpoch);
+  final elapsed = (now ?? DateTime.now()).difference(then);
+  if (elapsed.inMinutes < 1) return 'just now';
+  if (elapsed.inMinutes < 60) return '${elapsed.inMinutes} min ago';
+  if (elapsed.inHours < 24) {
+    return '${elapsed.inHours} ${elapsed.inHours == 1 ? 'hour' : 'hours'} ago';
+  }
+  if (elapsed.inDays == 1) return 'yesterday';
+  return '${elapsed.inDays} days ago';
 }
 
 class LandingPageContent extends StatelessWidget {
@@ -1041,10 +1284,14 @@ class AssignmentCard extends StatelessWidget {
     required this.theme,
     required this.onReturn,
     this.fillHeight = false,
+    this.suggestion,
   });
 
   /// In the fixed-height grid, pin status and actions to the card bottom.
   final bool fillHeight;
+
+  /// Shown on an unstarted card, such as which lesson to read first.
+  final String? suggestion;
 
   String get _displayTitle => assignmentDisplayTitle(a);
 
@@ -1246,7 +1493,13 @@ class AssignmentCard extends StatelessWidget {
                             '${attempts == 1 ? 'attempt' : 'attempts'}',
                       ),
                     ] else
-                      const TextSpan(text: 'No attempts yet'),
+                      TextSpan(
+                        text: progressState ==
+                                    AssignmentProgressState.notStarted &&
+                                suggestion != null
+                            ? suggestion
+                            : 'No attempts yet',
+                      ),
                   ]),
                 );
                 final statusBlock = Column(
@@ -1254,15 +1507,22 @@ class AssignmentCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [status, const SizedBox(height: 6), stats],
                 );
-                final button = FilledButton.icon(
-                  onPressed: () => _openAssignment(context),
-                  icon: const Icon(LucideIcons.arrowRight, size: 18),
-                  label: Text(progressState == AssignmentProgressState.completed
-                      ? 'Review assignment'
-                      : progressState == AssignmentProgressState.notStarted
-                          ? 'Start assignment'
-                          : 'Continue assignment'),
-                );
+                // Continuing work is the main action; starting is quieter.
+                final Widget button =
+                    progressState == AssignmentProgressState.notStarted
+                        ? OutlinedButton.icon(
+                            onPressed: () => _openAssignment(context),
+                            icon: const Icon(LucideIcons.arrowRight, size: 18),
+                            label: const Text('Start assignment'),
+                          )
+                        : FilledButton.icon(
+                            onPressed: () => _openAssignment(context),
+                            icon: const Icon(LucideIcons.arrowRight, size: 18),
+                            label: Text(progressState ==
+                                    AssignmentProgressState.completed
+                                ? 'Review assignment'
+                                : 'Continue assignment'),
+                          );
 
                 if (constraints.maxWidth < 440) {
                   return Column(

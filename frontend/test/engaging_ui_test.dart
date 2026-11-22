@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iuse_demo/main.dart' as app;
+import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/screens/course_content_page.dart';
 import 'package:iuse_demo/state/learning_progress_store.dart';
 import 'package:iuse_demo/state/progress_storage_base.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/app_blocks.dart';
+import 'package:iuse_demo/widgets/lesson_reader.dart';
+import 'package:iuse_demo/widgets/quick_check.dart';
+import 'package:iuse_demo/widgets/run_terminal.dart';
+import 'package:iuse_demo/screens/assignment_list.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 UnittestFeedbackDto _run({
@@ -162,5 +167,136 @@ void main() {
         findsOneWidget);
     await tester.tap(find.text('Pre-test'));
     expect(tapped, 'pretest');
+  });
+
+  group('mockup parity', () {
+    testWidgets('a quick check marks the right answer and explains it',
+        (tester) async {
+      final check = QuickCheck.fromAttribute(
+          '{"prompt":"Which index?","options":["0","45","90"],"answer":1,'
+          '"explanation":"The middle reading is straight ahead."}')!;
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: check)));
+      await tester.tap(find.byKey(const Key('quick-check-option-0')));
+      await tester.pump();
+      expect(find.text('Not quite. Try another answer.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('quick-check-option-1')));
+      await tester.pump();
+      expect(find.text('Correct. The middle reading is straight ahead.'),
+          findsOneWidget);
+      expect(QuickCheck.fromAttribute('{"prompt":"x","options":["a"],"answer":3}'),
+          isNull);
+    });
+
+    testWidgets('lesson sections show their place, time and a next button',
+        (tester) async {
+      final html = [
+        for (final title in ['One', 'Two', 'Three'])
+          '<h2>$title</h2>${[for (var i = 0; i < 30; i++) '<p>Words $i here.</p>'].join()}',
+        '<h2>References</h2><p>[1] A source.</p>',
+      ].join();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: SingleChildScrollView(child: LessonReader(html: html))),
+      ));
+      await tester.pumpAndSettle();
+      // References is not counted as a section.
+      expect(find.textContaining('Section 1 of 3 · about 1 min', findRichText: true), findsOneWidget);
+      expect(find.textContaining('Section 3 of 3', findRichText: true), findsOneWidget);
+      expect(find.text('Next: Two'), findsOneWidget);
+      expect(find.text('Next: Three'), findsOneWidget);
+      expect(find.text('Next: References'), findsNothing);
+    });
+
+    test('the terminal names the first check to fix', () {
+      final lines = buildRunTerminalLines(
+          data: _run(results: [true, false, false]), code: 'x = 1');
+      expect(lines.last.text, 'First to fix: Check label 1');
+      expect(lines.last.kind, TerminalLineKind.todo);
+      final summary = lines.firstWhere((line) => line.failing != null);
+      expect(summary.failing, 2);
+      final traditional = buildRunTerminalLines(
+          data: _run(results: [true, false], mode: 'traditional'),
+          code: 'x = 1');
+      expect(traditional.any((line) => line.text.startsWith('First to fix')),
+          isFalse);
+    });
+
+    testWidgets('the terminal header counts the checks to fix', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: RunTerminalPanel(
+            expanded: true,
+            height: 200,
+            running: false,
+            lines: buildRunTerminalLines(
+                data: _run(results: [true, false, false]), code: 'x = 1'),
+            onToggle: () {},
+            onResize: (_) {},
+          ),
+        ),
+      ));
+      expect(find.text('2 checks to fix'), findsOneWidget);
+    });
+
+    testWidgets('results compare with the run before and fold long lists',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: app.Feedback(
+            data: _run(results: [true, false, false, false, false]),
+            previousScore: 30,
+            previousPassed: 0,
+            runNumber: 4,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Up from 30% on run 3 · 1 more check passes'),
+          findsOneWidget);
+      // Four failed checks start as one-line rows that open on a tap.
+      expect(find.byKey(const Key('test-result-row-2')), findsOneWidget);
+      expect(find.byKey(const Key('test-result-points-2')), findsNothing);
+      await tester.ensureVisible(find.byKey(const Key('test-result-row-2')));
+      await tester.tap(find.byKey(const Key('test-result-row-2')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('test-result-points-2')), findsOneWidget);
+    });
+
+    test('time since the last run reads naturally', () {
+      final now = DateTime(2026, 11, 22, 12);
+      int ago(Duration d) => now.subtract(d).millisecondsSinceEpoch;
+      expect(timeAgo(ago(const Duration(seconds: 20)), now: now), 'just now');
+      expect(timeAgo(ago(const Duration(minutes: 5)), now: now), '5 min ago');
+      expect(timeAgo(ago(const Duration(hours: 2)), now: now), '2 hours ago');
+      expect(timeAgo(ago(const Duration(days: 1, hours: 2)), now: now),
+          'yesterday');
+    });
+
+    testWidgets('the course path lists topics and assignments in order',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      app.learningProgress.startEphemeralSession();
+      addTearDown(app.learningProgress.startEphemeralSession);
+      await app.learningProgress.updateTopicProgress('ros2',
+          title: 'ROS 2', lessonPercent: 60);
+      const a1 = AssignmentDto(
+          id: 7, title: 'Assignment 7: Wall', description: '', htmlDesc: '',
+          code: '', vals: {});
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: const Scaffold(
+          body: ProgressSummary(
+            totalAssignments: 1,
+            pathAssignments: [a1],
+            topics: [(id: 'ros2', title: 'ROS 2')],
+          ),
+        ),
+      ));
+      expect(find.bySemanticsLabel('ROS 2, Lesson 60% read'), findsOneWidget);
+      expect(find.bySemanticsLabel('Assignment 7, Not started'), findsOneWidget);
+    });
   });
 }

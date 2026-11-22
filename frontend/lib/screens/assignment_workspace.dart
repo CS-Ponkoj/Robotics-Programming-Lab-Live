@@ -102,6 +102,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   /// The score before the latest run, to show how this run compares.
   int? _previousScore;
+
+  /// Checks passing before the latest run, and the latest run's number.
+  int? _previousPassed;
+  int? _runNumber;
   bool _suppressEditorChange = false;
   String? _playgroundFunction;
   String _starterCode = '';
@@ -420,8 +424,13 @@ class _MyHomePageState extends State<MyHomePage> {
         }
         final score = feedback.score.clamp(0, 100).toInt();
         final previousScore = learningProgress.latestScores[widget.id];
+        final previousPassed =
+            learningProgress.checkSummaries[widget.id]?.passed;
+        final runNumber = (learningProgress.attemptCounts[widget.id] ?? 0) + 1;
         setState(() {
           _previousScore = previousScore;
+          _previousPassed = previousPassed;
+          _runNumber = runNumber;
           lastAttemptAccuracy[widget.id] = score;
           _submissionId = feedback.submissionId;
           _isRunning = false;
@@ -442,7 +451,8 @@ class _MyHomePageState extends State<MyHomePage> {
         );
         unawaited(learningProgress.recordAttempt(widget.id, score));
         if (summarizeChecks(feedback) case final checks?) {
-          unawaited(learningProgress.recordCheckSummary(widget.id, checks));
+          unawaited(learningProgress.recordCheckSummary(
+              widget.id, checks.withTime(DateTime.now().millisecondsSinceEpoch)));
         }
       },
       onError: (Object error) {
@@ -1059,6 +1069,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                 return Feedback(
                                     data: snap.data!,
                                     previousScore: _previousScore,
+                                    previousPassed: _previousPassed,
+                                    runNumber: _runNumber,
                                     errorLine: _diagnosticLine,
                                     onGoToLine: (line) {
                                       _scaffoldKey.currentState
@@ -4551,10 +4563,16 @@ class Feedback extends StatefulWidget {
     this.previousScore,
     this.errorLine,
     this.onGoToLine,
+    this.previousPassed,
+    this.runNumber,
   });
 
   /// The score before this run; null on a first run.
   final int? previousScore;
+
+  /// Checks passing before this run, and this run's number (1 = first).
+  final int? previousPassed;
+  final int? runNumber;
 
   /// The line the run's error points at, if any.
   final int? errorLine;
@@ -4666,6 +4684,7 @@ class _FeedbackState extends State<Feedback> {
         earnedWeight: detail?.earnedWeight,
         hintKey: detail?.hintKey,
         onWatch: onWatchInSimulation,
+        collapsible: didPass ? passed > 3 : failed > 3,
       ));
     }
     List<Widget> spaced(List<Widget> cards) => [
@@ -4690,6 +4709,8 @@ class _FeedbackState extends State<Feedback> {
             totalPoints: totalPoints,
             requirementChecks: requirementChecks,
             previousScore: widget.previousScore,
+            previousPassed: widget.previousPassed,
+            runNumber: widget.runNumber,
           ),
           // With check details, the first failed check leads with ways to
           // act on it; otherwise a short next step.
@@ -5274,17 +5295,32 @@ class _ResultSummary extends StatelessWidget {
     this.totalPoints,
     this.requirementChecks = 0,
     this.previousScore,
+    this.previousPassed,
+    this.runNumber,
   });
 
   /// The score before this run; null on a first run.
   final int? previousScore;
+  final int? previousPassed;
+  final int? runNumber;
 
   String? get _change {
     final previous = previousScore;
     if (previous == null) return null;
-    if (score > previous) return 'Up from $previous% on your last run';
-    if (score < previous) return 'Down from $previous% on your last run';
-    return 'Same score as your last run';
+    final run = runNumber;
+    final when = run != null && run > 1 ? 'on run ${run - 1}' : 'on your last run';
+    final base = score > previous
+        ? 'Up from $previous% $when'
+        : score < previous
+            ? 'Down from $previous% $when'
+            : 'Same score as $when'.replaceFirst('as on', 'as');
+    final before = previousPassed;
+    if (before == null) return base;
+    final delta = passed - before;
+    if (delta == 0) return base;
+    final count = delta.abs();
+    final noun = count == 1 ? 'check passes' : 'checks pass';
+    return '$base · $count ${delta > 0 ? 'more' : 'fewer'} $noun';
   }
 
   final int passed;
@@ -6132,8 +6168,144 @@ String? failureReasonExplanation(String? reason) {
 String _formatPoints(double value) =>
     value == value.roundToDouble() ? value.toStringAsFixed(0) : '$value';
 
-class _TestResultCard extends StatelessWidget {
+/// One check in Results. In a long list it starts as a single line (name
+/// and points) that opens to the details; in a short list it starts open.
+class _TestResultCard extends StatefulWidget {
   const _TestResultCard({
+    required this.checkNumber,
+    required this.passed,
+    required this.first,
+    required this.highlighted,
+    required this.last,
+    this.label,
+    this.reason,
+    this.weight,
+    this.earnedWeight,
+    this.hintKey,
+    this.onWatch,
+    this.collapsible = false,
+  });
+
+  final String? hintKey;
+  final ValueChanged<String>? onWatch;
+  final int checkNumber;
+  final bool passed;
+  final String first;
+  final String highlighted;
+  final String last;
+  final String? label;
+  final String? reason;
+  final double? weight;
+  final double? earnedWeight;
+
+  /// Starts as one line that opens to the details.
+  final bool collapsible;
+
+  @override
+  State<_TestResultCard> createState() => _TestResultCardState();
+}
+
+class _TestResultCardState extends State<_TestResultCard> {
+  late bool _open = !widget.collapsible;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = widget;
+    if (_open) {
+      final details = _TestResultDetails(
+        checkNumber: w.checkNumber,
+        passed: w.passed,
+        first: w.first,
+        highlighted: w.highlighted,
+        last: w.last,
+        label: w.label,
+        reason: w.reason,
+        weight: w.weight,
+        earnedWeight: w.earnedWeight,
+        hintKey: w.hintKey,
+        onWatch: w.onWatch,
+      );
+      if (!w.collapsible) return details;
+      return Stack(children: [
+        details,
+        Positioned(
+          top: 2,
+          right: 2,
+          child: IconButton(
+            key: Key('test-result-collapse-${w.checkNumber}'),
+            tooltip: 'Show less',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => setState(() => _open = false),
+            icon: const Icon(LucideIcons.chevronUp, size: 18),
+          ),
+        ),
+      ]);
+    }
+    final theme = Theme.of(context);
+    final statusColor = w.passed ? AppColors.success : theme.colorScheme.error;
+    final weight = w.weight;
+    final earned = w.earnedWeight ?? (w.passed ? weight : 0);
+    final points = weight == null
+        ? null
+        : weight == 0
+            ? 'Required'
+            : '${_formatPoints(earned ?? 0)} / ${_formatPoints(weight)}';
+    final title = (w.label ?? '').isNotEmpty ? w.label! : 'Check ${w.checkNumber}';
+    return Semantics(
+      button: true,
+      label: '$title, ${w.passed ? 'passed' : 'needs attention'}. '
+          'Show details',
+      excludeSemantics: true,
+      child: Material(
+        color: theme.colorScheme.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        child: InkWell(
+          key: Key('test-result-row-${w.checkNumber}'),
+          onTap: () => setState(() => _open = true),
+          child: IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Container(width: 4, color: statusColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                  child: Row(children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    if (points != null) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        points,
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: AppColors.inkMuted),
+                      ),
+                    ],
+                    const SizedBox(width: 4),
+                    const Icon(LucideIcons.chevronDown,
+                        size: 18, color: AppColors.inkMuted),
+                  ]),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TestResultDetails extends StatelessWidget {
+  const _TestResultDetails({
     required this.checkNumber,
     required this.passed,
     required this.first,

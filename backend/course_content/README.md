@@ -35,6 +35,8 @@ Formatting the builder understands, beyond plain Word text:
   (`scan-index`, `twist-path`, `wheel-speeds`);
 - captions start with "Figure" or "Animation".
 
+Section goals ("In this section you will") and ungraded quick checks are authored in `backend/course_lesson_extras.json`, not here. The API adds them to a lesson when it serves it, matched by each main heading's text, so a rebuild never overwrites them. Quick checks are answered in the browser and never stored, and must not repeat a quiz or pre-test question (a backend test checks this).
+
 Topics listed in `OLD_TOPICS` in the builder are flagged `old` in
 `catalog.json`, and the app shows them under Old contents.
 
