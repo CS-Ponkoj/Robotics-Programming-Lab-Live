@@ -11,6 +11,7 @@ import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/widgets/landing_page_header.dart';
 import 'package:iuse_demo/widgets/lesson_reader.dart';
 import 'package:iuse_demo/widgets/page_outline.dart';
+import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 /// Names the unanswered quiz questions by their 1-based display numbers,
@@ -421,6 +422,13 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
       try {
         final status = await CourseContentApi.pretestStatus(widget.topicId);
         if (status['taken'] != true && !_chosen) _kind = 'pretest';
+        if (status['taken'] == true) {
+          await learningProgress.updateTopicProgress(
+            widget.topicId,
+            title: topic['title'] as String,
+            doneKind: 'pretest',
+          );
+        }
       } catch (_) {
         // Without the status, open the lesson as before.
       }
@@ -484,8 +492,10 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
           return _CourseSectionView(
             key: ValueKey('${widget.topicId}/$sectionId'),
             topicId: widget.topicId,
+            topicTitle: topic['title'] as String,
             sectionId: sectionId,
             title: labels[sectionId] ?? '',
+            onProgress: () => setState(() {}),
             header: _header(
               context,
               topic,
@@ -544,21 +554,28 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
           ),
         ),
         const SizedBox(height: 14),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: PillTabBar(tabs: [
-            for (final kind in kinds)
-              PillTabData(
+        TopicStepBar(
+          steps: [
+            for (final (index, kind) in kinds.indexed)
+              TopicStep(
                 key: Key('content-tab-$kind'),
+                number: index + 1,
                 label: _kindLabel(kind),
                 icon: _kindIcon(kind),
                 selected: selectedKind == kind,
+                done: learningProgress.topicProgress[widget.topicId]?.doneKinds
+                        .contains(kind) ??
+                    false,
+                progress: kind == 'lesson'
+                    ? learningProgress
+                        .topicProgress[widget.topicId]?.lessonPercent
+                    : null,
                 onTap: () => setState(() {
                   _kind = kind;
                   _sectionId = null;
                 }),
               ),
-          ]),
+          ],
         ),
         // Wrapping keeps the selected exercise visible at every width.
         if (visible.length > 1) ...[
@@ -583,6 +600,161 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
 }
 
 const _kindOrder = ['pretest', 'lesson', 'exercise', 'math', 'quiz'];
+
+/// One step of a topic: Pre-test, Lesson, Exercises, Math practice, Quiz.
+class TopicStep {
+  const TopicStep({
+    required this.key,
+    required this.number,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.done,
+    required this.onTap,
+    this.progress,
+  });
+
+  final Key key;
+  final int number;
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final bool done;
+
+  /// A lesson's reading progress, 0 to 100, shown while it is unfinished.
+  final int? progress;
+  final VoidCallback onTap;
+}
+
+/// The topic's steps in order, joined by lines, with finished ones ticked.
+class TopicStepBar extends StatelessWidget {
+  const TopicStepBar({super.key, required this.steps});
+
+  final List<TopicStep> steps;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('topic-step-bar'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: AppColors.border),
+        boxShadow: appCardShadow,
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [
+          for (final (index, step) in steps.indexed) ...[
+            if (index > 0)
+              Container(
+                width: 28,
+                height: 2,
+                color: steps[index - 1].done
+                    ? AppColors.success
+                    : AppColors.border,
+              ),
+            _StepButton(step: step),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({required this.step});
+
+  final TopicStep step;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final selected = step.selected;
+    final progress = step.progress;
+    final showPercent =
+        !step.done && progress != null && progress > 0 && progress < 100;
+    final Widget marker;
+    if (step.done) {
+      marker = Container(
+        width: 26,
+        height: 26,
+        decoration: const BoxDecoration(
+          color: AppColors.success,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(LucideIcons.check, size: 15, color: Colors.white),
+      );
+    } else if (showPercent) {
+      marker = SizedBox.square(
+        dimension: 26,
+        child: Stack(alignment: Alignment.center, children: [
+          CircularProgressIndicator(
+            value: progress / 100,
+            strokeWidth: 3,
+            color: selected ? Colors.white : AppColors.brand,
+            backgroundColor: selected
+                ? Colors.white.withValues(alpha: 0.3)
+                : AppColors.brandTint,
+          ),
+          Icon(step.icon,
+              size: 12, color: selected ? Colors.white : AppColors.brandDark),
+        ]),
+      );
+    } else {
+      marker = Container(
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          color: selected ? Colors.white.withValues(alpha: 0.18) : null,
+          shape: BoxShape.circle,
+          border: selected
+              ? null
+              : Border.all(color: AppColors.borderStrong, width: 1.5),
+        ),
+        child: Icon(step.icon,
+            size: 14, color: selected ? Colors.white : AppColors.inkMuted),
+      );
+    }
+    return Semantics(
+      key: step.key,
+      button: true,
+      selected: selected,
+      label: [
+        'Step ${step.number}: ${step.label}',
+        if (step.done) 'done',
+        if (showPercent) '$progress percent read',
+      ].join(', '),
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? AppColors.brandDark : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          onTap: step.onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                marker,
+                const SizedBox(width: 8),
+                Text(
+                  step.label,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: selected ? Colors.white : AppColors.ink,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 IconData _kindIcon(String kind) => switch (kind) {
       'pretest' => LucideIcons.clipboardList,
@@ -633,6 +805,8 @@ class _CourseSectionView extends StatefulWidget {
   const _CourseSectionView({
     super.key,
     required this.topicId,
+    required this.topicTitle,
+    this.onProgress,
     required this.sectionId,
     required this.title,
     required this.header,
@@ -642,6 +816,10 @@ class _CourseSectionView extends StatefulWidget {
     this.next,
   });
   final String topicId;
+  final String topicTitle;
+
+  /// Called when a step is newly finished, so the step bar can update.
+  final VoidCallback? onProgress;
   final String sectionId;
   final String title;
   final Widget header;
@@ -684,6 +862,62 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
   static const _outlineMinWidth = 1100.0;
   static const _outlineWidth = 280.0;
 
+  /// How far down this page the reader is, 0 to 1.
+  double _readFraction = 0;
+  String? _sectionKind;
+
+  void _syncReading() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    // Before the content is laid out the page has no height; it must not
+    // count as read. Only a page taller than the screen reports progress.
+    if (position.maxScrollExtent <= 200) {
+      if (_readFraction != 0) setState(() => _readFraction = 0);
+      return;
+    }
+    final fraction =
+        (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0);
+    if ((fraction - _readFraction).abs() >= 0.01 || fraction == 1.0) {
+      setState(() => _readFraction = fraction);
+    }
+    final kind = _sectionKind;
+    if (kind == null) return;
+    final before = learningProgress.topicProgress[widget.topicId];
+    final wasDone = before?.doneKinds.contains(kind) ?? false;
+    if (kind == 'lesson') {
+      final percent = (fraction * 100).round();
+      // Only whole steps of 5% are stored, and only forward.
+      final stepped = percent >= 98 ? 100 : percent - percent % 5;
+      if (stepped > (before?.lessonPercent ?? 0)) {
+        final entries = _outline.entries;
+        final active = entries.indexWhere((e) => e.id == _outline.active);
+        final next = active >= 0 && active + 1 < entries.length
+            ? entries[active + 1].title
+            : '';
+        unawaited(learningProgress.updateTopicProgress(
+          widget.topicId,
+          title: widget.topicTitle,
+          lessonPercent: stepped,
+          nextHeading: next,
+        ));
+        // The Lesson step's ring follows the reading.
+        widget.onProgress?.call();
+      }
+    } else if ((kind == 'exercise' || kind == 'math') &&
+        fraction >= 0.9 &&
+        !wasDone) {
+      unawaited(learningProgress.updateTopicProgress(
+        widget.topicId,
+        title: widget.topicTitle,
+        doneKind: kind,
+      ));
+    }
+    final nowDone = learningProgress.topicProgress[widget.topicId]?.doneKinds
+            .contains(kind) ??
+        false;
+    if (nowDone && !wasDone) widget.onProgress?.call();
+  }
+
   void _syncOutline() {
     if (!_scroll.hasClients) return;
     final box = _scrollKey.currentContext?.findRenderObject();
@@ -706,6 +940,7 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
       final show = _scroll.hasClients && _scroll.offset > 900;
       if (show != _showTop) setState(() => _showTop = show);
       _syncOutline();
+      _syncReading();
     });
   }
 
@@ -751,6 +986,12 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
         section['version'] as String,
         _choices,
       );
+      await learningProgress.updateTopicProgress(
+        widget.topicId,
+        title: widget.topicTitle,
+        doneKind: 'quiz',
+      );
+      widget.onProgress?.call();
       if (mounted) {
         setState(() {
           _result = result;
@@ -864,6 +1105,18 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
             );
           },
         ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          child: LinearProgressIndicator(
+            key: const Key('reading-progress'),
+            value: _readFraction,
+            minHeight: 3,
+            color: AppColors.brand,
+            backgroundColor: Colors.transparent,
+          ),
+        ),
         if (_showTop)
           Positioned(
             right: 20,
@@ -905,6 +1158,18 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
     );
     final kind = section['kind'] as String;
     final practice = kind == 'exercise' || kind == 'math';
+    if (_sectionKind != kind) {
+      _sectionKind = kind;
+      _outline.trackReading = kind != 'quiz';
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncReading();
+      });
+    }
+    final words = RegExp(r'[A-Za-z0-9]+')
+        .allMatches(html.replaceAll(RegExp(r'<[^>]*>'), ' '))
+        .length;
+    final minutes = (words / 200).ceil().clamp(1, 600);
+    final sectionCount = RegExp(r'<h2[\s>]').allMatches(html).length;
     return Card(
       margin: EdgeInsets.zero,
       color: theme.colorScheme.surface,
@@ -936,6 +1201,25 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
               ),
               const SizedBox(height: 8),
               const Divider(height: 24),
+            ],
+            if (kind == 'lesson' && html.isNotEmpty) ...[
+              Row(
+                key: const Key('lesson-reading-time'),
+                children: [
+                  const Icon(LucideIcons.clock,
+                      size: 15, color: AppColors.inkMuted),
+                  const SizedBox(width: 6),
+                  Text(
+                    [
+                      if (sectionCount > 1) '$sectionCount sections',
+                      'about $minutes min read',
+                    ].join(' · '),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: AppColors.inkMuted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
             ],
             if (html.isNotEmpty)
               LessonReader(

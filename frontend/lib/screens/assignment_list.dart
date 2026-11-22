@@ -10,6 +10,8 @@ import 'package:iuse_demo/widgets/landing_page_header.dart';
 export 'package:iuse_demo/widgets/landing_page_header.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
+import 'package:iuse_demo/state/current_session.dart';
+import 'package:iuse_demo/state/learning_progress_store.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/models/assignment_dto.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
@@ -446,6 +448,18 @@ class AssignmentCollection extends StatelessWidget {
                   delegate: assignmentDelegate,
                 ),
               ),
+            if (learningProgress.lessonToResume case final resume?
+                when !oldAssignments && currentSession != null)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                sliver: SliverToBoxAdapter(
+                  child: KeepReadingTile(
+                    topicId: resume.key,
+                    progress: resume.value,
+                    onReturn: onReturn,
+                  ),
+                ),
+              ),
             if (!oldAssignments && oldCount > 0 && onToggleOld != null)
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -466,6 +480,100 @@ class AssignmentCollection extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// The course lesson read most recently, with how far it got and what
+/// comes next. Opens the topic where the student left off.
+class KeepReadingTile extends StatelessWidget {
+  const KeepReadingTile({
+    super.key,
+    required this.topicId,
+    required this.progress,
+    required this.onReturn,
+  });
+
+  final String topicId;
+  final TopicProgress progress;
+  final VoidCallback onReturn;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final session = currentSession;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 10),
+          child: Text('Keep reading', style: theme.textTheme.titleLarge),
+        ),
+        AppSurface(
+          key: const Key('keep-reading-tile'),
+          padding: EdgeInsets.zero,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadii.lg),
+            onTap: session == null
+                ? null
+                : () => Navigator.of(context)
+                    .push(MaterialPageRoute<void>(
+                      builder: (_) => CourseTopicPage(
+                        topicId: topicId,
+                        user: session.user,
+                        onLogout: session.onLogout,
+                      ),
+                    ))
+                    .then((_) => onReturn()),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(children: [
+                const IconTile(icon: LucideIcons.bookOpen, size: 44),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${progress.title} · Lesson',
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      if (progress.nextHeading.isNotEmpty)
+                        Text(
+                          'Next: ${progress.nextHeading}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 140,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: progress.lessonPercent / 100,
+                      minHeight: 6,
+                      color: AppColors.brand,
+                      backgroundColor: AppColors.neutralContainer,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text('${progress.lessonPercent}%',
+                    style: theme.textTheme.labelMedium),
+                const SizedBox(width: 4),
+                const Icon(LucideIcons.chevronRight, size: 18),
+              ]),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -706,6 +814,61 @@ class ProgressSummary extends StatelessWidget {
                     color: AppColors.brandDeep,
                   ),
                 ),
+                if (learningProgress.bestScores[next.id] case final best?
+                    when learningProgress.hasAttempted(next.id)) ...[
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    ScoreRing(
+                      key: const Key('up-next-score-ring'),
+                      score: best,
+                      color: performanceColor(best),
+                      size: 56,
+                      stroke: 5,
+                      label: 'best',
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (learningProgress.checkSummaries[next.id]
+                              case final checks?) ...[
+                            ChecksMeter(
+                              passed: checks.passed,
+                              total: checks.total,
+                              width: 110,
+                            ),
+                            if (checks.nextFailing.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text.rich(
+                                key: const Key('up-next-fix'),
+                                TextSpan(children: [
+                                  const TextSpan(
+                                    text: 'Next to fix: ',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                  TextSpan(text: checks.nextFailing),
+                                ]),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: AppColors.brandDeep),
+                              ),
+                            ],
+                          ] else
+                            Text(
+                              '${learningProgress.attemptCounts[next.id] ?? 0} '
+                              'runs so far',
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.brandDeep),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ]),
+                ],
                 const SizedBox(height: 14),
                 FilledButton.icon(
                   key: const Key('up-next-button'),
@@ -1007,6 +1170,19 @@ class AssignmentCard extends StatelessWidget {
                 ],
               ],
             ),
+            // The latest run's checks, when this device has them.
+            if (learningProgress.checkSummaries[a.id] case final checks?) ...[
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.only(left: 60),
+                child: ChecksMeter(
+                  key: const Key('assignment-checks-meter'),
+                  passed: checks.passed,
+                  total: checks.total,
+                  width: 160,
+                ),
+              ),
+            ],
             if (fillHeight) const Spacer() else const SizedBox(height: 22),
             const Divider(),
             const SizedBox(height: 16),
@@ -1032,25 +1208,6 @@ class AssignmentCard extends StatelessWidget {
                           LucideIcons.clock,
                       },
                     ),
-                    if (hasAccuracy)
-                      StatusPill(
-                        key: const Key('best-score-badge'),
-                        label:
-                            'Best score: ${learningProgress.bestScores[a.id] ?? score}%',
-                        color: performanceColor(
-                            learningProgress.bestScores[a.id] ?? score!),
-                      ),
-                    StatusPill(
-                      label:
-                          'Attempted: ${learningProgress.attemptCounts[a.id] ?? 0}',
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    if (hasAccuracy)
-                      StatusPill(
-                        key: const Key('latest-score-badge'),
-                        label: 'Last score: ${lastAttemptAccuracy[a.id]}%',
-                        color: scoreColor,
-                      ),
                     if (solutionRevealed)
                       StatusPill(
                         key: const Key('solution-viewed-badge'),
@@ -1059,6 +1216,43 @@ class AssignmentCard extends StatelessWidget {
                         color: theme.colorScheme.primary,
                       ),
                   ],
+                );
+                final attempts = learningProgress.attemptCounts[a.id] ?? 0;
+                final best = learningProgress.bestScores[a.id] ?? score;
+                final muted = theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+                final stats = Text.rich(
+                  key: const Key('assignment-stats-line'),
+                  TextSpan(style: muted, children: [
+                    if (hasAccuracy) ...[
+                      const TextSpan(text: 'Best '),
+                      TextSpan(
+                        text: '$best%',
+                        style: TextStyle(
+                          color: performanceColor(best!),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const TextSpan(text: '  ·  Last '),
+                      TextSpan(
+                        text: '$score%',
+                        style: TextStyle(
+                          color: scoreColor,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '  ·  $attempts '
+                            '${attempts == 1 ? 'attempt' : 'attempts'}',
+                      ),
+                    ] else
+                      const TextSpan(text: 'No attempts yet'),
+                  ]),
+                );
+                final statusBlock = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [status, const SizedBox(height: 6), stats],
                 );
                 final button = FilledButton.icon(
                   onPressed: () => _openAssignment(context),
@@ -1074,7 +1268,8 @@ class AssignmentCard extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Align(alignment: Alignment.centerLeft, child: status),
+                      Align(
+                          alignment: Alignment.centerLeft, child: statusBlock),
                       const SizedBox(height: 16),
                       button,
                     ],
@@ -1083,7 +1278,7 @@ class AssignmentCard extends StatelessWidget {
 
                 return Row(
                   children: [
-                    Expanded(child: status),
+                    Expanded(child: statusBlock),
                     const SizedBox(width: 16),
                     button,
                   ],

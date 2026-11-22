@@ -5,6 +5,97 @@ import '../models/server_progress_dto.dart';
 import 'progress_storage.dart';
 import 'progress_storage_base.dart';
 
+/// The latest run's checks for one assignment: how many passed, of how
+/// many, and the first one still failing (empty when none, or when the
+/// student's feedback mode shows no check details).
+class CheckSummary {
+  const CheckSummary({
+    required this.passed,
+    required this.total,
+    this.nextFailing = '',
+  });
+
+  final int passed;
+  final int total;
+  final String nextFailing;
+
+  Map<String, Object> toJson() =>
+      {'passed': passed, 'total': total, 'next': nextFailing};
+
+  static CheckSummary? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final passed = json['passed'];
+    final total = json['total'];
+    if (passed is! num || total is! num || total <= 0) return null;
+    return CheckSummary(
+      passed: passed.round().clamp(0, total.round()),
+      total: total.round(),
+      nextFailing: (json['next'] ?? '').toString(),
+    );
+  }
+}
+
+/// How far a student got in one course topic, on this device only: the
+/// lesson read so far, the next heading, and the steps they finished.
+class TopicProgress {
+  const TopicProgress({
+    required this.title,
+    this.lessonPercent = 0,
+    this.nextHeading = '',
+    this.doneKinds = const {},
+    this.updatedAt = 0,
+  });
+
+  final String title;
+
+  /// The furthest point read in the lesson, 0 to 100.
+  final int lessonPercent;
+  final String nextHeading;
+
+  /// Section kinds finished: pretest, lesson, exercise, math, quiz.
+  final Set<String> doneKinds;
+
+  /// Milliseconds since the epoch of the last change, to find the latest.
+  final int updatedAt;
+
+  TopicProgress copyWith({
+    String? title,
+    int? lessonPercent,
+    String? nextHeading,
+    Set<String>? doneKinds,
+    int? updatedAt,
+  }) =>
+      TopicProgress(
+        title: title ?? this.title,
+        lessonPercent: lessonPercent ?? this.lessonPercent,
+        nextHeading: nextHeading ?? this.nextHeading,
+        doneKinds: doneKinds ?? this.doneKinds,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+
+  Map<String, Object> toJson() => {
+        'title': title,
+        'lesson': lessonPercent,
+        'next': nextHeading,
+        'done': doneKinds.toList()..sort(),
+        'at': updatedAt,
+      };
+
+  static TopicProgress? fromJson(Object? json) {
+    if (json is! Map || json['title'] is! String) return null;
+    final lesson = json['lesson'];
+    final at = json['at'];
+    final done = json['done'];
+    return TopicProgress(
+      title: json['title'] as String,
+      lessonPercent: lesson is num ? lesson.round().clamp(0, 100) : 0,
+      nextHeading: (json['next'] ?? '').toString(),
+      doneKinds: done is List ? {for (final kind in done) kind.toString()} : {},
+      updatedAt: at is num ? at.round() : 0,
+    );
+  }
+}
+
 class LearningProgressStore {
   static const _latestScoresKey = 'learning.latest_scores.v1';
   static const _bestScoresKey = 'learning.best_scores.v1';
@@ -15,6 +106,8 @@ class LearningProgressStore {
   static const _submissionIdsKey = 'learning.submission_ids.v1';
   static const _unsyncedDraftsKey = 'learning.unsynced_drafts.v1';
   static const _earlierDraftsKey = 'learning.earlier_version_drafts.v1';
+  static const _checkSummariesKey = 'learning.check_summaries.v1';
+  static const _topicProgressKey = 'learning.topic_progress.v1';
 
   final Map<int, int> latestScores = {};
   final Map<int, int> bestScores = {};
@@ -27,6 +120,25 @@ class LearningProgressStore {
   // Code written for an older assignment version. It is never loaded into the
   // new version's editor, but the student can still view and copy it.
   final Map<int, String> earlierDrafts = {};
+
+  /// The latest run's checks per assignment, on this device only.
+  final Map<int, CheckSummary> checkSummaries = {};
+
+  /// Reading and step progress per course topic, on this device only.
+  final Map<String, TopicProgress> topicProgress = {};
+
+  /// The topic read most recently whose lesson is not finished, if any.
+  MapEntry<String, TopicProgress>? get lessonToResume {
+    MapEntry<String, TopicProgress>? latest;
+    for (final entry in topicProgress.entries) {
+      final value = entry.value;
+      if (value.lessonPercent <= 0 || value.lessonPercent >= 100) continue;
+      if (latest == null || value.updatedAt > latest.value.updatedAt) {
+        latest = entry;
+      }
+    }
+    return latest;
+  }
 
   ProgressStorage? _storage;
   String? _userScope;
@@ -160,6 +272,92 @@ class LearningProgressStore {
           .whereType<int>(),
     );
     earlierDrafts.addAll(_decodeStringMap(_getStringSafely(_earlierDraftsKey)));
+    checkSummaries.addAll(_decodeCheckSummaries(
+      _getStringSafely(_checkSummariesKey),
+    ));
+    topicProgress.addAll(_decodeTopicProgress(
+      _getStringSafely(_topicProgressKey),
+    ));
+  }
+
+  static Map<String, TopicProgress> _decodeTopicProgress(String? source) {
+    if (source == null) return {};
+    try {
+      final decoded = jsonDecode(source);
+      if (decoded is! Map<String, dynamic>) return {};
+      return {
+        for (final entry in decoded.entries)
+          if (TopicProgress.fromJson(entry.value) case final value?)
+            entry.key: value,
+      };
+    } on Object {
+      return {};
+    }
+  }
+
+  /// Records reading progress (only ever forward) and finished steps.
+  Future<void> updateTopicProgress(
+    String topicId, {
+    required String title,
+    int? lessonPercent,
+    String? nextHeading,
+    String? doneKind,
+  }) async {
+    final current = topicProgress[topicId] ?? TopicProgress(title: title);
+    var percent = current.lessonPercent;
+    if (lessonPercent != null && lessonPercent > percent) {
+      percent = lessonPercent.clamp(0, 100);
+    }
+    final done = {...current.doneKinds};
+    if (doneKind != null) done.add(doneKind);
+    if (percent >= 100) done.add('lesson');
+    final next = TopicProgress(
+      title: title,
+      lessonPercent: percent,
+      nextHeading: nextHeading ?? current.nextHeading,
+      doneKinds: done,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    if (current.lessonPercent == next.lessonPercent &&
+        current.nextHeading == next.nextHeading &&
+        current.title == next.title &&
+        current.doneKinds.length == next.doneKinds.length &&
+        topicProgress.containsKey(topicId)) {
+      return;
+    }
+    topicProgress[topicId] = next;
+    await _storage?.setString(
+      _scopedKey(_topicProgressKey),
+      jsonEncode(topicProgress.map(
+        (key, value) => MapEntry(key, value.toJson()),
+      )),
+    );
+  }
+
+  static Map<int, CheckSummary> _decodeCheckSummaries(String? source) {
+    if (source == null) return {};
+    try {
+      final decoded = jsonDecode(source);
+      if (decoded is! Map<String, dynamic>) return {};
+      return {
+        for (final entry in decoded.entries)
+          if (int.tryParse(entry.key) case final id?)
+            if (CheckSummary.fromJson(entry.value) case final summary?)
+              id: summary,
+      };
+    } on Object {
+      return {};
+    }
+  }
+
+  Future<void> recordCheckSummary(int assignmentId, CheckSummary summary) async {
+    checkSummaries[assignmentId] = summary;
+    await _storage?.setString(
+      _scopedKey(_checkSummariesKey),
+      jsonEncode(checkSummaries.map(
+        (key, value) => MapEntry(key.toString(), value.toJson()),
+      )),
+    );
   }
 
   Future<void> _copyLegacyProgress() async {
@@ -189,6 +387,8 @@ class LearningProgressStore {
     submissionIds.clear();
     unsyncedDrafts.clear();
     earlierDrafts.clear();
+    checkSummaries.clear();
+    topicProgress.clear();
   }
 
   Future<void> saveDraft(

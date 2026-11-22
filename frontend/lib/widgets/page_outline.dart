@@ -31,9 +31,16 @@ class PageOutlineEntry {
 class PageOutline extends ChangeNotifier {
   List<PageOutlineEntry> _entries = const [];
   String? _active;
+  int _furthest = -1;
+
+  /// When true, entries the reader has scrolled past are ticked as read.
+  bool trackReading = false;
 
   List<PageOutlineEntry> get entries => _entries;
   String? get active => _active;
+
+  /// Whether the reader has moved past this entry.
+  bool isRead(int index) => trackReading && index < _furthest;
 
   void setEntries(List<PageOutlineEntry> entries) {
     bool same(PageOutlineEntry a, PageOutlineEntry b) =>
@@ -48,14 +55,20 @@ class PageOutline extends ChangeNotifier {
       return;
     }
     _entries = List.unmodifiable(entries);
+    _furthest = -1;
     if (!_entries.any((entry) => entry.id == _active)) {
       _active = _entries.isEmpty ? null : _entries.first.id;
     }
     notifyListeners();
   }
 
-  void _setActive(String? id) {
-    if (id == _active) return;
+  void _setActive(String? id, {bool atEnd = false}) {
+    final index = _entries.indexWhere((entry) => entry.id == id);
+    // At the end of the page the last entry counts as read too.
+    final furthest = atEnd ? _entries.length : index;
+    final moved = furthest > _furthest;
+    if (moved) _furthest = furthest;
+    if (id == _active && !moved) return;
     _active = id;
     notifyListeners();
   }
@@ -77,7 +90,7 @@ class PageOutline extends ChangeNotifier {
   void syncWithScroll(double topY, {bool atEnd = false}) {
     if (_entries.isEmpty) return;
     if (atEnd) {
-      _setActive(_entries.last.id);
+      _setActive(_entries.last.id, atEnd: true);
       return;
     }
     String? current;
@@ -154,10 +167,11 @@ class PageOutlinePanel extends StatelessWidget {
                   // floating Feedback button in the bottom-left corner.
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 88),
                   children: [
-                    for (final entry in outline.entries)
+                    for (final (index, entry) in outline.entries.indexed)
                       _OutlineItem(
                         key: Key('outline-item-${entry.id}'),
                         entry: entry,
+                        read: outline.isRead(index),
                         active: entry.id == outline.active,
                         indent: indent && entry.level == 3,
                         onTap: () => outline.jumpTo(entry),
@@ -180,8 +194,11 @@ class _OutlineItem extends StatelessWidget {
     required this.active,
     required this.indent,
     required this.onTap,
+    this.read = false,
   });
 
+  /// Ticked as read: the reader has scrolled past it.
+  final bool read;
   final PageOutlineEntry entry;
   final bool active;
   final bool indent;
@@ -231,7 +248,7 @@ class _OutlineItem extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (entry.done) ...[
+                if (entry.done || read) ...[
                   const SizedBox(width: 6),
                   const Icon(LucideIcons.circleCheck,
                       size: 16, color: AppColors.success),

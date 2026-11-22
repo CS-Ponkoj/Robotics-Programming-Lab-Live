@@ -20,6 +20,7 @@ import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
+import 'package:iuse_demo/state/learning_progress_store.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/theme/editor_palette.dart';
 import 'package:iuse_demo/widgets/app_blocks.dart';
@@ -98,6 +99,9 @@ class _MyHomePageState extends State<MyHomePage> {
   double _editorFontSize = 16;
   bool _editorDarkMode = true;
   int? _diagnosticLine;
+
+  /// The score before the latest run, to show how this run compares.
+  int? _previousScore;
   bool _suppressEditorChange = false;
   String? _playgroundFunction;
   String _starterCode = '';
@@ -415,7 +419,9 @@ class _MyHomePageState extends State<MyHomePage> {
           return;
         }
         final score = feedback.score.clamp(0, 100).toInt();
+        final previousScore = learningProgress.latestScores[widget.id];
         setState(() {
+          _previousScore = previousScore;
           lastAttemptAccuracy[widget.id] = score;
           _submissionId = feedback.submissionId;
           _isRunning = false;
@@ -435,6 +441,9 @@ class _MyHomePageState extends State<MyHomePage> {
           learningProgress.recordSubmission(widget.id, feedback.submissionId),
         );
         unawaited(learningProgress.recordAttempt(widget.id, score));
+        if (summarizeChecks(feedback) case final checks?) {
+          unawaited(learningProgress.recordCheckSummary(widget.id, checks));
+        }
       },
       onError: (Object error) {
         if (mounted) {
@@ -1049,6 +1058,13 @@ class _MyHomePageState extends State<MyHomePage> {
                               if (snap.hasData) {
                                 return Feedback(
                                     data: snap.data!,
+                                    previousScore: _previousScore,
+                                    errorLine: _diagnosticLine,
+                                    onGoToLine: (line) {
+                                      _scaffoldKey.currentState
+                                          ?.closeEndDrawer();
+                                      _openLineInEditor(line);
+                                    },
                                     aiTutorEnabled: _aiTutorOn,
                                     onWatchInSimulation: _hasRobotSimulation
                                         ? _watchInSimulation
@@ -1101,6 +1117,7 @@ class _MyHomePageState extends State<MyHomePage> {
       displayNumber: widget.displayNumber,
       status: progressState.label,
       lastScore: lastScore,
+      checks: learningProgress.checkSummaries[widget.id],
       codeChangedSinceScore: lastScore != null && _hasUnrunChanges,
       solutionViewed: solutionRevealedAssignments.contains(widget.id),
       feedbackEnabled: _aiTutorOn,
@@ -3827,6 +3844,7 @@ class AssignmentPageHeader extends StatelessWidget
     this.displayNumber,
     required this.status,
     this.lastScore,
+    this.checks,
     this.codeChangedSinceScore = false,
     this.solutionViewed = false,
     required this.feedbackEnabled,
@@ -3840,6 +3858,9 @@ class AssignmentPageHeader extends StatelessWidget
 
   /// Why the AI tutor is unavailable, shown when it is.
   final String aiTutorMessage;
+
+  /// The latest run's checks, drawn as a small meter beside the score.
+  final CheckSummary? checks;
 
   String get _displayTitle {
     final prefix = 'Assignment $assignmentId:';
@@ -3930,6 +3951,18 @@ class AssignmentPageHeader extends StatelessWidget
             ])),
           );
 
+    final checkMeter = checks == null
+        ? null
+        : Padding(
+            padding: const EdgeInsets.only(left: 10),
+            child: ChecksMeter(
+              key: const Key('header-checks-meter'),
+              passed: checks!.passed,
+              total: checks!.total,
+              onDark: true,
+            ),
+          );
+
     return FloatingAppBar(barHeight: 64, AppBar(
       flexibleSpace: const BrandHeaderGradient(),
       toolbarHeight: 64,
@@ -3989,7 +4022,7 @@ class AssignmentPageHeader extends StatelessWidget
                 ]),
                 // Second row: the score as its own card (and, on phones,
                 // the status cards, which do not fit beside the title).
-                if (scoreCard != null || !wide) ...[
+                if (scoreCard != null || checkMeter != null || !wide) ...[
                   const SizedBox(height: 4),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -3998,6 +4031,7 @@ class AssignmentPageHeader extends StatelessWidget
                       if (!wide && scoreCard != null)
                         const SizedBox(width: 6),
                       if (scoreCard != null) scoreCard,
+                      if (checkMeter != null) checkMeter,
                     ]),
                   ),
                 ],
@@ -4507,14 +4541,24 @@ typedef TutorQuestionRequester = Future<Map<String, dynamic>> Function(
   int hintLevel,
 );
 
-class Feedback extends StatelessWidget {
+class Feedback extends StatefulWidget {
   const Feedback({
     super.key,
     required this.data,
     this.aiTutorEnabled = false,
     this.tutorQuestionRequester,
     this.onWatchInSimulation,
+    this.previousScore,
+    this.errorLine,
+    this.onGoToLine,
   });
+
+  /// The score before this run; null on a first run.
+  final int? previousScore;
+
+  /// The line the run's error points at, if any.
+  final int? errorLine;
+  final ValueChanged<int>? onGoToLine;
 
   final UnittestFeedbackDto data;
   final bool aiTutorEnabled;
@@ -4524,7 +4568,26 @@ class Feedback extends StatelessWidget {
   final ValueChanged<String>? onWatchInSimulation;
 
   @override
+  State<Feedback> createState() => _FeedbackState();
+}
+
+class _FeedbackState extends State<Feedback> {
+  /// Passed checks stay folded while some still fail.
+  bool _showPassed = false;
+  final _hintKey = GlobalKey();
+
+  @override
+  void didUpdateWidget(covariant Feedback oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.data, widget.data)) _showPassed = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final data = widget.data;
+    final aiTutorEnabled = widget.aiTutorEnabled;
+    final tutorQuestionRequester = widget.tutorQuestionRequester;
+    final onWatchInSimulation = widget.onWatchInSimulation;
     final passed = data.unittestPassResults.where((result) => result).length;
     final failed = data.unittestPassResults.length - passed;
     final total = passed + failed;
@@ -4560,6 +4623,7 @@ class Feedback extends StatelessWidget {
       });
     final failedCards = <Widget>[];
     final passedCards = <Widget>[];
+    ({int number, String label, String message, String? hintKey})? firstFailed;
     for (final entry in orderedChecks) {
       final feedback = entry.value;
       final didPass = entry.key < data.unittestPassResults.length &&
@@ -4580,6 +4644,16 @@ class Feedback extends StatelessWidget {
 
       final detail =
           entry.key < data.evidence.length ? data.evidence[entry.key] : null;
+      if (!didPass && firstFailed == null) {
+        firstFailed = (
+          number: entry.key + 1,
+          label: (detail?.label ?? '').isNotEmpty
+              ? detail!.label
+              : 'Check ${entry.key + 1}',
+          message: feedback,
+          hintKey: detail?.hintKey,
+        );
+      }
       (didPass ? passedCards : failedCards).add(_TestResultCard(
         checkNumber: entry.key + 1,
         passed: didPass,
@@ -4615,8 +4689,35 @@ class Feedback extends StatelessWidget {
             earnedPoints: totalPoints == null ? null : earnedPoints,
             totalPoints: totalPoints,
             requirementChecks: requirementChecks,
+            previousScore: widget.previousScore,
           ),
-          if (failed > 0 || !data.execSuccess) ...[
+          // With check details, the first failed check leads with ways to
+          // act on it; otherwise a short next step.
+          if (data.execSuccess && !resultsOnly && firstFailed != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _FixFirstCard(
+              label: firstFailed.label,
+              message: firstFailed.message,
+              errorLine: widget.errorLine,
+              onGoToLine: widget.onGoToLine,
+              onWatch: onWatchInSimulation != null &&
+                      SimFocus.forHint(firstFailed.hintKey, 0) != null
+                  ? () => onWatchInSimulation(firstFailed!.hintKey!)
+                  : null,
+              onShowHint: showHint
+                  ? () {
+                      final target = _hintKey.currentContext;
+                      if (target != null) {
+                        Scrollable.ensureVisible(
+                          target,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                        );
+                      }
+                    }
+                  : null,
+            ),
+          ] else if (failed > 0 || !data.execSuccess) ...[
             const SizedBox(height: AppSpacing.sm),
             _ResultNextStep(
               executionFailed: !data.execSuccess,
@@ -4628,6 +4729,7 @@ class Feedback extends StatelessWidget {
           if (showHint || tutorAvailable) ...[
             const SizedBox(height: AppSpacing.md),
             _TutorHintPanel(
+              key: _hintKey,
               data: data,
               allowQuestions: tutorAvailable,
               useAiTutor: aiTutorEnabled,
@@ -4669,8 +4771,139 @@ class Feedback extends StatelessWidget {
                 color: AppColors.success,
                 icon: LucideIcons.circleCheck,
               ),
-              ...spaced(passedCards),
+              if (failedCards.isEmpty || _showPassed)
+                ...spaced(passedCards)
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const Key('show-passed-checks'),
+                    onPressed: () => setState(() => _showPassed = true),
+                    icon: const Icon(LucideIcons.chevronDown, size: 18),
+                    label: Text(
+                      'Show ${passedCards.length} passed '
+                      '${passedCards.length == 1 ? 'check' : 'checks'}',
+                    ),
+                  ),
+                ),
             ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The run's checks as a store record, or null when the run returned none.
+CheckSummary? summarizeChecks(UnittestFeedbackDto data) {
+  final total = data.unittestPassResults.length;
+  if (total == 0) return null;
+  final passed = data.unittestPassResults.where((result) => result).length;
+  var nextFailing = '';
+  // Traditional accounts see counts only, so no check name is kept.
+  if (data.feedbackMode != FeedbackMode.traditional.wire) {
+    for (var index = 0; index < total; index++) {
+      if (data.unittestPassResults[index]) continue;
+      final label =
+          index < data.evidence.length ? data.evidence[index].label : '';
+      nextFailing = label.isNotEmpty
+          ? label
+          : (index < data.unittestFeedback.length
+              ? data.unittestFeedback[index]
+              : '');
+      break;
+    }
+  }
+  return CheckSummary(passed: passed, total: total, nextFailing: nextFailing);
+}
+
+/// The first failed check, with the quickest ways to act on it.
+class _FixFirstCard extends StatelessWidget {
+  const _FixFirstCard({
+    required this.label,
+    required this.message,
+    this.errorLine,
+    this.onGoToLine,
+    this.onWatch,
+    this.onShowHint,
+  });
+
+  final String label;
+  final String message;
+  final int? errorLine;
+  final ValueChanged<int>? onGoToLine;
+  final VoidCallback? onWatch;
+  final VoidCallback? onShowHint;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final line = errorLine;
+    return Container(
+      key: const Key('fix-first-card'),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(LucideIcons.target, size: 16, color: AppColors.brand),
+            const SizedBox(width: 6),
+            Text(
+              'FIX THIS FIRST',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppColors.brand,
+                letterSpacing: 1.0,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          if (message.isNotEmpty && message != label) ...[
+            const SizedBox(height: 4),
+            Text(
+              message,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+            ),
+          ],
+          if ((line != null && onGoToLine != null) ||
+              onWatch != null ||
+              onShowHint != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(spacing: AppSpacing.xs, runSpacing: AppSpacing.xs, children: [
+              if (line != null && onGoToLine != null)
+                OutlinedButton.icon(
+                  key: const Key('fix-first-line'),
+                  onPressed: () => onGoToLine!(line),
+                  icon: const Icon(LucideIcons.textCursor, size: 16),
+                  label: Text('Go to line $line'),
+                ),
+              if (onWatch != null)
+                OutlinedButton.icon(
+                  key: const Key('fix-first-watch'),
+                  onPressed: onWatch,
+                  icon: const Icon(LucideIcons.bot, size: 16),
+                  label: const Text('Watch in simulation'),
+                ),
+              if (onShowHint != null)
+                FilledButton.tonalIcon(
+                  key: const Key('fix-first-hint'),
+                  onPressed: onShowHint,
+                  icon: const Icon(LucideIcons.lightbulb, size: 16),
+                  label: const Text('Show a hint'),
+                ),
+            ]),
           ],
         ],
       ),
@@ -5040,7 +5273,19 @@ class _ResultSummary extends StatelessWidget {
     this.earnedPoints,
     this.totalPoints,
     this.requirementChecks = 0,
+    this.previousScore,
   });
+
+  /// The score before this run; null on a first run.
+  final int? previousScore;
+
+  String? get _change {
+    final previous = previousScore;
+    if (previous == null) return null;
+    if (score > previous) return 'Up from $previous% on your last run';
+    if (score < previous) return 'Down from $previous% on your last run';
+    return 'Same score as your last run';
+  }
 
   final int passed;
   final int failed;
@@ -5128,6 +5373,29 @@ class _ResultSummary extends StatelessWidget {
                           ),
                         ),
                       ]),
+                      if (_change case final change?) ...[
+                        const SizedBox(height: 2),
+                        Row(children: [
+                          Icon(
+                            score > previousScore!
+                                ? LucideIcons.trendingUp
+                                : score < previousScore!
+                                    ? LucideIcons.trendingDown
+                                    : LucideIcons.minus,
+                            size: 14,
+                            color: AppColors.inkMuted,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              change,
+                              key: const Key('result-score-change'),
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: AppColors.inkMuted),
+                            ),
+                          ),
+                        ]),
+                      ],
                       const SizedBox(height: AppSpacing.sm),
                       Wrap(
                         spacing: AppSpacing.xs,
@@ -5446,6 +5714,7 @@ class AiGeneratedBadge extends StatelessWidget {
 
 class _TutorHintPanel extends StatefulWidget {
   const _TutorHintPanel({
+    super.key,
     required this.data,
     required this.allowQuestions,
     required this.useAiTutor,

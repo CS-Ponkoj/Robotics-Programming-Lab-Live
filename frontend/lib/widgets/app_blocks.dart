@@ -848,3 +848,57 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(_RingPainter old) =>
       old.value != value || old.color != color || old.track != track;
 }
+
+/// Passed checks out of all checks, as a short bar with a "9 / 20 checks"
+/// label. On a coloured header it uses light colours.
+class ChecksMeter extends StatelessWidget {
+  const ChecksMeter({
+    super.key,
+    required this.passed,
+    required this.total,
+    this.onDark = false,
+    this.width = 120,
+  });
+
+  final int passed;
+  final int total;
+  final bool onDark;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final fraction = total == 0 ? 0.0 : (passed / total).clamp(0.0, 1.0);
+    final fill = onDark ? const Color(0xFF9BE3A9) : AppColors.success;
+    final track = onDark
+        ? Colors.white.withValues(alpha: 0.25)
+        : AppColors.neutralContainer;
+    final ink = onDark ? Colors.white : AppColors.inkMuted;
+    return Semantics(
+      label: '$passed of $total checks passing',
+      excludeSemantics: true,
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        SizedBox(
+          width: width,
+          height: 6,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: fraction,
+              color: fill,
+              backgroundColor: track,
+              minHeight: 6,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$passed / $total checks',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: ink,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+      ]),
+    );
+  }
+}

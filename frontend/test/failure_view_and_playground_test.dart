@@ -128,8 +128,13 @@ void main() {
         const MaterialApp(home: Scaffold(body: app.Feedback(data: feedback))),
       );
 
+      await tester.ensureVisible(find.byKey(const Key('show-passed-checks')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('show-passed-checks')));
+      await tester.pumpAndSettle();
       expect(find.text('Approach distance'), findsOneWidget);
-      expect(find.text('Boundary-following distance'), findsOneWidget);
+      // Once in "Fix this first" and once in the list.
+      expect(find.text('Boundary-following distance'), findsNWidgets(2));
       expect(find.text('Check 1 · 25 of 25 points'), findsOneWidget);
       expect(find.text('Check 2 · 0 of 12.5 points'), findsOneWidget);
       expect(find.byKey(const Key('test-result-reason-2')), findsOneWidget);
@@ -172,6 +177,10 @@ void main() {
         const MaterialApp(home: Scaffold(body: app.Feedback(data: feedback))),
       );
 
+      await tester.ensureVisible(find.byKey(const Key('show-passed-checks')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('show-passed-checks')));
+      await tester.pumpAndSettle();
       expect(find.text('Check 1 · 0 of 10 points'), findsOneWidget);
       expect(find.text('Check 2 · 0 of 20 points'), findsOneWidget);
     });

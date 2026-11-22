@@ -9,6 +9,7 @@ import 'package:iuse_demo/widgets/lesson_reader.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:iuse_demo/screens/course_content_page.dart';
+import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/services/course_content_api.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/screens/assignment_list.dart';
@@ -787,9 +788,40 @@ void main() {
       expect(active('Stopping'), isTrue);
       expect(active('Sensors'), isFalse);
       // The heading was scrolled into the reading area.
-      final reading = find.byType(Scrollable).last;
+      final reading = find
+          .ancestor(
+              of: find.byKey(const Key('course-section-html')),
+              matching: find.byType(Scrollable))
+          .first;
       expect(tester.state<ScrollableState>(reading).position.pixels,
           greaterThan(0));
+    });
+
+    testWidgets('opening a lesson is not reading it; scrolling to the end is',
+        (tester) async {
+      learningProgress.startEphemeralSession();
+      addTearDown(learningProgress.startEphemeralSession);
+      await openWide(tester);
+      await tester.pumpAndSettle();
+      final progress = learningProgress.topicProgress['obstacle-avoidance'];
+      expect(progress?.doneKinds.contains('lesson') ?? false, isFalse);
+      expect(progress?.lessonPercent ?? 0, 0);
+      final reading = find
+          .ancestor(
+              of: find.byKey(const Key('course-section-html')),
+              matching: find.byType(Scrollable))
+          .first;
+      final position = tester.state<ScrollableState>(reading).position;
+      position.jumpTo(position.maxScrollExtent / 2);
+      await tester.pumpAndSettle();
+      final halfway =
+          learningProgress.topicProgress['obstacle-avoidance']!.lessonPercent;
+      expect(halfway, inInclusiveRange(40, 60));
+      expect(learningProgress.lessonToResume?.key, 'obstacle-avoidance');
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(learningProgress.topicProgress['obstacle-avoidance']!.doneKinds,
+          contains('lesson'));
     });
 
     testWidgets('collapses to a button and opens again', (tester) async {

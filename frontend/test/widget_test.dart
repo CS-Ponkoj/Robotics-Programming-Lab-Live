@@ -1950,17 +1950,20 @@ void main() {
     );
 
     expect(find.text('Attempted'), findsOneWidget);
-    expect(find.text('Last score: 60%'), findsOneWidget);
-    // The latest score badge takes the score's performance colour.
-    final badge = tester.widget<StatusPill>(
-      find.byKey(const Key('latest-score-badge')),
+    // One line holds best score, last score and attempts.
+    expect(
+      find.text('Best 60%  ·  Last 60%  ·  1 attempt', findRichText: true),
+      findsOneWidget,
     );
-    expect(badge.color, performanceColor(60));
-    expect(find.text('Best score: 60%'), findsOneWidget);
-    expect(find.text('Attempted: 1'), findsOneWidget);
+    final stats = tester.widget<Text>(
+      find.byKey(const Key('assignment-stats-line')),
+    );
+    final lastSpan = (stats.textSpan! as TextSpan)
+        .children!
+        .whereType<TextSpan>()
+        .firstWhere((span) => span.text == '60%' && span.style != null);
+    expect(lastSpan.style?.color, performanceColor(60));
     expect(find.text('Continue assignment'), findsOneWidget);
-    final scoreText = tester.widget<Text>(find.text('Last score: 60%'));
-    expect(scoreText.style?.color, performanceColor(60));
   });
 
   testWidgets('feedback separates weighted score from check pass rate', (
@@ -2013,6 +2016,13 @@ void main() {
     expect(score.style?.color, performanceColor(35));
     expect(find.text('Passed'), findsOneWidget);
     expect(find.text('Needs attention'), findsOneWidget);
+    // The passed check is folded until asked for.
+    expect(find.byIcon(LucideIcons.check), findsOneWidget);
+    expect(find.byKey(const Key('fix-first-card')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('show-passed-checks')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('show-passed-checks')));
+    await tester.pumpAndSettle();
     expect(find.byIcon(LucideIcons.check), findsNWidgets(2));
     expect(find.byIcon(LucideIcons.x), findsNWidgets(2));
   });
@@ -2058,6 +2068,10 @@ void main() {
           'the 100 points of the behavior checks.'),
       findsOneWidget,
     );
+    await tester.ensureVisible(find.byKey(const Key('show-passed-checks')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('show-passed-checks')));
+    await tester.pumpAndSettle();
     expect(find.text('Check 1 · required, no points'), findsOneWidget);
     expect(find.text('Check 3 · 50 of 50 points'), findsOneWidget);
 
@@ -2087,10 +2101,18 @@ void main() {
       home: Scaffold(body: app.Feedback(data: feedback)),
     ));
 
-    expect(find.byKey(const Key('result-next-step')), findsOneWidget);
+    // With check details, the first failed check leads the results.
+    expect(find.byKey(const Key('fix-first-card')), findsOneWidget);
+    expect(find.byKey(const Key('result-next-step')), findsNothing);
     expect(find.text('Test details · failed first'), findsOneWidget);
-    final failedPosition = tester.getTopLeft(find.text('Check 2')).dy;
-    final passedPosition = tester.getTopLeft(find.text('Check 1')).dy;
+    await tester.ensureVisible(find.byKey(const Key('show-passed-checks')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('show-passed-checks')));
+    await tester.pumpAndSettle();
+    final failedPosition =
+        tester.getTopLeft(find.byKey(const Key('test-result-points-2'))).dy;
+    final passedPosition =
+        tester.getTopLeft(find.byKey(const Key('test-result-points-1'))).dy;
     expect(failedPosition, lessThan(passedPosition));
   });
 
