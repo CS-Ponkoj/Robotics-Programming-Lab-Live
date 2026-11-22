@@ -41,8 +41,12 @@ def test_assignment_identity_and_scoring():
 def test_public_tests_match_the_harness_in_order():
     """The worker reports package-build first, then the harness results in order."""
     harness = (BACKEND / "ros2_open_side_harness.py").read_text(encoding="utf-8")
-    harness_ids = re.findall(r'result\(\s*"([a-z0-9-]+)"', harness)
-    assert ["package-build", *harness_ids] == [item["id"] for item in SOURCE["public_tests"]]
+    found = re.findall(r'(?:result|gated)\(\s*"([a-z0-9-]+)"', harness)
+    harness_ids = list(dict.fromkeys(found))
+    code_ids = ["imports-allowed", "no-blocking", "main-unchanged"]
+    assert ["package-build", *code_ids, *harness_ids] == [
+        item["id"] for item in SOURCE["public_tests"]
+    ]
 
 
 def test_simulation_world_is_valid_and_drives_flbr():

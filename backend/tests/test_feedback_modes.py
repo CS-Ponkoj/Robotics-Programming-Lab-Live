@@ -7,7 +7,10 @@ from sqlalchemy import select
 from app import create_app
 from config import Settings
 from feedback_modes import (
+    NO_HINTS_MESSAGE,
+    SOLUTION_UNAVAILABLE_MESSAGE,
     feedback_mode_for,
+    mode_without_ai_message,
     shape_simulation_response,
     shape_submission_response,
 )
@@ -240,3 +243,99 @@ def test_traditional_simulation_is_the_plain_replay():
     assert plain["output"] == "" and plain["simulation"] == {"frames": [1]}
     assert shape_simulation_response(reply, "tdd") == reply
     assert reply["simulation"]["sensitivity"]  # the input is not changed
+
+
+def test_traditional_counts_have_no_check_order_and_no_check_labels(app_client, accounts):
+    _, client = app_client
+    result = run_starter(client, accounts["traditional"])
+    passes = result["unittest_pass_results"]
+    assert passes == sorted(passes, reverse=True)  # passed first: order-free
+    assert "error_frames" in result and "code_exec_result" in result
+    traditional = client.get("/assignments/1", headers=bearer(accounts["traditional"])).json()
+    tdd = client.get("/assignments/1", headers=bearer(accounts["tdd"])).json()
+    assert traditional["public_tests"] == [] and tdd["public_tests"]
+    listed = client.get("/assignments", headers=bearer(accounts["traditional"])).json()
+    assert all(item["public_tests"] == [] for item in listed["assignments"])
+    shaped = shape_submission_response(
+        {"unittest_pass_results": [False, True, False, True]}, "traditional"
+    )
+    assert shaped["unittest_pass_results"] == [True, True, False, False]
+
+
+def test_hints_follow_the_accounts_current_mode(app_client, accounts):
+    _, client = app_client
+    result = run_starter(client, accounts["ai"])
+    request = {"submission_id": result["submission_id"], "hint_level": 2}
+    assert client.post(
+        "/assignments/1/hint", headers=bearer(accounts["ai"]), json=request
+    ).status_code == 200
+    user_id = accounts["ai"]["user"]["id"]
+    for mode in ("tdd", "traditional"):
+        assert client.patch(
+            f"/admin/students/{user_id}", headers=instructor(client),
+            json={"feedback_mode": mode},
+        ).status_code == 200
+        hint = client.post("/assignments/1/hint", headers=bearer(accounts["ai"]), json=request)
+        assert hint.status_code == 403 and hint.json()["error"] == NO_HINTS_MESSAGE
+
+
+@pytest.mark.parametrize("name", ["traditional", "tdd", "ai"])
+def test_study_students_never_get_the_solution_approach(app_client, accounts, name):
+    _, client = app_client
+    result = run_starter(client, accounts[name])
+    for item in client.get("/assignments", headers=bearer(accounts[name])).json()["assignments"]:
+        assert item["has_solution"] is False and item["solution_html"] == ""
+    detail = client.get("/assignments/1", headers=bearer(accounts[name])).json()
+    assert detail["has_solution"] is False
+    reveal = client.post(
+        "/assignments/1/solution", headers=bearer(accounts[name]),
+        json={"submission_id": result["submission_id"]},
+    )
+    assert reveal.status_code == 403
+    assert reveal.json()["error"] == SOLUTION_UNAVAILABLE_MESSAGE
+
+
+def test_instructors_keep_the_solution_approach(app_client):
+    _, client = app_client
+    headers = instructor(client)
+    assert client.get("/assignments/1", headers=headers).json()["has_solution"] is True
+    starter = client.get("/assignments/1", headers=headers).json()["starter_code"]
+    run = client.post("/assignments/1/submit", headers=headers, json={"code": starter}).json()
+    reveal = client.post(
+        "/assignments/1/solution", headers=headers, json={"submission_id": run["submission_id"]}
+    )
+    assert reveal.status_code == 200 and reveal.json()["solution_html"]
+
+
+def test_accounts_without_hints_are_not_promised_built_in_hints(app_client, accounts):
+    _, client = app_client
+    for name in ("traditional", "tdd"):
+        message = client.get("/assignments/1", headers=bearer(accounts[name])).json()[
+            "ai_tutor_message"
+        ]
+        assert message and "hints still work" not in message.lower()
+    ai = client.get("/assignments/1", headers=bearer(accounts["ai"])).json()
+    assert "Built-in hints still work" in ai["ai_tutor_message"]
+    for mode in ("traditional", "tdd"):
+        assert "hint" not in mode_without_ai_message(mode).replace("without hints", "")
+
+
+def test_traditional_counts_keep_not_run_checks_apart_without_names():
+    from feedback_modes import NOT_RUN_COUNT_MESSAGE, shape_submission_response
+
+    payload = {
+        "unittest_pass_results": [False, True, False, False],
+        "unittest_results": [
+            "Not run: the code stopped with an error before this check.",
+            "Imports only rclpy.",
+            "The package was not built: controller.py has a SyntaxError on line 4.",
+            "Not checked: the node stopped before this situation.",
+        ],
+        "evidence": [{"test_id": "x"}],
+        "hint": "h",
+    }
+    shaped = shape_submission_response(payload, "traditional")
+    assert shaped["unittest_pass_results"] == [True, False, False, False]
+    assert shaped["unittest_results"] == ["", "", NOT_RUN_COUNT_MESSAGE, NOT_RUN_COUNT_MESSAGE]
+    assert shaped["evidence"] == [] and shaped["hint"] == ""
+    assert "SyntaxError" not in str(shaped["unittest_results"])

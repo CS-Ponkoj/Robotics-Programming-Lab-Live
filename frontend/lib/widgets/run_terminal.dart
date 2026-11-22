@@ -37,6 +37,35 @@ final _scenarioPattern = RegExp(
   r'^The required function could not complete every grading scenario '
   r'\(([A-Za-z_]\w*)(?:: (.*))?\)\.$',
 );
+// A syntax error as Python reports it: "SyntaxError: expected ':'
+// (controller.py, line 18)".
+final _syntaxPattern =
+    RegExp(r'^(\w*Error): (.*) \(([\w.-]+\.py), line (\d+)\)$');
+
+/// The ROS grader starts its output with its own summary ("Observed 66
+/// Twist messages…", "Simulated 8.0 s: …") and then the node's printed text
+/// after "Node stdout:". The two are kept apart so the grader's words are
+/// never shown as the student's output.
+({String grader, String printed}) splitGraderOutput(String output) {
+  const marker = 'Node stdout:';
+  final at = output.indexOf(marker);
+  if (at < 0) {
+    final graderLine = RegExp(r'^(Observed \d+ Twist messages|Simulated \d)');
+    final lines = output.split('\n');
+    if (lines.isNotEmpty && graderLine.hasMatch(lines.first)) {
+      return (
+        grader: lines.first.trim(),
+        printed: lines.skip(1).join('\n').trim(),
+      );
+    }
+    return (grader: '', printed: output.trim());
+  }
+  return (
+    grader: output.substring(0, at).trim(),
+    printed: output.substring(at + marker.length).trim(),
+  );
+}
+
 // A frame as the ROS grader reports it: "controller.py, line 12, in tick".
 final _textFramePattern = RegExp(
   r'^\s*(?:File ")?([\w.-]+\.py)"?, line (\d+), in (.+)$',
@@ -65,7 +94,10 @@ List<TerminalLine> buildRunTerminalLines({
       TerminalLineKind.command,
     ),
   ];
-  final printed = data.codeOutput.trimRight();
+  final split = command != null
+      ? splitGraderOutput(data.codeOutput)
+      : (grader: '', printed: data.codeOutput.trimRight());
+  final printed = split.printed;
   if (printed.isNotEmpty) {
     for (final text in printed.split('\n')) {
       lines.add(TerminalLine(text, TerminalLineKind.output));
@@ -77,6 +109,9 @@ List<TerminalLine> buildRunTerminalLines({
         TerminalLineKind.info));
   } else if (data.execSuccess) {
     lines.add(const TerminalLine('(no printed output)', TerminalLineKind.info));
+  }
+  if (split.grader.isNotEmpty) {
+    lines.add(TerminalLine('[grader] ${split.grader}', TerminalLineKind.info));
   }
 
   if (!data.execSuccess) {
@@ -153,6 +188,14 @@ List<TerminalLine> buildRunTerminalLines({
       final text = error.isEmpty ? 'The program could not be run.' : error;
       var tracebackShown = false;
       for (final raw in text.split('\n')) {
+        final syntax = _syntaxPattern.firstMatch(raw.trim());
+        if (syntax != null) {
+          // Point at the line, the way Python's own message does.
+          addFrame(int.parse(syntax.group(4)!), null, file: syntax.group(3));
+          lines.add(TerminalLine(
+              '${syntax.group(1)}: ${syntax.group(2)}', TerminalLineKind.error));
+          continue;
+        }
         final frame = _textFramePattern.firstMatch(raw);
         if (frame == null) {
           lines.add(
@@ -186,13 +229,19 @@ List<TerminalLine> buildRunTerminalLines({
         );
       }
     }
-    lines.add(
-      const TerminalLine(
-        'Tests did not finish: fix the error above, then run again.',
-        TerminalLineKind.info,
-      ),
-    );
-    return lines;
+    // When the grader still returned check results (a node that crashed
+    // part-way), the summary below says how far it got.
+    if (command == null ||
+        data.unittestPassResults.isEmpty ||
+        !data.unittestPassResults.contains(true)) {
+      lines.add(
+        const TerminalLine(
+          'Tests did not finish: fix the error above, then run again.',
+          TerminalLineKind.info,
+        ),
+      );
+      return lines;
+    }
   }
 
   final total = data.unittestPassResults.length;
@@ -211,7 +260,7 @@ List<TerminalLine> buildRunTerminalLines({
   );
   // The first failed check by its public name, except for Traditional
   // accounts, which see counts only.
-  if (passed < total && data.feedbackMode != 'traditional') {
+  if (data.execSuccess && passed < total && data.feedbackMode != 'traditional') {
     for (var index = 0; index < total; index++) {
       if (data.unittestPassResults[index]) continue;
       final label =

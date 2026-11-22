@@ -132,12 +132,14 @@ from feedback_modes import (
     NO_HINTS_MESSAGE,
     NO_SIMULATION_MESSAGE,
     NO_TUTOR_MESSAGE,
+    SOLUTION_UNAVAILABLE_MESSAGE,
     allows_ai,
     allows_hints,
     allows_simulation,
     feedback_mode_for,
     shape_simulation_response,
     shape_submission_response,
+    shows_check_names,
 )
 from assignment_insights import assignment_insights
 from course_settings import (
@@ -378,6 +380,28 @@ def create_app(
     def is_ephemeral_demo(request: Request, user: User) -> bool:
         record = demo_session_record(request)
         return bool(record is not None and record[1]["user_id"] == user.id)
+
+    def is_study_student(request: Request, user: User) -> bool:
+        """A real student account; the public demo and instructors are not."""
+        return user.role == "student" and not is_ephemeral_demo(request, user)
+
+    def shape_student_assignment(
+        payload: AssignmentStudent, request: Request, user: User
+    ) -> AssignmentStudent:
+        """Hide what this account's feedback does not include.
+
+        Study students never get the solution approach (owner decision), so
+        has_solution is False for them. Traditional accounts see counts only,
+        so the public check labels are left out as well.
+        """
+        update: dict = {}
+        if is_study_student(request, user):
+            update["has_solution"] = False
+            update["solution_html"] = ""
+        mode = feedback_mode_for(user, demo=is_ephemeral_demo(request, user))
+        if not shows_check_names(mode):
+            update["public_tests"] = []
+        return payload.model_copy(update=update) if update else payload
 
     def reject_demo_research_write(request: Request, user: User) -> None:
         # Demo sessions share the seeded student row, so they must never
@@ -1627,7 +1651,9 @@ def create_app(
         old_ids = current_old_ids(session)
 
         def with_draft_flag(assignment: Assignment) -> AssignmentStudent:
-            payload = to_student_assignment(assignment, old_ids)
+            payload = shape_student_assignment(
+                to_student_assignment(assignment, old_ids), request, user
+            )
             code = drafts.get((assignment.id, assignment.version))
             saved = bool(code and code.strip() and code != assignment.starter_code)
             return payload.model_copy(update={"has_saved_draft": saved})
@@ -1645,7 +1671,11 @@ def create_app(
         _user: User = Depends(current_user),
     ):
         assignment = get_assignment_or_404(session, assignment_id)
-        payload = to_student_assignment(assignment, current_old_ids(session))
+        payload = shape_student_assignment(
+            to_student_assignment(assignment, current_old_ids(session)),
+            request,
+            _user,
+        )
         access = ai_access(
             request.app.state.settings, session, assignment, _user,
             demo=is_ephemeral_demo(request, _user), count_quota=False,
@@ -2110,9 +2140,12 @@ def create_app(
             raise HTTPException(404, "Submission not found.")
         if submission.student_id != user.login_id:
             raise HTTPException(404, "Submission not found.")
-        if not allows_hints(
-            submission.feedback_mode or "tdd",
-            demo=is_ephemeral_demo(request, user),
+        demo = is_ephemeral_demo(request, user)
+        # Both the mode the attempt ran under and the account's current mode
+        # must include hints: an instructor may have changed the mode since.
+        if not (
+            allows_hints(submission.feedback_mode or "tdd", demo=demo)
+            and allows_hints(feedback_mode_for(user, demo=demo), demo=demo)
         ):
             raise HTTPException(403, NO_HINTS_MESSAGE)
         access = ai_access(
@@ -2237,6 +2270,10 @@ def create_app(
         user: User = Depends(current_user),
     ):
         assignment = get_assignment_or_404(session, assignment_id)
+        if is_study_student(request, user):
+            # Owner decision: the solution approach is hidden from study
+            # students in every feedback mode; the demo and instructors keep it.
+            raise HTTPException(403, SOLUTION_UNAVAILABLE_MESSAGE)
         submission = submission_for_request(
             request,
             session,

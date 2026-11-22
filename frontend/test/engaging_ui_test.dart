@@ -299,4 +299,98 @@ void main() {
       expect(find.bySemanticsLabel('Assignment 7, Not started'), findsOneWidget);
     });
   });
+
+  group('qa round 3', () {
+    UnittestFeedbackDto runWith(List<(bool, String, double, double?)> checks,
+            {int score = 0, String mode = 'tdd', bool ok = true}) =>
+        UnittestFeedbackDto(
+          id: 7,
+          score: score,
+          testedVals: const [],
+          pass: false,
+          unittestFeedback: [for (final c in checks) c.$2],
+          unittestPassResults: [for (final c in checks) c.$1],
+          codeExecResult: ok ? '' : 'SyntaxError: expected \':\'',
+          codeOutput: '',
+          execSuccess: ok,
+          hint: '',
+          feedbackMode: mode,
+          evidence: [
+            for (final (i, c) in checks.indexed)
+              TestEvidenceDto(
+                testId: 't$i',
+                label: 'Check $i',
+                passed: c.$1,
+                message: c.$2,
+                weight: c.$3,
+                earnedWeight: c.$4,
+              ),
+          ],
+        );
+
+    testWidgets('checks that did not run are folded apart from failures',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: app.Feedback(
+            data: runWith([
+              (false, 'The package was not built: SyntaxError on line 4.', 10, 0),
+              (false, 'Not run: the code stopped with an error before this check.', 10, 0),
+              (false, 'Not run: the code stopped with an error before this check.', 10, 0),
+            ], ok: false),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Failed: 1'), findsOneWidget);
+      expect(find.text('Not run: 2'), findsOneWidget);
+      expect(find.byKey(const Key('checks-not-run-group')), findsOneWidget);
+      expect(find.byKey(const Key('show-not-run-checks')), findsOneWidget);
+    });
+
+    testWidgets('held-back points explain a 0% score', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: app.Feedback(
+            data: runWith([
+              (true, 'Requirement passed.', 10, 0),
+              (false, 'Your robot never drove forward.', 20, 0),
+            ]),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(
+          find.text('Points from passed checks count only once your robot '
+              'passes at least one driving check.'),
+          findsOneWidget);
+    });
+
+    testWidgets('Traditional 0% names both possible reasons', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+          body: app.Feedback(
+            data: UnittestFeedbackDto(
+              id: 7,
+              score: 0,
+              testedVals: [],
+              pass: false,
+              unittestFeedback: ['', ''],
+              unittestPassResults: [true, false],
+              codeExecResult: '',
+              codeOutput: '',
+              execSuccess: true,
+              hint: '',
+              feedbackMode: 'traditional',
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(
+          find.text('Your score stays at 0% until every required check passes '
+              'and your robot passes at least one driving check.'),
+          findsOneWidget);
+    });
+  });
 }

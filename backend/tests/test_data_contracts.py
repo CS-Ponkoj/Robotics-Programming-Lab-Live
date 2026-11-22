@@ -40,6 +40,16 @@ def valid_assignment_data():
     [
         (True, "", ExecutionStatus.COMPLETED),
         (False, "SyntaxError: invalid syntax", ExecutionStatus.SYNTAX_ERROR),
+        (
+            False,
+            "IndentationError: unexpected indent (controller.py, line 21)",
+            ExecutionStatus.SYNTAX_ERROR,
+        ),
+        (
+            False,
+            "TabError: inconsistent use of tabs and spaces in indentation",
+            ExecutionStatus.SYNTAX_ERROR,
+        ),
         (False, "TimeoutError: execution exceeded 5 seconds", ExecutionStatus.TIMEOUT),
         (False, "Import of socket is not allowed", ExecutionStatus.REJECTED),
         (

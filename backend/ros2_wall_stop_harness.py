@@ -1,8 +1,14 @@
 """Publish 270-degree scans of a wall ahead and observe the student's /cmd_vel.
 
-The student designs the node in build_node(), so this harness checks only
-observable behavior and the ROS interfaces the running node creates. It never
-requires a particular callback structure or stop distance.
+The student designs the node in build_node(), so this harness checks
+observable behavior, the ROS interfaces the running node creates, and the
+one-command-per-scan contract (counted inside the student's process by
+ros2_callback_audit). It never requires a particular callback structure or
+stop distance.
+
+Each check judges only its own rule. A check that could not be judged because
+the node was not running is reported as not run, with the reason, and a check
+whose credit is withheld says why.
 """
 
 from __future__ import annotations
@@ -18,7 +24,16 @@ import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from ros2_callback_audit import launch_student, summarize_student_failure
+from ros2_callback_audit import (
+    output_tail,
+    build_state,
+    callback_contract_problem,
+    created_interfaces,
+    launch_student,
+    one_per_callback,
+    read_audit,
+    summarize_student_failure,
+)
 
 
 FORWARD_MIN = 0.1
@@ -34,6 +49,7 @@ SCAN_INCREMENT_DEG = 3.0
 SCAN_BEAMS = 91
 RANGE_MIN = 0.1
 RANGE_MAX = 10.0
+INTERFACE_SAMPLE_PERIOD = 0.25
 TWIST_TYPE = "geometry_msgs/msg/Twist"
 SCAN_TYPE = "sensor_msgs/msg/LaserScan"
 
@@ -47,9 +63,34 @@ PHASES = [
     ("resume", 1.2),
 ]
 
+# Why behavior could not be observed, by node state. A check without
+# evidence for one of these reasons is "not run", not failed on its rule.
+NOT_CHECKED = {
+    "build-returned-non-node": "Not checked: build_node() did not return a node, so nothing could run.",
+    "build-error": "Not checked: build_node() stopped with an error before the node could run.",
+    "build-never-returned": "Not checked: build_node() never returned, so main() could not start the node.",
+    "callback-error": "Not checked: the node stopped with an error while handling a scan.",
+    "callback-blocked": "Not checked: the scan callback never finished (a loop or a wait blocks it), so the node stopped publishing.",
+    "stopped": "Not checked: the node stopped before this situation.",
+}
+NODE_START_FAILURE = {
+    "build-returned-non-node": "The node did not start: build_node() returned None instead of a node.",
+    "build-error": "The node did not start: build_node() stopped with an error.",
+    "build-never-returned": "The node did not start: build_node() never returned.",
+    "callback-error": "The node started, but it stopped with an error while handling its first scan, so it never published on /cmd_vel.",
+    "callback-blocked": "The node started, but its scan callback never finished, so it never published on /cmd_vel.",
+}
+NO_COMMANDS = (
+    "No command arrived in this situation, so this rule could not be checked."
+)
+ONE_COMMAND_RULE = "Exactly one command was published in the /scan callback for every scan."
 
-def result(test_id: str, passed: bool, message: str) -> dict:
-    return {"id": test_id, "passed": passed, "message": message}
+
+def result(test_id: str, passed: bool, message: str, status: str = "") -> dict:
+    item = {"id": test_id, "passed": passed, "message": message}
+    if status and not passed:
+        item["status"] = status
+    return item
 
 
 def wall_ranges(front: float | None) -> list[float]:
@@ -76,21 +117,32 @@ def forward_ok(samples: list[tuple]) -> bool:
     )
 
 
+def moving(samples: list[tuple]) -> bool:
+    """The robot drives forward, at any speed (the speed has its own checks)."""
+    return bool(samples) and all(item[1] > STOP_TOLERANCE for item in samples)
+
+
 def stopped_ok(samples: list[tuple]) -> bool:
     return bool(samples) and all(abs(item[1]) <= STOP_TOLERANCE for item in samples)
 
 
-def read_spin_report(read_fd: int) -> bool:
-    """True when main() passed something other than a node to rclpy.spin()."""
-    os.set_blocking(read_fd, False)
-    try:
-        try:
-            evidence = os.read(read_fd, 65536)
-        except BlockingIOError:
-            evidence = b""
-    finally:
-        os.close(read_fd)
-    return b"N" in evidence.splitlines()
+def node_state(build: str, alive: bool, audit: dict, commands: bool, resumed: bool) -> str:
+    """One word for how the student's node ran; "running" when it worked as a node."""
+    began = audit["events"]["B"]
+    finished = len(audit["counts"])
+    if build == "non-node":
+        return "build-returned-non-node"
+    if build == "raised":
+        return "build-error"
+    if not alive and audit["events"]["F"]:
+        return "callback-error"
+    if alive and began > finished and not resumed:
+        return "callback-blocked"
+    if build == "pending" and not commands:
+        return "build-never-returned" if alive else "stopped"
+    if not alive:
+        return "stopped"
+    return "running"
 
 
 def main() -> None:
@@ -102,6 +154,9 @@ def main() -> None:
 
     commands: list[tuple[float, float, float]] = []
     windows: dict[str, tuple[float, float]] = {}
+    publishers: set[str] = set()
+    subscriptions: set[str] = set()
+    last_sample = [0.0]
 
     rclpy.init(args=None)
     monitor_name = f"grader_wall_monitor_{os.getpid()}"
@@ -127,6 +182,20 @@ def main() -> None:
         scan.ranges = wall_ranges(front)
         return scan
 
+    def interface_types(info_list) -> set[str]:
+        return {
+            info.topic_type for info in info_list if info.node_name != monitor_name
+        }
+
+    def sample_interfaces(force: bool = False) -> None:
+        """Remember the node's interfaces while it runs; a crash removes them."""
+        now = time.monotonic()
+        if not force and now - last_sample[0] < INTERFACE_SAMPLE_PERIOD:
+            return
+        last_sample[0] = now
+        publishers.update(interface_types(monitor.get_publishers_info_by_topic(command_topic)))
+        subscriptions.update(interface_types(monitor.get_subscriptions_info_by_topic(scan_topic)))
+
     def wait_for_controller(timeout: float = 5.0) -> bool:
         deadline = time.monotonic() + timeout
         next_publish = time.monotonic()
@@ -138,6 +207,7 @@ def main() -> None:
                 scan_publisher.publish(scan_message(None))
                 next_publish = now + SCAN_PERIOD
             rclpy.spin_once(monitor, timeout_sec=0.03)
+            sample_interfaces()
             if commands and monitor.count_publishers(command_topic) > 0:
                 return True
         return False
@@ -151,29 +221,24 @@ def main() -> None:
                 scan_publisher.publish(scan_message(front))
                 next_publish = now + SCAN_PERIOD
             rclpy.spin_once(monitor, timeout_sec=0.03)
+            sample_interfaces()
             if student.poll() is not None:
                 return
 
-    def interface_types(info_list) -> set[str]:
-        return {
-            info.topic_type for info in info_list if info.node_name != monitor_name
-        }
-
     controller_ready = False
-    publishers: set[str] = set()
-    subscriptions: set[str] = set()
     try:
         controller_ready = wait_for_controller()
         if controller_ready:
             spin_for(1.0, publish=False)
-            publishers = interface_types(monitor.get_publishers_info_by_topic(command_topic))
-            subscriptions = interface_types(monitor.get_subscriptions_info_by_topic(scan_topic))
+            sample_interfaces(force=True)
             commands.clear()
             for phase, front in PHASES:
                 started = time.monotonic()
                 spin_for(PHASE_SECONDS, front)
                 windows[phase] = (started, time.monotonic())
             spin_for(0.2, publish=False)
+        elif student.poll() is None:
+            sample_interfaces(force=True)
     finally:
         alive_at_end = student.poll() is None
         if alive_at_end:
@@ -185,7 +250,7 @@ def main() -> None:
         monitor.destroy_node()
         rclpy.shutdown()
     student_stdout, student_stderr = student.communicate(timeout=1)
-    spun_non_node = read_spin_report(audit_fd)
+    audit = read_audit(audit_fd)
 
     def samples(phase: str) -> list[tuple]:
         if phase not in windows:
@@ -199,104 +264,175 @@ def main() -> None:
     )
     observed_seconds = len(PHASES) * PHASE_SECONDS
     rate = len(observed) / observed_seconds
-    moves_when_clear = forward_ok(samples("open")) or forward_ok(samples("far"))
+    build = build_state(audit)
+    if build == "raised" and alive_at_end:
+        # The grader's own shutdown interrupted a build_node() that never returned.
+        build = "pending"
+    publishers |= created_interfaces(audit, "pub")
+    subscriptions |= created_interfaces(audit, "sub")
+    state = node_state(build, alive_at_end, audit, bool(commands), bool(samples("resume")))
+    reason = NOT_CHECKED.get(state)
+    # Stopping, recovery and straight driving count only once the robot also
+    # drives (at any speed) when the way is clear; speed has its own checks.
+    moves_when_clear = moving(samples("open")) or moving(samples("far"))
     node_started = controller_ready and (alive_at_end or bool(commands))
-    returns_node = not spun_non_node and node_started
-    runtime_error = "" if alive_at_end else summarize_student_failure(student_stderr, student.returncode)
-    drive_hint = " Forward means linear.x between 0.1 and 0.3 m/s."
-    stop_hint = " Stopped means linear.x is 0.0. Stopping only counts once the robot also drives when the way is clear."
+    if build == "unknown":
+        returns_node = node_started and not audit["events"]["N"]
+    else:
+        returns_node = build == "returned"
+    runtime_error = (
+        "" if alive_at_end
+        else summarize_student_failure(
+            student_stderr, student.returncode, returned_non_node=build == "non-node",
+        )
+    )
+    withheld = "Not credited yet: this counts only once the robot also drives when the way is clear."
+
+    def not_checked(phase_samples: list) -> bool:
+        return reason is not None and not phase_samples
+
+    def drive_check(test_id: str, phase: str, ok_message: str, rule: str) -> dict:
+        items = samples(phase)
+        if forward_ok(items):
+            return result(test_id, True, ok_message)
+        if not_checked(items):
+            return result(test_id, False, reason, "not_run")
+        if not items:
+            return result(test_id, False, NO_COMMANDS)
+        return result(test_id, False, rule + " Forward means linear.x between 0.1 and 0.3 m/s.")
+
+    def stop_check(test_id: str, phase: str, ok_message: str, rule: str) -> dict:
+        items = samples(phase)
+        if moves_when_clear and stopped_ok(items):
+            return result(test_id, True, ok_message)
+        if not_checked(items):
+            return result(test_id, False, reason, "not_run")
+        if not items:
+            return result(test_id, False, NO_COMMANDS)
+        if stopped_ok(items):
+            return result(test_id, False, "The robot was stopped here. " + withheld)
+        return result(test_id, False, rule + " Stopped means linear.x is 0.0.")
+
+    if returns_node:
+        returns_message = "build_node() returned a ROS node."
+    elif build == "non-node":
+        returns_message = (
+            "build_node() returned None or something that is not a ROS node. "
+            "The rule: build_node() returns the node it created."
+        )
+    elif build == "raised":
+        returns_message = "build_node() stopped with an error before it returned a node; the error shows the line."
+    elif build == "pending" and alive_at_end:
+        returns_message = (
+            "build_node() never returned, so main() could not spin the node."
+        )
+    else:
+        returns_message = "build_node() did not return a node before the program stopped."
+
+    if node_started:
+        start_message = "The node started and published on /cmd_vel."
+    else:
+        start_message = NODE_START_FAILURE.get(
+            state, "The node did not start publishing on /cmd_vel within 5 seconds."
+        )
+
+    interface_reason = reason if state != "running" else None
+    turning = [abs(item[2]) for item in observed if abs(item[2]) > ANGULAR_TOLERANCE]
+    hold = samples("hold")
+    resume = samples("resume")
+    contract_ok = one_per_callback(audit)
+    contract_problem = callback_contract_problem(audit, "/scan")
+    contract_unjudged = reason is not None and 1 not in audit["counts"]
 
     tests = [
-        result(
-            "node-start",
-            node_started,
-            "The node started and published on /cmd_vel."
-            if node_started
-            else "The node did not start publishing on /cmd_vel within 5 seconds.",
-        ),
-        result(
-            "returns-node",
-            returns_node,
-            "build_node() returned a ROS node."
-            if returns_node
-            else (
-                "build_node() returned None or something that is not a ROS node. "
-                "Create your node and return it at the end of build_node()."
-                if spun_non_node
-                else "build_node() did not finish, so no node could start."
-            ),
-        ),
+        result("node-start", node_started, start_message),
+        result("returns-node", returns_node, returns_message),
         result(
             "cmd-vel-publisher",
             TWIST_TYPE in publishers,
-            "The node publishes Twist messages on /cmd_vel."
-            if TWIST_TYPE in publishers
-            else "Create a Twist publisher on /cmd_vel.",
+            "The node publishes Twist messages on /cmd_vel.",
+        ) if TWIST_TYPE in publishers else (
+            result("cmd-vel-publisher", False, interface_reason, "not_run")
+            if interface_reason else
+            result("cmd-vel-publisher", False, "Create a Twist publisher on /cmd_vel.")
         ),
         result(
             "scan-subscription",
-            SCAN_TYPE in subscriptions,
-            "The node subscribes to LaserScan messages on /scan."
-            if SCAN_TYPE in subscriptions
-            else "Subscribe to sensor_msgs/msg/LaserScan on /scan.",
+            True,
+            "The node subscribes to LaserScan messages on /scan.",
+        ) if SCAN_TYPE in subscriptions else (
+            result("scan-subscription", False, interface_reason, "not_run")
+            if interface_reason else
+            result("scan-subscription", False, "Subscribe to sensor_msgs/msg/LaserScan on /scan.")
         ),
-        result(
-            "drive-open-floor",
-            forward_ok(samples("open")),
-            "The robot drives when nothing is in range."
-            if forward_ok(samples("open"))
-            else "Drive forward when every reading is +inf: nothing is in range, so the way is clear." + drive_hint,
+        drive_check(
+            "drive-open-floor", "open",
+            "The robot drives when nothing is in range.",
+            "Drive forward when every reading is +inf: nothing is in range, so the way is clear.",
         ),
-        result(
-            "drive-wall-far",
-            forward_ok(samples("far")),
-            "The robot drives with the wall 1.2 m away."
-            if forward_ok(samples("far"))
-            else "Keep driving while the wall is more than 1.0 m away." + drive_hint,
+        drive_check(
+            "drive-wall-far", "far",
+            "The robot drives with the wall 1.2 m away.",
+            "Keep driving while the wall is more than 1.0 m away.",
         ),
-        result(
-            "stop-wall-0-3",
-            moves_when_clear and stopped_ok(samples("near")),
-            "The robot is stopped with the wall 0.3 m away."
-            if moves_when_clear and stopped_ok(samples("near"))
-            else "Be stopped when the wall is 0.3 m away." + stop_hint,
+        stop_check(
+            "stop-wall-0-3", "near",
+            "The robot is stopped with the wall 0.3 m away.",
+            "Be stopped when the wall is 0.3 m away.",
         ),
-        result(
-            "stop-wall-0-2",
-            moves_when_clear and stopped_ok(samples("close")),
-            "The robot is stopped with the wall 0.2 m away."
-            if moves_when_clear and stopped_ok(samples("close"))
-            else "Be stopped when the wall is 0.2 m away." + stop_hint,
+        stop_check(
+            "stop-wall-0-2", "close",
+            "The robot is stopped with the wall 0.2 m away.",
+            "Be stopped when the wall is 0.2 m away.",
         ),
-        result(
-            "stay-stopped",
-            moves_when_clear and stopped_ok(samples("hold")),
-            "The robot stays stopped while the wall is close."
-            if moves_when_clear and stopped_ok(samples("hold"))
-            else "Stay stopped for as long as the wall is close; do not creep forward." + stop_hint,
+        stop_check(
+            "stay-stopped", "hold",
+            "The robot stays stopped while the wall is close.",
+            "Stay stopped for as long as the wall is close; do not creep forward.",
         ),
-        result(
-            "resume-motion",
-            forward_ok(samples("resume")) and stopped_ok(samples("hold")),
-            "The robot drives again when the wall moves away."
-            if forward_ok(samples("resume")) and stopped_ok(samples("hold"))
-            else "After stopping for the close wall, drive again as soon as it is 1.2 m away." + drive_hint,
+        (
+            result("resume-motion", True, "The robot drives again when the wall moves away.")
+            if moving(resume) and stopped_ok(hold)
+            else result("resume-motion", False, reason, "not_run") if not_checked(resume)
+            else result("resume-motion", False, NO_COMMANDS) if not resume
+            else result(
+                "resume-motion", False,
+                "The robot drove at 1.2 m, but it had not stayed stopped for the close wall, "
+                "so there was no stop to recover from.",
+            ) if moving(resume)
+            else result(
+                "resume-motion", False,
+                "After stopping for the close wall, drive again as soon as it is 1.2 m away.",
+            )
         ),
-        result(
-            "straight-motion",
-            moves_when_clear and bool(observed) and all(abs(item[2]) <= ANGULAR_TOLERANCE for item in observed),
-            "angular.z stayed 0.0."
-            if moves_when_clear and bool(observed) and all(abs(item[2]) <= ANGULAR_TOLERANCE for item in observed)
-            else "Drive straight: keep angular.z at 0.0 in every command, and drive when the way is clear.",
+        (
+            result("straight-motion", True, "angular.z stayed 0.0.")
+            if moves_when_clear and observed and not turning
+            else result("straight-motion", False, reason, "not_run") if not_checked(observed)
+            else result("straight-motion", False, "Drive straight: keep angular.z at 0.0 in every command.")
+            if turning or not observed
+            else result("straight-motion", False, "angular.z stayed 0.0. " + withheld)
         ),
-        result(
-            "publish-rate",
-            rate >= MINIMUM_RATE_HZ,
-            f"Published about {rate:.1f} commands per second."
+        (
+            result("publish-rate", True, f"Published about {rate:.1f} commands per second.")
             if rate >= MINIMUM_RATE_HZ
-            else f"Published about {rate:.1f} commands per second; publish at least 5 per second (one per scan is enough).",
+            else result("publish-rate", False, reason, "not_run") if not_checked(observed)
+            else result(
+                "publish-rate", False,
+                "The rule: at least 5 commands per second, one in the scan callback for every scan.",
+            )
+        ),
+        (
+            result("one-command-per-scan", True, ONE_COMMAND_RULE)
+            if contract_ok
+            else result("one-command-per-scan", False, reason, "not_run") if contract_unjudged
+            else result(
+                "one-command-per-scan", False,
+                contract_problem or "Publish exactly one Twist inside the /scan callback for every scan.",
+            )
         ),
     ]
+
     def phase_summary(phase: str) -> dict:
         """What the node published in one phase: the student's own output."""
         items = samples(phase)
@@ -309,6 +445,7 @@ def main() -> None:
             "angular_max_abs": round(max(abs(item[2]) for item in items), 3),
         }
 
+    counts = audit["counts"]
     print(
         json.dumps(
             {
@@ -316,13 +453,23 @@ def main() -> None:
                 "observations": {
                     "phases": {phase: phase_summary(phase) for phase, _ in PHASES},
                     "rate_hz": round(rate, 2),
+                    # How the node ran: "running" or why behavior was not observed.
+                    "node_state": state,
+                    "build_node": build,
+                    "callbacks": {
+                        "count": len(counts),
+                        "max_commands": max(counts, default=0),
+                        "skipped": sum(1 for count in counts if count == 0),
+                        "published_outside": bool(audit["events"]["O"]),
+                        "queue_depth_wrong": bool(audit["events"]["Q"]),
+                    },
                 },
                 "error": runtime_error
                 or ("" if all(item["passed"] for item in tests) else "One or more requirements need attention."),
                 "runtime_error": runtime_error,
                 "output": (
                     f"Observed {len(observed)} Twist messages over {observed_seconds:.0f} s of scans."
-                    + (f"\nNode stdout: {student_stdout.strip()[-1000:]}" if student_stdout.strip() else "")
+                    + (f"\nNode stdout: {output_tail(student_stdout)}" if student_stdout.strip() else "")
                 ),
                 "tests": tests,
             }

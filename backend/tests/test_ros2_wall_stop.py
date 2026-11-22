@@ -1,6 +1,7 @@
 """Assignment 7: open-structure ROS 2 task with code checks and a gate."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -98,13 +99,17 @@ def test_worker_reports_disallowed_import_as_a_failed_gate_check():
         "config": CONFIG,
     })
     assert response["success"] is False
-    assert response["tests"] == [
-        {
-            "id": "imports-allowed",
-            "passed": False,
-            "message": "Import of 'numpy' is not allowed. Use only rclpy, math, geometry_msgs and sensor_msgs.",
-        }
-    ]
+    assert response["tests"][0] == {
+        "id": "imports-allowed",
+        "passed": False,
+        "message": "Import of 'numpy' is not allowed. Use only rclpy, math, geometry_msgs and sensor_msgs.",
+    }
+    # One cause: every other check is reported as not run, not as N failures.
+    rest = response["tests"][1:]
+    public_ids = {item["id"] for item in SOURCE["public_tests"]}
+    assert {item["id"] for item in rest} == public_ids - {"imports-allowed"}
+    assert all(item["status"] == "not_run" and not item["passed"] for item in rest)
+    assert {item["message"] for item in rest} == {"Not run: the code stopped with an error before this check."}
 
 
 def test_worker_keeps_plain_import_failure_for_older_assignments():
@@ -192,13 +197,19 @@ def test_a_failed_behaviour_check_fails_the_task():
 def test_assignment_7_configuration_is_consistent():
     test_ids = [item["id"] for item in SOURCE["public_tests"]]
     weights = CONFIG["test_weights"]
-    assert len(test_ids) == len(set(test_ids)) == 20
+    assert len(test_ids) == len(set(test_ids)) == 21
     assert set(weights) == set(test_ids)
     assert sum(weights.values()) == 100
     assert sum(item["weight"] for item in SOURCE["rubric"]) == 100
     assert set(GATE) <= set(test_ids) and set(BEHAVIOUR) <= set(test_ids)
     assert all(weights[test_id] == 0 for test_id in GATE)
     assert sum(weights[test_id] for test_id in BEHAVIOUR) == 70
+    # Credit is held back until the robot drives when the way is clear: only
+    # the driving, stopping, recovery and straight-motion checks release it.
+    assert set(test_ids) - set(CONFIG["scaffold_tests"]) == {
+        "drive-open-floor", "drive-wall-far", "stop-wall-0-3", "stop-wall-0-2",
+        "stay-stopped", "resume-motion", "straight-motion",
+    }
     assert SOURCE["status"] == "published"
     assert 'src="/images/7"' in SOURCE["assignment_html"]
     assert (ROOT / "backend" / "static" / "image7.png").read_bytes().startswith(b"\x89PNG")
@@ -239,6 +250,6 @@ def test_wall_stop_harness_uses_the_documented_scan_and_timing():
         '("hold", 0.2)', '("resume", 1.2)',
     ):
         assert text in source
-    harness_ids = {line.split('"')[1] for line in source.splitlines() if line.strip().startswith('"') and line.strip().endswith('",') and "-" in line}
+    harness_ids = set(re.findall(r'"([a-z0-9]+(?:-[a-z0-9]+)+)"', source))
     runtime_ids = set(SOURCE["grader_config"]["test_weights"]) - CODE_TEST_IDS - {"package-build"}
     assert runtime_ids <= harness_ids

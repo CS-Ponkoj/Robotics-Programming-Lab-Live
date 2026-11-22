@@ -248,7 +248,16 @@ class SimulationReplay {
         return 'The robot stopped ${stopGap(stopped)} at ${stopped?.t.toStringAsFixed(1)} s, '
             'but did not drive again after the wall moved away.';
       default:
-        return 'The robot was still driving when the replay ended '
+        // Say what the robot was doing at the end: driving, turning on the
+        // spot, or standing still.
+        final moving = end.linear.abs() > 0.001;
+        final turning = end.angular.abs() > 0.001;
+        final doing = moving
+            ? 'still driving'
+            : turning
+                ? 'turning on the spot'
+                : 'stopped';
+        return 'The robot was $doing when the replay ended '
             '(${travelled.toStringAsFixed(2)} m travelled, ${metres(end.front)} ahead).';
     }
   }

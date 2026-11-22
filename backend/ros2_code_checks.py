@@ -38,21 +38,57 @@ def _reads_ranges(tree: ast.Module) -> bool:
     )
 
 
+SLEEP_CALLS = frozenset({"sleep", "sleep_for", "sleep_until"})
+# Spinning belongs to main(); spinning inside build_node() or a callback blocks.
+SPIN_CALLS = frozenset({"spin", "spin_once", "spin_until_future_complete"})
+
+
+def _call_name(node: ast.Call) -> str:
+    target = node.func
+    if isinstance(target, ast.Name):
+        return target.id
+    if isinstance(target, ast.Attribute):
+        return target.attr
+    return ""
+
+
+def _loops_while_ok(test: ast.expr) -> bool:
+    """``while rclpy.ok():`` and similar loops that only end at shutdown."""
+    return any(
+        isinstance(node, ast.Call) and _call_name(node) == "ok"
+        for node in ast.walk(test)
+    )
+
+
 def _blocking_call(tree: ast.Module) -> str | None:
-    for node in ast.walk(tree):
-        if isinstance(node, ast.While) and isinstance(node.test, ast.Constant):
-            if node.test.value:
+    """The first blocking construct outside the given main(), if any."""
+    skeleton = _top_level_function(tree, SKELETON_FUNCTION)
+    inside_main = {id(node) for node in ast.walk(skeleton)} if skeleton is not None else set()
+    nodes = [node for node in ast.walk(tree) if id(node) not in inside_main]
+    for node in nodes:
+        if isinstance(node, ast.While):
+            if isinstance(node.test, ast.Constant) and node.test.value:
                 return "a while True loop"
-        if isinstance(node, ast.Call):
-            target = node.func
-            name = (
-                target.id if isinstance(target, ast.Name)
-                else target.attr if isinstance(target, ast.Attribute)
-                else ""
-            )
-            if name == "sleep":
-                return "a sleep() call"
+            if _loops_while_ok(node.test):
+                return "a while rclpy.ok() loop"
+    for node in nodes:
+        if not isinstance(node, ast.Call):
+            continue
+        name = _call_name(node)
+        if name in SLEEP_CALLS:
+            return f"a {name}() call"
+        if name in SPIN_CALLS:
+            return f"a {name}() call (main() already spins the node)"
     return None
+
+
+def describe_imports(roots) -> str:
+    """'rclpy, math, geometry_msgs and sensor_msgs' in the course's usual order."""
+    order = ["rclpy", "math", "geometry_msgs", "sensor_msgs", "rse_msgs"]
+    names = sorted(set(roots), key=lambda name: (order.index(name) if name in order else len(order), name))
+    if len(names) < 2:
+        return "".join(names)
+    return ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def _is_number(node: ast.expr) -> bool:
@@ -102,14 +138,31 @@ def _used_names(tree: ast.Module) -> set[str]:
     return {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
 
 
-def run_code_checks(code: str, config: dict) -> list[dict]:
+DEFAULT_IMPORTS = ("rclpy", "math", "geometry_msgs", "sensor_msgs")
+CODE_CHECK_IDS = (
+    "imports-allowed", "build-node-defined", "reads-ranges", "no-blocking",
+    "main-unchanged", "named-constants", "no-unused-imports",
+)
+
+
+def selected_checks(config: dict) -> tuple[str, ...]:
+    """``code_checks: true`` runs every check; a list runs only those ids."""
+    chosen = config.get("code_checks") if isinstance(config, dict) else None
+    if chosen is True:
+        return CODE_CHECK_IDS
+    if isinstance(chosen, list):
+        return tuple(test_id for test_id in CODE_CHECK_IDS if test_id in chosen)
+    return ()
+
+
+def run_code_checks(code: str, config: dict, allowed_imports=DEFAULT_IMPORTS) -> list[dict]:
     """Return gate, contract, and quality results for an open-structure task."""
     tree = ast.parse(code, filename="controller.py", mode="exec")
     tests = [
         test_result(
             "imports-allowed",
             True,
-            "controller.py imports only rclpy, math, geometry_msgs and sensor_msgs.",
+            f"controller.py imports only {describe_imports(allowed_imports)}.",
         )
     ]
 
@@ -136,7 +189,7 @@ def run_code_checks(code: str, config: dict) -> list[dict]:
             reads,
             "The code reads scan.ranges."
             if reads
-            else "Decide from the scan: read scan.ranges in your callback.",
+            else "The code never reads scan.ranges. The rule: decide from scan.ranges in the callback.",
         )
     )
 
@@ -147,7 +200,7 @@ def run_code_checks(code: str, config: dict) -> list[dict]:
             blocking is None,
             "No blocking loop or sleep() was found."
             if blocking is None
-            else f"Remove {blocking}. Blocking code stops a real robot from reacting.",
+            else f"Found {blocking}. The rule: no blocking loop, sleep or spinning outside main(), because blocking code stops a robot from reacting.",
         )
     )
 
@@ -163,7 +216,7 @@ def run_code_checks(code: str, config: dict) -> list[dict]:
             main_unchanged,
             "main() matches the starter code."
             if main_unchanged
-            else "main() differs from the starter code. Put it back as given; the grader starts your node through it.",
+            else "main() differs from the starter code. The rule: main() stays as given, because the grader starts your node through it.",
         )
     )
 
@@ -175,8 +228,8 @@ def run_code_checks(code: str, config: dict) -> list[dict]:
             "Speed and stop distance are named constants."
             if constants >= MINIMUM_NAMED_CONSTANTS
             else (
-                f"Found {constants} named constant(s). Put numbers such as the forward "
-                "speed and the stop distance in UPPER_CASE names at the top of the file."
+                f"Found {constants} named constant(s). The rule: the forward speed and the "
+                "stop distance are UPPER_CASE named constants at the top of the file."
             ),
         )
     )
@@ -196,4 +249,5 @@ def run_code_checks(code: str, config: dict) -> list[dict]:
             else "Imported but not used: " + ", ".join(sorted(set(unused))) + ".",
         )
     )
-    return tests
+    chosen = selected_checks(config) or CODE_CHECK_IDS
+    return [item for item in tests if item["id"] in chosen]

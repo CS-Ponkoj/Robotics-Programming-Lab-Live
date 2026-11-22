@@ -6,6 +6,7 @@ from typing import Any
 
 from openai import OpenAI
 
+from assignment_repository import course_numbers
 from config import Settings
 from models import Assignment, Submission
 from ros2_feedback import HINT_LADDERS
@@ -108,6 +109,8 @@ _CORE_RULES = (
     "can help with this assignment and point to the first failing check. If it "
     "asks for protected material or completed code, decline briefly and redirect "
     "to a conceptual debugging step. "
+    "Refer to the assignment only by assignment.display_name; never use any "
+    "other assignment number. "
     "Never mention input field names such as built_in_feedback, "
     "visible_evidence, observed_pattern, or code_observations, and do not label "
     "the hint with its level."
@@ -202,9 +205,14 @@ class TutorService:
                         "assignment": {
                             "id": assignment.stable_id,
                             "version": assignment.version,
-                            "title": assignment.title,
-                            "description": assignment.description,
-                            "instructions_html": assignment.assignment_html,
+                            "display_name": self._display_name(assignment),
+                            "title": self._student_facing(assignment.title, assignment),
+                            "description": self._student_facing(
+                                assignment.description, assignment
+                            ),
+                            "instructions_html": self._student_facing(
+                                assignment.assignment_html, assignment
+                            ),
                             "learning_objectives": assignment.learning_objectives,
                             "common_misconceptions": assignment.misconceptions,
                             "tutoring_rules": assignment.tutoring_rules,
@@ -280,13 +288,40 @@ class TutorService:
             r"\b(?:check|implement|handle|ensure|support)\b[^.!?]{0,120}\bwrap", text, re.IGNORECASE
         ):
             raise ValueError("Tutor added an excluded angle-wrapping requirement.")
-        if "exactly 0.75 m must stop" in instructions and re.search(
+        # Assignment 6 says "exactly 0.75 m must stop"; Assignment 8 says
+        # "front exactly 0.75 m: blocked". Both fix the threshold.
+        if re.search(r"exactly 0\.75 m(?: must stop|: blocked)", instructions) and re.search(
             r"(?:adjust|set|change)[^\n]{0,140}(?:threshold|stop(?:ping)? distance)"
             r"[^\n]{0,100}(?:less than|higher|lower|or more|or less)|"
             r"(?:adjust|set|change)[^\n]{0,100}0\.75\s*(?:m(?:eters?)?)?\s*"
             r"(?:or higher|or lower|or more|or less)", text, re.IGNORECASE
         ):
             raise ValueError("Tutor changed the fixed obstacle-safety threshold.")
+
+    @staticmethod
+    def _display_number(assignment: Assignment) -> int:
+        """The number students see (catalog.json course_numbers), else the ID."""
+        try:
+            number = course_numbers().get(str(assignment.stable_id or ""))
+        except (OSError, ValueError):
+            number = None
+        return number if isinstance(number, int) else int(assignment.id or 0)
+
+    @classmethod
+    def _display_name(cls, assignment: Assignment) -> str:
+        return f"Assignment {cls._display_number(assignment)}"
+
+    @classmethod
+    def _student_facing(cls, text: str | None, assignment: Assignment) -> str:
+        """Replace the internal "Assignment <ID>" with the student-facing number."""
+        text = text or ""
+        if assignment.id is None:
+            return text
+        return re.sub(
+            rf"\bAssignment\s+{int(assignment.id)}\b",
+            cls._display_name(assignment),
+            text,
+        )
 
     @staticmethod
     def _plain_text(content: TutorGeneratedContent) -> TutorGeneratedContent:
@@ -421,6 +456,121 @@ class TutorService:
         }
 
     @staticmethod
+    def _ros2_focus(
+        assignment: Assignment,
+        evidence: dict[str, Any],
+        failures: list[dict[str, Any]],
+        failed: dict[str, Any] | None,
+        hint_level: int,
+    ) -> tuple[dict[str, Any] | None, tuple[str, str, str, str] | None]:
+        """The failed check to explain, or guidance that replaces any check."""
+        returns_none = next(
+            (item for item in failures if item.get("hint_key") == "build-node-returns-none"),
+            None,
+        )
+        if returns_none is not None:
+            return returns_none, None
+        if not evidence.get("execution_succeeded", False):
+            return None, TutorService._ros2_execution_guidance(
+                str(evidence.get("execution_status") or ""), hint_level
+            )
+        if any(item.get("test_id") == "no-blocking" for item in failures):
+            return None, TutorService._ros2_blocking_guidance(True, hint_level)
+        config = assignment.grader_config or {}
+        start_checks = {
+            "package-build", "node-start", "returns-node", "imports-allowed",
+            "build-node-defined",
+            *(str(item) for item in config.get("gate_tests", [])),
+        }
+        not_started = next(
+            (item for item in failures if item.get("test_id") in start_checks), None
+        )
+        if not_started is None:
+            return failed, None
+        if not_started.get("hint_key") in HINT_LADDERS:
+            # Unfinished wiring or a silent callback has its own ladder.
+            return not_started, None
+        return None, TutorService._ros2_blocking_guidance(False, hint_level)
+
+    @staticmethod
+    def _ros2_execution_guidance(status: str, hint_level: int) -> tuple[str, str, str, str]:
+        """Diagnosis, question, hint, and next action when the node did not run."""
+        level = min(max(hint_level, 1), 4)
+        if status == "syntax_error":
+            return (
+                "Your code has a syntax error, so the ROS 2 package could not be "
+                "built and no robot check could run.",
+                "What is the first error message and line number?",
+                {
+                    1: "Fix the first syntax error, then run the tests again.",
+                    2: "Look at the line the error names and the line just before it.",
+                    3: "A missing colon, bracket, or quote, or uneven indentation, is the usual cause.",
+                    4: "Compare that line's shape with a similar line in the starter code.",
+                }[level],
+                "Fix the line the error names, then run the tests again.",
+            )
+        if status == "rejected":
+            return (
+                "The grader did not run your node because the code uses something "
+                "the rules do not allow, such as an import outside the allowed list.",
+                "Which import or call does the error message name?",
+                {
+                    1: "Read the error: it names the import or call that is not allowed.",
+                    2: "The instructions list the only modules controller.py may import.",
+                    3: "Remove that import and the code that uses it, then solve the task with the allowed modules.",
+                    4: "Compare your imports with the starter code and keep only the allowed ones.",
+                }[level],
+                "Remove what the error names, then run the tests again.",
+            )
+        if status == "timeout":
+            return TutorService._ros2_blocking_guidance(False, hint_level, timed_out=True)
+        return (
+            "Your node stopped with an error, so the robot checks could not run.",
+            "What is the first error message, and which line in your file does it name?",
+            {
+                1: "Fix the first error, then run the tests again.",
+                2: "Read the last line of the error: it names the problem, such as a name or attribute that does not exist.",
+                3: "Open the line number from your file in the error and compare each name on it with the instructions and starter code.",
+                4: "If the error appeared after your last change, undo it, then change one thing at a time and rerun.",
+            }[level],
+            "Fix the line the error names, then run the tests again.",
+        )
+
+    @staticmethod
+    def _ros2_blocking_guidance(
+        blocking: bool, hint_level: int, *, timed_out: bool = False
+    ) -> tuple[str, str, str, str]:
+        """Guidance when the node blocks, times out, or never started publishing."""
+        level = min(max(hint_level, 1), 4)
+        if blocking:
+            diagnosis = (
+                "Your node contains a blocking loop or sleep(), which keeps it "
+                "from reacting to new messages."
+            )
+        elif timed_out:
+            diagnosis = "Your node did not finish in time, so the robot checks could not complete."
+        else:
+            diagnosis = (
+                "Your node ran but did not start publishing commands, so the "
+                "behaviour checks could not run."
+            )
+        return (
+            diagnosis,
+            "Does your node finish setting up, and does every callback publish a command and finish quickly?",
+            {
+                1: (
+                    "Check that your node finishes setting up and that your callback publishes a command for each message."
+                    if not blocking
+                    else "Look for a while loop or sleep() in your node's setup or in your callback."
+                ),
+                2: "ROS calls your callback for every message; a loop that never ends, or waiting inside it, stops all replies.",
+                3: "Let rclpy.spin() in main() do the waiting: your setup code only creates the node, its publisher and its subscription.",
+                4: "Remove any loop or wait, and let each callback publish one command and return.",
+            }[level],
+            "Make every callback publish once and return, then run the tests again.",
+        )
+
+    @staticmethod
     def _fallback(
         assignment: Assignment,
         submission: Submission,
@@ -431,19 +581,31 @@ class TutorService:
         failures = [
             item for item in evidence.get("tests", []) if not item.get("passed", False)
         ]
+        ros2 = TutorService._is_ros2(assignment)
+        executed = bool(evidence.get("execution_succeeded", False))
         # Explain the first failed check whose cause the grader observed, so a
         # targeted hint is not hidden behind an earlier check without one.
         failed = next(
             (item for item in failures if item.get("hint_key") in HINT_LADDERS),
             failures[0] if failures else None,
         )
+        # A node that did not run, blocks, or never started cannot be judged
+        # by its behaviour: lead with that, not with a behaviour ladder. A
+        # build_node() that returns None is the exception: it has its own ladder.
+        ros2_guidance = None
+        if ros2:
+            failed, ros2_guidance = TutorService._ros2_focus(
+                assignment, evidence, failures, failed, hint_level
+            )
         misconception = ""
         # A hint level is not evidence of a misconception. Name only a tag
         # explicitly attached to the failing check by a grader.
         if failed:
             # A stored null tag means no tag, not the text "None".
             misconception = str(failed.get("misconception_tag") or "")
-        if not evidence.get("execution_succeeded", False):
+        if ros2_guidance is not None:
+            diagnosis, guiding_question, hint, next_action = ros2_guidance
+        elif not executed and not ros2:
             diagnosis = "The program must execute before its calculations can be checked."
             guiding_question = "What is the first error message and line number?"
             # Each level adds one concrete step, so asking again helps.
@@ -487,8 +649,8 @@ class TutorService:
             }
             hint = level_hints[hint_level]
             next_action = "Change one calculation, rerun the tests, and use the new evidence."
-            if TutorService._is_ros2(assignment):
-                diagnosis = f"The ROS 2 assessment completed, but {label.lower()} still needs attention."
+            if ros2:
+                diagnosis = f'Your node ran, but the check "{label}" did not pass.'
                 guiding_question = "What does the first failed behavior require, and where does your node implement it?"
                 hint = {
                     1: "Trace the callback or node setup named by the first failed check.",
@@ -507,7 +669,12 @@ class TutorService:
             hint = ladder.levels[min(max(hint_level, 1), len(ladder.levels)) - 1]
             next_action = ladder.next_action
             observed_step = str(failed.get("message", "")).strip()
-        if failed is not None and evidence.get("execution_succeeded") and TutorService._code_observations(submission.code):
+        if (
+            not ros2
+            and failed is not None
+            and executed
+            and TutorService._code_observations(submission.code)
+        ):
             diagnosis = "Some final returned fields are replaced by literal values after earlier calculations."
             guiding_question = "Does the last return preserve the calculated value for the failing field?"
             hint = "Trace the final returned field, not just the earlier calculation or printed example."
@@ -525,7 +692,10 @@ class TutorService:
                 observed_step
                 or (
                     "Review the passed checks."
-                    if failed is None and evidence.get("execution_succeeded") and evidence.get("tests")
+                    if failed is None
+                    and executed
+                    and evidence.get("tests")
+                    and all(item.get("passed") for item in evidence.get("tests", []))
                     else "Inspect the returned check results or execution error."
                 ),
                 next_action,

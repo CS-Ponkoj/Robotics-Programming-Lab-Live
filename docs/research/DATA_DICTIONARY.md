@@ -133,7 +133,7 @@ Standard `execution_status` values are:
 | Value | Simple meaning |
 |---|---|
 | `completed` | The program ran and grading completed |
-| `syntax_error` | Python could not parse the code |
+| `syntax_error` | Python could not parse the code (including `IndentationError` and `TabError`, classified this way from 2026-11-22) |
 | `runtime_error` | The code started but failed while running |
 | `timeout` | Execution exceeded its limit |
 | `rejected` | A safety or request rule rejected the code |
@@ -190,6 +190,37 @@ check may store one of these `hint_key` values in the same way:
 `open-side-no-resume`, `not-wired`, `silent-callback`, or
 `skips-clear-messages`. The Assignment 8 harness also reports `started`,
 `subscribed`, and `alive` (booleans) in its observations; they are not stored.
+
+From 2026-11-22 the observation sentence added to a check `message` states
+only what the robot or node did; advice on how to fix it moved to the hint
+ladders, which only the `tdd_ai` mode receives. Records saved earlier may end
+with advice. New `hint_key` values from that date: `never-drives` (Assignment
+7: the robot published `linear.x` 0.0 in every situation, which earlier
+records may label `stops-too-early`, `must-drive-first`, or
+`does-not-resume`), `stop-distance-at-boundary` (Assignment 7: stopped with
+the wall 0.2 m away but not 0.3 m away), `sensor-ignored` and `main-modified`
+(Assignment 7: the `reads-ranges` or `main-unchanged` source check failed;
+`sensor-ignored` is also set on stop checks of a publishing node that never
+reads `scan.ranges`), and for Assignment 8 `drives-when-blocked` (kept driving
+with the front 0.5 m away) and `never-moves` (published only zero commands).
+`one-command-contract` (both assignments) marks a failed one-command-per-
+callback check (`one-command-per-scan`, `flbr-response`) and, when the node
+also published from outside its callback, the behaviour checks whose
+commands were mixed by it.
+`publisher-queue-depth` (both assignments) is used instead when the /cmd_vel
+publisher's queue depth is not the required 10, and `extra-axes` (Assignment
+8) marks failed behaviour checks of a node that set linear.y, linear.z,
+angular.x or angular.y.
+`sensor-ignored` and `main-modified` are configured Assignment 7 tags, so they
+now also reach `misconception_tag`. Interpretation changes from the same date:
+no behaviour `hint_key` is stored when no command was observed during the
+checked situations (crash, hang); `publishes-too-rarely` is stored on
+behaviour checks when the node published below 5 commands per second;
+`does-not-resume` requires that the robot drove with the wall 1.2 m away; and
+Assignment 8 checks the reversed front comparison first, so
+`front-check-reversed` replaces the earlier `turns-while-clear` and
+`no-turn-when-blocked` labels for that pattern. Checks the grader marks as not
+run never store a `hint_key`.
 
 For a ROS 2 assignment whose `grader_config` lists `gate_tests` and
 `pass_tests` (Assignment 7 onward), `score` is 0 whenever any gate check
@@ -287,6 +318,11 @@ learning-event record.
 account's mode at that moment, so moving a student to another mode never
 changes the meaning of earlier events.
 
+From 2026-11-22 study student accounts can no longer reveal an assignment's
+solution approach in any mode (owner decision), so new `solution_revealed`
+events come only from instructor accounts; the public demo never records
+events. Earlier `solution_revealed` rows remain valid history.
+
 ### Feedback modes (`users.feedback_mode`)
 
 An instructor assigns each student account one study condition on the Accounts
@@ -296,7 +332,7 @@ grading is identical in all three.
 
 | Value | Label | What the student receives |
 |---|---|---|
-| `traditional` | Traditional | Score, pass state, and how many checks passed. Build and runtime errors at the student's own line still show. Plain simulation replay (since 2026-11-20) without the beam probe, printed output, or links from failed checks. No check names or messages, printed output, hints, or tutor |
+| `traditional` | Traditional | Score, pass state, and how many checks passed (from 2026-11-22 the per-check pass list is returned passed-first and the assignment payload omits the public check labels, so the order cannot name a failed check). Build and runtime errors at the student's own line still show. Plain simulation replay (since 2026-11-20) without the beam probe, printed output, or links from failed checks. No check names or messages, printed output, hints, or tutor |
 | `tdd` | TDD | Everything above plus check names and messages, printed output, and the full simulation replay (beam probe and links from failed checks). No hints (since 2026-11-20; the server switch `TDD_BUILT_IN_HINTS` restores the built-in hint ladder), no tutor questions or AI. The public demo is `tdd` but keeps built-in hints |
 | `tdd_ai` | TDD + AI | Everything in `tdd` plus hints: the AI tutor and Ask the tutor, still subject to the AI policy gates, with the built-in hint ladder as the fallback |
 

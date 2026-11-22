@@ -83,6 +83,44 @@ def verify_open_assignment(assignment_id: int, image: str) -> None:
         )
     print(f"Assignment {assignment_id}: PASS +inf-as-obstacle rejection (drive-open-floor).")
 
+    # A node that prints a lot must not freeze (its output pipes are drained).
+    printing = reference.replace(
+        "        command = Twist()\n", "        print(list(scan.ranges))\n        command = Twist()\n", 1
+    )
+    if printing == reference:
+        raise RuntimeError(f"Assignment {assignment_id}: reference answer changed shape.")
+    printed = run_open(source, image, printing)
+    printed_failures = sorted(
+        str(item.get("id")) for item in printed.get("tests", []) if item.get("passed") is not True
+    )
+    if printed.get("success") is not True or printed_failures:
+        raise RuntimeError(f"Assignment {assignment_id}: a printing answer failed {printed_failures}.")
+    print(f"Assignment {assignment_id}: PASS answer that prints every scan still passes every check.")
+
+    # One command per scan callback: doubling or a timer fails the contract check.
+    doubled = reference.replace(
+        "        publisher.publish(command)\n",
+        "        publisher.publish(command)\n        publisher.publish(command)\n",
+    )
+    timed = (
+        reference.replace("    def handle_scan(scan):\n", "    latest = {'command': Twist()}\n\n    def handle_scan(scan):\n")
+        .replace("        publisher.publish(command)\n", "        latest['command'] = command\n")
+        .replace(
+            "    node.create_subscription(LaserScan, '/scan', handle_scan, 10)\n",
+            "    node.create_subscription(LaserScan, '/scan', handle_scan, 10)\n"
+            "    node.create_timer(0.1, lambda: publisher.publish(latest['command']))\n",
+        )
+    )
+    for name, code in (("double publish", doubled), ("timer publish", timed)):
+        if code == reference or "create_timer" not in code and name == "timer publish":
+            raise RuntimeError(f"Assignment {assignment_id}: reference answer changed shape.")
+        contract = {
+            str(item.get("id")): item.get("passed") for item in run_open(source, image, code).get("tests", [])
+        }
+        if contract.get("one-command-per-scan") is not False:
+            raise RuntimeError(f"Assignment {assignment_id}: '{name}' passed one-command-per-scan.")
+        print(f"Assignment {assignment_id}: PASS '{name}' fails one-command-per-scan.")
+
     # Feedback: real observations name the cause of the failed check.
     if not isinstance((result.get("observations") or {}).get("phases"), dict):
         raise RuntimeError(f"Assignment {assignment_id}: the harness reported no observations.")
@@ -210,6 +248,7 @@ def verify_open_side_assignment(assignment_id: int, image: str) -> None:
             ("stop-at-threshold",),
         ),
         "tie turns left": (variant("elif left > right:", "elif left >= right:"), ("equal-sides-turn-right",)),
+        "imports sensor_msgs": ("from sensor_msgs.msg import LaserScan\n" + reference, ("package-build",)),
         "NaN compared directly": (
             variant(
                 "        right = 0.0 if math.isnan(msg.right) else msg.right\n",

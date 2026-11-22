@@ -172,7 +172,8 @@ def test_submission_hint_solution_and_ai_status_are_recorded(research_client):
         headers=_bearer(student),
         json={"submission_id": submission_id},
     )
-    assert solution.status_code == 200
+    # Study students never get the solution approach, so nothing is recorded.
+    assert solution.status_code == 403
 
     mine = research_client.get("/research/me", headers=_bearer(student)).json()
     types = [event["event_type"] for event in mine["events"]]
@@ -180,12 +181,11 @@ def test_submission_hint_solution_and_ai_status_are_recorded(research_client):
         "assignment_submitted",
         "hint_requested",
         "hint_requested",
-        "solution_revealed",
     ]
     assert mine["summary"]["attempts"] == 1
     assert mine["summary"]["hints_requested"] == 1
     assert mine["summary"]["tutor_questions_asked"] == 1
-    assert mine["summary"]["solutions_revealed"] == 1
+    assert mine["summary"]["solutions_revealed"] == 0
     assert all("code" not in attempt for attempt in mine["attempts"])
     assert all("code" not in event["event_data"] for event in mine["events"])
     assert all(

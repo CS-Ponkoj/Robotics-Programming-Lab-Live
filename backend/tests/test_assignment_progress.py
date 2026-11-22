@@ -79,7 +79,8 @@ def test_progress_summarizes_attempts_scores_and_reveals(client):
     revealed = client.post(
         "/assignments/1/solution", headers=bearer(student), json={"submission_id": latest["submission_id"]}
     )
-    assert revealed.status_code == 200
+    # Study students never get the solution approach (owner decision).
+    assert revealed.status_code == 403
 
     summary = progress(client, student)
     assert set(summary) == {1}
@@ -89,7 +90,7 @@ def test_progress_summarizes_attempts_scores_and_reveals(client):
         "best_score": 100,
         "latest_score": 0,
         "latest_submission_id": latest["submission_id"],
-        "solution_revealed": True,
+        "solution_revealed": False,
     }
     assert best["score"] == 100
 

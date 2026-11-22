@@ -104,7 +104,7 @@ def test_bad_commands_are_treated_as_stop():
 def test_assignment_7_world_is_a_valid_ros2_2d_simulation():
     config = SimulationConfig.model_validate(SOURCE["simulation_config"])
     assert config.provider == "ros2_2d" and config.enabled
-    assert SOURCE["version"] == 4
+    assert SOURCE["version"] == 5
     assert "Press <strong>Simulate</strong>" in SOURCE["assignment_html"]
     with pytest.raises(ValidationError):
         SimulationConfig.model_validate({"enabled": True, "provider": "ros2_2d"})
@@ -237,7 +237,7 @@ def test_student_simulation_returns_a_replay_and_records_only_one_event(sim_clie
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["success"] is True and body["assignment_version"] == 4
+    assert body["success"] is True and body["assignment_version"] == 5
     assert body["simulation"]["outcome"] == "stopped_and_resumed"
     assert set(body) == {"assignment_version", "success", "error", "output", "simulation"}
     text = json.dumps(body)
@@ -249,7 +249,7 @@ def test_student_simulation_returns_a_replay_and_records_only_one_event(sim_clie
         event = session.scalars(select(LearningEvent).order_by(LearningEvent.id.desc())).first()
         assert event.event_type == "simulation_run"
         assert event.event_data == {"outcome": "stopped_and_resumed", "duration_seconds": body["simulation"]["duration_seconds"]}
-        assert event.assignment_version == 4
+        assert event.assignment_version == 5
     assert sim_client.executor.configs[-1]["mode"] == "simulate"
 
 

@@ -24,6 +24,10 @@ COPY ros2_code_checks.py /grader/ros2_code_checks.py
 COPY ros2_sim_world.py /grader/ros2_sim_world.py
 COPY ros2_sim_harness.py /grader/ros2_sim_harness.py
 COPY ros2_entrypoint.sh /grader/ros2_entrypoint.sh
+# Grader files are root-owned and read-only. The student's node additionally
+# loses read access to /grader (Landlock, applied by ros2_callback_audit.py
+# before any student code is imported), so it cannot print the harnesses.
+RUN chmod -R a-w /grader
 
 USER 10001:10001
 ENTRYPOINT ["bash", "/grader/ros2_entrypoint.sh"]

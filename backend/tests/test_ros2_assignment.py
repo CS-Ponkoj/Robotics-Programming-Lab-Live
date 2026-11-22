@@ -184,7 +184,7 @@ def test_ros2_obstacle_grader_rejects_starter_and_wrong_behavior():
     assert [item.test_id for item in result.evidence] == A6_TEST_IDS
     build = next(item for item in result.evidence if item.test_id == "package-build")
     assert build.passed is True
-    assert "counts once your code passes at least one behavior check" in build.message
+    assert "counts once your robot passes at least one driving check" in build.message
 
 
 class SelectedChecksExecutor:
@@ -281,10 +281,12 @@ def test_callback_audit_treats_relative_topic_names_as_absolute():
         )
         callback(None)
         # A relative name is audited, and depth 10 on a relative name is not flagged.
-        assert os.read(read_fd, 64) == b"1\n"
+        assert os.read(read_fd, 256).split() == [
+            b"I:pub:builtins/msg/object", b"I:sub:builtins/msg/object", b"B", b"1",
+        ]
         wrong_depth = node.create_publisher(object, "cmd_vel", 5)
         assert wrong_depth.topic_name == "/cmd_vel"
-        assert os.read(read_fd, 64) == b"0\n"
+        assert os.read(read_fd, 256).split() == [b"I:pub:builtins/msg/object", b"Q"]
     finally:
         os.close(read_fd)
         os.close(write_fd)

@@ -1129,6 +1129,7 @@ class _MyHomePageState extends State<MyHomePage> {
       displayNumber: widget.displayNumber,
       status: progressState.label,
       lastScore: lastScore,
+      bestScore: learningProgress.bestScores[widget.id],
       checks: learningProgress.checkSummaries[widget.id],
       codeChangedSinceScore: lastScore != null && _hasUnrunChanges,
       solutionViewed: solutionRevealedAssignments.contains(widget.id),
@@ -3856,6 +3857,7 @@ class AssignmentPageHeader extends StatelessWidget
     this.displayNumber,
     required this.status,
     this.lastScore,
+    this.bestScore,
     this.checks,
     this.codeChangedSinceScore = false,
     this.solutionViewed = false,
@@ -3873,6 +3875,10 @@ class AssignmentPageHeader extends StatelessWidget
 
   /// The latest run's checks, drawn as a small meter beside the score.
   final CheckSummary? checks;
+
+  /// The best score so far; shown when it differs from the last score, so
+  /// "Completed" never sits beside a lower last score unexplained.
+  final int? bestScore;
 
   String get _displayTitle {
     final prefix = 'Assignment $assignmentId:';
@@ -3960,6 +3966,20 @@ class AssignmentPageHeader extends StatelessWidget
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              if (bestScore case final best? when best != lastScore) ...[
+                TextSpan(
+                  text: '  ·  Best  ',
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: AppColors.inkMuted),
+                ),
+                TextSpan(
+                  text: '$best%',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: performanceColor(best),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ])),
           );
 
@@ -4533,7 +4553,7 @@ class SecureGraderLoadingState extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
             ],
             Text(
-              'The first run can take up to one minute on the free hosting tier.',
+              'The first run of the day can take a little longer while the grader starts.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -4592,6 +4612,9 @@ class Feedback extends StatefulWidget {
 class _FeedbackState extends State<Feedback> {
   /// Passed checks stay folded while some still fail.
   bool _showPassed = false;
+
+  /// Checks that did not run stay folded: the error above is the cause.
+  bool _showNotRun = false;
   final _hintKey = GlobalKey();
 
   @override
@@ -4639,7 +4662,17 @@ class _FeedbackState extends State<Feedback> {
             data.unittestPassResults[b.key];
         return (aPassed ? 1 : 0).compareTo(bPassed ? 1 : 0);
       });
+    // Passed checks whose points wait for a driving check to pass.
+    final heldBack = data.evidence.indexed.any((entry) {
+      final (index, detail) = entry;
+      final ok = index < data.unittestPassResults.length &&
+          data.unittestPassResults[index];
+      return ok &&
+          (detail.weight ?? 0) > 0 &&
+          (detail.earnedWeight ?? detail.weight) == 0;
+    });
     final failedCards = <Widget>[];
+    final notRunCards = <Widget>[];
     final passedCards = <Widget>[];
     ({int number, String label, String message, String? hintKey})? firstFailed;
     for (final entry in orderedChecks) {
@@ -4672,7 +4705,15 @@ class _FeedbackState extends State<Feedback> {
           hintKey: detail?.hintKey,
         );
       }
-      (didPass ? passedCards : failedCards).add(_TestResultCard(
+      final notRun = !didPass &&
+          isNotRunMessage(
+              (detail?.message ?? '').isNotEmpty ? detail!.message : feedback);
+      (didPass
+              ? passedCards
+              : notRun
+                  ? notRunCards
+                  : failedCards)
+          .add(_TestResultCard(
         checkNumber: entry.key + 1,
         passed: didPass,
         first: first,
@@ -4708,6 +4749,8 @@ class _FeedbackState extends State<Feedback> {
             earnedPoints: totalPoints == null ? null : earnedPoints,
             totalPoints: totalPoints,
             requirementChecks: requirementChecks,
+            notRun: notRunCards.length,
+            heldBack: heldBack,
             previousScore: widget.previousScore,
             previousPassed: widget.previousPassed,
             runNumber: widget.runNumber,
@@ -4783,8 +4826,34 @@ class _FeedbackState extends State<Feedback> {
               ),
               ...spaced(failedCards),
             ],
-            if (passedCards.isNotEmpty) ...[
+            if (notRunCards.isNotEmpty) ...[
               if (failedCards.isNotEmpty) const SizedBox(height: AppSpacing.xs),
+              _CheckGroupHeader(
+                key: const Key('checks-not-run-group'),
+                label: 'Not run',
+                count: notRunCards.length,
+                color: AppColors.inkMuted,
+                icon: LucideIcons.circleMinus,
+              ),
+              if (_showNotRun)
+                ...spaced(notRunCards)
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const Key('show-not-run-checks'),
+                    onPressed: () => setState(() => _showNotRun = true),
+                    icon: const Icon(LucideIcons.chevronDown, size: 18),
+                    label: Text(
+                      'Show ${notRunCards.length} '
+                      '${notRunCards.length == 1 ? 'check' : 'checks'} that did not run',
+                    ),
+                  ),
+                ),
+            ],
+            if (passedCards.isNotEmpty) ...[
+              if (failedCards.isNotEmpty || notRunCards.isNotEmpty)
+                const SizedBox(height: AppSpacing.xs),
               _CheckGroupHeader(
                 key: const Key('checks-passed-group'),
                 label: 'Passed',
@@ -4792,7 +4861,7 @@ class _FeedbackState extends State<Feedback> {
                 color: AppColors.success,
                 icon: LucideIcons.circleCheck,
               ),
-              if (failedCards.isEmpty || _showPassed)
+              if ((failedCards.isEmpty && notRunCards.isEmpty) || _showPassed)
                 ...spaced(passedCards)
               else
                 Align(
@@ -4815,6 +4884,12 @@ class _FeedbackState extends State<Feedback> {
   }
 }
 
+/// A check the grader could not run, because the code stopped first.
+bool isNotRunMessage(String message) {
+  final text = message.trimLeft();
+  return text.startsWith('Not run:') || text.startsWith('Not checked:');
+}
+
 /// The run's checks as a store record, or null when the run returned none.
 CheckSummary? summarizeChecks(UnittestFeedbackDto data) {
   final total = data.unittestPassResults.length;
@@ -4822,7 +4897,7 @@ CheckSummary? summarizeChecks(UnittestFeedbackDto data) {
   final passed = data.unittestPassResults.where((result) => result).length;
   var nextFailing = '';
   // Traditional accounts see counts only, so no check name is kept.
-  if (data.feedbackMode != FeedbackMode.traditional.wire) {
+  if (data.execSuccess && data.feedbackMode != FeedbackMode.traditional.wire) {
     for (var index = 0; index < total; index++) {
       if (data.unittestPassResults[index]) continue;
       final label =
@@ -5297,7 +5372,15 @@ class _ResultSummary extends StatelessWidget {
     this.previousScore,
     this.previousPassed,
     this.runNumber,
+    this.notRun = 0,
+    this.heldBack = false,
   });
+
+  /// Checks the grader could not run; shown apart from failures.
+  final int notRun;
+
+  /// Passed checks whose points wait for a driving check to pass.
+  final bool heldBack;
 
   /// The score before this run; null on a first run.
   final int? previousScore;
@@ -5337,8 +5420,26 @@ class _ResultSummary extends StatelessWidget {
 
   /// Why the score and the passed-check count can disagree, or null.
   String? get _explanation {
+    // Every point earned, yet a required check fails: say why it is not a
+    // pass (no check name, so this holds in every mode).
+    if (score == 100 && failed > 0) {
+      return 'Every point is earned, but a required check still fails, so the '
+          'task is not passed yet.';
+    }
     final total = totalPoints;
-    if (total == null || total <= 0) return null;
+    if (total == null || total <= 0) {
+      // Traditional results carry no points or names: one sentence covers
+      // both reasons a run with passed checks can score 0%.
+      if (score == 0 && passed > 0 && failed > 0) {
+        return 'Your score stays at 0% until every required check passes and '
+            'your robot passes at least one driving check.';
+      }
+      return null;
+    }
+    if (score == 0 && heldBack) {
+      return 'Points from passed checks count only once your robot passes at '
+          'least one driving check.';
+    }
     final earned = earnedPoints ?? 0;
     if (score == 0 && earned > 0) {
       return 'A required check failed, so the score stays at 0% until it '
@@ -5346,7 +5447,7 @@ class _ResultSummary extends StatelessWidget {
     }
     if (requirementChecks > 0 && passed > 0 && score < 100) {
       return '$requirementChecks required checks carry no points; your score '
-          'comes from the ${_formatPoints(total)} points of the behavior '
+          'comes from the ${_formatPoints(total)} points of the other '
           'checks.';
     }
     return null;
@@ -5451,11 +5552,18 @@ class _ResultSummary extends StatelessWidget {
                             label: 'Checks passed: $passed of ${passed + failed}',
                             color: AppColors.success,
                           ),
-                          if (failed > 0)
+                          if (failed - notRun > 0)
                             _ResultCount(
                               icon: LucideIcons.x,
-                              label: 'Failed: $failed',
+                              label: 'Failed: ${failed - notRun}',
                               color: theme.colorScheme.error,
+                            ),
+                          if (notRun > 0)
+                            _ResultCount(
+                              key: const Key('result-not-run'),
+                              icon: LucideIcons.circleMinus,
+                              label: 'Not run: $notRun',
+                              color: AppColors.inkMuted,
                             ),
                         ],
                       ),
@@ -5537,6 +5645,9 @@ class _TerminalOutput extends StatelessWidget {
     if (data.execSuccess && data.feedbackMode == 'traditional') {
       return const SizedBox.shrink();
     }
+    // The ROS grader's own summary is labelled, never shown as the
+    // student's printed output.
+    final split = splitGraderOutput(data.codeOutput);
     if (data.execSuccess) {
       return _TerminalPanel(
         key: const Key('terminal-output'),
@@ -5544,7 +5655,13 @@ class _TerminalOutput extends StatelessWidget {
         semanticsLabel: 'Terminal output',
         icon: LucideIcons.squareTerminal,
         iconColor: const Color(0xFF90D8B5),
-        text: data.codeOutput,
+        text: [
+          if (split.printed.isNotEmpty) split.printed,
+          if (split.printed.isEmpty && split.grader.isNotEmpty)
+            '(no printed output)',
+          if (split.grader.isNotEmpty) '[grader] ${split.grader}',
+          if (split.printed.isEmpty && split.grader.isEmpty) data.codeOutput,
+        ].join('\n'),
       );
     }
     // A failed run still shows what the program printed before it stopped;
@@ -5560,7 +5677,7 @@ class _TerminalOutput extends StatelessWidget {
           iconColor: const Color(0xFFFFB4AB),
           text: data.codeExecResult,
         ),
-        if (data.codeOutput.trim().isNotEmpty) ...[
+        if (split.printed.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
           _TerminalPanel(
             key: const Key('terminal-printed-output'),
@@ -5568,7 +5685,7 @@ class _TerminalOutput extends StatelessWidget {
             semanticsLabel: 'Printed output before the error',
             icon: LucideIcons.squareTerminal,
             iconColor: const Color(0xFF90D8B5),
-            text: data.codeOutput,
+            text: split.printed,
           ),
         ],
       ],
@@ -5766,6 +5883,20 @@ class _TutorHintPanel extends StatefulWidget {
   State<_TutorHintPanel> createState() => _TutorHintPanelState();
 }
 
+/// What the hint panel showed for a run, kept while the app is open so that
+/// closing and reopening Results returns to the same hint level, answer and
+/// unsent question.
+typedef _HintMemory = ({
+  String hint,
+  String source,
+  int level,
+  Map<String, dynamic>? details,
+  Map<String, dynamic>? answer,
+  String question,
+});
+
+final Map<String, _HintMemory> _hintMemory = {};
+
 class _TutorHintPanelState extends State<_TutorHintPanel> {
   final TextEditingController _questionController = TextEditingController();
   final FocusNode _questionFocus = FocusNode();
@@ -5796,12 +5927,45 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
 
   @override
   void dispose() {
+    _remember();
     _questionController.dispose();
     _questionFocus.dispose();
     super.dispose();
   }
 
+  void _remember() {
+    final id = widget.data.submissionId;
+    if (id.isEmpty) return;
+    _hintMemory.remove(id);
+    _hintMemory[id] = (
+      hint: _hint,
+      source: _source,
+      level: _hintLevel,
+      details: _details,
+      answer: _answer,
+      question: _questionController.text,
+    );
+    // Only recent runs are worth keeping.
+    while (_hintMemory.length > 20) {
+      _hintMemory.remove(_hintMemory.keys.first);
+    }
+  }
+
   void _reset() {
+    final kept = _hintMemory[widget.data.submissionId];
+    if (kept != null) {
+      _hint = kept.hint;
+      _source = kept.source;
+      _hintLevel = kept.level;
+      _details = kept.details;
+      _answer = kept.answer;
+      _questionController.text = kept.question;
+      _loading = false;
+      _asking = false;
+      _error = null;
+      _questionError = null;
+      return;
+    }
     _hint = widget.data.hint;
     _source = widget.data.tutorSource;
     _hintLevel = 1;

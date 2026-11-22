@@ -2070,7 +2070,7 @@ void main() {
     expect(find.text('Checks passed: 3 of 4'), findsOneWidget);
     expect(
       find.text('2 required checks carry no points; your score comes from '
-          'the 100 points of the behavior checks.'),
+          'the 100 points of the other checks.'),
       findsOneWidget,
     );
     await tester.ensureVisible(find.byKey(const Key('show-passed-checks')));
@@ -2482,7 +2482,7 @@ void main() {
     expect(restoreRequested, isTrue);
   });
 
-  testWidgets('secure grader loading state explains free-tier startup delay', (
+  testWidgets('secure grader loading state explains a slower first run', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -2494,7 +2494,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Starting secure grader…'), findsOneWidget);
-    expect(find.textContaining('up to one minute'), findsOneWidget);
+    expect(find.textContaining('first run of the day'), findsOneWidget);
   });
 
   testWidgets('results remain readable and overflow-free on a narrow screen', (

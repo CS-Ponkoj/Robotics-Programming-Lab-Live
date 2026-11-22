@@ -1,8 +1,42 @@
+import re
+
 from graders.base import GradeResult
 from models import Assignment
 from ros2_executor import Ros2Executor
 from ros2_feedback import Finding, classify
 from schemas import TestEvidence
+
+_NOT_RUN_STATUSES = {"not_run", "not-run", "not_checked", "skipped"}
+
+
+def _not_run(item: dict) -> bool:
+    """Whether a harness result marks its check as not run."""
+    return (
+        item.get("not_run") is True
+        or item.get("skipped") is True
+        or item.get("run") is False
+        or str(item.get("status", "")).casefold() in _NOT_RUN_STATUSES
+        or str(item.get("reason", "")).casefold() in _NOT_RUN_STATUSES
+    )
+
+
+def _sentences(text: str) -> list[str]:
+    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
+
+
+def _normalized(text: str) -> str:
+    return re.sub(r"[^a-z0-9.+-]+", " ", text.casefold()).strip()
+
+
+def _new_sentences(finding: Finding, message: str) -> str:
+    """The observation without anything the check message already says."""
+    if finding.unless_message_has and finding.unless_message_has.casefold() in message.casefold():
+        return ""
+    said = _normalized(message)
+    return " ".join(
+        sentence for sentence in _sentences(finding.observation)
+        if _normalized(sentence) not in said
+    )
 
 
 class Ros2TopicGrader:
@@ -42,8 +76,8 @@ class Ros2TopicGrader:
                 item.model_copy(
                     update={
                         "message": item.message
-                        + " This supplied-scaffold credit counts once your code"
-                        " passes at least one behavior check."
+                        + " Not credited yet: this counts once your robot passes"
+                        " at least one driving check."
                     }
                 )
                 if item.test_id in scaffold and item.passed
@@ -113,7 +147,19 @@ class Ros2TopicGrader:
         Only a tag the assignment configures becomes a misconception label;
         other observed patterns select hints but are not research labels.
         """
-        passed = {item.test_id: item.passed for item in evidence}
+        reported = {
+            str(item.get("id"))
+            for item in result.get("tests", [])
+            if isinstance(item, dict) and item.get("id") and not _not_run(item)
+        }
+        # A check the grader did not run (or did not report) is not evidence
+        # of anything, so it neither gets a finding nor shapes another one.
+        passed = {
+            item.test_id: item.passed
+            or item.test_id not in reported
+            or item.reason == "not_checked"
+            for item in evidence
+        }
         findings = classify(
             str(config.get("harness", "")), passed, result.get("observations")
         )
@@ -132,12 +178,13 @@ class Ros2TopicGrader:
                 and "returned None" in item.message
             ):
                 finding = Finding("build-node-returns-none", "")
-            if item.passed or finding is None:
+            if item.passed or passed.get(item.test_id) or finding is None:
                 updated.append(item)
                 continue
             message = item.message
-            if finding.observation:
-                message = f"{message} {finding.observation}"
+            observation = _new_sentences(finding, message)
+            if observation:
+                message = f"{message} {observation}"
             updated.append(
                 item.model_copy(
                     update={

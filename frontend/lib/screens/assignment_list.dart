@@ -711,7 +711,8 @@ void openAssignment(
   Navigator.push(
     context,
     MaterialPageRoute(
-      settings: RouteSettings(arguments: FeedbackPage(a.title)),
+      settings: RouteSettings(arguments: FeedbackPage(
+          'Assignment ${a.shownNumber}: ${assignmentDisplayTitle(a)}')),
       builder: (_) => MyHomePage(
         title: a.title,
         id: a.id,
@@ -1251,7 +1252,8 @@ class ListAssignment extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      settings: RouteSettings(arguments: FeedbackPage(a.title)),
+                      settings: RouteSettings(arguments: FeedbackPage(
+          'Assignment ${a.shownNumber}: ${assignmentDisplayTitle(a)}')),
                       builder: (_) => MyHomePage(
                         title: a.title,
                         id: a.id,

@@ -22,16 +22,23 @@ from sqlalchemy.orm import Session
 
 from config import Settings
 from course_settings import AiTutorSettings, get_setting
-from feedback_modes import MODE_WITHOUT_AI, allows_ai, feedback_mode_for
+from feedback_modes import (
+    MODE_WITHOUT_AI,  # noqa: F401  (re-exported: the tdd message)
+    allows_ai,
+    allows_hints,
+    feedback_mode_for,
+    mode_without_ai_message,
+)
 from instructor_dataset import ReviewStatus, load_instructor_datasets
 from models import Assignment, HintInteraction, Submission, User
 
-NOT_ENABLED = "Not enabled for this course. Built-in hints still work."
+HINTS_STILL_WORK = " Built-in hints still work."
+NOT_ENABLED = "Not enabled for this course." + HINTS_STILL_WORK
 NOT_REVIEWED = (
     "Not available for this assignment yet: an instructor is still reviewing "
-    "its AI test cases. Built-in hints still work."
+    "its AI test cases." + HINTS_STILL_WORK
 )
-DEMO = "Not available in the demo. Built-in hints still work."
+DEMO = "Not available in the demo." + HINTS_STILL_WORK
 QUOTA = (
     "You have used today's AI tutor questions. Built-in hints still work, and "
     "the AI tutor is back tomorrow."
@@ -85,17 +92,24 @@ def ai_access(
     demo: bool = False,
     count_quota: bool = True,
 ) -> AiAccess:
+    mode = feedback_mode_for(user, demo=demo)
+    # Only accounts whose mode includes hints may be told that hints work.
+    suffix = "" if allows_hints(mode, demo=demo) else HINTS_STILL_WORK
+
+    def blocked(reason: str, message: str) -> AiAccess:
+        return AiAccess(False, reason, message.removesuffix(suffix) if suffix else message)
+
     if not settings.openai_api_key:
-        return AiAccess(False, "no_key", NOT_ENABLED)
+        return blocked("no_key", NOT_ENABLED)
     course = get_setting(session, AiTutorSettings)
     if not course.enabled:
-        return AiAccess(False, "course_off", NOT_ENABLED)
+        return blocked("course_off", NOT_ENABLED)
     if (assignment.id, assignment.version) not in approved_assignments():
-        return AiAccess(False, "not_reviewed", NOT_REVIEWED)
+        return blocked("not_reviewed", NOT_REVIEWED)
     if demo:
-        return AiAccess(False, "demo", DEMO)
-    if not allows_ai(feedback_mode_for(user)):
-        return AiAccess(False, "feedback_mode", MODE_WITHOUT_AI)
+        return blocked("demo", DEMO)
+    if not allows_ai(mode):
+        return AiAccess(False, "feedback_mode", mode_without_ai_message(mode))
     if not count_quota:
         return AiAccess(True)
     remaining = course.daily_limit - ai_uses_today(session, user)

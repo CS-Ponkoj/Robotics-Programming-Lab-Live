@@ -34,7 +34,26 @@ DEFAULT_FEEDBACK_MODE = TDD
 NO_HINTS_MESSAGE = "Hints are not part of this account's feedback."
 NO_TUTOR_MESSAGE = "The tutor is not part of this account's feedback."
 NO_SIMULATION_MESSAGE = "The simulation is not part of this account's feedback."
-MODE_WITHOUT_AI = "Not part of this account's feedback. Built-in hints still work."
+# Why an account has no AI tutor, in words true for its mode: traditional and
+# tdd have no hints at all, so neither may promise built-in hints.
+MODE_WITHOUT_AI_MESSAGES = {
+    TRADITIONAL: (
+        "Not part of this account's feedback, which shows your score and how "
+        "many checks passed."
+    ),
+    TDD: (
+        "Not part of this account's feedback, which shows each check's result "
+        "without hints."
+    ),
+}
+MODE_WITHOUT_AI = MODE_WITHOUT_AI_MESSAGES[TDD]
+SOLUTION_UNAVAILABLE_MESSAGE = (
+    "The solution approach is not part of this course's feedback."
+)
+
+
+def mode_without_ai_message(mode: str) -> str:
+    return MODE_WITHOUT_AI_MESSAGES.get(mode, "Not part of this account's feedback.")
 
 # Owner decision (2026-11-20): the tdd condition gives test feedback only, so
 # each mode adds one feedback level (score -> test details -> hints). The
@@ -79,6 +98,19 @@ def allows_ai(mode: str) -> bool:
     return mode == TDD_AI
 
 
+def shows_check_names(mode: str) -> bool:
+    """Traditional sees counts only, so no check names or labels."""
+    return mode != TRADITIONAL
+
+
+NOT_RUN_COUNT_MESSAGE = "Not run: the code stopped with an error before this check."
+
+
+def _not_run(message: Any) -> bool:
+    text = str(message or "").lstrip()
+    return text.startswith("Not run:") or text.startswith("Not checked:")
+
+
 def shape_submission_response(
     payload: dict[str, Any], mode: str, *, demo: bool = False
 ) -> dict[str, Any]:
@@ -88,12 +120,26 @@ def shape_submission_response(
         shaped.update({"hint": "", "tutor_feedback": None})
     if mode != TRADITIONAL:
         return shaped
-    passes = list(payload.get("unittest_pass_results") or [])
+    # Counts only, in an order-free form (passed, then failed, then not run):
+    # the public check order would otherwise tell which named check failed.
+    # A check the grader could not run keeps one generic, nameless sentence,
+    # so the count does not call it a failure.
+    results = payload.get("unittest_pass_results") or []
+    messages = payload.get("unittest_results") or []
+    kinds = sorted(
+        (
+            0 if bool(item)
+            else 2 if _not_run(messages[index] if index < len(messages) else "")
+            else 1
+        )
+        for index, item in enumerate(results)
+    )
+    passes = [kind == 0 for kind in kinds]
     shaped.update(
         {
-            # Counts stay derivable; names, messages and evidence do not.
+            # Counts stay derivable; names, messages, order and evidence do not.
             "tested_vals": [],
-            "unittest_results": ["" for _ in passes],
+            "unittest_results": [NOT_RUN_COUNT_MESSAGE if kind == 2 else "" for kind in kinds],
             "unittest_pass_results": passes,
             "evidence": [],
             "code_output": "",

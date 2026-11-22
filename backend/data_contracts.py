@@ -55,7 +55,11 @@ def classify_execution_status(success: bool, error: str = "") -> ExecutionStatus
     if success:
         return ExecutionStatus.COMPLETED
     normalized = error.casefold()
-    if "syntaxerror" in normalized or "syntax error" in normalized:
+    # IndentationError and TabError are SyntaxError subclasses.
+    if any(
+        phrase in normalized
+        for phrase in ("syntaxerror", "syntax error", "indentationerror", "taberror")
+    ):
         return ExecutionStatus.SYNTAX_ERROR
     if "timeout" in normalized or "timed out" in normalized or "exceeded" in normalized:
         return ExecutionStatus.TIMEOUT

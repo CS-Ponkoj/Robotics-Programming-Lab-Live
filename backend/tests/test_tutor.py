@@ -179,7 +179,9 @@ def test_ros_built_in_hints_describe_behavior_not_route_calculations(level):
     submission = _submission()
     submission.evidence['tests'][0]['label'] = 'Controller starts without crashing'
     result = TutorService(Settings()).feedback(assignment, submission, hint_level=level, use_ai_tutor=False)
-    assert 'ROS 2 assessment completed' in result.diagnosis
+    assert result.diagnosis == (
+        'Your node ran, but the check "Controller starts without crashing" did not pass.'
+    )
     assert 'Your program runs' not in result.diagnosis
     assert 'calculation' not in result.model_dump_json()
     assert 'formula' not in result.hint

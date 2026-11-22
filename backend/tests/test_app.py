@@ -339,11 +339,12 @@ def test_lists_all_assignments_in_numeric_order_without_private_fields(client):
     assert response.status_code == 200
     assignments = response.json()["assignments"]
     assert [assignment["id"] for assignment in assignments] == [1, 2, 3, 4, 5, 6, 7, 8]
-    assert [assignment["version"] for assignment in assignments] == [17, 16, 18, 16, 12, 12, 4, 2]
+    assert [assignment["version"] for assignment in assignments] == [17, 16, 18, 16, 12, 12, 5, 3]
     assert all(assignment["stable_id"] for assignment in assignments)
     assert all(assignment["solution_html"] == "" for assignment in assignments)
     assert all(assignment["vals"] == {} for assignment in assignments)
-    assert all(assignment["has_solution"] for assignment in assignments)
+    # Study students never get the solution approach (owner decision).
+    assert not any(assignment["has_solution"] for assignment in assignments)
     assert all(
         "<strong>solution" not in assignment["assignment_html"].lower()
         for assignment in assignments
@@ -393,7 +394,8 @@ def test_assignment_reports_ai_tutor_available_without_revealing_key(
             return body["ai_tutor_available"], body["ai_tutor_message"]
 
         # A key alone is not enough: the course switch starts off.
-        assert available() == (False, ai_policy.NOT_ENABLED)
+        # A TDD account has no hints, so it is not promised built-in hints.
+        assert available() == (False, ai_policy.NOT_ENABLED.removesuffix(ai_policy.HINTS_STILL_WORK))
         status = value.put(
             "/admin/course-settings/ai-tutor",
             json={"enabled": True, "daily_limit": 5},
@@ -403,7 +405,7 @@ def test_assignment_reports_ai_tutor_available_without_revealing_key(
         assert status.json()["key_configured"] is True
         assert secret not in status.text
         # Switched on, but the assignment's AI cases are not approved yet.
-        assert available() == (False, ai_policy.NOT_REVIEWED)
+        assert available() == (False, ai_policy.NOT_REVIEWED.removesuffix(ai_policy.HINTS_STILL_WORK))
         version = value.get("/assignments/1", headers=student).json()["version"]
         monkeypatch.setattr(
             ai_policy, "approved_assignments", lambda: frozenset({(1, version)})
@@ -677,17 +679,42 @@ def test_ai_tutoring_is_opt_in_for_fast_default_grading(client):
     assert body["tutor_feedback"]["source"] == "fallback"
 
 
-def test_solution_requires_a_submission_for_current_assignment_version(client):
+def _instructor_headers(client) -> dict:
+    login = client.post(
+        "/auth/login", json={"login_id": "instructor", "password": "instructor"}
+    )
+    assert login.status_code == 200
+    return {"Authorization": f"Bearer {login.json()['token']}"}
+
+
+def test_study_students_cannot_reveal_the_solution(client):
+    submission = client.post(
+        "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
+    ).json()
     blocked = client.post(
-        "/assignments/2/solution", json={"submission_id": "not-a-submission"}
+        "/assignments/2/solution",
+        json={"submission_id": submission["submission_id"]},
+    )
+    assert blocked.status_code == 403
+    assert "solution_html" not in blocked.json()
+    assert client.get("/assignments/2").json()["has_solution"] is False
+
+
+def test_solution_requires_a_submission_for_current_assignment_version(client):
+    headers = _instructor_headers(client)
+    blocked = client.post(
+        "/assignments/2/solution",
+        headers=headers,
+        json={"submission_id": "not-a-submission"},
     )
     assert blocked.status_code == 403
 
     submission = client.post(
-        "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
+        "/assignments/2/submit", headers=headers, json={"code": INCORRECT_ASSIGNMENT_2}
     ).json()
     revealed = client.post(
         "/assignments/2/solution",
+        headers=headers,
         json={"submission_id": submission["submission_id"]},
     )
     assert revealed.status_code == 200
@@ -697,8 +724,9 @@ def test_solution_requires_a_submission_for_current_assignment_version(client):
 def test_solution_reveal_rejects_a_submission_from_an_old_assignment_version(
     client,
 ):
+    teacher = _instructor_headers(client)
     submission = client.post(
-        "/assignments/2/submit", json={"code": INCORRECT_ASSIGNMENT_2}
+        "/assignments/2/submit", headers=teacher, json={"code": INCORRECT_ASSIGNMENT_2}
     ).json()
     headers = {"X-Admin-Token": "test-admin"}
     assignment = client.get("/admin/assignments", headers=headers).json()[
@@ -727,6 +755,7 @@ def test_solution_reveal_rejects_a_submission_from_an_old_assignment_version(
 
     revealed = client.post(
         "/assignments/2/solution",
+        headers=teacher,
         json={"submission_id": submission["submission_id"]},
     )
     assert revealed.status_code == 403

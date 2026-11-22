@@ -22,7 +22,14 @@ import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from ros2_callback_audit import launch_student, summarize_student_failure
+from ros2_callback_audit import (
+    output_tail,
+    RETURNED_NON_NODE_MESSAGE,
+    build_state,
+    launch_student,
+    read_audit,
+    summarize_student_failure,
+)
 from ros2_sim_world import (
     RANGE_MAX, RANGE_MIN, SCAN_BEAMS, SCAN_INCREMENT_DEG, SCAN_MIN_DEG, Simulation, flbr,
     scan,
@@ -51,19 +58,6 @@ def probe_groups() -> list[list[int]]:
             index for index in (center - 1, center, center + 1) if 0 <= index < SCAN_BEAMS
         ])
     return groups
-
-
-def read_spin_report(read_fd: int) -> bool:
-    """True when main() passed something other than a node to rclpy.spin()."""
-    os.set_blocking(read_fd, False)
-    try:
-        try:
-            evidence = os.read(read_fd, 65536)
-        except BlockingIOError:
-            evidence = b""
-    finally:
-        os.close(read_fd)
-    return b"N" in evidence.splitlines()
 
 
 def main() -> None:
@@ -210,13 +204,12 @@ def main() -> None:
         monitor.destroy_node()
         rclpy.shutdown()
     stdout, stderr = student.communicate(timeout=1)
-    spun_non_node = read_spin_report(audit_fd)
-    runtime_error = "" if alive else summarize_student_failure(stderr, student.returncode)
+    spun_non_node = build_state(read_audit(audit_fd)) == "non-node"
+    runtime_error = "" if alive else summarize_student_failure(
+        stderr, student.returncode, returned_non_node=spun_non_node,
+    )
     if spun_non_node:
-        runtime_error = (
-            "build_node() returned None or something that is not a ROS node, so there was "
-            "no robot to drive. Create your node and return it at the end of build_node()."
-        )
+        runtime_error = RETURNED_NON_NODE_MESSAGE
     if not ready and not runtime_error and flbr_topic:
         runtime_error = (
             "The node did not publish on /cmd_vel within 5 seconds, so the robot never moved. "
@@ -233,7 +226,7 @@ def main() -> None:
         replay["sensitivity"] = sensitivity
     output = f"Simulated {simulation.time:.1f} s: {replay['outcome'].replace('_', ' ')}." if replay else ""
     if stdout.strip():
-        output += f"\nNode stdout: {stdout.strip()[-1000:]}"
+        output += f"\nNode stdout: {output_tail(stdout)}"
     print(json.dumps({
         "error": runtime_error,
         "runtime_error": runtime_error,
