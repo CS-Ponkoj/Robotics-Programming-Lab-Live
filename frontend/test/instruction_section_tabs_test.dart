@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:iuse_demo/screens/assignment_workspace.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 void main() {
   testWidgets('the Instructions header tabs follow the scroll and jump',
@@ -24,7 +25,7 @@ void main() {
       home: Scaffold(
         body: Column(children: [
           AssignmentPanelHeader(
-            icon: Icons.menu_book_rounded,
+            icon: LucideIcons.bookOpen,
             title: 'Instructions',
             subtitle: 'Review the scenario and task',
             sectionNav: nav,

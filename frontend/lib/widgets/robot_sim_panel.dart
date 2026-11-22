@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/widgets/robot_sim_view.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Where the Simulation panel is shown in the workspace.
 enum SimPanelMode { docked, floating }
@@ -232,14 +233,14 @@ class _PanelHeader extends StatelessWidget {
           if (draggable) ...[
             Tooltip(
               message: 'Drag the header to move this window',
-              child: Icon(Icons.drag_indicator_rounded,
+              child: Icon(LucideIcons.gripVertical,
                   key: const Key('robot-sim-grip'),
                   size: 20,
                   color: theme.colorScheme.outline),
             ),
             const SizedBox(width: 4),
           ],
-          Icon(Icons.smart_toy_outlined,
+          Icon(LucideIcons.bot,
               size: 20, color: theme.colorScheme.primary),
           const SizedBox(width: 8),
           // Title and status take the free space, so the view buttons stay
@@ -263,7 +264,7 @@ class _PanelHeader extends StatelessWidget {
             tooltip: 'Simulate: watch your node drive the robot. Not graded.',
             visualDensity: VisualDensity.compact,
             onPressed: isSimulating ? null : onSimulate,
-            icon: const Icon(Icons.play_circle_outline_rounded),
+            icon: const Icon(LucideIcons.circlePlay),
           ),
           if (onToggleMode != null)
             IconButton(
@@ -274,8 +275,8 @@ class _PanelHeader extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               onPressed: onToggleMode,
               icon: Icon(mode == SimPanelMode.docked
-                  ? Icons.open_in_new_rounded
-                  : Icons.vertical_align_top_rounded),
+                  ? LucideIcons.externalLink
+                  : LucideIcons.arrowUpToLine),
             ),
           if (onFullScreen != null)
             IconButton(
@@ -283,7 +284,7 @@ class _PanelHeader extends StatelessWidget {
               tooltip: 'Full screen',
               visualDensity: VisualDensity.compact,
               onPressed: onFullScreen,
-              icon: const Icon(Icons.fullscreen_rounded),
+              icon: const Icon(LucideIcons.maximize),
             ),
           if (onToggleCollapsed != null)
             IconButton(
@@ -292,8 +293,8 @@ class _PanelHeader extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               onPressed: onToggleCollapsed,
               icon: Icon(collapsed
-                  ? Icons.expand_more_rounded
-                  : Icons.expand_less_rounded),
+                  ? LucideIcons.chevronDown
+                  : LucideIcons.chevronUp),
             ),
           if (onClose != null)
             IconButton(
@@ -301,7 +302,7 @@ class _PanelHeader extends StatelessWidget {
               tooltip: 'Exit full screen',
               visualDensity: VisualDensity.compact,
               onPressed: onClose,
-              icon: const Icon(Icons.fullscreen_exit_rounded),
+              icon: const Icon(LucideIcons.minimize),
             ),
         ],
       ),
@@ -405,7 +406,7 @@ class SimulationBody extends StatelessWidget {
     }
     if (future == null) {
       return _Message(
-        icon: Icons.smart_toy_outlined,
+        icon: LucideIcons.bot,
         title: 'Watch your robot',
         text: 'Press Simulate (▶) to run your node in a small 2D world and replay '
             'how it drives the robot. It is not graded.',
@@ -420,7 +421,7 @@ class SimulationBody extends StatelessWidget {
   Widget _body(ThemeData theme, AsyncSnapshot<SimulationResultDto> snap) {
     if (snap.connectionState == ConnectionState.waiting) {
       return const _Message(
-        icon: Icons.hourglass_top_rounded,
+        icon: LucideIcons.hourglass,
         title: 'Running your node on the robot…',
         text: 'The grader builds your package and drives the robot for '
             'up to 8 seconds. This takes about 10 seconds.',
@@ -430,7 +431,7 @@ class SimulationBody extends StatelessWidget {
     if (snap.hasError) {
       final error = snap.error;
       return _Message(
-        icon: Icons.cloud_off_rounded,
+        icon: LucideIcons.cloudOff,
         title: 'The simulation could not run',
         text: error is Exception
             ? error.toString().replaceFirst('Exception: ', '')

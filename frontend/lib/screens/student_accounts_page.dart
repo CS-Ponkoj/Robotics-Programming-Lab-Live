@@ -8,6 +8,7 @@ import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/feature_flags.dart';
 import 'package:iuse_demo/services/student_admin_api.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class StudentAccountsPage extends StatefulWidget {
   const StudentAccountsPage({super.key});
@@ -349,7 +350,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                     setDialogState(() => copyBlocked = true);
                   }
                 },
-                icon: Icon(copied ? Icons.check_rounded : Icons.copy_rounded),
+                icon: Icon(copied ? LucideIcons.check : LucideIcons.copy),
                 label: Text(copied ? 'Copied' : 'Copy credentials'),
               ),
             FilledButton(
@@ -823,13 +824,13 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
         OutlinedButton.icon(
           key: const Key('import-accounts-button'),
           onPressed: _loading ? null : _importAccounts,
-          icon: const Icon(Icons.sync_rounded),
+          icon: const Icon(LucideIcons.refreshCw),
           label: const Text('Import study_accounts.json'),
         ),
         FilledButton.icon(
           key: const Key('create-account-button'),
           onPressed: _loading ? null : _createAccount,
-          icon: const Icon(Icons.person_add_alt_1_rounded),
+          icon: const Icon(LucideIcons.userPlus),
           label: const Text('New account'),
         ),
       ],
@@ -883,8 +884,8 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                     child: ListTile(
                       leading: Icon(
                         emailConfigured
-                            ? Icons.mark_email_read_outlined
-                            : Icons.mark_email_unread_outlined,
+                            ? LucideIcons.mailOpen
+                            : LucideIcons.mail,
                         color: emailConfigured
                             ? AppColors.success
                             : AppColors.performanceMid,
@@ -903,7 +904,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                       trailing: emailConfigured
                           ? TextButton.icon(
                               onPressed: _loading ? null : _testEmailDelivery,
-                              icon: const Icon(Icons.outgoing_mail),
+                              icon: const Icon(LucideIcons.mailCheck),
                               label: const Text('Send test'),
                             )
                           : null,
@@ -984,7 +985,7 @@ class _StudentAccountsPageState extends State<StudentAccountsPage> {
                                                 ),
                                               )
                                             : const Icon(
-                                                Icons.person_off_outlined,
+                                                LucideIcons.userX,
                                                 color: AppColors.inkMuted,
                                               ),
                                       ),

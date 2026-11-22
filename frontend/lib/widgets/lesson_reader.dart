@@ -6,6 +6,7 @@ import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/lesson_animation.dart';
 import 'package:iuse_demo/widgets/lesson_code_block.dart';
 import 'package:iuse_demo/widgets/lesson_interactives.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Adds navigation to authored headings, without rewriting lesson content.
 class LessonReader extends StatefulWidget {
@@ -190,7 +191,7 @@ class _LessonReaderState extends State<LessonReader> {
             clipBehavior: Clip.antiAlias,
             child: ExpansionTile(
               key: const Key('lesson-outline'),
-              leading: const Icon(Icons.format_list_bulleted_rounded),
+              leading: const Icon(LucideIcons.list),
               title: const Text('On this page'),
               subtitle: Text('${_headings.length} sections · jump to a topic'),
               shape: const Border(),
@@ -203,7 +204,7 @@ class _LessonReaderState extends State<LessonReader> {
                         left: indent && heading.level == 3 ? 40 : 16,
                         right: 16),
                     title: Text(heading.title),
-                    leading: const Icon(Icons.arrow_downward_rounded, size: 18),
+                    leading: const Icon(LucideIcons.arrowDown, size: 18),
                     onTap: () =>
                         _htmlKey.currentState?.scrollToAnchor(heading.id),
                   ),

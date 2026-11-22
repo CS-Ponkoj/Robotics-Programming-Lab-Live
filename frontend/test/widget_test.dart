@@ -144,8 +144,8 @@ void main() {
     // Collapsed: a narrow rail of icons with lock and pencil badges.
     expect(tester.getSize(explorer).width,
         app.AssignmentProjectExplorer.railWidth);
-    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
-    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+    expect(find.byIcon(LucideIcons.lock), findsOneWidget);
+    expect(find.byIcon(LucideIcons.pencil), findsOneWidget);
     expect(
       find.bySemanticsLabel('src/robot_motion/package.xml, read only'),
       findsOneWidget,
@@ -364,7 +364,7 @@ void main() {
             child: AppPanel(
               title: 'Sensor telemetry',
               subtitle: 'Last replay',
-              icon: Icons.sensors_rounded,
+              icon: LucideIcons.radio,
               actions: const [
                 StatusPill(label: 'Live', color: AppColors.success, dot: true),
               ],
@@ -509,11 +509,14 @@ void main() {
       expect(find.byKey(const Key('assignment-editor-panel')), findsOneWidget);
       expect(
           tester
-              .widget<SwitchListTile>(
+              .widget<app.AiToggle>(
                 find.byKey(const Key('results-ai-toggle')),
               )
               .value,
           isFalse);
+      // The Results panel uses the AI button, never the old switch row.
+      expect(find.text('AI tutoring'), findsNothing);
+      expect(find.byType(SwitchListTile), findsNothing);
       await tester.tap(find.byKey(const Key('minimize-results-button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('assignment-results-panel')), findsNothing);
@@ -804,15 +807,18 @@ void main() {
       await pressControlEnter(tester);
     }, () => client);
 
-    final resultsSwitch = tester.widget<SwitchListTile>(
+    final resultsSwitch = tester.widget<app.AiToggle>(
       find.byKey(const Key('results-ai-toggle')),
     );
     expect(resultsSwitch.value, isFalse);
     expect(resultsSwitch.onChanged, isNull);
+    expect(resultsSwitch.onDark, isFalse);
     expect(
-      find.text('Not enabled for this course. Built-in hints still work.'),
-      findsOneWidget,
+      find.byTooltip(
+          'Not enabled for this course. Built-in hints still work.'),
+      findsWidgets,
     );
+    expect(find.text('AI tutoring'), findsNothing);
     expect(submitted, hasLength(1));
     expect(jsonDecode(submitted.single)['use_ai_tutor'], isFalse);
   });
@@ -1142,7 +1148,7 @@ void main() {
         theme: buildAppTheme(),
         home: const Scaffold(
           body: app.AssignmentPanelHeader(
-            icon: Icons.fact_check_rounded,
+            icon: LucideIcons.clipboardCheck,
             title: 'Results',
             subtitle: 'Review test outcomes and feedback',
           ),
@@ -1150,7 +1156,7 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.fact_check_rounded), findsOneWidget);
+    expect(find.byIcon(LucideIcons.clipboardCheck), findsOneWidget);
     expect(find.text('Results'), findsOneWidget);
     expect(find.text('Review test outcomes and feedback'), findsOneWidget);
     expect(tester.getSize(find.byType(app.AssignmentPanelHeader)).height, 48);
@@ -1995,16 +2001,20 @@ void main() {
       find.byKey(const Key('result-summary')),
     );
     final summaryDecoration = summary.decoration! as BoxDecoration;
+    // A white card edged in the score colour, with the score as a ring.
     expect(
-      summaryDecoration.color,
-      performanceColor(35).withValues(alpha: 0.12),
+      (summaryDecoration.border! as Border).top.color,
+      performanceColor(35).withValues(alpha: 0.35),
     );
+    expect(find.byKey(const Key('result-score-ring')), findsOneWidget);
+    expect(find.byKey(const Key('checks-failed-group')), findsOneWidget);
+    expect(find.byKey(const Key('checks-passed-group')), findsOneWidget);
     final score = tester.widget<Text>(find.text('35%'));
     expect(score.style?.color, performanceColor(35));
     expect(find.text('Passed'), findsOneWidget);
     expect(find.text('Needs attention'), findsOneWidget);
-    expect(find.byIcon(Icons.check_rounded), findsNWidgets(2));
-    expect(find.byIcon(Icons.close_rounded), findsNWidgets(2));
+    expect(find.byIcon(LucideIcons.check), findsNWidgets(2));
+    expect(find.byIcon(LucideIcons.x), findsNWidgets(2));
   });
 
   testWidgets('weighted results show points and explain required checks', (

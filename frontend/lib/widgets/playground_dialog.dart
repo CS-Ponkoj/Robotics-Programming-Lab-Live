@@ -8,6 +8,7 @@ import 'package:iuse_demo/models/playground_result_dto.dart';
 import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/playground_diagram.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 typedef PlaygroundRunner =
     Future<PlaygroundResultDto> Function(
@@ -462,7 +463,7 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
             padding: const EdgeInsets.only(top: AppSpacing.sm),
             child: _PlaygroundMessage(
               key: const Key('playground-scenario-description'),
-              icon: Icons.lightbulb_outline_rounded,
+              icon: LucideIcons.lightbulb,
               color: theme.colorScheme.primary,
               text: selected.description,
             ),
@@ -571,7 +572,7 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                 if (_modeNote != null)
                   _PlaygroundMessage(
                     key: const Key('playground-mode-note'),
-                    icon: Icons.info_outline_rounded,
+                    icon: LucideIcons.info,
                     color: theme.colorScheme.onSurfaceVariant,
                     text: _modeNote!,
                   ),
@@ -591,8 +592,8 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                             onPressed: _running ? null : _toggleMode,
                             icon: Icon(
                               _useFields
-                                  ? Icons.short_text_rounded
-                                  : Icons.view_list_rounded,
+                                  ? LucideIcons.text
+                                  : LucideIcons.list,
                               size: 18,
                             ),
                             label: Text(
@@ -606,7 +607,7 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                           TextButton.icon(
                             key: const Key('playground-use-example'),
                             onPressed: _running ? null : _useSample,
-                            icon: const Icon(Icons.restore_rounded, size: 18),
+                            icon: const Icon(LucideIcons.history, size: 18),
                             label: const Text('Use example inputs'),
                           ),
                       ],
@@ -624,7 +625,7 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(Icons.play_arrow_rounded, size: 20),
+                            : const Icon(LucideIcons.play, size: 20),
                         label: Text(_running ? 'Running…' : 'Run my function'),
                       ),
                     ),
@@ -634,7 +635,7 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                   const SizedBox(height: AppSpacing.md),
                   _PlaygroundMessage(
                     key: const Key('playground-request-error'),
-                    icon: Icons.error_outline_rounded,
+                    icon: LucideIcons.circleAlert,
                     color: theme.colorScheme.error,
                     text: _requestError!,
                   ),
@@ -643,7 +644,7 @@ class _PlaygroundDialogState extends State<PlaygroundDialog> {
                   if (_resultArguments?.trim() != _currentArguments.trim())
                     _PlaygroundMessage(
                       key: const Key('playground-stale-result'),
-                      icon: Icons.update_rounded,
+                      icon: LucideIcons.history,
                       color: AppColors.performanceMid,
                       text: 'These results are from your previous inputs. '
                           'Run again to see results for the inputs above.',
@@ -699,7 +700,7 @@ class _PlaygroundResultView extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         if (!result.success)
           _PlaygroundMessage(
-            icon: Icons.error_outline_rounded,
+            icon: LucideIcons.circleAlert,
             color: theme.colorScheme.error,
             text: result.error.isEmpty
                 ? 'Your function did not finish running.'
@@ -709,7 +710,7 @@ class _PlaygroundResultView extends StatelessWidget {
           if (result.hasWrongReturnCount)
             _PlaygroundMessage(
               key: const Key('playground-return-count-warning'),
-              icon: Icons.warning_amber_rounded,
+              icon: LucideIcons.triangleAlert,
               color: AppColors.performanceMid,
               text:
                   'Your function returned ${result.returnCount} values, but the '
@@ -718,7 +719,7 @@ class _PlaygroundResultView extends StatelessWidget {
           if (result.returnedSingleValue)
             _PlaygroundMessage(
               key: const Key('playground-return-count-warning'),
-              icon: Icons.warning_amber_rounded,
+              icon: LucideIcons.triangleAlert,
               color: AppColors.performanceMid,
               text:
                   'Your function returned one value, but the assignment expects '

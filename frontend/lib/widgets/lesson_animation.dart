@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// A lesson animation that plays on its own and always offers a Stop button,
 /// so moving content can be stopped (WCAG 2.2.2). Readers whose device asks
@@ -59,7 +60,7 @@ class _LessonAnimationState extends State<LessonAnimation> {
       TextButton.icon(
         key: const Key('lesson-animation-toggle'),
         onPressed: () => setState(() => _chosen = !playing),
-        icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded),
+        icon: Icon(playing ? LucideIcons.square : LucideIcons.play),
         label: Text(playing ? 'Stop animation' : 'Play animation'),
       ),
     ]);

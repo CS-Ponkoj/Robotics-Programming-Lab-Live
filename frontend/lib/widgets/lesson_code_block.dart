@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:highlight/highlight_core.dart' show Highlight, Node;
 import 'package:highlight/languages/python.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Python highlighting for lesson code (only Python is registered).
 final _highlighter = Highlight()..registerLanguage('python', python);
@@ -136,7 +137,7 @@ class _LessonCodeBlockState extends State<LessonCodeBlock> {
               key: const Key('lesson-code-copy'),
               tooltip: _copied ? 'Copied' : 'Copy code',
               color: Colors.white70,
-              icon: Icon(_copied ? Icons.check_rounded : Icons.copy_rounded,
+              icon: Icon(_copied ? LucideIcons.check : LucideIcons.copy,
                   size: 18),
               onPressed: _copy,
             ),

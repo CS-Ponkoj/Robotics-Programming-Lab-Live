@@ -3,6 +3,7 @@ import 'package:iuse_demo/widgets/floating_app_bar.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/services/feedback_api.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Instructor view of feedback sent from the Feedback button on any page.
 class FeedbackInboxPage extends StatefulWidget {
@@ -93,7 +94,7 @@ class _FeedbackInboxPageState extends State<FeedbackInboxPage> {
           IconButton(
             tooltip: 'Refresh',
             onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(LucideIcons.refreshCw),
           ),
         ],
       )),
@@ -166,7 +167,7 @@ class _FeedbackInboxPageState extends State<FeedbackInboxPage> {
                                 _load();
                               }
                             : null,
-                        icon: const Icon(Icons.chevron_left_rounded),
+                        icon: const Icon(LucideIcons.chevronLeft),
                       ),
                       Text('Page $_page of $pages'),
                       IconButton(
@@ -177,7 +178,7 @@ class _FeedbackInboxPageState extends State<FeedbackInboxPage> {
                                 _load();
                               }
                             : null,
-                        icon: const Icon(Icons.chevron_right_rounded),
+                        icon: const Icon(LucideIcons.chevronRight),
                       ),
                     ],
                   ),
@@ -262,8 +263,8 @@ class _FeedbackCard extends StatelessWidget {
                 TextButton.icon(
                   onPressed: busy ? null : onToggle,
                   icon: Icon(resolved
-                      ? Icons.undo_rounded
-                      : Icons.check_circle_outline_rounded),
+                      ? LucideIcons.undo2
+                      : LucideIcons.circleCheck),
                   label: Text(resolved ? 'Reopen' : 'Mark resolved'),
                 ),
               ],

@@ -5,6 +5,7 @@ import 'package:iuse_demo/services/research_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class StudentResearchPage extends StatefulWidget {
   const StudentResearchPage({super.key, this.initialData});
@@ -202,7 +203,7 @@ class _InstructorResearchDashboardState
                     dimension: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.download_rounded),
+                : const Icon(LucideIcons.download),
           ),
         ],
       )),
@@ -249,7 +250,7 @@ class _InstructorResearchDashboardState
                 key: const Key('participant-search'),
                 decoration: const InputDecoration(
                   labelText: 'Search participant code',
-                  prefixIcon: Icon(Icons.search_rounded),
+                  prefixIcon: Icon(LucideIcons.search),
                 ),
                 onChanged: (value) => setState(() => _query = value.trim()),
               ),
@@ -346,7 +347,7 @@ class _InstructorResearchDashboardState
             ),
             if (canOpen) ...[
               const SizedBox(width: AppSpacing.sm),
-              const Icon(Icons.chevron_right_rounded),
+              const Icon(LucideIcons.chevronRight),
             ],
           ],
         ),
@@ -511,25 +512,25 @@ class ResearchMetricGrid extends StatelessWidget {
         (
           'Assignments completed',
           '${summary['assignments_completed'] ?? 0}',
-          Icons.verified_rounded,
+          LucideIcons.badgeCheck,
           onShowAssignments,
         ),
         (
           'Total attempts',
           '${summary['attempts'] ?? 0}',
-          Icons.playlist_add_check_rounded,
+          LucideIcons.listChecks,
           onShowAttempts,
         ),
         (
           'Best score',
           '${summary['best_score'] ?? 0}%',
-          Icons.insights_rounded,
+          LucideIcons.chartLine,
           onShowAssignments,
         ),
         (
           'Total app active time',
           _formatDuration(_intValue(summary['active_seconds'])),
-          Icons.schedule_rounded,
+          LucideIcons.clock,
           onShowAssignments,
         ),
       ],
@@ -568,25 +569,25 @@ class _ClassroomMetricGrid extends StatelessWidget {
         (
           'Active participants',
           '${summary['active_participants'] ?? summary['participants'] ?? 0}',
-          Icons.groups_rounded,
+          LucideIcons.users,
           () => onShowList('Active participants', participants),
         ),
         (
           'Students started',
           '${summary['students_started'] ?? 0}',
-          Icons.start_rounded,
+          LucideIcons.skipForward,
           () => onShowList('Students who started an assignment', started),
         ),
         (
           'Students completed',
           '${summary['students_completed'] ?? 0}',
-          Icons.verified_rounded,
+          LucideIcons.badgeCheck,
           () => onShowList('Students who completed an assignment', completed),
         ),
         (
           'Participation rate',
           _formatPercent(summary['participation_rate']),
-          Icons.pie_chart_rounded,
+          LucideIcons.chartPie,
           () => onShowList(
               'Participating: ${started.length} of ${participants.length}',
               started),
@@ -594,7 +595,7 @@ class _ClassroomMetricGrid extends StatelessWidget {
         (
           'Completion rate',
           _formatPercent(summary['completion_rate']),
-          Icons.task_alt_rounded,
+          LucideIcons.circleCheckBig,
           () => onShowList(
               'Completed: ${completed.length} of ${started.length} who started',
               completed),
@@ -602,14 +603,14 @@ class _ClassroomMetricGrid extends StatelessWidget {
         (
           'Total attempts',
           '${summary['total_attempts'] ?? summary['attempts'] ?? 0}',
-          Icons.playlist_add_check_rounded,
+          LucideIcons.listChecks,
           () => onShowList('Attempts by participant', _sortedBy('attempts')),
         ),
         (
           'Total active time',
           _formatDuration(_intValue(
               summary['total_active_seconds'] ?? summary['active_seconds'])),
-          Icons.schedule_rounded,
+          LucideIcons.clock,
           () => onShowList(
               'Active time by participant', _sortedBy('active_seconds')),
         ),
@@ -793,8 +794,8 @@ class _AttemptHistory extends StatelessWidget {
               ),
               trailing: Icon(
                 row['passed'] == true
-                    ? Icons.check_circle_rounded
-                    : Icons.pending_actions_rounded,
+                    ? LucideIcons.circleCheck
+                    : LucideIcons.clipboardList,
                 color: row['passed'] == true
                     ? AppColors.success
                     : Theme.of(context).colorScheme.primary,
@@ -913,7 +914,7 @@ class _MetricCatalogCard extends StatelessWidget {
     return Card(
       child: ExpansionTile(
         key: const Key('phase-1-metric-catalog'),
-        leading: const Icon(Icons.menu_book_rounded),
+        leading: const Icon(LucideIcons.bookOpen),
         title: const Text('Phase 1 metric definitions'),
         subtitle: Text(
           '${metrics.length} implemented metrics · catalog ${catalog['catalog_version'] ?? 'current'}',
@@ -1047,7 +1048,7 @@ class _MetricCard extends StatelessWidget {
               const Positioned(
                 right: 8,
                 top: 8,
-                child: Icon(Icons.chevron_right_rounded,
+                child: Icon(LucideIcons.chevronRight,
                     size: 20, color: AppColors.inkMuted),
               ),
             ],
@@ -1091,7 +1092,7 @@ class _ResearchError extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.cloud_off_rounded, size: 44),
+          const Icon(LucideIcons.cloudOff, size: 44),
           const SizedBox(height: AppSpacing.sm),
           const Text('Study data is temporarily unavailable.'),
           const SizedBox(height: AppSpacing.sm),
@@ -1203,10 +1204,10 @@ String _statusLabel(String status) => switch (status) {
     };
 
 IconData _statusIcon(String status) => switch (status) {
-      'completed' => Icons.check_circle_rounded,
-      'partial' => Icons.timelapse_rounded,
-      'started' => Icons.play_circle_outline_rounded,
-      _ => Icons.radio_button_unchecked_rounded,
+      'completed' => LucideIcons.circleCheck,
+      'partial' => LucideIcons.timer,
+      'started' => LucideIcons.circlePlay,
+      _ => LucideIcons.circle,
     };
 
 Color _statusColor(String status) => status == 'completed'

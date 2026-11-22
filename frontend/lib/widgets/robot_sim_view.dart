@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/widgets/playground_diagram.dart' show niceDiagramStep;
 import 'package:iuse_demo/widgets/robot_sim_sensors.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// How the replay is arranged in the space it gets.
 enum SimViewLayout {
@@ -211,7 +212,7 @@ class _RobotSimViewState extends State<RobotSimView>
       key: const ValueKey('robot-sim-play'),
       tooltip: playing ? 'Pause replay' : 'Play replay',
       onPressed: _togglePlay,
-      icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+      icon: Icon(playing ? LucideIcons.pause : LucideIcons.play),
     );
 
     // Collapsed panel: live readings only.
@@ -237,7 +238,7 @@ class _RobotSimViewState extends State<RobotSimView>
           key: const ValueKey('robot-sim-restart'),
           tooltip: 'Replay from the start',
           onPressed: _restart,
-          icon: const Icon(Icons.replay_rounded),
+          icon: const Icon(LucideIcons.rotateCcw),
         ),
         Expanded(
           child: Slider(
@@ -421,10 +422,10 @@ class _RobotSimViewState extends State<RobotSimView>
             ),
             segments: [
               for (final (view, name, icon) in const [
-                (SimSensorView.arena, 'Arena', Icons.map_outlined),
-                (SimSensorView.lidar, 'LiDAR', Icons.radar_rounded),
-                (SimSensorView.charts, 'Charts', Icons.show_chart_rounded),
-                (SimSensorView.ranges, 'Ranges', Icons.table_rows_outlined),
+                (SimSensorView.arena, 'Arena', LucideIcons.map),
+                (SimSensorView.lidar, 'LiDAR', LucideIcons.radar),
+                (SimSensorView.charts, 'Charts', LucideIcons.chartLine),
+                (SimSensorView.ranges, 'Ranges', LucideIcons.rows3),
               ])
                 ButtonSegment(
                   value: view,

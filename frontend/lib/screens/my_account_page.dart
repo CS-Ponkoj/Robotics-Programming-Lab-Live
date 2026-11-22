@@ -4,6 +4,7 @@ import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Lets a signed-in student or instructor review their account and change
 /// their own password. Login ID and participant code are managed by
@@ -119,8 +120,8 @@ class _MyAccountPageState extends State<MyAccountPage> {
             tooltip: _hidePasswords ? 'Show passwords' : 'Hide passwords',
             onPressed: () => setState(() => _hidePasswords = !_hidePasswords),
             icon: Icon(_hidePasswords
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined),
+                ? LucideIcons.eye
+                : LucideIcons.eyeOff),
           ),
         );
 
@@ -251,7 +252,7 @@ class _MyAccountPageState extends State<MyAccountPage> {
                                     child: CircularProgressIndicator(
                                         strokeWidth: 2),
                                   )
-                                : const Icon(Icons.lock_reset_rounded),
+                                : const Icon(LucideIcons.lockKeyholeOpen),
                             label:
                                 Text(_saving ? 'Saving...' : 'Change password'),
                           ),

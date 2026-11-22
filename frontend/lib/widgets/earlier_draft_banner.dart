@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Offers code written for an older version of the assignment. It is never
 /// loaded into the new version automatically; the student views and copies it.
@@ -39,7 +40,7 @@ class EarlierVersionDraftBanner extends StatelessWidget {
                 const SnackBar(content: Text('Earlier code copied.')),
               );
             },
-            icon: const Icon(Icons.copy_rounded, size: 18),
+            icon: const Icon(LucideIcons.copy, size: 18),
             label: const Text('Copy all'),
           ),
           FilledButton(
@@ -65,7 +66,7 @@ class EarlierVersionDraftBanner extends StatelessWidget {
           runSpacing: 4,
           children: [
             Icon(
-              Icons.history_rounded,
+              LucideIcons.history,
               size: 20,
               color: theme.colorScheme.onTertiaryContainer,
             ),

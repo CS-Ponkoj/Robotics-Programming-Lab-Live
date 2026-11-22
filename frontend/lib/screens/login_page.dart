@@ -4,6 +4,7 @@ import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/external_link.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
@@ -296,8 +297,8 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         icon: Icon(
                           _hidePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
+                              ? LucideIcons.eye
+                              : LucideIcons.eyeOff,
                         ),
                       ),
                     ),
@@ -326,7 +327,7 @@ class _LoginPageState extends State<LoginPage> {
                     decoration: const InputDecoration(
                       labelText: 'Login ID',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person_outline_rounded),
+                      prefixIcon: Icon(LucideIcons.user),
                     ),
                     validator: (value) =>
                         (value == null || value.trim().isEmpty)
@@ -341,15 +342,15 @@ class _LoginPageState extends State<LoginPage> {
                     decoration: InputDecoration(
                       labelText: 'Password',
                       border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      prefixIcon: const Icon(LucideIcons.lock),
                       suffixIcon: IconButton(
                         onPressed: () => setState(
                           () => _hidePassword = !_hidePassword,
                         ),
                         icon: Icon(
                           _hidePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
+                              ? LucideIcons.eye
+                              : LucideIcons.eyeOff,
                         ),
                       ),
                     ),
@@ -385,8 +386,8 @@ class _LoginPageState extends State<LoginPage> {
                         )
                       : Icon(
                           resetMode
-                              ? Icons.password_rounded
-                              : Icons.login_rounded,
+                              ? LucideIcons.keyRound
+                              : LucideIcons.logIn,
                         ),
                   label: Text(
                     _working
@@ -415,7 +416,7 @@ class _LoginPageState extends State<LoginPage> {
                   OutlinedButton.icon(
                     key: const Key('student-demo-button'),
                     onPressed: _working ? null : _startDemo,
-                    icon: const Icon(Icons.science_outlined),
+                    icon: const Icon(LucideIcons.flaskConical),
                     label: const Text('Try the student demo'),
                   ),
                   const SizedBox(height: 10),
@@ -552,7 +553,7 @@ class _CreditLink extends StatelessWidget {
                 ),
                 const SizedBox(width: 2),
                 Icon(
-                  Icons.open_in_new_rounded,
+                  LucideIcons.externalLink,
                   size: 13,
                   color: AppColors.brand,
                 ),
@@ -573,13 +574,13 @@ class _LoopStep {
 }
 
 const _learningLoop = [
-  _LoopStep(Icons.menu_book_rounded, 'Learn',
+  _LoopStep(LucideIcons.bookOpen, 'Learn',
       'Short lessons, diagrams, and quizzes for each robotics topic.'),
-  _LoopStep(Icons.code_rounded, 'Code',
+  _LoopStep(LucideIcons.code, 'Code',
       'Write Python and ROS 2 solutions in a full code editor.'),
-  _LoopStep(Icons.fact_check_rounded, 'Evaluate',
+  _LoopStep(LucideIcons.clipboardCheck, 'Evaluate',
       'Run the tests and see exactly which checks pass.'),
-  _LoopStep(Icons.auto_awesome_rounded, 'Improve',
+  _LoopStep(LucideIcons.sparkles, 'Improve',
       'Progressive hints, plus optional AI tutoring when enabled.'),
 ];
 
@@ -601,7 +602,7 @@ class _BrandPanel extends StatelessWidget {
         border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
       ),
       child: Icon(
-        Icons.memory_rounded,
+        LucideIcons.cpu,
         color: Colors.white,
         size: compact ? 26 : 34,
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 enum TerminalLineKind {
   command,
@@ -302,7 +303,7 @@ class RunTerminalPanel extends StatelessWidget {
       child: Row(
         children: [
           const Icon(
-            Icons.terminal_rounded,
+            LucideIcons.squareTerminal,
             size: 16,
             color: Color(0xFF89DDFF),
           ),
@@ -357,7 +358,7 @@ class RunTerminalPanel extends StatelessWidget {
             _HeaderButton(
               key: const Key('run-terminal-copy'),
               tooltip: 'Copy terminal text',
-              icon: Icons.copy_rounded,
+              icon: LucideIcons.copy,
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: _plainText));
                 ScaffoldMessenger.maybeOf(context)?.showSnackBar(
@@ -368,7 +369,7 @@ class RunTerminalPanel extends StatelessWidget {
             _HeaderButton(
               key: const Key('run-terminal-clear'),
               tooltip: 'Clear terminal',
-              icon: Icons.block_rounded,
+              icon: LucideIcons.ban,
               onPressed: onClear,
             ),
           ],
@@ -376,8 +377,8 @@ class RunTerminalPanel extends StatelessWidget {
             key: const Key('run-terminal-toggle'),
             tooltip: expanded ? 'Collapse terminal' : 'Open terminal',
             icon: expanded
-                ? Icons.keyboard_arrow_down_rounded
-                : Icons.keyboard_arrow_up_rounded,
+                ? LucideIcons.chevronDown
+                : LucideIcons.chevronUp,
             onPressed: onToggle,
           ),
         ],

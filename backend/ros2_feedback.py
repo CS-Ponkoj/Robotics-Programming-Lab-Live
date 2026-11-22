@@ -128,8 +128,8 @@ def wall_stop_findings(passed: dict[str, bool], observations: dict) -> dict[str,
             if not (_drives(open_) or _drives(far)):
                 findings[test_id] = Finding(
                     "must-drive-first",
-                    "Stopping only counts once your robot also drives when the way "
-                    "is clear; first make it drive in the open.",
+                    "Your robot never drove when the way was clear, so first make "
+                    "it drive in the open.",
                 )
             elif _drives(phase) or (_number(phase, "linear_max") or 0) > STOP_TOLERANCE:
                 speed = _number(phase, "linear_max") or 0.0

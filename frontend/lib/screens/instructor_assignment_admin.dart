@@ -16,6 +16,7 @@ import 'package:iuse_demo/services/instructor_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Instructor Studio home: one card per instructor tool.
 class InstructorAssignmentAdmin extends StatelessWidget {
@@ -32,21 +33,21 @@ class InstructorAssignmentAdmin extends StatelessWidget {
     final cards = [
       _StudioLinkCard(
         key: const Key('studio-assignments-card'),
-        icon: Icons.assignment_outlined,
+        icon: LucideIcons.clipboardList,
         title: 'Assignment management',
         detail: 'Create, edit, validate, and publish versioned assignments.',
         onTap: () =>
             open(const AssignmentManagementPage(), 'Assignment management'),
       ),
       _StudioLinkCard(
-        icon: Icons.manage_accounts_outlined,
+        icon: LucideIcons.userCog,
         title: 'Manage accounts',
         detail:
             'Create logins, reset access, and see each account\'s sign-ins.',
         onTap: () => open(const StudentAccountsPage(), 'Manage accounts'),
       ),
       _StudioLinkCard(
-        icon: Icons.insights_rounded,
+        icon: LucideIcons.chartLine,
         title: 'Research study dashboard',
         detail: 'Participation, attempts, and privacy-safe research exports.',
         onTap: () => open(
@@ -54,7 +55,7 @@ class InstructorAssignmentAdmin extends StatelessWidget {
       ),
       _StudioLinkCard(
         key: const Key('studio-ai-card'),
-        icon: Icons.psychology_outlined,
+        icon: LucideIcons.brain,
         title: 'AI tutor',
         detail: 'Turn AI tutoring on for the course, set a daily limit, and '
             'see which assignments are reviewed.',
@@ -62,7 +63,7 @@ class InstructorAssignmentAdmin extends StatelessWidget {
       ),
       _StudioLinkCard(
         key: const Key('studio-feedback-card'),
-        icon: Icons.feedback_outlined,
+        icon: LucideIcons.messageSquareText,
         title: 'Feedback',
         detail: 'Bug reports and suggestions sent from any page.',
         onTap: () => open(const FeedbackInboxPage(), 'Feedback inbox'),
@@ -232,7 +233,7 @@ class _AssignmentManagementPageState extends State<AssignmentManagementPage> {
     final createButton = FilledButton.icon(
       key: const Key('create-assignment-button'),
       onPressed: _loading ? null : () => _edit(),
-      icon: const Icon(Icons.add_rounded),
+      icon: const Icon(LucideIcons.plus),
       label: const Text('Create assignment'),
     );
     final intro = Column(
@@ -396,7 +397,7 @@ class _StudioLinkCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
+              const Icon(LucideIcons.chevronRight,
                   color: AppColors.inkMuted),
             ],
           ),
@@ -522,7 +523,7 @@ class _StudioAssignmentRow extends StatelessWidget {
               const SizedBox(width: 12),
               Tooltip(
                 message: 'Edit assignment',
-                child: Icon(Icons.edit_outlined,
+                child: Icon(LucideIcons.pencil,
                     color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
@@ -537,7 +538,7 @@ class _StudioAssignmentRow extends StatelessWidget {
               tooltip: 'Insights for Assignment ${assignment['id']}, '
                   'where students get stuck',
               onPressed: onInsights,
-              icon: const Icon(Icons.insights_rounded),
+              icon: const Icon(LucideIcons.chartLine),
             ),
           IconButton(
             key: Key('assignment-old-${assignment['id']}'),
@@ -546,7 +547,7 @@ class _StudioAssignmentRow extends StatelessWidget {
                 : 'Move Assignment ${assignment['id']} to Old assignments',
             onPressed: onToggleOld,
             icon: Icon(
-                isOld ? Icons.unarchive_outlined : Icons.archive_outlined),
+                isOld ? LucideIcons.archiveRestore : LucideIcons.archive),
           ),
           const SizedBox(width: 8),
         ],
@@ -813,12 +814,12 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                 IconButton(
                   tooltip: 'Validate',
                   onPressed: _busy != null ? null : _validate,
-                  icon: const Icon(Icons.fact_check_outlined),
+                  icon: const Icon(LucideIcons.clipboardCheck),
                 ),
                 IconButton(
                   tooltip: 'Publish',
                   onPressed: _busy != null ? null : _publish,
-                  icon: const Icon(Icons.publish_rounded),
+                  icon: const Icon(LucideIcons.upload),
                 ),
                 const SizedBox(width: 4),
               ]
@@ -826,7 +827,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                 TextButton.icon(
                   onPressed: _busy != null ? null : _validate,
                   style: TextButton.styleFrom(foregroundColor: Colors.white),
-                  icon: const Icon(Icons.fact_check_outlined, size: 18),
+                  icon: const Icon(LucideIcons.clipboardCheck, size: 18),
                   label: const Text('Validate'),
                 ),
                 const SizedBox(width: 8),
@@ -838,7 +839,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                     foregroundColor: AppColors.brandDark,
                     minimumSize: const Size(0, 40),
                   ),
-                  icon: const Icon(Icons.publish_rounded, size: 18),
+                  icon: const Icon(LucideIcons.upload, size: 18),
                   label: const Text('Publish'),
                 ),
                 const SizedBox(width: 16),
@@ -885,7 +886,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                         child: OutlinedButton.icon(
                           key: const Key('preview-as-student'),
                           onPressed: _previewAsStudent,
-                          icon: const Icon(Icons.visibility_outlined),
+                          icon: const Icon(LucideIcons.eye),
                           label: const Text('Preview as a student sees it'),
                         ),
                       ),
@@ -909,7 +910,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                         child: OutlinedButton.icon(
                           key: const Key('edit-simulation-world'),
                           onPressed: _editSimulationWorld,
-                          icon: const Icon(Icons.map_outlined),
+                          icon: const Icon(LucideIcons.map),
                           label: const Text('Edit the simulation world'),
                         ),
                       ),
@@ -931,7 +932,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                     alignment: Alignment.centerLeft,
                     child: FilledButton.icon(
                       onPressed: _saving || _busy != null ? null : _save,
-                      icon: const Icon(Icons.save_outlined),
+                      icon: const Icon(LucideIcons.save),
                       label: Text(_saving ? 'Saving…' : 'Save draft'),
                     ),
                   ),
@@ -974,7 +975,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                     IconButton(
                       tooltip: 'Close preview',
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded),
+                      icon: const Icon(LucideIcons.x),
                     ),
                   ]),
                 ),
@@ -1061,10 +1062,10 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
               children: [
                 Icon(
                   busy != null
-                      ? Icons.hourglass_top_rounded
+                      ? LucideIcons.hourglass
                       : error
-                          ? Icons.error_outline_rounded
-                          : Icons.check_circle_outline_rounded,
+                          ? LucideIcons.circleAlert
+                          : LucideIcons.circleCheck,
                   size: 20,
                   color: error ? scheme.onErrorContainer : scheme.primary,
                 ),
@@ -1081,7 +1082,7 @@ class _AssignmentEditorPageState extends State<AssignmentEditorPage> {
                   IconButton(
                     tooltip: 'Dismiss',
                     onPressed: () => setState(() => _message = null),
-                    icon: const Icon(Icons.close_rounded, size: 18),
+                    icon: const Icon(LucideIcons.x, size: 18),
                   ),
               ],
             ),

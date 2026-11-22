@@ -604,7 +604,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           .toDouble()),
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.open_in_full_rounded,
+                    child: Icon(LucideIcons.maximize2,
                         size: 16,
                         color: Theme.of(context).colorScheme.outline),
                   ),
@@ -977,46 +977,54 @@ class _MyHomePageState extends State<MyHomePage> {
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
+  void _setAiTutor(bool value) {
+    setState(() => _enableFeedback = value);
+    unawaited(_trackWorkspaceEvent('ai_tutor_toggled', {'enabled': value}));
+  }
+
   Widget _resultsPanel() => ColoredBox(
         color: AppColors.resultsSurface,
         child: SafeArea(
           child: Column(key: const Key('assignment-results-panel'), children: [
             Container(
-              color: AppColors.resultsHeader,
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              decoration: const BoxDecoration(
+                color: AppColors.resultsHeader,
+                border: Border(bottom: BorderSide(color: AppColors.border)),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
               child: Row(children: [
-                const Icon(Icons.fact_check_rounded),
-                const SizedBox(width: 8),
+                const IconTile(icon: LucideIcons.clipboardCheck),
+                const SizedBox(width: 10),
                 Expanded(
                     child: Text('Results',
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700))),
+                            ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.brandDark))),
+                // The same AI button as the page header, so the switch can
+                // be reached while Results covers the header.
+                if (currentFeedbackMode.value.allowsAi)
+                  Tooltip(
+                    message: _aiTutorAvailable
+                        ? 'Built-in feedback stays available'
+                        : _aiTutorMessage,
+                    child: AiToggle(
+                      key: const Key('results-ai-toggle'),
+                      onDark: false,
+                      value: _aiTutorOn,
+                      onChanged: _aiTutorAvailable ? _setAiTutor : null,
+                    ),
+                  ),
                 IconButton(
                   key: const Key('minimize-results-button'),
                   tooltip: 'Minimize results',
                   onPressed: () => _scaffoldKey.currentState?.closeEndDrawer(),
-                  icon: const Icon(Icons.keyboard_double_arrow_right_rounded),
+                  icon: const Icon(LucideIcons.panelRightClose),
                 ),
               ]),
             ),
-            if (currentFeedbackMode.value.allowsAi)
-              SwitchListTile(
-                key: const Key('results-ai-toggle'),
-                title: const Text('AI tutoring'),
-                subtitle: Text(_aiTutorAvailable
-                    ? 'Off by default; built-in feedback remains available'
-                    : _aiTutorMessage),
-                value: _aiTutorOn,
-                onChanged: _aiTutorAvailable
-                    ? (value) {
-                        setState(() => _enableFeedback = value);
-                        unawaited(_trackWorkspaceEvent(
-                            'ai_tutor_toggled', {'enabled': value}));
-                      }
-                    : null,
-              ),
               Expanded(
                 child: _emptyCodeAttempted
                     ? EmptyCodeTestRunState(onRestore: _resetStarterCode)
@@ -1556,7 +1564,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                             child: Column(
                                             children: [
                                               AssignmentPanelHeader(
-                                                icon: Icons.menu_book_rounded,
+                                                icon: LucideIcons.bookOpen,
                                                 title: 'Instructions',
                                                 subtitle:
                                                     'Review the scenario and task',
@@ -1793,7 +1801,7 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
         SizedBox(key: _scenario),
         _InstructionSectionCard(
           key: const Key('instruction-scenario-section'),
-          icon: Icons.explore_outlined,
+          icon: LucideIcons.compass,
           title: 'Scenario',
           subtitle: 'Understand the environment and objective',
           html: sections.scenario,
@@ -1803,7 +1811,7 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
           SizedBox(key: _task),
           _InstructionSectionCard(
             key: const Key('instruction-task-section'),
-            icon: Icons.task_alt_rounded,
+            icon: LucideIcons.circleCheckBig,
             title: 'Your task',
             subtitle: 'What your solution needs to do',
             html: taskList.remainingHtml,
@@ -1816,7 +1824,7 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
           SizedBox(key: _support),
           _InstructionSectionCard(
             key: const Key('instruction-support-section'),
-            icon: Icons.tips_and_updates_outlined,
+            icon: LucideIcons.lightbulb,
             title: 'Rules, scoring, and checks',
             subtitle: 'Rules, scoring, given data, and hints',
             html: sections.support,
@@ -2000,7 +2008,7 @@ class _InstructionSectionCard extends StatelessWidget {
                   IconButton(
                     tooltip: 'Close enlarged diagram',
                     onPressed: () => Navigator.pop(dialogContext),
-                    icon: const Icon(Icons.close_rounded),
+                    icon: const Icon(LucideIcons.x),
                   ),
                 ],
               ),
@@ -2182,7 +2190,7 @@ class _SolutionSection extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Icons.visibility_outlined),
+        icon: const Icon(LucideIcons.eye),
         title: const Text('Show solution approach?'),
         content: const Text(
           'The solution approach will be shown and this assignment will be '
@@ -2226,7 +2234,7 @@ class _SolutionSection extends StatelessWidget {
                 Row(
                   children: [
                     Icon(
-                      Icons.visibility_rounded,
+                      LucideIcons.eye,
                       color: theme.colorScheme.primary,
                     ),
                     const SizedBox(width: AppSpacing.sm),
@@ -2268,7 +2276,7 @@ class _SolutionSection extends StatelessWidget {
                 Row(
                   children: [
                     Icon(
-                      Icons.visibility_off_outlined,
+                      LucideIcons.eyeOff,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: AppSpacing.sm),
@@ -2301,7 +2309,7 @@ class _SolutionSection extends StatelessWidget {
                   key: const Key('reveal-solution-button'),
                   onPressed: canReveal ? () => _requestReveal(context) : null,
                   icon: Icon(
-                    canReveal ? Icons.visibility_outlined : Icons.lock_outline,
+                    canReveal ? LucideIcons.eye : LucideIcons.lock,
                   ),
                   label: Text(
                     canReveal
@@ -2446,8 +2454,8 @@ class AssignmentPanelHeader extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               icon: Icon(
                 isFocused
-                    ? Icons.close_fullscreen_rounded
-                    : Icons.open_in_full_rounded,
+                    ? LucideIcons.minimize2
+                    : LucideIcons.maximize2,
                 size: 20,
               ),
             ),
@@ -2553,7 +2561,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.code_rounded,
+                    Icon(LucideIcons.code,
                         size: 18,
                         color: theme.colorScheme.primary,
                         semanticLabel: compactSimulate ? 'Python editor' : null),
@@ -2586,35 +2594,35 @@ class AssignmentEditorToolbar extends StatelessWidget {
                       children: [
                         toolButton(
                           keyName: 'save',
-                          icon: Icons.save_outlined,
+                          icon: LucideIcons.save,
                           label: 'Save draft',
                           shortcut: 'Ctrl+S / Ctrl+Alt+D',
                           onPressed: onSave,
                         ),
                         toolButton(
                           keyName: 'find',
-                          icon: Icons.search_rounded,
+                          icon: LucideIcons.search,
                           label: 'Find',
                           shortcut: 'Ctrl+F / Ctrl+Alt+Q',
                           onPressed: onSearch,
                         ),
                         toolButton(
                           keyName: 'replace',
-                          icon: Icons.find_replace_rounded,
+                          icon: LucideIcons.replace,
                           label: 'Replace',
                           shortcut: 'Ctrl+H / Ctrl+Alt+W',
                           onPressed: onReplace,
                         ),
                         toolButton(
                           keyName: 'format',
-                          icon: Icons.auto_fix_high_rounded,
+                          icon: LucideIcons.wandSparkles,
                           label: 'Format Python',
                           shortcut: 'Shift+Alt+F / Ctrl+Shift+I',
                           onPressed: isRunning ? null : onFormat,
                         ),
                         toolButton(
                           keyName: 'restore',
-                          icon: Icons.restart_alt_rounded,
+                          icon: LucideIcons.rotateCcw,
                           label: 'Restore starter code',
                           shortcut: 'Ctrl+Alt+R',
                           onPressed: isRunning ? null : onReset,
@@ -2623,14 +2631,14 @@ class AssignmentEditorToolbar extends StatelessWidget {
                             height: 28, child: VerticalDivider(width: 18)),
                         toolButton(
                           keyName: 'font-down',
-                          icon: Icons.text_decrease_rounded,
+                          icon: LucideIcons.aArrowDown,
                           label: 'Decrease editor font',
                           shortcut: 'Ctrl+- / Ctrl+Alt+1',
                           onPressed: fontSize > 12 ? onDecreaseFont : null,
                         ),
                         toolButton(
                           keyName: 'font-up',
-                          icon: Icons.text_increase_rounded,
+                          icon: LucideIcons.aArrowUp,
                           label: 'Increase editor font',
                           shortcut: 'Ctrl+= / Ctrl+Alt+2',
                           onPressed: fontSize < 22 ? onIncreaseFont : null,
@@ -2639,14 +2647,14 @@ class AssignmentEditorToolbar extends StatelessWidget {
                             height: 28, child: VerticalDivider(width: 18)),
                         toolButton(
                           keyName: 'reference',
-                          icon: Icons.integration_instructions_outlined,
+                          icon: LucideIcons.fileCode,
                           label: 'Names in the starter code',
                           shortcut: 'Ctrl+Alt+A',
                           onPressed: onShowApiReference,
                         ),
                         toolButton(
                           keyName: 'shortcuts',
-                          icon: Icons.keyboard_outlined,
+                          icon: LucideIcons.keyboard,
                           label: 'Keyboard shortcuts',
                           shortcut: 'F1 / Ctrl+Alt+K',
                           onPressed: onShowShortcuts,
@@ -2654,8 +2662,8 @@ class AssignmentEditorToolbar extends StatelessWidget {
                         toolButton(
                           keyName: 'theme',
                           icon: editorDarkMode
-                              ? Icons.light_mode_outlined
-                              : Icons.dark_mode_outlined,
+                              ? LucideIcons.sun
+                              : LucideIcons.moon,
                           label: editorDarkMode
                               ? 'Switch editor to light mode'
                               : 'Switch editor to dark mode',
@@ -2687,12 +2695,12 @@ class AssignmentEditorToolbar extends StatelessWidget {
                     ),
                     child: Icon(
                       switch (saveState) {
-                        DraftSaveState.saving => Icons.sync_rounded,
-                        DraftSaveState.saved => Icons.cloud_done_outlined,
-                        DraftSaveState.sessionSaved => Icons.save_outlined,
-                        DraftSaveState.failed => Icons.cloud_off_outlined,
-                        DraftSaveState.outdated => Icons.update_rounded,
-                        DraftSaveState.idle => Icons.cloud_outlined,
+                        DraftSaveState.saving => LucideIcons.refreshCw,
+                        DraftSaveState.saved => LucideIcons.cloudCheck,
+                        DraftSaveState.sessionSaved => LucideIcons.save,
+                        DraftSaveState.failed => LucideIcons.cloudOff,
+                        DraftSaveState.outdated => LucideIcons.history,
+                        DraftSaveState.idle => LucideIcons.cloud,
                       },
                       key: const Key('draft-save-state-icon'),
                       size: 20,
@@ -2712,8 +2720,8 @@ class AssignmentEditorToolbar extends StatelessWidget {
                   onPressed: onFocusToggle,
                   icon: Icon(
                     isFocused
-                        ? Icons.close_fullscreen_rounded
-                        : Icons.open_in_full_rounded,
+                        ? LucideIcons.minimize2
+                        : LucideIcons.maximize2,
                     size: 20,
                   ),
                   visualDensity: VisualDensity.compact,
@@ -2726,7 +2734,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
                     key: const Key('try-inputs-button'),
                     tooltip: 'Try inputs: call your function. Not graded or saved.',
                     onPressed: isRunning ? null : onTryInputs,
-                    icon: const Icon(Icons.science_outlined, size: 20),
+                    icon: const Icon(LucideIcons.flaskConical, size: 20),
                   )
                 else
                   Tooltip(
@@ -2735,7 +2743,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
                     child: OutlinedButton.icon(
                       key: const Key('try-inputs-button'),
                       onPressed: isRunning ? null : onTryInputs,
-                      icon: const Icon(Icons.science_outlined, size: 18),
+                      icon: const Icon(LucideIcons.flaskConical, size: 18),
                       label: const Text('Try inputs'),
                     ),
                   ),
@@ -2755,7 +2763,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.smart_toy_outlined, size: 20),
+                        : const Icon(LucideIcons.bot, size: 20),
                   )
                 else
                   Tooltip(
@@ -2770,7 +2778,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.smart_toy_outlined, size: 18),
+                          : const Icon(LucideIcons.bot, size: 18),
                       label: Text(isSimulating ? 'Simulating…' : 'Simulate'),
                     ),
                   ),
@@ -2793,7 +2801,7 @@ class AssignmentEditorToolbar extends StatelessWidget {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.play_arrow_rounded, size: 20),
+                        : const Icon(LucideIcons.play, size: 20),
                     label: Text(isRunning ? 'Running…' : 'Run tests'),
                   ),
                 ),
@@ -3027,7 +3035,7 @@ class ProjectFilePicker extends StatelessWidget {
             key: const Key('project-file-picker'),
             value: current,
             isExpanded: true,
-            icon: const Icon(Icons.unfold_more_rounded),
+            icon: const Icon(LucideIcons.chevronsUpDown),
             items: [
               for (final file in files)
                 DropdownMenuItem(
@@ -3036,8 +3044,8 @@ class ProjectFilePicker extends StatelessWidget {
                     children: [
                       Icon(
                         file.editable
-                            ? Icons.edit_outlined
-                            : Icons.lock_outline,
+                            ? LucideIcons.pencil
+                            : LucideIcons.lock,
                         size: 16,
                       ),
                       const SizedBox(width: AppSpacing.sm),
@@ -3157,14 +3165,14 @@ class _AssignmentProjectExplorerState extends State<AssignmentProjectExplorer> {
         children: [
           Icon(
             folderOpen
-                ? Icons.keyboard_arrow_down_rounded
-                : Icons.keyboard_arrow_right_rounded,
+                ? LucideIcons.chevronDown
+                : LucideIcons.chevronRight,
             size: 18,
             color: scheme.onSurfaceVariant,
           ),
           const SizedBox(width: 2),
           Icon(
-            folderOpen ? Icons.folder_open_rounded : Icons.folder_rounded,
+            folderOpen ? LucideIcons.folderOpen : LucideIcons.folder,
             size: 18,
             color: scheme.primary,
           ),
@@ -3205,7 +3213,7 @@ class _AssignmentProjectExplorerState extends State<AssignmentProjectExplorer> {
           Tooltip(
             message: file.editable ? 'Editable' : 'Read only',
             child: Icon(
-              file.editable ? Icons.edit_outlined : Icons.lock_outline,
+              file.editable ? LucideIcons.pencil : LucideIcons.lock,
               size: 14,
               color: badgeColor,
             ),
@@ -3397,7 +3405,7 @@ class _AssignmentProjectExplorerState extends State<AssignmentProjectExplorer> {
                 SizedBox(
                   width: AssignmentProjectExplorer.railWidth - 1,
                   child: Icon(
-                    Icons.account_tree_outlined,
+                    LucideIcons.folderTree,
                     size: 20,
                     color: scheme.primary,
                   ),
@@ -3418,7 +3426,7 @@ class _AssignmentProjectExplorerState extends State<AssignmentProjectExplorer> {
                   Padding(
                     padding: const EdgeInsets.only(right: AppSpacing.sm),
                     child: Icon(
-                      _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                      _pinned ? LucideIcons.pinOff : LucideIcons.pin,
                       size: 16,
                       color: _pinned ? scheme.primary : scheme.onSurfaceVariant,
                     ),
@@ -3480,8 +3488,8 @@ class _AssignmentProjectExplorerState extends State<AssignmentProjectExplorer> {
                               ),
                               child: Icon(
                                 file.editable
-                                    ? Icons.edit_outlined
-                                    : Icons.lock_outline,
+                                    ? LucideIcons.pencil
+                                    : LucideIcons.lock,
                                 size: 10,
                                 color: badgeColor,
                               ),
@@ -3558,10 +3566,10 @@ class _ProjectTreeRow {
 
 /// Icon for a project file, by its extension.
 IconData projectFileIcon(String name) {
-  if (name.endsWith('.py')) return Icons.code_rounded;
-  if (name.endsWith('.xml')) return Icons.data_object_rounded;
-  if (name.endsWith('.cfg')) return Icons.tune_rounded;
-  return Icons.insert_drive_file_outlined;
+  if (name.endsWith('.py')) return LucideIcons.code;
+  if (name.endsWith('.xml')) return LucideIcons.braces;
+  if (name.endsWith('.cfg')) return LucideIcons.slidersHorizontal;
+  return LucideIcons.file;
 }
 
 /// File tabs above the editor, like a code editor's tab strip. Editable files
@@ -3633,7 +3641,7 @@ class ProjectFileStatusBar extends StatelessWidget {
                     key: const Key('editor-diagnostic-line'),
                     label: 'Check line $diagnosticLine',
                     color: scheme.error,
-                    icon: Icons.error_outline_rounded,
+                    icon: LucideIcons.circleAlert,
                     size: PillSize.small,
                   ),
                   const SizedBox(width: AppSpacing.xs),
@@ -3641,7 +3649,7 @@ class ProjectFileStatusBar extends StatelessWidget {
                 StatusPill(
                   label: editable ? 'Editable' : 'Read only',
                   color: editable ? scheme.primary : scheme.onSurfaceVariant,
-                  icon: editable ? Icons.edit_outlined : Icons.lock_outline,
+                  icon: editable ? LucideIcons.pencil : LucideIcons.lock,
                   size: PillSize.small,
                 ),
               ],
@@ -3711,14 +3719,14 @@ class _FileTab extends StatelessWidget {
                   ),
                   if (!file.editable) ...[
                     const SizedBox(width: 4),
-                    Icon(Icons.lock_outline, size: 12, color: color),
+                    Icon(LucideIcons.lock, size: 12, color: color),
                   ],
                   if (onClose != null)
                     IconButton(
                       key: Key('editor-tab-close-${file.path}'),
                       tooltip: 'Close $name',
                       onPressed: onClose,
-                      icon: const Icon(Icons.close_rounded, size: 14),
+                      icon: const Icon(LucideIcons.x, size: 14),
                       visualDensity: VisualDensity.compact,
                       constraints:
                           const BoxConstraints(minWidth: 28, minHeight: 28),
@@ -4065,9 +4073,17 @@ class AssignmentPageHeader extends StatelessWidget
 /// The AI tutor switch as a small "AI" button: the sparkles move while it is
 /// on, and the button fades while it is off.
 class AiToggle extends StatefulWidget {
-  const AiToggle({super.key, required this.value, required this.onChanged});
+  const AiToggle({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.onDark = true,
+  });
 
   final bool value;
+
+  /// True on the coloured page header; false on light panels.
+  final bool onDark;
 
   /// Null when the course has no AI tutor available.
   final ValueChanged<bool>? onChanged;
@@ -4129,26 +4145,35 @@ class _AiToggleState extends State<AiToggle>
   Widget build(BuildContext context) {
     final on = widget.value;
     final enabled = widget.onChanged != null;
+    final dark = widget.onDark;
+    final ink = dark ? Colors.white : AppColors.brandDark;
+    final fill = dark
+        ? Colors.white.withValues(alpha: on ? 0.22 : 0.08)
+        : (on ? AppColors.brandTint : Colors.white);
+    final edge = dark
+        ? Colors.white.withValues(alpha: on ? 0.55 : 0.18)
+        : (on ? AppColors.brand : AppColors.border);
+    final sparkle = on
+        ? (dark ? const Color(0xFFFFE08A) : const Color(0xFFB7791F))
+        : ink;
     return Semantics(
-      label: 'AI tutoring',
+      label: 'AI',
       toggled: on,
       enabled: enabled,
       button: true,
       excludeSemantics: true,
       child: Tooltip(
-        message: on ? 'AI tutoring is on' : 'AI tutoring is off',
+        message: on ? 'AI is on' : 'AI is off',
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 3),
           child: AnimatedOpacity(
             duration: const Duration(milliseconds: 250),
             opacity: on ? 1 : (enabled ? 0.55 : 0.35),
             child: Material(
-              color: Colors.white.withValues(alpha: on ? 0.22 : 0.08),
+              color: fill,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadii.md),
-                side: BorderSide(
-                  color: Colors.white.withValues(alpha: on ? 0.55 : 0.18),
-                ),
+                side: BorderSide(color: edge),
               ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
@@ -4170,14 +4195,14 @@ class _AiToggleState extends State<AiToggle>
                         child: Icon(
                           LucideIcons.sparkles,
                           size: 18,
-                          color: on ? const Color(0xFFFFE08A) : Colors.white,
+                          color: sparkle,
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
+                      Text(
                         'AI',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: ink,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.5,
                         ),
@@ -4216,14 +4241,14 @@ class AssignmentWorkspaceNavigation extends StatelessWidget {
       onDestinationSelected: onDestinationSelected,
       destinations: [
         const NavigationDestination(
-            icon: Icon(Icons.code_rounded), label: 'Code'),
+            icon: Icon(LucideIcons.code), label: 'Code'),
         const NavigationDestination(
-          icon: Icon(Icons.menu_book_rounded),
+          icon: Icon(LucideIcons.bookOpen),
           label: 'Instructions',
         ),
         if (showSimulation)
           const NavigationDestination(
-            icon: Icon(Icons.smart_toy_outlined),
+            icon: Icon(LucideIcons.bot),
             label: 'Simulation',
           ),
       ],
@@ -4248,7 +4273,7 @@ class _EmptyResultsState extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.play_circle_outline_rounded,
+                LucideIcons.circlePlay,
                 size: 40,
                 color: theme.colorScheme.primary,
               ),
@@ -4290,7 +4315,7 @@ class EmptyCodeTestRunState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.code_off_rounded,
+            Icon(LucideIcons.codeXml,
                 size: 40, color: theme.colorScheme.primary),
             const SizedBox(height: AppSpacing.sm),
             Text('The code editor is empty',
@@ -4310,7 +4335,7 @@ class EmptyCodeTestRunState extends StatelessWidget {
               style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
               key: const Key('restore-starter-from-results'),
               onPressed: onRestore,
-              icon: const Icon(Icons.restart_alt_rounded),
+              icon: const Icon(LucideIcons.rotateCcw),
               label: const Text('Restore starter code'),
             ),
           ],
@@ -4343,7 +4368,7 @@ class TestRunErrorState extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.cloud_off_rounded,
+                LucideIcons.cloudOff,
                 size: 40,
                 color: theme.colorScheme.error,
               ),
@@ -4371,7 +4396,7 @@ class TestRunErrorState extends StatelessWidget {
               FilledButton.icon(
                 key: const Key('retry-test-run-button'),
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded),
+                icon: const Icon(LucideIcons.refreshCw),
                 label: const Text('Retry test run'),
               ),
             ],
@@ -4533,7 +4558,9 @@ class Feedback extends StatelessWidget {
             data.unittestPassResults[b.key];
         return (aPassed ? 1 : 0).compareTo(bPassed ? 1 : 0);
       });
-    final resultCards = orderedChecks.map((entry) {
+    final failedCards = <Widget>[];
+    final passedCards = <Widget>[];
+    for (final entry in orderedChecks) {
       final feedback = entry.value;
       final didPass = entry.key < data.unittestPassResults.length &&
           data.unittestPassResults[entry.key];
@@ -4553,7 +4580,7 @@ class Feedback extends StatelessWidget {
 
       final detail =
           entry.key < data.evidence.length ? data.evidence[entry.key] : null;
-      return _TestResultCard(
+      (didPass ? passedCards : failedCards).add(_TestResultCard(
         checkNumber: entry.key + 1,
         passed: didPass,
         first: first,
@@ -4565,8 +4592,14 @@ class Feedback extends StatelessWidget {
         earnedWeight: detail?.earnedWeight,
         hintKey: detail?.hintKey,
         onWatch: onWatchInSimulation,
-      );
-    }).toList();
+      ));
+    }
+    List<Widget> spaced(List<Widget> cards) => [
+          for (final card in cards) ...[
+            card,
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ];
 
     return SingleChildScrollView(
       key: const Key('feedback-scroll-view'),
@@ -4610,19 +4643,93 @@ class Feedback extends StatelessWidget {
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: AppSpacing.sm),
-            if (resultCards.isEmpty)
+            if (failedCards.isEmpty && passedCards.isEmpty)
               Text(
                 'No individual test details were returned.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-              )
-            else
-              ...resultCards.expand(
-                (card) => [card, const SizedBox(height: AppSpacing.sm)],
               ),
+            if (failedCards.isNotEmpty) ...[
+              _CheckGroupHeader(
+                key: const Key('checks-failed-group'),
+                label: 'Needs attention',
+                count: failedCards.length,
+                color: Theme.of(context).colorScheme.error,
+                icon: LucideIcons.circleX,
+              ),
+              ...spaced(failedCards),
+            ],
+            if (passedCards.isNotEmpty) ...[
+              if (failedCards.isNotEmpty) const SizedBox(height: AppSpacing.xs),
+              _CheckGroupHeader(
+                key: const Key('checks-passed-group'),
+                label: 'Passed',
+                count: passedCards.length,
+                color: AppColors.success,
+                icon: LucideIcons.circleCheck,
+              ),
+              ...spaced(passedCards),
+            ],
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// A heading for one group of checks, with how many it holds.
+class _CheckGroupHeader extends StatelessWidget {
+  const _CheckGroupHeader({
+    super.key,
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      header: true,
+      label: '$label, $count',
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Row(children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadii.pill),
+            ),
+            child: Text(
+              '$count',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: Divider(color: color.withValues(alpha: 0.2))),
+        ]),
       ),
     );
   }
@@ -4651,7 +4758,7 @@ class _ResultNextStep extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.lightbulb_outline_rounded,
+          Icon(LucideIcons.lightbulb,
               size: 20, color: theme.colorScheme.primary),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -4713,7 +4820,7 @@ class LegacyFeedback extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  check ? Icons.check : Icons.cancel,
+                  check ? LucideIcons.check : LucideIcons.circleX,
                   color: check ? Colors.green : Colors.red,
                 ),
                 const SizedBox(width: 8),
@@ -4768,14 +4875,14 @@ class LegacyFeedback extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.check_circle, color: Colors.green),
+                Icon(LucideIcons.circleCheck, color: Colors.green),
                 const SizedBox(width: 4),
                 Text(
                   "Passed: $passed",
                   style: const TextStyle(color: Colors.green),
                 ),
                 const SizedBox(width: 16),
-                Icon(Icons.cancel, color: Colors.red),
+                Icon(LucideIcons.circleX, color: Colors.red),
                 const SizedBox(width: 4),
                 Text(
                   "Failed: $failed",
@@ -4878,7 +4985,7 @@ class LegacyFeedback extends StatelessWidget {
                   child: Row(
                     children: [
                       const Icon(
-                        Icons.lightbulb,
+                        LucideIcons.lightbulb,
                         color: Colors.amber,
                         size: 24,
                       ),
@@ -4969,7 +5076,6 @@ class _ResultSummary extends StatelessWidget {
     final theme = Theme.of(context);
     final allPassed = failed == 0 && passed > 0;
     final statusColor = performanceColor(score);
-    final statusBackground = statusColor.withValues(alpha: 0.12);
 
     return Semantics(
       container: true,
@@ -4979,78 +5085,79 @@ class _ResultSummary extends StatelessWidget {
         key: const Key('result-summary'),
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: statusBackground,
-          borderRadius: BorderRadius.circular(AppRadii.md),
-          border: Border.all(color: statusColor.withValues(alpha: 0.28)),
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          border: Border.all(color: statusColor.withValues(alpha: 0.35)),
+          boxShadow: appCardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(
-                  allPassed
-                      ? Icons.verified_rounded
-                      : Icons.troubleshoot_rounded,
+                ScoreRing(
+                  key: const Key('result-score-ring'),
+                  score: score,
                   color: statusColor,
+                  size: 76,
+                  label: 'score',
                 ),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
-                  child: Text(
-                    allPassed
-                        ? 'All tests passed'
-                        : 'Keep refining your solution',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: statusColor,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Icon(
+                          allPassed
+                              ? LucideIcons.badgeCheck
+                              : LucideIcons.searchCode,
+                          size: 18,
+                          color: statusColor,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            allPassed
+                                ? 'All tests passed'
+                                : 'Keep refining your solution',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: statusColor,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          if (totalPoints != null)
+                            _ResultCount(
+                              key: const Key('result-points'),
+                              icon: LucideIcons.star,
+                              label: 'Points: ${_formatPoints(earnedPoints ?? 0)} of '
+                                  '${_formatPoints(totalPoints!)}',
+                              color: theme.colorScheme.primary,
+                            ),
+                          _ResultCount(
+                            key: const Key('result-checks'),
+                            icon: LucideIcons.check,
+                            label: 'Checks passed: $passed of ${passed + failed}',
+                            color: AppColors.success,
+                          ),
+                          if (failed > 0)
+                            _ResultCount(
+                              icon: LucideIcons.x,
+                              label: 'Failed: $failed',
+                              color: theme.colorScheme.error,
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  '$score%',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    color: statusColor,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            LinearProgressIndicator(
-              value: score / 100,
-              color: statusColor,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(AppRadii.pill),
-              backgroundColor: theme.colorScheme.surface.withValues(
-                alpha: 0.72,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                if (totalPoints != null)
-                  _ResultCount(
-                    key: const Key('result-points'),
-                    icon: Icons.stars_rounded,
-                    label: 'Points: ${_formatPoints(earnedPoints ?? 0)} of '
-                        '${_formatPoints(totalPoints!)}',
-                    color: theme.colorScheme.primary,
-                  ),
-                _ResultCount(
-                  key: const Key('result-checks'),
-                  icon: Icons.check_rounded,
-                  label: 'Checks passed: $passed of ${passed + failed}',
-                  color: AppColors.success,
-                ),
-                if (failed > 0)
-                  _ResultCount(
-                    icon: Icons.close_rounded,
-                    label: 'Failed: $failed',
-                    color: theme.colorScheme.error,
-                  ),
               ],
             ),
             if (_explanation case final note?) ...[
@@ -5058,7 +5165,8 @@ class _ResultSummary extends StatelessWidget {
               Text(
                 note,
                 key: const Key('result-score-explanation'),
-                style: theme.textTheme.bodySmall,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: AppColors.inkMuted),
               ),
             ],
           ],
@@ -5088,8 +5196,9 @@ class _ResultCount extends StatelessWidget {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(AppRadii.sm),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -5129,7 +5238,7 @@ class _TerminalOutput extends StatelessWidget {
         key: const Key('terminal-output'),
         title: 'Terminal output',
         semanticsLabel: 'Terminal output',
-        icon: Icons.terminal_rounded,
+        icon: LucideIcons.squareTerminal,
         iconColor: const Color(0xFF90D8B5),
         text: data.codeOutput,
       );
@@ -5143,7 +5252,7 @@ class _TerminalOutput extends StatelessWidget {
           key: const Key('terminal-output'),
           title: 'Execution error',
           semanticsLabel: 'Code execution error',
-          icon: Icons.error_outline_rounded,
+          icon: LucideIcons.circleAlert,
           iconColor: const Color(0xFFFFB4AB),
           text: data.codeExecResult,
         ),
@@ -5153,7 +5262,7 @@ class _TerminalOutput extends StatelessWidget {
             key: const Key('terminal-printed-output'),
             title: 'Your printed output',
             semanticsLabel: 'Printed output before the error',
-            icon: Icons.terminal_rounded,
+            icon: LucideIcons.squareTerminal,
             iconColor: const Color(0xFF90D8B5),
             text: data.codeOutput,
           ),
@@ -5267,8 +5376,8 @@ class _HintCallout extends StatelessWidget {
         children: [
           Icon(
             fromAi
-                ? Icons.auto_awesome_rounded
-                : Icons.lightbulb_outline_rounded,
+                ? LucideIcons.sparkles
+                : LucideIcons.lightbulb,
             color: fromAi ? AppColors.ai : Colors.amber.shade900,
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -5329,7 +5438,7 @@ class AiGeneratedBadge extends StatelessWidget {
         key: Key('ai-generated-badge'),
         label: 'AI-generated',
         color: AppColors.ai,
-        icon: Icons.auto_awesome_rounded,
+        icon: LucideIcons.sparkles,
         solid: true,
         size: PillSize.small,
       );
@@ -5512,7 +5621,7 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
                         dimension: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.arrow_forward_rounded, size: 18),
+                    : const Icon(LucideIcons.arrowRight, size: 18),
                 label: Text(
                   _hintLevel >= 4
                       ? 'Maximum guidance reached'
@@ -5575,7 +5684,7 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
                       dimension: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.question_answer_outlined, size: 18),
+                  : const Icon(LucideIcons.messagesSquare, size: 18),
               label: Text(_asking ? 'Asking tutor…' : 'Ask tutor'),
             ),
           ),
@@ -5640,8 +5749,8 @@ class _TutorAnswerCard extends StatelessWidget {
                 children: [
                   Icon(
                     source == 'openai'
-                        ? Icons.auto_awesome_rounded
-                        : Icons.support_agent_rounded,
+                        ? LucideIcons.sparkles
+                        : LucideIcons.headset,
                     size: 18,
                     color: source == 'openai' ? AppColors.ai : AppColors.brand,
                   ),
@@ -5788,124 +5897,141 @@ class _TestResultCard extends StatelessWidget {
     final statusColor = passed ? AppColors.success : theme.colorScheme.error;
     final earned = earnedWeight ?? (passed ? weight : 0);
 
+    final hasLabel = label != null && label!.isNotEmpty;
     return Semantics(
       container: true,
       label: passed ? 'Test passed' : 'Test needs attention',
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadii.sm),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          border: Border.all(color: AppColors.border),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                passed ? Icons.check_rounded : Icons.close_rounded,
-                size: 18,
-                color: statusColor,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    passed ? 'Passed' : 'Needs attention',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: statusColor,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  if (label != null && label!.isNotEmpty)
-                    Text(
-                      label!,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  Text(
-                    weight == null
-                        ? 'Check $checkNumber'
-                        : weight == 0
-                            ? 'Check $checkNumber · required, no points'
-                            : 'Check $checkNumber · '
-                                '${_formatPoints(earned ?? 0)} of '
-                                '${_formatPoints(weight!)} points',
-                    key: Key('test-result-points-$checkNumber'),
-                    style: theme.textTheme.labelSmall,
-                  ),
-                  if (!passed && failureReasonExplanation(reason) != null) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      key: Key('test-result-reason-$checkNumber'),
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.tips_and_updates_outlined,
-                          size: 16,
-                          color: theme.colorScheme.primary,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(width: 4, color: statusColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.sm, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 26,
+                        height: 26,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Text(
-                            failureReasonExplanation(reason)!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
+                        child: Icon(
+                          passed ? LucideIcons.check : LucideIcons.x,
+                          size: 15,
+                          color: statusColor,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (hasLabel)
+                              Text(
+                                label!,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            Text(
+                              weight == null
+                                  ? 'Check $checkNumber'
+                                  : weight == 0
+                                      ? 'Check $checkNumber · required, no points'
+                                      : 'Check $checkNumber · '
+                                          '${_formatPoints(earned ?? 0)} of '
+                                          '${_formatPoints(weight!)} points',
+                              key: Key('test-result-points-$checkNumber'),
+                              style: theme.textTheme.labelSmall
+                                  ?.copyWith(color: AppColors.inkMuted),
                             ),
-                          ),
+                            if (!passed &&
+                                failureReasonExplanation(reason) != null) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              Row(
+                                key: Key('test-result-reason-$checkNumber'),
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    LucideIcons.lightbulb,
+                                    size: 15,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Expanded(
+                                    child: Text(
+                                      failureReasonExplanation(reason)!,
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            if (first.isNotEmpty ||
+                                highlighted.isNotEmpty ||
+                                last.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              RichText(
+                                softWrap: true,
+                                text: TextSpan(
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: passed
+                                        ? AppColors.inkMuted
+                                        : theme.colorScheme.onSurface,
+                                    height: 1.45,
+                                  ),
+                                  children: [
+                                    TextSpan(text: first),
+                                    TextSpan(
+                                      text: highlighted,
+                                      style: TextStyle(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    TextSpan(text: last),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            if (!passed &&
+                                onWatch != null &&
+                                SimFocus.forHint(hintKey, 0) != null)
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  key: Key('test-result-watch-$checkNumber'),
+                                  onPressed: () => onWatch!(hintKey!),
+                                  icon: const Icon(LucideIcons.bot, size: 18),
+                                  label:
+                                      const Text('Watch it in the simulation'),
+                                ),
+                              ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.xs),
-                  RichText(
-                    softWrap: true,
-                    text: TextSpan(
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                        fontFamily: 'roboto-mono',
-                        height: 1.4,
                       ),
-                      children: [
-                        TextSpan(text: first),
-                        TextSpan(
-                          text: highlighted,
-                          style: TextStyle(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        TextSpan(text: last),
-                      ],
-                    ),
+                    ],
                   ),
-                  if (!passed &&
-                      onWatch != null &&
-                      SimFocus.forHint(hintKey, 0) != null)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        key: Key('test-result-watch-$checkNumber'),
-                        onPressed: () => onWatch!(hintKey!),
-                        icon: const Icon(Icons.smart_toy_outlined, size: 18),
-                        label: const Text('Watch it in the simulation'),
-                      ),
-                    ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

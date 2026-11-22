@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Interactive "Try it" tools that a lesson places with
 /// `<div class="lesson-interactive" data-interactive="name">`. Each one only
@@ -74,7 +75,7 @@ class _ToolCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Icon(Icons.touch_app_rounded, color: AppColors.brand),
+          Icon(LucideIcons.pointer, color: AppColors.brand),
           const SizedBox(width: 8),
           Expanded(child: Text(title, style: theme.textTheme.titleMedium)),
         ]),

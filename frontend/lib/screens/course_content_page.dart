@@ -314,7 +314,7 @@ IconData topicIcon(String topicId) => switch (topicId) {
       'hybrid-navigation-gps' ||
       'hybrid-navigation-and-gps' =>
         LucideIcons.satellite,
-      _ => Icons.menu_book_rounded,
+      _ => LucideIcons.bookOpen,
     };
 
 class _QuizProgress extends StatelessWidget {
@@ -359,13 +359,13 @@ class _QuizProgress extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            badge('Attempted: $count', neutral, icon: Icons.science_outlined),
+            badge('Attempted: $count', neutral, icon: LucideIcons.flaskConical),
             if (first != null)
               badge('Quiz score: $first% (first try)', performanceColor(first),
-                  icon: Icons.verified_outlined),
+                  icon: LucideIcons.badgeCheck),
             if (pretest != null)
               badge('Pre-test: $pretest%', neutral,
-                  icon: Icons.assignment_turned_in_outlined),
+                  icon: LucideIcons.clipboardCheck),
             badge(
               'Best score: ${best == null ? '—' : '$best%'}',
               best == null ? neutral : performanceColor(best),
@@ -810,7 +810,7 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
                 duration: const Duration(milliseconds: 350),
                 curve: Curves.easeOutCubic,
               ),
-              child: const Icon(Icons.arrow_upward_rounded),
+              child: const Icon(LucideIcons.arrowUp),
             ),
           ),
       ],
@@ -854,7 +854,7 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
               Row(
                 children: [
                   const Icon(
-                    Icons.info_outline_rounded,
+                    LucideIcons.info,
                     size: 16,
                     color: AppColors.inkMuted,
                   ),
@@ -1055,14 +1055,14 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
             style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
             key: const Key('next-section'),
               onPressed: () => widget.onOpen(section),
-              icon: const Icon(Icons.arrow_forward_rounded),
+              icon: const Icon(LucideIcons.arrowRight),
               iconAlignment: IconAlignment.end,
               label: text,
             )
           : OutlinedButton.icon(
               key: const Key('previous-section'),
               onPressed: () => widget.onOpen(section),
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: const Icon(LucideIcons.arrowLeft),
               label: text,
             );
     }
@@ -1221,7 +1221,7 @@ class _QuizMark extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            correct ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            correct ? LucideIcons.circleCheck : LucideIcons.circleX,
             size: 18,
             color: color,
           ),
@@ -1252,7 +1252,7 @@ class _LoadError extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.menu_book_rounded,
+                LucideIcons.bookOpen,
                 size: 40,
                 color: AppColors.brandDark,
               ),
@@ -1274,7 +1274,7 @@ class _LoadError extends StatelessWidget {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(LucideIcons.refreshCw),
                 label: const Text('Retry'),
               ),
             ],
@@ -1324,8 +1324,8 @@ class _WorkedAnswerState extends State<_WorkedAnswer> {
           key: const Key('show-worked-answer'),
           onPressed: _toggle,
           icon: Icon(_open
-              ? Icons.visibility_off_rounded
-              : Icons.lightbulb_outline_rounded),
+              ? LucideIcons.eyeOff
+              : LucideIcons.lightbulb),
           label: Text(_open ? 'Hide answer' : 'Show answer'),
         ),
       ),

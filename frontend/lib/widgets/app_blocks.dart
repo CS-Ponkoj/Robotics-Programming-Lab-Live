@@ -744,3 +744,107 @@ class AnswerOption extends StatelessWidget {
     );
   }
 }
+
+/// A score as a ring that fills to the percentage, with the number inside.
+/// The fill animates in once unless the platform asks for reduced motion.
+class ScoreRing extends StatelessWidget {
+  const ScoreRing({
+    super.key,
+    required this.score,
+    required this.color,
+    this.size = 72,
+    this.stroke = 7,
+    this.label,
+  });
+
+  /// 0 to 100.
+  final int score;
+  final Color color;
+  final double size;
+  final double stroke;
+
+  /// Optional small caption under the number, such as "score".
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final target = score.clamp(0, 100) / 100;
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    return SizedBox.square(
+      dimension: size,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: reduceMotion ? target : 0, end: target),
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, child) => CustomPaint(
+          painter: _RingPainter(
+            value: value,
+            color: color,
+            track: color.withValues(alpha: 0.14),
+            stroke: stroke,
+          ),
+          child: child,
+        ),
+        child: Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(
+              '$score%',
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w900,
+                height: 1,
+                fontSize: size * 0.26,
+              ),
+            ),
+            if (label != null)
+              Text(
+                label!,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppColors.inkMuted,
+                  fontSize: size * 0.13,
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  _RingPainter({
+    required this.value,
+    required this.color,
+    required this.track,
+    required this.stroke,
+  });
+
+  final double value;
+  final Color color;
+  final Color track;
+  final double stroke;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset(stroke / 2, stroke / 2) &
+        Size(size.width - stroke, size.height - stroke);
+    final base = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = track;
+    canvas.drawArc(rect, 0, 6.283185307179586, false, base);
+    if (value <= 0) return;
+    final arc = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = color;
+    canvas.drawArc(rect, -1.5707963267948966, 6.283185307179586 * value, false,
+        arc);
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.value != value || old.color != color || old.track != track;
+}

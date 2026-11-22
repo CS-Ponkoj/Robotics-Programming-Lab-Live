@@ -4,6 +4,7 @@ import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 typedef AiSettingsLoader = Future<Map<String, dynamic>> Function(String token);
 typedef AiSettingsSaver = Future<Map<String, dynamic>> Function(
@@ -230,7 +231,7 @@ class _Gate extends StatelessWidget {
     return Card(
       child: ListTile(
         leading: Icon(
-          ok ? Icons.check_circle_rounded : Icons.pending_outlined,
+          ok ? LucideIcons.circleCheck : LucideIcons.clock,
           color: ok ? Colors.green.shade700 : scheme.outline,
           semanticLabel: ok ? 'Ready' : 'Not ready',
         ),

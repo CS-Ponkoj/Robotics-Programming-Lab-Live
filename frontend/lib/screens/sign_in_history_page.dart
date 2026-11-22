@@ -6,6 +6,7 @@ import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:iuse_demo/api_config.dart';
 import 'package:iuse_demo/services/auth_api.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Instructor-only table of one account's sign-ins, opened from
 /// Manage accounts by clicking the account.
@@ -97,7 +98,7 @@ class _SignInHistoryPageState extends State<SignInHistoryPage> {
           IconButton(
             tooltip: 'Refresh',
             onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(LucideIcons.refreshCw),
           ),
         ],
       )),
@@ -166,13 +167,13 @@ class _SignInHistoryPageState extends State<SignInHistoryPage> {
                   IconButton(
                     tooltip: 'Newer',
                     onPressed: _page > 1 ? () => _goTo(_page - 1) : null,
-                    icon: const Icon(Icons.chevron_left_rounded),
+                    icon: const Icon(LucideIcons.chevronLeft),
                   ),
                   Text('Page $_page of $pages'),
                   IconButton(
                     tooltip: 'Older',
                     onPressed: _page < pages ? () => _goTo(_page + 1) : null,
-                    icon: const Icon(Icons.chevron_right_rounded),
+                    icon: const Icon(LucideIcons.chevronRight),
                   ),
                 ],
               ),

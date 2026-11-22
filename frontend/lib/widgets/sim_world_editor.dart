@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/widgets/robot_sim_view.dart' show SimPalette;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// The server's limits for a `ros2_2d` world (backend data_contracts.py).
 const double _coordinateLimit = 20;
@@ -207,7 +208,7 @@ class _SimWorldEditorState extends State<SimWorldEditor> {
                 IconButton(
                   tooltip: 'Remove wall ${index + 1}',
                   onPressed: () => setState(() => _walls.removeAt(index)),
-                  icon: const Icon(Icons.delete_outline_rounded),
+                  icon: const Icon(LucideIcons.trash2),
                 ),
               ],
             ),
@@ -221,7 +222,7 @@ class _SimWorldEditorState extends State<SimWorldEditor> {
                 : () => setState(() => _walls.add([
                       for (final v in [1.0, -1.0, 1.0, 1.0]) _number(v)
                     ])),
-            icon: const Icon(Icons.add_rounded),
+            icon: const Icon(LucideIcons.plus),
             label: const Text('Add wall'),
           ),
         ),

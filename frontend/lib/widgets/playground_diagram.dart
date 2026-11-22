@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:iuse_demo/models/playground_diagram.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Okabe-Ito colours: distinguishable with common colour-vision deficiencies.
 const diagramPalette = <Color>[
@@ -71,7 +72,7 @@ class PlaygroundDiagram extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                Icons.info_outline_rounded,
+                LucideIcons.info,
                 size: 18,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -132,7 +133,7 @@ class PlaygroundDiagram extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    Icons.info_outline_rounded,
+                    LucideIcons.info,
                     size: 18,
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -153,7 +154,7 @@ class PlaygroundDiagram extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    Icons.tips_and_updates_outlined,
+                    LucideIcons.lightbulb,
                     size: 18,
                     color: AppColors.performanceMid,
                   ),

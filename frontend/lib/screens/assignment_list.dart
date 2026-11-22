@@ -189,13 +189,14 @@ class AssignmentLoadingState extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
+              Flexible(
+                  child: Text(
                 'Loading assignments…',
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: theme.colorScheme.onSurface,
                   fontWeight: FontWeight.w700,
                 ),
-              ),
+              )),
             ],
           ),
         ),
@@ -278,7 +279,7 @@ class AssignmentLoadError extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
-                  Icons.cloud_off_rounded,
+                  LucideIcons.cloudOff,
                   color: theme.colorScheme.onErrorContainer,
                 ),
               ),
@@ -303,7 +304,7 @@ class AssignmentLoadError extends StatelessWidget {
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded),
+                icon: const Icon(LucideIcons.refreshCw),
                 label: const Text('Try again'),
               ),
             ],
@@ -488,7 +489,7 @@ class OldAssignmentsNote extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.inventory_2_outlined, color: theme.colorScheme.primary),
+            Icon(LucideIcons.archive, color: theme.colorScheme.primary),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -684,7 +685,7 @@ class ProgressSummary extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.flag_rounded,
+                    Icon(LucideIcons.flag,
                         size: 18, color: AppColors.brandDark),
                     const SizedBox(width: 6),
                     Text(
@@ -709,7 +710,7 @@ class ProgressSummary extends StatelessWidget {
                 FilledButton.icon(
                   key: const Key('up-next-button'),
                   onPressed: onOpenNext,
-                  icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                  icon: const Icon(LucideIcons.play, size: 20),
                   label: Text(learningProgress.hasAttempted(next.id)
                       ? 'Continue learning'
                       : 'Begin'),
@@ -984,7 +985,25 @@ class AssignmentCard extends StatelessWidget {
                 ),
                 if (!compact) ...[
                   const SizedBox(width: 12),
-                  trackTag,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      trackTag,
+                      // The best score at a glance once there is one.
+                      if (hasAccuracy) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        ScoreRing(
+                          key: const Key('assignment-score-ring'),
+                          score: learningProgress.bestScores[a.id] ?? score!,
+                          color: performanceColor(
+                              learningProgress.bestScores[a.id] ?? score!),
+                          size: 54,
+                          stroke: 5,
+                          label: 'best',
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ],
             ),
@@ -1004,13 +1023,13 @@ class AssignmentCard extends StatelessWidget {
                       color: statusColor,
                       icon: switch (progressState) {
                         AssignmentProgressState.completed =>
-                          Icons.check_circle_rounded,
+                          LucideIcons.circleCheck,
                         AssignmentProgressState.attempted =>
-                          Icons.science_outlined,
+                          LucideIcons.flaskConical,
                         AssignmentProgressState.inProgress =>
-                          Icons.edit_outlined,
+                          LucideIcons.pencil,
                         AssignmentProgressState.notStarted =>
-                          Icons.schedule_rounded,
+                          LucideIcons.clock,
                       },
                     ),
                     if (hasAccuracy)
@@ -1036,14 +1055,14 @@ class AssignmentCard extends StatelessWidget {
                       StatusPill(
                         key: const Key('solution-viewed-badge'),
                         label: 'Solution viewed',
-                        icon: Icons.visibility_rounded,
+                        icon: LucideIcons.eye,
                         color: theme.colorScheme.primary,
                       ),
                   ],
                 );
                 final button = FilledButton.icon(
                   onPressed: () => _openAssignment(context),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                  icon: const Icon(LucideIcons.arrowRight, size: 18),
                   label: Text(progressState == AssignmentProgressState.completed
                       ? 'Review assignment'
                       : progressState == AssignmentProgressState.notStarted

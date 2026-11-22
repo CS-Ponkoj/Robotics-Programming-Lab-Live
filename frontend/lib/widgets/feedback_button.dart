@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/services/feedback_api.dart';
 import 'package:iuse_demo/state/feedback_page_tracker.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// "Feedback" button shown on every signed-in page.
 class FeedbackButton extends StatelessWidget {
@@ -35,7 +36,7 @@ class FeedbackButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.feedback_rounded, size: 20, color: colors.onPrimary),
+                Icon(LucideIcons.messageSquareText, size: 20, color: colors.onPrimary),
                 const SizedBox(width: 8),
                 Text(
                   'Feedback',
@@ -218,7 +219,7 @@ class _FeedbackDialogState extends State<FeedbackDialog> {
             leading: IconButton(
               tooltip: 'Cancel',
               onPressed: _sending ? null : () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close_rounded),
+              icon: const Icon(LucideIcons.x),
             ),
             title: const Text('Send feedback'),
             actions: [
