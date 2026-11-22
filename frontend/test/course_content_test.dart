@@ -711,4 +711,120 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('show-worked-answer')), findsNothing);
   });
+  group('side outline on wide screens', () {
+    Future<void> openWide(WidgetTester tester, {String? lessonHtml}) async {
+      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final html = lessonHtml ??
+          [
+            for (final title in ['Sensors', 'Ranges', 'Stopping'])
+              '<h2>$title</h2>'
+                  '${[for (var i = 0; i < 25; i++) '<p>$title line $i.</p>'].join()}',
+          ].join();
+      CourseContentApi.testClient = MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/contents/obstacle-avoidance') {
+          return http.Response(
+              jsonEncode({
+                'id': 'obstacle-avoidance',
+                'title': 'Obstacle Avoidance',
+                'summary': 'Learn',
+                'sections': [
+                  {'id': 'quiz', 'title': 'Quiz', 'kind': 'quiz'},
+                  {'id': 'math', 'title': 'Math', 'kind': 'math'},
+                  {'id': 'lesson', 'title': 'Lesson', 'kind': 'lesson'},
+                ],
+              }),
+              200);
+        }
+        if (path.endsWith('/sections/lesson')) {
+          return http.Response(
+              jsonEncode({
+                'id': 'lesson',
+                'title': 'Lesson',
+                'kind': 'lesson',
+                'html': html,
+                'questions': [],
+              }),
+              200);
+        }
+        return client.get(request.url, headers: request.headers);
+      });
+      await tester.pumpWidget(MaterialApp(
+          theme: buildAppTheme(),
+          home: CourseTopicPage(
+              topicId: 'obstacle-avoidance',
+              user: _student,
+              onLogout: _logout)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('lists the lesson headings, follows the scroll and jumps',
+        (tester) async {
+      await openWide(tester);
+      expect(find.byKey(const Key('page-outline-panel')), findsOneWidget);
+      // The side outline replaces the inline "On this page" list.
+      expect(find.byKey(const Key('lesson-outline')), findsNothing);
+      final panel = find.byKey(const Key('page-outline-panel'));
+      for (final title in ['Sensors', 'Ranges', 'Stopping']) {
+        expect(find.descendant(of: panel, matching: find.text(title)),
+            findsOneWidget);
+      }
+      // The item being read is drawn bold.
+      bool active(String title) =>
+          tester
+              .widget<Text>(
+                  find.descendant(of: panel, matching: find.text(title)))
+              .style
+              ?.fontWeight ==
+          FontWeight.w700;
+      expect(active('Sensors'), isTrue);
+
+      await tester.tap(find.descendant(of: panel, matching: find.text('Stopping')));
+      await tester.pumpAndSettle();
+      expect(active('Stopping'), isTrue);
+      expect(active('Sensors'), isFalse);
+      // The heading was scrolled into the reading area.
+      final reading = find.byType(Scrollable).last;
+      expect(tester.state<ScrollableState>(reading).position.pixels,
+          greaterThan(0));
+    });
+
+    testWidgets('collapses to a button and opens again', (tester) async {
+      await openWide(tester);
+      await tester.tap(find.byKey(const Key('outline-collapse')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('page-outline-panel')), findsNothing);
+      await tester.tap(find.byKey(const Key('outline-open')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('page-outline-panel')), findsOneWidget);
+    });
+
+    testWidgets('a page without headings shows no outline', (tester) async {
+      await openWide(tester, lessonHtml: '<p>Just one paragraph.</p>');
+      expect(find.byKey(const Key('page-outline-panel')), findsNothing);
+      expect(find.byKey(const Key('outline-open')), findsNothing);
+    });
+
+    testWidgets('Quiz is the last tab and lists its questions', (tester) async {
+      await openWide(tester);
+      final tabs = ['lesson', 'math', 'quiz']
+          .map((kind) =>
+              tester.getTopLeft(find.byKey(Key('content-tab-$kind'))).dx)
+          .toList();
+      expect(tabs[0], lessThan(tabs[1]));
+      expect(tabs[1], lessThan(tabs[2]));
+      await tester.tap(find.byKey(const Key('content-tab-quiz')));
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const Key('page-outline-panel'));
+      expect(find.descendant(of: panel, matching: find.text('Questions')),
+          findsOneWidget);
+      expect(
+          find.descendant(
+              of: panel, matching: find.text('1. Which direction?')),
+          findsOneWidget);
+    });
+  });
 }

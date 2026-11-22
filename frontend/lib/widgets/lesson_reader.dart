@@ -6,15 +6,25 @@ import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/lesson_animation.dart';
 import 'package:iuse_demo/widgets/lesson_code_block.dart';
 import 'package:iuse_demo/widgets/lesson_interactives.dart';
+import 'package:iuse_demo/widgets/page_outline.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Adds navigation to authored headings, without rewriting lesson content.
 class LessonReader extends StatefulWidget {
-  const LessonReader({super.key, required this.html, this.outline = true});
+  const LessonReader({
+    super.key,
+    required this.html,
+    this.outline = true,
+    this.pageOutline,
+  });
   final String html;
 
   /// Show the "On this page" list when the page has several headings.
   final bool outline;
+
+  /// When given, the headings go to this side outline instead of the
+  /// "On this page" list, and each heading can be scrolled to and tracked.
+  final PageOutline? pageOutline;
 
   @override
   State<LessonReader> createState() => _LessonReaderState();
@@ -136,6 +146,7 @@ class _LessonReaderState extends State<LessonReader> {
   final _htmlKey = GlobalKey<HtmlWidgetState>();
   late String _html;
   late List<({String id, String title, int level})> _headings;
+  final Map<String, GlobalKey> _headingKeys = {};
 
   @override
   void initState() {
@@ -146,7 +157,10 @@ class _LessonReaderState extends State<LessonReader> {
   @override
   void didUpdateWidget(covariant LessonReader oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.html != widget.html) _prepare();
+    if (oldWidget.html != widget.html ||
+        oldWidget.pageOutline != widget.pageOutline) {
+      _prepare();
+    }
   }
 
   void _prepare() {
@@ -176,6 +190,59 @@ class _LessonReaderState extends State<LessonReader> {
     final main = all.where((heading) => heading.level == 2).toList();
     _headings = main.length >= 2 ? main : all;
     _html = document.outerHtml;
+    final outline = widget.pageOutline;
+    if (outline != null) {
+      final entries = [
+        for (final heading in all)
+          PageOutlineEntry(
+            id: heading.id,
+            title: heading.title,
+            level: heading.level,
+            key: _headingKeys.putIfAbsent(heading.id, GlobalKey.new),
+          ),
+      ];
+      // Not during build: the outline's listeners rebuild other widgets.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) outline.setEntries(entries);
+      });
+    }
+  }
+
+  /// With a side outline, headings are drawn here so each has a key to
+  /// scroll to; the look matches [lessonStyles].
+  Widget? _heading(dom.Element element) {
+    final key = _headingKeys[element.id];
+    if (widget.pageOutline == null || key == null) return null;
+    final level = element.localName == 'h3' ? 3 : 2;
+    final text = Text(
+      element.text.trim(),
+      style: TextStyle(
+        fontSize: 17 * (level == 2 ? 1.45 : 1.2),
+        fontWeight: FontWeight.w700,
+        height: level == 2 ? 1.3 : 1.35,
+        color: AppColors.ink,
+      ),
+    );
+    return Padding(
+      key: key,
+      padding: EdgeInsets.only(
+        top: level == 2 ? 27 : 23,
+        bottom: level == 2 ? 9 : 8,
+      ),
+      child: Semantics(
+        header: true,
+        child: level == 2
+            ? Container(
+                width: double.infinity,
+                padding: const EdgeInsets.only(bottom: 5),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: AppColors.border)),
+                ),
+                child: text,
+              )
+            : text,
+      ),
+    );
   }
 
   @override
@@ -184,7 +251,9 @@ class _LessonReaderState extends State<LessonReader> {
     final indent = _headings.any((heading) => heading.level == 2) &&
         _headings.any((heading) => heading.level == 3);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      if (widget.outline && _headings.length > 1) ...[
+      if (widget.outline &&
+          widget.pageOutline == null &&
+          _headings.length > 1) ...[
         Material(
             color: AppColors.learningSurface,
             borderRadius: BorderRadius.circular(12),
@@ -219,7 +288,9 @@ class _LessonReaderState extends State<LessonReader> {
         textStyle: theme.textTheme.bodyLarge
             ?.copyWith(fontSize: 17, height: 1.7, color: AppColors.ink),
         customStylesBuilder: lessonStyles,
-        customWidgetBuilder: lessonWidgets,
+        customWidgetBuilder: widget.pageOutline == null
+            ? lessonWidgets
+            : (element) => _heading(element) ?? lessonWidgets(element),
       ),
     ]);
   }

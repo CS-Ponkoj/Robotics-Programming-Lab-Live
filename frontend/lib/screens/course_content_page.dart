@@ -10,6 +10,7 @@ import 'package:iuse_demo/widgets/app_blocks.dart';
 import 'package:iuse_demo/models/authenticated_user.dart';
 import 'package:iuse_demo/widgets/landing_page_header.dart';
 import 'package:iuse_demo/widgets/lesson_reader.dart';
+import 'package:iuse_demo/widgets/page_outline.dart';
 import 'package:iuse_demo/widgets/scrollable_center.dart';
 
 /// Names the unanswered quiz questions by their 1-based display numbers,
@@ -468,7 +469,7 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
           final sectionId = visible.any((s) => s['id'] == _sectionId)
               ? _sectionId!
               : visible.first['id'] as String;
-          // Reading order for Previous / Next: lesson, exercises, quiz, math.
+          // Reading order for Previous / Next: lesson, exercises, math, quiz.
           final ordered = [
             for (final kind in kinds)
               ...sections.where((s) => s['kind'] == kind),
@@ -581,7 +582,7 @@ class _CourseTopicPageState extends State<CourseTopicPage> {
   }
 }
 
-const _kindOrder = ['pretest', 'lesson', 'exercise', 'quiz', 'math'];
+const _kindOrder = ['pretest', 'lesson', 'exercise', 'math', 'quiz'];
 
 IconData _kindIcon(String kind) => switch (kind) {
       'pretest' => LucideIcons.clipboardList,
@@ -672,6 +673,29 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
   String? _quizError;
   Future<List<Map<String, dynamic>>>? _attempts;
 
+  /// The side outline of this page's headings (or quiz questions).
+  final _outline = PageOutline();
+  final _scrollKey = GlobalKey();
+
+  /// Whether the side outline is open; kept while moving between pages.
+  static bool _outlineOpen = true;
+
+  /// The side outline needs room beside the reading column.
+  static const _outlineMinWidth = 1100.0;
+  static const _outlineWidth = 280.0;
+
+  void _syncOutline() {
+    if (!_scroll.hasClients) return;
+    final box = _scrollKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached) return;
+    final position = _scroll.position;
+    _outline.syncWithScroll(
+      box.localToGlobal(Offset.zero).dy,
+      atEnd: position.maxScrollExtent > 0 &&
+          position.pixels >= position.maxScrollExtent - 4,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -681,12 +705,14 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
     _scroll.addListener(() {
       final show = _scroll.hasClients && _scroll.offset > 900;
       if (show != _showTop) setState(() => _showTop = show);
+      _syncOutline();
     });
   }
 
   @override
   void dispose() {
     _scroll.dispose();
+    _outline.dispose();
     super.dispose();
   }
 
@@ -751,7 +777,46 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
 
   @override
   Widget build(BuildContext context) {
-    final narrow = MediaQuery.sizeOf(context).width < 600;
+    final width = MediaQuery.sizeOf(context).width;
+    final reading = _reading(context, width < 600);
+    if (width < _outlineMinWidth) return reading;
+    return ListenableBuilder(
+      listenable: _outline,
+      child: reading,
+      builder: (context, reading) {
+        final hasOutline = _outline.entries.isNotEmpty;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (hasOutline && _outlineOpen)
+              SizedBox(
+                width: _outlineWidth,
+                child: PageOutlinePanel(
+                  outline: _outline,
+                  title: widget.sectionId == 'quiz' ? 'Questions' : 'Outline',
+                  onCollapse: () => setState(() => _outlineOpen = false),
+                ),
+              ),
+            Expanded(
+              child: Stack(children: [
+                reading!,
+                if (hasOutline && !_outlineOpen)
+                  Positioned(
+                    left: 16,
+                    top: 16,
+                    child: PageOutlineOpenButton(
+                      onPressed: () => setState(() => _outlineOpen = true),
+                    ),
+                  ),
+              ]),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _reading(BuildContext context, bool narrow) {
     return Stack(
       children: [
         FutureBuilder<Map<String, dynamic>>(
@@ -775,6 +840,7 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
             // estimated the page height, so the scrollbar showed the middle
             // and then jumped to the bottom once the pager was laid out.
             return SingleChildScrollView(
+              key: _scrollKey,
               controller: _scroll,
               padding: EdgeInsets.fromLTRB(
                 narrow ? 16 : 24,
@@ -821,7 +887,7 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
   /// limits lines to a comfortable reading length.
   Widget _readingWidth(Widget child) => Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 820),
+          constraints: const BoxConstraints(maxWidth: 1000),
           child: child,
         ),
       );
@@ -872,7 +938,13 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
               const Divider(height: 24),
             ],
             if (html.isNotEmpty)
-              LessonReader(html: html, key: const Key('course-section-html')),
+              LessonReader(
+                html: html,
+                key: const Key('course-section-html'),
+                pageOutline: MediaQuery.sizeOf(context).width >= _outlineMinWidth
+                    ? _outline
+                    : null,
+              ),
             if (practice && section['has_answer'] == true)
               _WorkedAnswer(
                 key: ValueKey('worked-answer-${widget.sectionId}'),
@@ -900,6 +972,20 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
     final theme = Theme.of(context);
     final answered =
         questions.where((q) => _choices.containsKey(q['id'])).length;
+    if (MediaQuery.sizeOf(context).width >= _outlineMinWidth) {
+      final entries = [
+        for (final (index, question) in questions.indexed)
+          PageOutlineEntry(
+            id: '${question['id']}',
+            title: '${index + 1}. ${question['prompt']}',
+            key: _questionKeys.putIfAbsent('${question['id']}', GlobalKey.new),
+            done: _choices.containsKey(question['id']),
+          ),
+      ];
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _outline.setEntries(entries);
+      });
+    }
     return [
       Container(
         key: const Key('quiz-score-rule'),
