@@ -342,7 +342,7 @@ void main() {
 
     testWidgets('before any run it explains what will appear', (tester) async {
       await tester.pumpWidget(host());
-      expect(find.text('TERMINAL'), findsOneWidget);
+      expect(find.text('Terminal'), findsOneWidget);
       expect(
         find.textContaining('Run tests to see what your program prints'),
         findsOneWidget,
@@ -398,7 +398,7 @@ void main() {
 
     testWidgets('a collapsed terminal shows only its header', (tester) async {
       await tester.pumpWidget(host(expanded: false, lines: errorLines));
-      expect(find.text('TERMINAL'), findsOneWidget);
+      expect(find.text('Terminal'), findsOneWidget);
       expect(find.text('starting'), findsNothing);
       expect(find.byKey(const Key('run-terminal-resize')), findsNothing);
     });

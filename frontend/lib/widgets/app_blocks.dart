@@ -139,7 +139,12 @@ class PanelTitleRow extends StatelessWidget {
     this.subtitle,
     this.actions = const [],
     this.minHeight = 36,
+    this.fillTitle = false,
   });
+
+  /// Keep the title at its full width and leave the space to [actions]
+  /// (one of which should be Expanded).
+  final bool fillTitle;
 
   final String title;
   final IconData? icon;
@@ -160,6 +165,8 @@ class PanelTitleRow extends StatelessWidget {
             const SizedBox(width: 10),
           ],
           Flexible(
+            fit: FlexFit.loose,
+            flex: fillTitle ? 0 : 1,
             child: Semantics(
               header: true,
               child: Text(
@@ -185,7 +192,7 @@ class PanelTitleRow extends StatelessWidget {
                 ),
               ),
             ),
-          ] else
+          ] else if (!fillTitle)
             const Spacer(),
           ...actions,
         ],

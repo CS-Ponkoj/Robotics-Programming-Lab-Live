@@ -118,6 +118,8 @@ class _MyHomePageState extends State<MyHomePage> {
   // The square Simulation panel: docked above the instructions or floating.
   // Docked above the instructions by default; it can float as its own window.
   SimPanelMode _simMode = SimPanelMode.docked;
+  // Scenario / Your task / Rules tabs shown in the Instructions header.
+  final _instructionNav = InstructionSectionNav();
   // Starts collapsed so the empty panel does not cover the instructions;
   // the first Simulate opens it.
   bool _simCollapsed = true;
@@ -216,6 +218,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     _draftSaveTimer?.cancel();
+    _instructionNav.dispose();
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     researchTracker.clearActiveAssignment(widget.id);
     if (!_init && _assignmentVersion != null) {
@@ -1558,6 +1561,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                 title: 'Instructions',
                                                 subtitle:
                                                     'Review the scenario and task',
+                                                sectionNav: _instructionNav,
                                                 isFocused: _workspaceFocus ==
                                                     AssignmentWorkspaceFocus
                                                         .instructions,
@@ -1570,7 +1574,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                                     : null,
                                               ),
                                               Expanded(
-                                                child: SingleChildScrollView(
+                                                // A soft grey behind the white
+                                                // section cards.
+                                                child: ColoredBox(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .surfaceContainerLow,
+                                                  child: SingleChildScrollView(
                                                   key: const Key(
                                                     'assignment-instructions-panel',
                                                   ),
@@ -1583,6 +1593,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                                     builder: (ctx, snap) {
                                                       if (snap.hasData) {
                                                         return AssignmentInstructions(
+                                                          sectionNav:
+                                                              _instructionNav,
                                                           assignmentId:
                                                               widget.id,
                                                           assignmentVersion:
@@ -1635,6 +1647,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                                     },
                                                   ),
                                                 ),
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -1671,7 +1684,12 @@ class AssignmentInstructions extends StatefulWidget {
     this.solutionRevealed = false,
     this.canRevealSolution = true,
     this.onSolutionRevealed,
+    this.sectionNav,
   });
+
+  /// When given, the section tabs live in the panel header instead of above
+  /// the sections, and follow the scroll position.
+  final InstructionSectionNav? sectionNav;
 
   final String html;
   final int assignmentId;
@@ -1690,6 +1708,45 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
   final _scenario = GlobalKey();
   final _task = GlobalKey();
   final _support = GlobalKey();
+  ScrollPosition? _position;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final position = Scrollable.maybeOf(context)?.position;
+    if (position != _position) {
+      _position?.removeListener(_followScroll);
+      _position = position?..addListener(_followScroll);
+    }
+  }
+
+  @override
+  void dispose() {
+    _position?.removeListener(_followScroll);
+    super.dispose();
+  }
+
+  /// Marks the section whose top has passed the top of the panel.
+  void _followScroll() {
+    final nav = widget.sectionNav;
+    final position = _position;
+    if (nav == null || position == null) return;
+    final viewport = position.context.storageContext.findRenderObject();
+    if (viewport is! RenderBox) return;
+    var current = 0;
+    if (position.pixels >= position.maxScrollExtent - 4 &&
+        position.maxScrollExtent > 0) {
+      current = nav.sections.length - 1;
+    } else {
+      for (final (index, section) in nav.sections.indexed) {
+        final box = section.target.currentContext?.findRenderObject();
+        if (box is! RenderBox || !box.attached) continue;
+        final top = box.localToGlobal(Offset.zero, ancestor: viewport).dy;
+        if (top <= 72) current = index;
+      }
+    }
+    nav.select(current);
+  }
 
   Widget _sectionLink(String label, GlobalKey target) => OutlinedButton(
       onPressed: () {
@@ -1709,17 +1766,31 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
     final displayedSolutionHtml = widget.solutionHtml.isNotEmpty
         ? widget.solutionHtml
         : sections.solution;
+    final nav = widget.sectionNav;
+    if (nav != null) {
+      final entries = [
+        InstructionSection('Scenario', _scenario),
+        if (sections.task.isNotEmpty) InstructionSection('Your task', _task),
+        if (sections.support.isNotEmpty)
+          InstructionSection('Rules & scoring', _support),
+      ];
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) nav.setSections(entries);
+      });
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          _sectionLink('Scenario', _scenario),
-          if (sections.task.isNotEmpty) _sectionLink('Your task', _task),
-          if (sections.support.isNotEmpty)
-            _sectionLink('Rules & scoring', _support),
-        ]),
-        const SizedBox(height: 12),
+        if (nav == null) ...[
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _sectionLink('Scenario', _scenario),
+            if (sections.task.isNotEmpty) _sectionLink('Your task', _task),
+            if (sections.support.isNotEmpty)
+              _sectionLink('Rules & scoring', _support),
+          ]),
+          const SizedBox(height: 12),
+        ],
         SizedBox(key: _scenario),
         _InstructionSectionCard(
           key: const Key('instruction-scenario-section'),
@@ -1967,23 +2038,24 @@ class _InstructionSectionCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(AppRadii.md),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+          border: Border.all(color: AppColors.border),
+          boxShadow: appCardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(icon, size: 20, color: theme.colorScheme.primary),
-                const SizedBox(width: AppSpacing.sm),
+                IconTile(icon: icon, size: 34),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         title,
-                        style: theme.textTheme.titleSmall?.copyWith(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -2235,12 +2307,55 @@ BoxDecoration workspaceCardEdge() => BoxDecoration(
       border: Border.all(color: AppColors.border),
     );
 
+/// One instruction section a header tab scrolls to.
+class InstructionSection {
+  const InstructionSection(this.label, this.target);
+  final String label;
+  final GlobalKey target;
+}
+
+/// The instruction sections and which one is in view, shared by the
+/// Instructions header tabs and the scrolling instructions.
+class InstructionSectionNav extends ChangeNotifier {
+  List<InstructionSection> sections = const [];
+  int current = 0;
+
+  void setSections(List<InstructionSection> value) {
+    final same = value.length == sections.length &&
+        [for (var i = 0; i < value.length; i++)
+          value[i].label == sections[i].label &&
+              value[i].target == sections[i].target].every((x) => x);
+    if (same) return;
+    sections = value;
+    if (current >= sections.length) current = 0;
+    notifyListeners();
+  }
+
+  void select(int index) {
+    if (index == current) return;
+    current = index;
+    notifyListeners();
+  }
+
+  void jumpTo(int index) {
+    select(index);
+    final target = sections[index].target.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(target,
+          duration: const Duration(milliseconds: 250));
+    }
+  }
+}
+
 class AssignmentPanelHeader extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
   final bool isFocused;
   final VoidCallback? onFocusToggle;
+
+  /// Section tabs shown in this header row, in place of the subtitle.
+  final InstructionSectionNav? sectionNav;
 
   const AssignmentPanelHeader({
     super.key,
@@ -2249,6 +2364,7 @@ class AssignmentPanelHeader extends StatelessWidget {
     this.subtitle,
     this.isFocused = false,
     this.onFocusToggle,
+    this.sectionNav,
   });
 
   @override
@@ -2266,10 +2382,35 @@ class AssignmentPanelHeader extends StatelessWidget {
         ),
       ),
       child: PanelTitleRow(
+        // With section tabs the title keeps its width and the tabs fill the
+        // rest of the row.
         title: title,
         icon: icon,
-        subtitle: subtitle,
+        subtitle: sectionNav == null ? subtitle : null,
+        fillTitle: sectionNav != null,
         actions: [
+          if (sectionNav case final nav?)
+            Expanded(
+              child: ListenableBuilder(
+                listenable: nav,
+                builder: (context, _) => nav.sections.isEmpty
+                    ? const SizedBox.shrink()
+                    : SingleChildScrollView(
+                        key: const Key('instruction-section-tabs'),
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.only(left: 12),
+                        child: PillTabBar(compact: true, tabs: [
+                          for (final (index, section) in nav.sections.indexed)
+                            PillTabData(
+                              key: Key('instruction-tab-$index'),
+                              label: section.label,
+                              selected: nav.current == index,
+                              onTap: () => nav.jumpTo(index),
+                            ),
+                        ]),
+                      ),
+              ),
+            ),
           if (onFocusToggle != null)
             IconButton(
               key: Key('focus-${title.toLowerCase()}-button'),
@@ -2358,11 +2499,11 @@ class AssignmentEditorToolbar extends StatelessWidget {
         );
 
     return Container(
-      height: 108,
+      height: 60,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.xs,
-        AppSpacing.md,
+        AppSpacing.sm,
         AppSpacing.xs,
       ),
       decoration: BoxDecoration(
@@ -2372,62 +2513,36 @@ class AssignmentEditorToolbar extends StatelessWidget {
         ),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: PanelTitleRow(
-                  title: 'Python editor',
-                  icon: Icons.code_rounded,
-                  subtitle: 'Edit the starter code, then run the tests',
-                  minHeight: 40,
-                ),
-              ),
-              if (saveState != DraftSaveState.idle)
-                Tooltip(
-                  message: switch (saveState) {
-                    DraftSaveState.saving => 'Saving draft',
-                    DraftSaveState.saved => 'Draft saved',
-                    DraftSaveState.sessionSaved =>
-                      'Draft saved for this session; refresh resets it',
-                    DraftSaveState.failed =>
-                      'Cloud save failed. A local fallback remains available.',
-                    DraftSaveState.outdated =>
-                      'Assignment updated. Reopen it; your code is kept on '
-                      'this device to copy across.',
-                    DraftSaveState.idle => '',
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                    ),
-                    child: Icon(
-                      switch (saveState) {
-                        DraftSaveState.saving => Icons.sync_rounded,
-                        DraftSaveState.saved => Icons.cloud_done_outlined,
-                        DraftSaveState.sessionSaved => Icons.save_outlined,
-                        DraftSaveState.failed => Icons.cloud_off_outlined,
-                        DraftSaveState.outdated => Icons.update_rounded,
-                        DraftSaveState.idle => Icons.cloud_outlined,
-                      },
-                      key: const Key('draft-save-state-icon'),
-                      size: 20,
-                      color: saveState == DraftSaveState.failed ||
-                              saveState == DraftSaveState.outdated
-                          ? theme.colorScheme.error
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
           // A narrow editor panel keeps room for the tools with an icon-only
           // Simulate button.
           LayoutBuilder(builder: (context, constraints) {
-            final compactSimulate = constraints.maxWidth < 560;
+            final compactSimulate = constraints.maxWidth < 760;
             return Row(
             children: [
+              Tooltip(
+                message: 'Edit the starter code, then run the tests',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.code_rounded,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                        semanticLabel: compactSimulate ? 'Python editor' : null),
+                    // A narrow panel keeps the room for its tools.
+                    if (!compactSimulate) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        'Python editor',
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28, child: VerticalDivider(width: 20)),
               Expanded(
                 // Fade the trailing edge so a clipped row reads as scrollable.
                 child: ShaderMask(
@@ -2525,6 +2640,42 @@ class AssignmentEditorToolbar extends StatelessWidget {
                   ),
                 ),
               ),
+              if (saveState != DraftSaveState.idle)
+                Tooltip(
+                  message: switch (saveState) {
+                    DraftSaveState.saving => 'Saving draft',
+                    DraftSaveState.saved => 'Draft saved',
+                    DraftSaveState.sessionSaved =>
+                      'Draft saved for this session; refresh resets it',
+                    DraftSaveState.failed =>
+                      'Cloud save failed. A local fallback remains available.',
+                    DraftSaveState.outdated =>
+                      'Assignment updated. Reopen it; your code is kept on '
+                      'this device to copy across.',
+                    DraftSaveState.idle => '',
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                    ),
+                    child: Icon(
+                      switch (saveState) {
+                        DraftSaveState.saving => Icons.sync_rounded,
+                        DraftSaveState.saved => Icons.cloud_done_outlined,
+                        DraftSaveState.sessionSaved => Icons.save_outlined,
+                        DraftSaveState.failed => Icons.cloud_off_outlined,
+                        DraftSaveState.outdated => Icons.update_rounded,
+                        DraftSaveState.idle => Icons.cloud_outlined,
+                      },
+                      key: const Key('draft-save-state-icon'),
+                      size: 20,
+                      color: saveState == DraftSaveState.failed ||
+                              saveState == DraftSaveState.outdated
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
               if (onFocusToggle != null)
                 IconButton(
                   key: const Key('focus-editor-button'),

@@ -204,17 +204,17 @@ List<TerminalLine> buildRunTerminalLines({
   return lines;
 }
 
-const _background = Color(0xFF1E1E1E);
-const _headerBackground = Color(0xFF252526);
-const _border = Color(0xFF3C3C3C);
+const _background = Color(0xFF263238);
+const _headerBackground = Color(0xFF1F2B31);
+const _border = Color(0xFF37474F);
 
 Color _lineColor(TerminalLineKind kind) => switch (kind) {
       TerminalLineKind.command => const Color(0xFF9CDCFE),
-      TerminalLineKind.output => const Color(0xFFD4D4D4),
+      TerminalLineKind.output => const Color(0xFFEEFFFF),
       TerminalLineKind.error => const Color(0xFFF48771),
       TerminalLineKind.location => const Color(0xFF4FC1FF),
       TerminalLineKind.source => const Color(0xFFCE9178),
-      TerminalLineKind.info => const Color(0xFF9DA5B4),
+      TerminalLineKind.info => const Color(0xFFA6B5BD),
       TerminalLineKind.success => const Color(0xFF89D185),
     };
 
@@ -280,31 +280,40 @@ class RunTerminalPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mono = const TextStyle(
-      // The editor's bundled code font, so indentation lines up.
-      fontFamily: 'Courier-New',
-      fontFamilyFallback: ['monospace'],
-      fontSize: 12.5,
-      height: 1.5,
+      // The bundled code font of the lesson code cards; monospaced, so
+      // indentation lines up.
+      fontFamily: 'Lotion',
+      fontFamilyFallback: ['Courier-New', 'monospace'],
+      fontSize: 13,
+      height: 1.55,
     );
+    final statusColor = running
+        ? const Color(0xFF82AAFF)
+        : requestError != null ||
+                lines.any((line) => line.kind == TerminalLineKind.error)
+            ? const Color(0xFFF07178)
+            : lines.isNotEmpty && lines.last.kind == TerminalLineKind.success
+                ? const Color(0xFFC3E88D)
+                : const Color(0xFFA6B5BD);
     final header = Container(
-      height: 36,
+      height: 38,
       color: _headerBackground,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.only(left: 12, right: 6),
       child: Row(
         children: [
           const Icon(
             Icons.terminal_rounded,
             size: 16,
-            color: Color(0xFFCCCCCC),
+            color: Color(0xFF89DDFF),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           const Text(
-            'TERMINAL',
+            'Terminal',
             style: TextStyle(
-              color: Color(0xFFE7E7E7),
-              fontSize: 11,
+              color: Color(0xFFEEFFFF),
+              fontSize: 12.5,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1.1,
+              letterSpacing: 0.2,
             ),
           ),
           const SizedBox(width: 10),
@@ -319,12 +328,27 @@ class RunTerminalPanel extends StatelessWidget {
             ),
           if (_status.isNotEmpty) ...[
             const SizedBox(width: 6),
+            // A small status pill, coloured by the outcome.
             Flexible(
-              child: Text(
-                _status,
-                key: const Key('run-terminal-status'),
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Color(0xFF9DA5B4), fontSize: 11),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  _status,
+                  key: const Key('run-terminal-status'),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ],
@@ -374,9 +398,18 @@ class RunTerminalPanel extends StatelessWidget {
         );
       }
       if (lines.isEmpty) {
-        return Text(
-          'Run tests to see what your program prints and any error here.',
-          style: mono.copyWith(color: _lineColor(TerminalLineKind.info)),
+        return Text.rich(
+          TextSpan(children: [
+            TextSpan(
+              text: '\$ ',
+              style: mono.copyWith(color: _lineColor(TerminalLineKind.command)),
+            ),
+            TextSpan(
+              text:
+                  'Run tests to see what your program prints and any error here.',
+              style: mono.copyWith(color: _lineColor(TerminalLineKind.info)),
+            ),
+          ]),
         );
       }
       // Plain lines sit in selection blocks that screen readers read as
@@ -470,7 +503,7 @@ class RunTerminalPanel extends StatelessWidget {
                 child: Scrollbar(
                   child: SingleChildScrollView(
                     key: const Key('run-terminal-scroll'),
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                     child: body(),
                   ),
                 ),
@@ -500,7 +533,7 @@ class _HeaderButton extends StatelessWidget {
       tooltip: tooltip,
       onPressed: onPressed,
       icon: Icon(icon, size: 16),
-      color: const Color(0xFFCCCCCC),
+      color: const Color(0xFFA6B5BD),
       visualDensity: VisualDensity.compact,
       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       padding: EdgeInsets.zero,

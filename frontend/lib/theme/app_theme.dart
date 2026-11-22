@@ -344,6 +344,8 @@ ThemeData buildAppTheme() {
           textTheme.bodyMedium?.copyWith(color: Colors.white, height: 1.4),
       actionTextColor: const Color(0xFF9FE3EF),
       shape: roundedSmall,
+      // Float above the Feedback button in the bottom-left corner.
+      insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 64),
     ),
     popupMenuTheme: PopupMenuThemeData(
       color: colorScheme.surface,
