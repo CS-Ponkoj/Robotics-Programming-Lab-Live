@@ -134,8 +134,6 @@ class _FeedbackDialogState extends State<FeedbackDialog> {
         const SnackBar(
           content: Text('Thank you. Your feedback was sent.'),
           behavior: SnackBarBehavior.floating,
-          // Float above the Feedback button in the bottom-left corner.
-          margin: EdgeInsets.fromLTRB(16, 0, 16, 72),
         ),
       );
     } catch (error) {

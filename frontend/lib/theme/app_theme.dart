@@ -344,7 +344,9 @@ ThemeData buildAppTheme() {
           textTheme.bodyMedium?.copyWith(color: Colors.white, height: 1.4),
       actionTextColor: const Color(0xFF9FE3EF),
       shape: roundedSmall,
-      // Float above the Feedback button in the bottom-left corner.
+      // The app shell moves these to the bottom-right corner
+      // (bottomRightSnackBars); this keeps them clear of the Feedback
+      // button anywhere else.
       insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 64),
     ),
     popupMenuTheme: PopupMenuThemeData(

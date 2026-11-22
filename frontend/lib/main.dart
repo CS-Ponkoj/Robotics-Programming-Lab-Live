@@ -210,7 +210,10 @@ class _MyAppState extends State<MyApp> {
           onPointerSignal: (_) => researchTracker.recordUserInteraction(),
           child: Stack(
             children: [
-              Positioned.fill(child: child ?? const SizedBox.shrink()),
+              Positioned.fill(
+                child: bottomRightSnackBars(
+                    context, child ?? const SizedBox.shrink()),
+              ),
               if (_user != null)
                 Positioned(
                   left: 12,
@@ -254,4 +257,21 @@ class _MyAppState extends State<MyApp> {
                 ),
     );
   }
+}
+
+/// Notifications float in the bottom-right corner, away from the Feedback
+/// button on the left; on phones they span the width above that button.
+Widget bottomRightSnackBars(BuildContext context, Widget child) {
+  final width = MediaQuery.sizeOf(context).width;
+  final theme = Theme.of(context);
+  const snackWidth = 420.0;
+  final inset = width < 600
+      ? const EdgeInsets.fromLTRB(16, 0, 16, 64)
+      : EdgeInsets.fromLTRB(width - 16 - snackWidth, 0, 16, 16);
+  return Theme(
+    data: theme.copyWith(
+      snackBarTheme: theme.snackBarTheme.copyWith(insetPadding: inset),
+    ),
+    child: child,
+  );
 }
