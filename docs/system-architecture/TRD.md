@@ -84,7 +84,7 @@ flowchart TD
     V --> LOAD[Load published assignment<br/>+ server-only grader config]
     LOAD --> PICK{grader_type}
     PICK -->|python_function| PF[Build harness:<br/>call function with hidden cases]
-    PICK -->|ros2_topic| RT[Build ROS 2 package +<br/>topic / callback checks]
+    PICK -->|ros2_topic| RT[Build ROS 2 package +<br/>topic / callback checks<br/>one command per callback]
     PF --> SBX[[Python sandbox<br/>5 s, no network, 256 MB, import allow-list]]
     RT --> RBX[[ROS 2 container<br/>30 s, no network]]
     SBX --> EV[Evidence: returns, errors, timings]
@@ -93,7 +93,7 @@ flowchart TD
     SCORE --> SAVE[(Submission<br/>with assignment_version<br/>+ feedback_mode)]
     SAVE --> MODE{Account's feedback mode}
     MODE -->|Traditional| RT1[Score, pass, counts,<br/>error at the student's line]
-    MODE -->|TDD| RT2[Checks, messages, output]
+    MODE -->|TDD| RT2[Checks, factual messages, output<br/>no hints]
     MODE -->|TDD + AI| RT3[Checks, messages, output,<br/>hint ladder]
     RT1 --> RESP[Response — never hidden values]
     RT2 --> RESP
@@ -103,6 +103,18 @@ flowchart TD
 **Execution outcomes** (`execution_status`): `completed` · `syntax_error` ·
 `runtime_error` · `timeout` · `rejected` · `grader_unavailable` ·
 `internal_error` · `execution_error`.
+
+**ROS 2 check rules** (Assignments 7 and 8):
+
+- Each behaviour check judges only its own rule, and a node must publish
+  exactly one command in its sensor callback for every message
+  (`ros2_callback_audit.py`).
+- When the node crashes, hangs or never becomes ready, the checks it could not
+  reach are reported as not run (`"status": "not_run"`), not as failures.
+- Points from setup checks (`scaffold_tests`) are held back until the robot passes at least
+  one driving check, so a node that never moves scores 0%.
+- Check messages state facts and rules only. Fix advice lives in the hint
+  ladders in `ros2_feedback.py`, and level 4 contains no code.
 
 ## 5. API catalog
 
@@ -133,7 +145,7 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 | Sessions | Server-side, revocable, expiring | `auth_sessions` table stores only a token hash; 12 h lifetime |
 | Authorization | Server-enforced roles | `admin_dependency` on every `/admin/*` route; identity always comes from the session |
 | Secrets | Never in Git or in the client | Ignored root `.env`; Flutter only gets `API_BASE_URL` |
-| Untrusted code | Isolated and bounded | Separate Docker container per attempt: `--network none`, 256 MB memory, 1 CPU, 64 processes, time limit, import allow-list; a timed-out container is force-removed |
+| Untrusted code | Isolated and bounded | Separate Docker container per attempt: `--network none`, 256 MB memory, 1 CPU, 64 processes, time limit, import allow-list; a timed-out container is force-removed. ROS 2 code is also checked before it runs: `ros2_worker.py` rejects forbidden built-ins (`open`, `eval`, `exec`, `__import__`, `getattr` and similar) in any form, including rebinding them, and Landlock hides the grader files from the student node |
 | Data leaks | Hidden tests and solutions stay server-side | Responses carry checks and evidence, never expected values |
 | Feedback modes | A student gets only the feedback their mode allows | `feedback_modes.py` trims run/submit responses on the server; hint, tutor and simulate requests outside the mode return 403; the AI gate checks the mode. The browser only hides controls |
 | Abuse | Rate limits per user/address | Execution 30/min · tutor 10/min · auth 120/min · admin 300/min · general 60/min · request ≤ 100 KB |

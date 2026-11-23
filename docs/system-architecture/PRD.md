@@ -35,7 +35,7 @@ flowchart LR
 
 | User | Main goal | What they can do |
 |---|---|---|
-| **Student** | Learn and pass assignments | Read lessons, take quizzes, write code, run tests, try inputs, get hints, reveal the solution approach after an attempt, see their own progress |
+| **Student** | Learn and pass assignments | Read lessons, take quizzes, write code, run tests, try inputs, get hints (TDD + AI mode), see their own progress; the solution approach is for the demo and instructors only |
 | **Instructor** | Run the course | Everything a student sees (always with every feedback tool), plus create/validate/publish assignments, manage student and instructor accounts, set each student's feedback mode, switch the AI tutor on, read page feedback, view sign-in history and the research dashboard |
 | **Researcher** (an instructor role today) | Study learning behaviour | Classroom overview, per-participant detail by participant code, exact-version analytics, privacy-safe export |
 | **Demo visitor** | Try the student experience | A temporary student session. Nothing is stored, and a refresh returns to login |
@@ -64,8 +64,8 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 | F5 | Assignment workspace: instructions, editor, terminal, results | ✅ | See [UI_Spec](UI_Spec.md) |
 | F6 | Run tests (graded, saved) | ✅ | Python sandbox or ROS 2 container |
 | F7 | Try inputs (not graded, not saved) | ✅ | Call your function with your own values, including fractions |
-| F8 | Built-in hints (4 levels) | ✅ | Deterministic, works with AI off |
-| F9 | Reveal solution approach | ✅ | Only after a run or submit of the same version |
+| F8 | Built-in hints (4 levels) | ✅ | Deterministic, works with AI off. TDD + AI accounts (as the AI fallback) and the demo; level 4 contains no code |
+| F9 | Reveal solution approach | ✅ | Demo and instructors only, after a run or submit of the same version. Study students never get it in any mode (owner decision, 2026-11-22) |
 | F10 | Draft autosave per assignment version | ✅ | A draft from an earlier version is kept in a separate banner, never loaded into a newer workspace |
 | F11 | Page feedback button and instructor inbox | ✅ | |
 | F12 | Instructor Studio: create, validate, publish | ✅ | |
@@ -87,8 +87,8 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 | 4 | `robotics-assignment-4` | 16 | Simplified VFH direction choice | `python_function` |
 | 5 | `ros2-drive-forward` | 12 | Drive forward and stop (ROS 2) | `ros2_topic` |
 | 6 | `ros2-obstacle-stop` | 12 | Stop for an obstacle (ROS 2) | `ros2_topic` |
-| 7 | `ros2-wall-stop` | 3 | Stop before the wall using a laser scan (ROS 2); students see it as **Assignment 1** | `ros2_topic` |
-| 8 | `ros2-turn-open-side` | 1 | Turn toward the open side using four distances (ROS 2); students see it as **Assignment 2** | `ros2_topic` |
+| 7 | `ros2-wall-stop` | 5 | Stop before the wall using a laser scan (ROS 2); students see it as **Assignment 1** | `ros2_topic` |
+| 8 | `ros2-turn-open-side` | 3 | Turn toward the open side using four distances (ROS 2); students see it as **Assignment 2** | `ros2_topic` |
 
 Assignments 1-6 are listed under **Old assignments** (`backend/assignments/catalog.json`).
 The study uses Assignments 7 and 8. Display numbers never change an assignment's

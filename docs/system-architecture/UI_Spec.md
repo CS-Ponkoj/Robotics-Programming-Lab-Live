@@ -85,7 +85,7 @@
 | **Editor** | Python highlighting with a line gutter that scrolls with the code, find/replace, format, font size, light/dark editor toggle (dark by default), and an option to restore the starter code |
 | **Earlier-version banner** | Appears when a draft exists for an older version. **View and copy** or **Dismiss** |
 | **Terminal** | Collapsible and resizable. Shows printed output, the error on the student's line, and a summary such as "· code changed since" |
-| **Results overlay** | Right side, can be minimized and keeps its content when reopened. Shows checks, hints and the solution approach |
+| **Results overlay** | Right side, can be minimized and keeps its content when reopened. Shows the score ring, the first check to fix, failed checks, then folded groups for checks that did not run and passed checks; hints for TDD + AI; the solution approach only for the demo and instructors. Explains a 0% score (a required check fails, or points wait for a driving check) |
 | **Try inputs dialog** | Call the function with your own values, including fractions such as `1/3`. Not graded or saved. Warns when the inputs changed after the shown result |
 | **Simulation** | Square panel with a 2D replay of the student's ROS 2 node (Arena, LiDAR, Charts, Ranges). Visual only, never graded |
 | **AI tutoring** | Toggle off by default, and every AI answer is labelled. When AI is unavailable, the built-in hints remain. One tutor reply is one card: the hint, then what to inspect, debugging steps and the next action. The Ask the tutor answer card appears only after a question |
@@ -101,7 +101,8 @@ mode cannot use. Grading is the same in every mode.
 | Error at the student's own line | ✅ | ✅ | ✅ | ✅ |
 | Check names, messages, test details | — | ✅ | ✅ | ✅ |
 | Printed output (terminal says it is not part of the feedback) | — | ✅ | ✅ | ✅ |
-| Built-in hint ladder | — | ✅ | ✅ | ✅ |
+| Built-in hint ladder (AI fallback; also in the demo) | — | — | ✅ | ✅ |
+| Solution approach | — | — | — | ✅ |
 | Simulate button and Simulation panel | — | ✅ | ✅ | ✅ |
 | AI button (tutoring on/off), AI hint, Ask the tutor | — | — | ✅ | ✅ |
 

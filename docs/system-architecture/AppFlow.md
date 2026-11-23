@@ -102,7 +102,7 @@ sequenceDiagram
         UI-->>S: Results panel + terminal
     end
 
-    opt Stuck (TDD and TDD + AI modes)
+    opt Stuck (TDD + AI mode and the demo)
         S->>UI: Get a hint (levels 1–4)
         UI->>API: POST /assignments/{id}/hint
         API-->>UI: built-in hint (AI only for TDD + AI and when every AI gate holds)
@@ -112,7 +112,7 @@ sequenceDiagram
         UI->>API: POST /assignments/{id}/tutor
         API-->>UI: AI answer, or a built-in answer with the reason
     end
-    opt After at least one attempt
+    opt After at least one attempt (demo and instructors only)
         S->>UI: Show solution approach
         UI->>API: POST /assignments/{id}/solution
         API-->>UI: solution explanation
