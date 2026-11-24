@@ -248,3 +248,53 @@ def test_quiz_answers_keep_question_ids_and_gain_uses_counts(client):
     learning = client.get("/admin/study-data/course_learning", headers=instructor).json()["rows"]
     # 66.7% - 33.3% from the counts; the rounded percentages would give 34.
     assert learning[0]["learning_gain"] == 33.3
+
+
+def test_followups_ids_times_definitions_and_large_csv(client, monkeypatch):
+    import re
+    from datetime import timedelta
+
+    import study_data
+    from models import CourseQuizAttempt, User, utc_now
+
+    _activity(client)
+    instructor = _instructor(client)
+    with client.app.state.SessionLocal() as session:
+        user = session.scalars(select(User).where(User.login_id == STUDENT_LOGIN)).one()
+        session.add(CourseQuizAttempt(
+            user_id=user.id, topic_id="ros2-mobile-robots", quiz_version="v1",
+            correct_count=10, total_questions=15, score_percent=67, assessment="quiz",
+            feedback_mode="tdd_ai", submitted_at=utc_now() - timedelta(minutes=1),
+            answers=[{"question_id": f"q{i}", "choice": "A", "correct": i <= 10}
+                     for i in range(1, 16)],
+        ))
+        session.commit()
+
+    def table(name):
+        return client.get(f"/admin/study-data/{name}", headers=instructor).json()
+
+    # Quiz attempts join to quiz answers by attempt_id.
+    attempt = table("quiz_attempts")["rows"][0]
+    answers = table("quiz_answers")["rows"]
+    assert attempt["attempt_id"] and {row["attempt_id"] for row in answers} == {attempt["attempt_id"]}
+
+    # Every *_at value is UTC to the second with an offset.
+    stamp = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00$")
+    for name in ("quiz_attempts", "assignment_summary", "attempts", "participants"):
+        for row in table(name)["rows"]:
+            for key, value in row.items():
+                if key.endswith("_at") and value not in (None, ""):
+                    assert stamp.match(value), (name, key, value)
+
+    # The summary's help counts are defined.
+    summary = table("assignment_summary")
+    helps = {column["key"]: column["help"] for column in summary["columns"]}
+    assert "Hint button" in helps["built_in_hint_count"]
+    assert "AI switch" in helps["ai_interaction_count"]
+
+    # A CSV past the safety bound is refused, never cut short.
+    monkeypatch.setattr(study_data, "MAX_TABLE_ROWS", 2)
+    refused = client.get("/admin/study-data/check_results", params={"format": "csv"},
+                         headers=instructor)
+    assert refused.status_code == 413
+    assert "Narrow the filters" in refused.json()["error"]

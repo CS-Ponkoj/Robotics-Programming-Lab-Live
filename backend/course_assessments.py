@@ -34,6 +34,7 @@ def course_assessment_rows(
         answers = attempt.answers or []
         rows.append({
             "participant_code": participant_code,
+            "attempt_id": attempt.id,
             "topic_id": attempt.topic_id,
             "assessment": attempt.assessment,
             "quiz_version": attempt.quiz_version,

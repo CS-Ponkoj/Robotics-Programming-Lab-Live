@@ -1699,7 +1699,16 @@ def create_app(
         )
         descending = order == "desc"
         if format == "csv":
-            content = study_data.csv_payload(session, table, filters, sort, descending)
+            try:
+                content = study_data.csv_payload(
+                    session, table, filters, sort, descending
+                )
+            except study_data.TableTooLarge:
+                raise HTTPException(
+                    413,
+                    "This table is too large for one CSV. Narrow the filters "
+                    "(for example by date or assignment) and download again.",
+                ) from None
             record_audit(
                 session,
                 action="study_data.exported",

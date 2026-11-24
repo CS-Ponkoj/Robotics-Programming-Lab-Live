@@ -42,6 +42,10 @@ TEST_PARTICIPANT_CODES = frozenset({"DEMO"})
 # A safety bound on any one table; a study is far below it.
 MAX_TABLE_ROWS = 200_000
 
+
+class TableTooLarge(Exception):
+    """A CSV would exceed MAX_TABLE_ROWS; it is refused, never cut short."""
+
 NOT_RUN_PREFIXES = ("Not run:", "Not checked:")
 
 # Audit detail keys that are safe to show; login IDs and emails are dropped.
@@ -723,7 +727,13 @@ TABLES: tuple[Table, ...] = (
     Table("assignment_summary", "Assignment summary",
           "Per student and assignment of this course: attempts, scores, hints, and completion. "
           "Choose an old assignment in the filter to see it.",
-          (_P, _M, _A), "assignment_id", _assignment_summary, has_assignment=True,
+          (_P, _M, _A,
+           Column("built_in_hint_count", "Built-in hints",
+                  "Hint button requests answered by built-in hints (from learning "
+                  "events; automatic run hints and tutor questions are not counted)."),
+           Column("ai_interaction_count", "AI interactions",
+                  "Runs made with the AI switch on, plus hints the AI answered.")),
+          "assignment_id", _assignment_summary, has_assignment=True,
           has_dates=False),
     Table("study_sessions", "Study sessions",
           "Each signed-in study session and its active time.",
@@ -749,6 +759,7 @@ TABLES: tuple[Table, ...] = (
            Column("topic_id", "Topic", "Course topic."),
            Column("assessment", "Type", "pretest or quiz."),
            Column("quiz_version", "Quiz version", "Exact quiz version."),
+           Column("attempt_id", "Attempt ID", "Joins to quiz_answers.attempt_id."),
            Column("attempt_number", "Attempt no.", "Order of this attempt."),
            Column("scored", "Scored", "True for the pre-test and the first quiz attempt."),
            Column("correct_count", "Correct", "Correct answers."),
@@ -796,6 +807,18 @@ TABLES: tuple[Table, ...] = (
 TABLES_BY_NAME = {table.name: table for table in TABLES}
 
 
+def _uniform_time(value: Any) -> Any:
+    """Every *_at value as UTC ISO 8601 to the second, like the detail tables."""
+    if isinstance(value, datetime):
+        return iso_utc(value)
+    if isinstance(value, str):
+        try:
+            return iso_utc(datetime.fromisoformat(value))
+        except ValueError:
+            return value
+    return value
+
+
 def _sort_key(value: Any) -> tuple:
     if value is None or value == "":
         return (1, "")
@@ -815,6 +838,10 @@ def build_rows(session: Session, table: Table, filters: Filters,
         rows.append(row)
         if len(rows) >= MAX_TABLE_ROWS:
             break
+    for row in rows:
+        for name, value in row.items():
+            if name.endswith("_at") and value not in (None, ""):
+                row[name] = _uniform_time(value)
     key = sort if sort and rows and sort in rows[0] else table.time_key
     if rows and key in rows[0]:
         rows.sort(key=lambda row: _sort_key(row.get(key)), reverse=descending)
@@ -864,6 +891,8 @@ def page_payload(session: Session, table: Table, filters: Filters, *, page: int,
 def csv_payload(session: Session, table: Table, filters: Filters,
                 sort: str | None, descending: bool) -> bytes:
     rows = build_rows(session, table, filters, sort, descending)
+    if len(rows) >= MAX_TABLE_ROWS:
+        raise TableTooLarge(table.name)
     columns = [column["key"] for column in table_columns(table, rows)]
     ordered = [{key: row.get(key) for key in columns} for row in rows]
     if not ordered:

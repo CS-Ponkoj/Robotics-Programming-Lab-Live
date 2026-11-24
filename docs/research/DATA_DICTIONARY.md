@@ -405,6 +405,16 @@ Table rules (2026-11-24 data review):
   "not started" counts.
 - Participants, assignment summary, and course learning are whole-study
   summaries; the date filter does not apply to them.
+- Assignment summary help counts come from learning events:
+  `built_in_hint_count` is Hint button requests answered by built-in hints
+  (automatic run hints and tutor questions are not counted), and
+  `ai_interaction_count` is runs made with the AI switch on plus hints the AI
+  answered. For every help row, use AI questions and hints.
+- Quiz attempts carry `attempt_id`, which joins to quiz answers.
+- Every `*_at` value in every table is UTC ISO 8601 to the second with an
+  offset (for example `2026-11-24T09:41:59+00:00`).
+- A CSV larger than 200,000 rows is refused with a message to narrow the
+  filters; it is never cut short.
 
 ### `course_quiz_attempts`
 
@@ -481,8 +491,9 @@ shown on every signed-in page. Instructors read and resolve it from
 | `created_at` | UTC time it was sent |
 | `resolved_at` | UTC time an instructor marked it resolved; cleared when reopened |
 
-Feedback is operational, not research data: it is not part of the research
-exports or analytics. Each sender is limited to five messages per minute.
+Feedback is operational, not research data: it is not part of the Research
+dashboard exports or analytics. Instructors can still view and download it as
+the Page feedback table on the Study data page. Each sender is limited to five messages per minute.
 
 ### `course_settings`
 
