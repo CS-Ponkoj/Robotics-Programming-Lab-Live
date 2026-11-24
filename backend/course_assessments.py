@@ -57,6 +57,8 @@ def course_learning_summary(
 ) -> list[dict[str, Any]]:
     """Per topic: pre-test score, first-attempt quiz score, and the difference."""
     topics: dict[str, dict[str, Any]] = {}
+    # Exact fractions for the gain; the stored percentages are rounded.
+    exact: dict[tuple[str, str], float] = {}
     for attempt in _attempts(session, user):
         entry = topics.setdefault(attempt.topic_id, {
             "participant_code": participant_code,
@@ -72,14 +74,26 @@ def course_learning_summary(
         if attempt.assessment == "pretest":
             if entry["pretest_score"] is None:
                 entry["pretest_score"] = attempt.score_percent
+                exact[(attempt.topic_id, "pretest")] = _fraction(attempt)
             continue
         entry["quiz_attempts"] += 1
         entry["best_quiz_score"] = max(entry["best_quiz_score"] or 0, attempt.score_percent)
         if entry["quiz_score"] is None:
             entry["quiz_score"] = attempt.score_percent
+            exact[(attempt.topic_id, "quiz")] = _fraction(attempt)
             entry["quiz_version"] = attempt.quiz_version
             entry["feedback_mode"] = attempt.feedback_mode
     for entry in topics.values():
         if entry["pretest_score"] is not None and entry["quiz_score"] is not None:
-            entry["learning_gain"] = entry["quiz_score"] - entry["pretest_score"]
+            # Percentage points from the correct counts, to one decimal.
+            entry["learning_gain"] = round(
+                exact[(entry["topic_id"], "quiz")] - exact[(entry["topic_id"], "pretest")], 1
+            )
     return sorted(topics.values(), key=lambda entry: entry["topic_id"])
+
+
+def _fraction(attempt: CourseQuizAttempt) -> float:
+    """Exact score in percent from the correct count."""
+    if not attempt.total_questions:
+        return float(attempt.score_percent)
+    return 100.0 * attempt.correct_count / attempt.total_questions

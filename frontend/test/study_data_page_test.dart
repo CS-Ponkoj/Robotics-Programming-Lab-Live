@@ -17,6 +17,13 @@ const _catalog = {
       'description': 'Every sign-in.',
       'has_assignment': false,
     },
+    {
+      'name': 'course_learning',
+      'title': 'Course learning per topic',
+      'description': 'Whole-study summary.',
+      'has_assignment': false,
+      'has_dates': false,
+    },
   ],
   'participants': [
     {'id': 'u1', 'participant_code': 'P-001', 'feedback_mode': 'tdd_ai'},
@@ -182,5 +189,21 @@ void main() {
     expect(find.byKey(const Key('study-data-empty')), findsOneWidget);
     expect(find.text('0–0 of 0'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('summary tables say the date filter does not apply',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final calls = _Calls();
+    await tester.pumpWidget(_app(calls));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('study-filter-dates')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('study-table-course_learning')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('study-filter-dates')), findsNothing);
+    expect(find.byKey(const Key('study-filter-no-dates')), findsOneWidget);
   });
 }

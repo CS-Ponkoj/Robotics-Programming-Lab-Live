@@ -462,6 +462,7 @@ class _TableArea extends StatelessWidget {
           participants: participants,
           assignments: assignments,
           showAssignment: info?['has_assignment'] == true,
+          showDates: info?['has_dates'] != false,
           onChanged: onFilters,
         ),
         const SizedBox(height: AppSpacing.md),
@@ -474,6 +475,15 @@ class _TableArea extends StatelessWidget {
           )
         else ...[
           if (loading) const LinearProgressIndicator(minHeight: 2),
+          if (data!['truncated'] == true)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Text(
+                'This table is cut short at its size limit. Narrow the '
+                'filters to see every row.',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
           _DataGrid(
             columns: [
               for (final column in data!['columns'] as List)
@@ -507,6 +517,7 @@ class _FilterBar extends StatelessWidget {
     required this.participants,
     required this.assignments,
     required this.showAssignment,
+    required this.showDates,
     required this.onChanged,
   });
 
@@ -514,6 +525,7 @@ class _FilterBar extends StatelessWidget {
   final List<Map<String, dynamic>> participants;
   final List<Map<String, dynamic>> assignments;
   final bool showAssignment;
+  final bool showDates;
   final void Function(StudyDataFilters, {bool reloadCatalog}) onChanged;
 
   StudyDataFilters _copy({
@@ -641,14 +653,24 @@ class _FilterBar extends StatelessWidget {
             ),
           ),
         ),
-        OutlinedButton.icon(
-          key: const Key('study-filter-dates'),
-          onPressed: () => _pickDates(context),
-          icon: const Icon(LucideIcons.calendar, size: 18),
-          label: Text(filters.dateFrom == null
-              ? 'Any date'
-              : '${_day(filters.dateFrom!)} to ${_day(filters.dateTo!)}'),
-        ),
+        if (showDates)
+          OutlinedButton.icon(
+            key: const Key('study-filter-dates'),
+            onPressed: () => _pickDates(context),
+            icon: const Icon(LucideIcons.calendar, size: 18),
+            label: Text(filters.dateFrom == null
+                ? 'Any date'
+                : '${_day(filters.dateFrom!)} to ${_day(filters.dateTo!)}'),
+          )
+        else
+          Text(
+            'Whole study: the date filter does not apply here.',
+            key: const Key('study-filter-no-dates'),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppColors.inkMuted),
+          ),
         FilterChip(
           key: const Key('study-filter-test-accounts'),
           label: const Text('Include test accounts'),

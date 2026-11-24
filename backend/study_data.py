@@ -21,6 +21,7 @@ from assignment_repository import course_numbers
 from course_assessments import course_assessment_rows, course_learning_summary
 from models import (
     Assignment,
+    CourseQuizAttempt,
     AssignmentActivity,
     AuditEvent,
     AuthSession,
@@ -47,6 +48,9 @@ NOT_RUN_PREFIXES = ("Not run:", "Not checked:")
 SAFE_AUDIT_DETAIL_KEYS = frozenset({
     "feedback_mode", "from", "to", "active", "enabled", "daily_limit",
     "created", "updated", "errors", "role", "participant_code",
+    # Study data downloads: the filters used (no participant identity).
+    "assignment_id", "date_from", "date_to", "one_participant",
+    "include_test_accounts",
 })
 
 INTERACTION_LABELS = {
@@ -84,6 +88,8 @@ class Table:
     time_key: str
     build: Callable[["_Context"], Iterable[dict[str, Any]]]
     has_assignment: bool = False
+    # False for whole-study summaries: the date filter does not apply to them.
+    has_dates: bool = True
 
 
 def is_test_account(user: User) -> bool:
@@ -109,8 +115,11 @@ class _Context:
         self.user_ids = list(self.users)
         numbers = course_numbers()
         self.assignments: dict[int, str] = {}
+        self.course_assignment_ids: set[int] = set()
         for assignment in session.scalars(select(Assignment)).all():
             number = numbers.get(assignment.stable_id)
+            if number:
+                self.course_assignment_ids.add(assignment.id)
             self.assignments[assignment.id] = (
                 f"Assignment {number}" if number else f"Old assignment (ID {assignment.id})"
             )
@@ -175,6 +184,21 @@ def _submissions(ctx: _Context) -> list[Submission]:
     return ctx.session.scalars(query.order_by(Submission.created_at)).all()
 
 
+def _points_earned(test: dict[str, Any]) -> float | None:
+    """Credit the check actually gave.
+
+    The grader stores earned_weight only when it differs from the plain rule
+    (0 for setup checks held back until a driving check passes); otherwise a
+    passed check earns its weight and any other check earns nothing.
+    """
+    weight = test.get("weight")
+    if weight is None:
+        return None
+    if test.get("earned_weight") is not None:
+        return float(test["earned_weight"])
+    return float(weight) if test.get("passed") is True else 0.0
+
+
 def _check_result(test: dict[str, Any]) -> str:
     if test.get("passed") is True:
         return "passed"
@@ -187,15 +211,24 @@ def _check_result(test: dict[str, Any]) -> str:
 
 
 def _participants(ctx: _Context):
-    counts: dict[str, dict[str, int]] = {uid: {"attempts": 0, "questions": 0, "hints": 0}
-                                         for uid in ctx.user_ids}
-    submissions = _submissions(ctx) if ctx.filters.assignment_id is None else []
-    for item in submissions:
+    keys = ("attempts", "tutor_questions", "hint_button", "automatic_hints",
+            "hints_type_not_recorded", "ai_answers")
+    counts: dict[str, dict[str, int]] = {uid: dict.fromkeys(keys, 0) for uid in ctx.user_ids}
+    for item in _submissions(ctx):
         counts[item.user_id]["attempts"] += 1
+    # Requested help and automatic hints are counted apart: an automatic hint
+    # after a run is exposure, not a request.
+    kind_keys = {
+        "student_question": "tutor_questions",
+        "progressive_hint": "hint_button",
+        "run_hint": "automatic_hints",
+    }
     for interaction, user_id in _interactions(ctx):
-        kind = (interaction.feedback or {}).get("interaction_type")
-        key = "questions" if kind == "student_question" else "hints"
-        counts[user_id][key] += 1
+        feedback = interaction.feedback or {}
+        kind = kind_keys.get(feedback.get("interaction_type"), "hints_type_not_recorded")
+        counts[user_id][kind] += 1
+        if feedback.get("source") == "openai":
+            counts[user_id]["ai_answers"] += 1
     for user in ctx.users.values():
         if ctx.filters.feedback_mode and user.feedback_mode != ctx.filters.feedback_mode:
             continue
@@ -206,9 +239,7 @@ def _participants(ctx: _Context):
             "test_account": is_test_account(user),
             "created_at": iso_utc(user.created_at),
             "last_sign_in": iso_utc(user.last_login_at),
-            "attempts": counts[user.id]["attempts"],
-            "ai_questions": counts[user.id]["questions"],
-            "hints": counts[user.id]["hints"],
+            **counts[user.id],
         }
 
 
@@ -324,8 +355,9 @@ def _check_results(ctx: _Context):
                 "check_id": str(test.get("test_id") or ""),
                 "check": str(test.get("label") or ""),
                 "result": _check_result(test),
-                "points_earned": test.get("earned_weight"),
+                "points_earned": _points_earned(test),
                 "points_possible": test.get("weight"),
+                "reason": str(test.get("reason") or ""),
                 "mistake_label": str(test.get("misconception_tag") or ""),
                 "hint_key": str(test.get("hint_key") or ""),
                 "message": str(test.get("message") or ""),
@@ -420,13 +452,20 @@ def _learning_events(ctx: _Context):
         ).all())
     for event in events:
         data = event.event_data or {}
-        mode = data.get("feedback_mode") or modes.get(str(data.get("submission_id"))) or ""
+        if data.get("feedback_mode"):
+            mode, mode_source = data["feedback_mode"], "recorded with the event"
+        elif modes.get(str(data.get("submission_id"))):
+            mode, mode_source = modes[str(data["submission_id"])], "from its attempt"
+        else:
+            mode = ctx.account_mode(event.user_id)
+            mode_source = "account's current mode" if mode else ""
         if not ctx.keep(mode=mode, assignment_id=event.assignment_id,
                         when=event.created_at, has_assignment=True):
             continue
         yield {
             "participant_code": ctx.code(event.user_id),
             "feedback_mode": mode,
+            "mode_source": mode_source,
             "event_type": event.event_type,
             "assignment": ctx.assignment(event.assignment_id),
             "assignment_id": event.assignment_id or "",
@@ -454,25 +493,35 @@ def _quiz_attempts(ctx: _Context):
 
 
 def _quiz_answers(ctx: _Context):
-    for user, row in _quiz_rows(ctx):
-        when = datetime.fromisoformat(row["submitted_at"])
-        if not ctx.keep(mode=row["feedback_mode"], when=when):
+    if not ctx.user_ids:
+        return
+    attempts = ctx.session.scalars(
+        select(CourseQuizAttempt)
+        .where(CourseQuizAttempt.user_id.in_(ctx.user_ids))
+        .order_by(CourseQuizAttempt.submitted_at, CourseQuizAttempt.id)
+    ).all()
+    numbers: dict[tuple[str, str, str, str], int] = {}
+    for attempt in attempts:
+        key = (attempt.user_id, attempt.topic_id, attempt.assessment, attempt.quiz_version)
+        numbers[key] = numbers.get(key, 0) + 1
+        if not ctx.keep(mode=attempt.feedback_mode, when=attempt.submitted_at):
             continue
-        choices = (row.get("choices") or "").split(",") if row.get("choices") else []
-        pattern = row.get("correct_pattern") or ""
-        for index, choice in enumerate(choices):
+        for index, answer in enumerate(attempt.answers or []):
             yield {
-                "participant_code": row["participant_code"],
-                "feedback_mode": row["feedback_mode"] or "",
-                "topic_id": row["topic_id"],
-                "assessment": row["assessment"],
-                "quiz_version": row["quiz_version"],
-                "attempt_number": row["attempt_number"],
-                "scored": row["scored"],
+                "participant_code": ctx.code(attempt.user_id),
+                "feedback_mode": attempt.feedback_mode or "",
+                "topic_id": attempt.topic_id,
+                "assessment": attempt.assessment,
+                "quiz_version": attempt.quiz_version,
+                "attempt_id": attempt.id,
+                "attempt_number": numbers[key],
+                # The pre-test has one attempt; a quiz counts only its first.
+                "scored": numbers[key] == 1,
                 "question_number": index + 1,
-                "choice": choice,
-                "correct": pattern[index:index + 1] == "1",
-                "submitted_at": row["submitted_at"],
+                "question_id": str(answer.get("question_id") or ""),
+                "choice": str(answer.get("choice") or ""),
+                "correct": answer.get("correct") is True,
+                "submitted_at": iso_utc(attempt.submitted_at),
             }
 
 
@@ -490,8 +539,12 @@ def _assignment_summary(ctx: _Context):
             continue
         payload = student_analytics_payload(ctx.session, user)
         for row in payload["assignment_summaries"]:
-            if (ctx.filters.assignment_id is not None
-                    and row.get("assignment_id") != ctx.filters.assignment_id):
+            if ctx.filters.assignment_id is not None:
+                if row.get("assignment_id") != ctx.filters.assignment_id:
+                    continue
+            elif row.get("assignment_id") not in ctx.course_assignment_ids:
+                # Old assignments would inflate "not started" counts; pick one
+                # in the Assignment filter to see it.
                 continue
             yield {
                 "participant_code": participant_label(user),
@@ -507,6 +560,14 @@ def _instructor_actions(ctx: _Context):
     actor_ids = {event.actor_user_id for event in events if event.actor_user_id}
     resource_ids = {event.resource_id for event in events
                     if event.resource_type == "user" and event.resource_id}
+    attempt_ids = {event.resource_id for event in events
+                   if event.resource_type == "submission" and event.resource_id}
+    attempt_owners = {}
+    if attempt_ids:
+        attempt_owners = dict(ctx.session.execute(
+            select(Submission.id, Submission.user_id).where(Submission.id.in_(attempt_ids))
+        ).all())
+        resource_ids |= set(attempt_owners.values())
     people = {}
     if actor_ids | resource_ids:
         people = {user.id: user for user in ctx.session.scalars(
@@ -515,13 +576,22 @@ def _instructor_actions(ctx: _Context):
     for event in events:
         if not ctx.in_range(event.created_at):
             continue
-        about = people.get(event.resource_id or "") if event.resource_type == "user" else None
+        if event.resource_type == "user":
+            about = people.get(event.resource_id or "")
+        elif event.resource_type == "submission":
+            about = people.get(attempt_owners.get(event.resource_id or "", ""))
+        else:
+            about = None
         if about is not None and about.role == "student":
             if about.id not in ctx.users:
                 continue
             about_label = participant_label(about)
+            if event.resource_type == "submission":
+                about_label += " (attempt " + (event.resource_id or "")[:8] + ")"
         elif about is not None:
             about_label = f"{about.role} account"
+        elif event.resource_type == "study_data_table":
+            about_label = f"{event.resource_id} table"
         else:
             about_label = event.resource_type
         if ctx.filters.student_id and (about is None or about.id != ctx.filters.student_id):
@@ -581,9 +651,12 @@ TABLES: tuple[Table, ...] = (
            Column("created_at", "Created", "When the account was created (UTC)."),
            Column("last_sign_in", "Last sign-in", "Most recent sign-in (UTC)."),
            Column("attempts", "Attempts", "Run Tests presses (scored attempts)."),
-           Column("ai_questions", "AI questions", "Questions typed to the tutor."),
-           Column("hints", "Hints", "Hints shown: automatic or from the Hint button.")),
-          "created_at", _participants),
+           Column("tutor_questions", "Tutor questions", "Questions typed to the tutor, whether AI or built-in answered."),
+           Column("hint_button", "Hint button", "Hints the student asked for with the Hint button."),
+           Column("automatic_hints", "Automatic hints", "Hints shown automatically after a run (exposure, not a request)."),
+           Column("hints_type_not_recorded", "Older hints", "Hints from before 2026-11-24, when the type was not recorded."),
+           Column("ai_answers", "AI answers", "Help answers that came from the AI (the rest were built-in).")),
+          "created_at", _participants, has_dates=False),
     Table("ai_questions_and_hints", "AI questions and hints",
           "Every question a student asked the tutor and every hint they got, with the answer shown.",
           (_P, _M, _A,
@@ -620,8 +693,9 @@ TABLES: tuple[Table, ...] = (
            Column("check_id", "Check ID", "Stable check identifier."),
            Column("check", "Check", "Check name students see."),
            Column("result", "Result", "passed, failed, or not run."),
-           Column("points_earned", "Points", "Points earned for this check."),
+           Column("points_earned", "Points", "Points this check gave (0 while setup credit is held back)."),
            Column("points_possible", "Out of", "Points this check is worth."),
+           Column("reason", "Reason", "Structured reason the grader gave, if any."),
            Column("mistake_label", "Mistake label", "Misconception tag from grader evidence."),
            Column("hint_key", "Hint key", "Observed pattern that picks the hint ladder."),
            Column("message", "Message", "The check message (what the student saw in TDD modes).")),
@@ -629,6 +703,7 @@ TABLES: tuple[Table, ...] = (
     Table("learning_events", "Learning events",
           "App actions: opening assignments, runs, Simulate, AI on/off, files, tabs.",
           (_P, _M,
+           Column("mode_source", "Mode from", "recorded with the event, from its attempt, or the account's current mode."),
            Column("event_type", "Event", "What happened."),
            _A, _AID, _V,
            Column("details", "Details", "Stored event data."),
@@ -646,8 +721,10 @@ TABLES: tuple[Table, ...] = (
            Column("active_seconds_to_completion", "Seconds to complete", "Active time until the first pass.")),
           "first_active_at", _assignment_time, has_assignment=True),
     Table("assignment_summary", "Assignment summary",
-          "Per student and assignment: attempts, scores, hints, and completion.",
-          (_P, _M, _A), "assignment_id", _assignment_summary, has_assignment=True),
+          "Per student and assignment of this course: attempts, scores, hints, and completion. "
+          "Choose an old assignment in the filter to see it.",
+          (_P, _M, _A), "assignment_id", _assignment_summary, has_assignment=True,
+          has_dates=False),
     Table("study_sessions", "Study sessions",
           "Each signed-in study session and its active time.",
           (_P, _M,
@@ -689,13 +766,14 @@ TABLES: tuple[Table, ...] = (
            Column("attempt_number", "Attempt no.", "Order of this attempt."),
            Column("scored", "Scored", "True for the scored attempt."),
            Column("question_number", "Question", "Question position in the quiz."),
+           Column("question_id", "Question ID", "Stable question identifier in this quiz version."),
            Column("choice", "Choice", "The option the student chose."),
            Column("correct", "Correct", "Whether that choice was right."),
            Column("submitted_at", "When", "UTC.")),
           "submitted_at", _quiz_answers),
     Table("course_learning", "Course learning per topic",
-          "Pre-test score, first quiz score, and the gain between them.",
-          (_P, _M), "topic_id", _course_learning),
+          "Pre-test score, first quiz score, and the gain between them (from the correct counts).",
+          (_P, _M), "topic_id", _course_learning, has_dates=False),
     Table("instructor_actions", "Instructor actions",
           "Account, mode, and setting changes from the audit log (sign-ins are in Sign-ins).",
           (Column("created_at", "When", "UTC."),
@@ -776,6 +854,8 @@ def page_payload(session: Session, table: Table, filters: Filters, *, page: int,
         "columns": table_columns(table, rows),
         "rows": rows[start:start + page_size],
         "total": len(rows),
+        # True only if the safety bound cut the table short.
+        "truncated": len(rows) >= MAX_TABLE_ROWS,
         "page": page,
         "page_size": page_size,
     }
@@ -816,7 +896,7 @@ def catalog_payload(session: Session, include_test_accounts: bool) -> dict[str, 
     return {
         "tables": [
             {"name": table.name, "title": table.title, "description": table.description,
-             "has_assignment": table.has_assignment}
+             "has_assignment": table.has_assignment, "has_dates": table.has_dates}
             for table in TABLES
         ],
         "participants": participants,

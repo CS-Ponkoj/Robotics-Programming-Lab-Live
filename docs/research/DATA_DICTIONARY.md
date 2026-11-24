@@ -384,7 +384,27 @@ unless "Include test accounts" is on. Submitted code is never in a table or
 CSV; an instructor can open one attempt's code in the app, which writes a
 `study_data.code_viewed` audit event. Each CSV download writes a
 `study_data.exported` audit event with the table and filters (no participant
-identity). Instructor-action rows drop login IDs and emails from audit details.
+identity). Instructor-action rows drop login IDs and emails from audit details,
+and name the table or attempt they concern.
+
+Table rules (2026-11-24 data review):
+
+- Participants count help apart: `tutor_questions`, `hint_button` (requested),
+  `automatic_hints` (shown after a run; exposure, not a request),
+  `hints_type_not_recorded` (before 2026-11-24), and `ai_answers` (answers
+  whose source was the AI; the rest were built-in).
+- Check results: `points_earned` is the credit the check gave (its weight when
+  passed, 0 when failed, not run, or held back); `reason` is the grader's
+  structured reason.
+- Learning events: `mode_source` says whether the mode was recorded with the
+  event, taken from its attempt, or is the account's current mode (for events
+  that never stored one, such as `assignment_opened`).
+- Quiz answers carry the stored `question_id` and the quiz `attempt_id`.
+- Assignment summary shows this course's assignments (those with a course
+  number) unless an assignment is chosen, so old assignments do not inflate
+  "not started" counts.
+- Participants, assignment summary, and course learning are whole-study
+  summaries; the date filter does not apply to them.
 
 ### `course_quiz_attempts`
 
@@ -436,7 +456,10 @@ score, `choices` such as `B,C,A,...`, `correct_pattern` such as `1101...`,
 submission time, `data_schema_version`) and `course_learning_summary` (per
 participant and topic: `pretest_score`, `quiz_score` from the first attempt,
 `learning_gain`, `quiz_attempts`, `best_quiz_score`, and the feedback mode of
-the first attempt). The instructor's participant page shows the same summary.
+the first attempt). From 2026-11-24 `learning_gain` is computed from the
+correct counts (quiz percent minus pre-test percent, one decimal), not from the
+two rounded percentages; before that a 5/15 to 10/15 change showed 34 instead
+of 33.3. The instructor's participant page shows the same summary.
 Quiz attempts are not part of the Phase 1 analytics metrics.
 
 ### `page_feedback`

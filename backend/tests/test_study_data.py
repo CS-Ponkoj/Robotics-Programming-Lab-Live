@@ -171,3 +171,80 @@ def test_code_is_viewable_one_attempt_at_a_time_and_audited(client):
     with client.app.state.SessionLocal() as session:
         actions = session.scalars(select(AuditEvent.action)).all()
     assert "study_data.code_viewed" in actions
+
+
+def test_fixes_from_the_data_review(client):
+    """Points, help counts, event modes, summary scope, and audit rows."""
+    _headers, user, attempt_id, _code = _activity(client)
+    instructor = _instructor(client)
+
+    def rows(table, **params):
+        response = client.get(f"/admin/study-data/{table}", params=params, headers=instructor)
+        assert response.status_code == 200, response.text
+        return response.json()["rows"]
+
+    # Points: a passed check earns its weight even without earned_weight.
+    for row in rows("check_results"):
+        if row["points_possible"] is not None:
+            expected = row["points_possible"] if row["result"] == "passed" else 0.0
+            assert row["points_earned"] == expected, row
+
+    # Help: requests and automatic hints are counted apart.
+    participant = rows("participants")[0]
+    assert participant["tutor_questions"] == 1 and participant["hint_button"] == 1
+    assert "ai_questions" not in participant and "hints" not in participant
+    assert participant["ai_answers"] == 0
+
+    # Events: every row says where its mode came from.
+    events = rows("learning_events")
+    assert events and all(row["feedback_mode"] == "tdd_ai" for row in events)
+    assert {row["mode_source"] for row in events} <= {
+        "recorded with the event", "from its attempt", "account's current mode"}
+
+    # Summary: only this course's assignments unless one is chosen.
+    catalog = client.get("/admin/study-data", headers=instructor).json()
+    course_tables = {t["name"]: t for t in catalog["tables"]}
+    assert course_tables["assignment_summary"]["has_dates"] is False
+    assert course_tables["attempts"]["has_dates"] is True
+    summary_ids = {row["assignment_id"] for row in rows("assignment_summary")}
+    assert 1 not in summary_ids  # assignment 1 is an old assignment
+    assert {row["assignment_id"] for row in rows("assignment_summary", assignment_id=1)} == {1}
+
+    # Audit rows name the table and attempt they concern.
+    client.get("/admin/study-data/attempts", params={"format": "csv", "feedback_mode": "tdd_ai"},
+               headers=instructor)
+    client.get(f"/admin/study-data/attempts/{attempt_id}/code", headers=instructor)
+    actions = rows("instructor_actions")
+    export = next(row for row in actions if row["action"] == "study_data.exported")
+    assert export["about"] == "attempts table"
+    assert export["details"]["feedback_mode"] == "tdd_ai"
+    viewed = next(row for row in actions if row["action"] == "study_data.code_viewed")
+    assert viewed["about"].startswith("P-001 (attempt ")
+
+
+def test_quiz_answers_keep_question_ids_and_gain_uses_counts(client):
+    from datetime import timedelta
+
+    from models import CourseQuizAttempt, User, utc_now
+
+    instructor = _instructor(client)
+    with client.app.state.SessionLocal() as session:
+        user = session.scalars(select(User).where(User.login_id == STUDENT_LOGIN)).one()
+        start = utc_now()
+        for offset, (assessment, correct) in enumerate((("pretest", 5), ("quiz", 10))):
+            session.add(CourseQuizAttempt(
+                user_id=user.id, topic_id="ros2-mobile-robots", quiz_version="v1",
+                correct_count=correct, total_questions=15,
+                score_percent=round(100 * correct / 15), assessment=assessment,
+                feedback_mode="tdd", submitted_at=start + timedelta(seconds=offset),
+                answers=[{"question_id": f"q{i}", "choice": "A", "correct": i <= correct}
+                         for i in range(1, 16)],
+            ))
+        session.commit()
+    answers = client.get("/admin/study-data/quiz_answers", params={"page_size": 200},
+                         headers=instructor).json()["rows"]
+    assert len(answers) == 30
+    assert {row["question_id"] for row in answers} == {f"q{i}" for i in range(1, 16)}
+    learning = client.get("/admin/study-data/course_learning", headers=instructor).json()["rows"]
+    # 66.7% - 33.3% from the counts; the rounded percentages would give 34.
+    assert learning[0]["learning_gain"] == 33.3
