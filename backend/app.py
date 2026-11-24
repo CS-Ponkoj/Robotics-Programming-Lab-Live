@@ -4,7 +4,7 @@ import secrets
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import timedelta, timezone
+from datetime import date, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -50,13 +50,18 @@ from auth_service import (
 )
 from config import Settings, get_settings
 from code_formatting import CodeFormattingError, format_python_code
-from data_contracts import classify_execution_status, normalize_event_data
+from data_contracts import (
+    HINT_INTERACTION_SCHEMA_VERSION,
+    classify_execution_status,
+    normalize_event_data,
+)
 from database import Base, build_engine
 from email_service import EmailService
 from graders import PythonFunctionGrader, PythonVariableGrader, Ros2TopicGrader
 from graders.python_function import PlaygroundInputError, parse_playground_arguments
 from playground_inputs import parameter_problems
 from progress_service import student_assignment_progress
+import study_data
 from models import (
     Assignment,
     AuthSession,
@@ -1619,6 +1624,116 @@ def create_app(
             },
         )
 
+    @application.get("/admin/study-data")
+    def admin_study_data_catalog(
+        include_test_accounts: bool = False,
+        session: Session = Depends(session_dependency),
+        _actor: User | None = Depends(admin_dependency),
+    ):
+        return study_data.catalog_payload(session, include_test_accounts)
+
+    @application.get("/admin/study-data/attempts/{attempt_id}/code")
+    def admin_study_data_attempt_code(
+        attempt_id: str,
+        session: Session = Depends(session_dependency),
+        actor: User | None = Depends(admin_dependency),
+    ):
+        """One attempt's code, for viewing in the app only (never exported)."""
+        submission = session.get(Submission, attempt_id)
+        student = session.get(User, submission.user_id) if submission else None
+        if (
+            submission is None
+            or student is None
+            or student.role != "student"
+            or student.is_demo
+        ):
+            raise HTTPException(404, "Attempt not found.")
+        record_audit(
+            session,
+            action="study_data.code_viewed",
+            resource_type="submission",
+            resource_id=submission.id,
+            actor_user_id=actor.id if actor else None,
+        )
+        return {
+            "attempt_id": submission.id,
+            "participant_code": study_data.participant_label(student),
+            "assignment_id": submission.assignment_id,
+            "assignment_version": submission.assignment_version,
+            "score": submission.score,
+            "created_at": study_data.iso_utc(submission.created_at),
+            "code": submission.code,
+        }
+
+    @application.get("/admin/study-data/{table_name}")
+    def admin_study_data_table(
+        table_name: str,
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=50, ge=1, le=200),
+        sort: str | None = Query(default=None, pattern="^[a-z_]{1,60}$"),
+        order: str = Query(default="desc", pattern="^(asc|desc)$"),
+        student_id: str | None = Query(default=None, max_length=36),
+        assignment_id: int | None = Query(default=None, ge=1),
+        feedback_mode: str | None = Query(
+            default=None, pattern="^(traditional|tdd|tdd_ai)$"
+        ),
+        date_from: date | None = None,
+        date_to: date | None = None,
+        include_test_accounts: bool = False,
+        format: str = Query(default="json", pattern="^(json|csv)$"),
+        session: Session = Depends(session_dependency),
+        actor: User | None = Depends(admin_dependency),
+    ):
+        table = study_data.TABLES_BY_NAME.get(table_name)
+        if table is None:
+            raise HTTPException(404, "Choose one of the study data tables.")
+        if date_from and date_to and date_from > date_to:
+            raise HTTPException(400, "The start date must be on or before the end date.")
+        filters = study_data.Filters(
+            student_id=student_id or None,
+            assignment_id=assignment_id,
+            feedback_mode=feedback_mode,
+            date_from=date_from,
+            date_to=date_to,
+            include_test_accounts=include_test_accounts,
+        )
+        descending = order == "desc"
+        if format == "csv":
+            content = study_data.csv_payload(session, table, filters, sort, descending)
+            record_audit(
+                session,
+                action="study_data.exported",
+                resource_type="study_data_table",
+                resource_id=table.name,
+                actor_user_id=actor.id if actor else None,
+                details={
+                    "assignment_id": assignment_id,
+                    "feedback_mode": feedback_mode,
+                    "date_from": date_from.isoformat() if date_from else None,
+                    "date_to": date_to.isoformat() if date_to else None,
+                    "one_participant": bool(student_id),
+                    "include_test_accounts": include_test_accounts,
+                },
+            )
+            return Response(
+                content=content,
+                media_type="text/csv; charset=utf-8",
+                headers={
+                    "Content-Disposition": (
+                        f'attachment; filename="{table.name}.csv"'
+                    )
+                },
+            )
+        return study_data.page_payload(
+            session,
+            table,
+            filters,
+            page=page,
+            page_size=page_size,
+            sort=sort,
+            descending=descending,
+        )
+
     @application.get(
         "/assignments",
         response_model=AssignmentListResponse,
@@ -1920,6 +2035,7 @@ def create_app(
                 event_data={
                     "outcome": replay["outcome"] if replay else "error",
                     "duration_seconds": replay["duration_seconds"] if replay else 0.0,
+                    "feedback_mode": mode,
                 },
             )
         return shape_simulation_response(result, mode)
@@ -2073,11 +2189,14 @@ def create_app(
                 ai_unavailable_message=access.message,
             )
             if not is_ephemeral_demo(request, user):
+                stored_feedback = tutor_feedback.model_dump()
+                stored_feedback["interaction_type"] = "run_hint"
                 session.add(
                     HintInteraction(
                         submission_id=submission.id,
                         hint_level=1,
-                        feedback=tutor_feedback.model_dump(),
+                        feedback=stored_feedback,
+                        data_schema_version=HINT_INTERACTION_SCHEMA_VERSION,
                     )
                 )
                 session.commit()
@@ -2160,11 +2279,14 @@ def create_app(
             ai_unavailable_message=access.message if access else "",
         )
         if not is_ephemeral_demo(request, user):
+            stored_feedback = feedback.model_dump()
+            stored_feedback["interaction_type"] = "progressive_hint"
             session.add(
                 HintInteraction(
                     submission_id=submission.id,
                     hint_level=body.hint_level,
-                    feedback=feedback.model_dump(),
+                    feedback=stored_feedback,
+                    data_schema_version=HINT_INTERACTION_SCHEMA_VERSION,
                 )
             )
             session.commit()
@@ -2231,11 +2353,15 @@ def create_app(
         if not is_ephemeral_demo(request, user):
             stored_feedback = feedback.model_dump()
             stored_feedback["interaction_type"] = "student_question"
+            # Owner decision (2026-11-24): keep the student's own question so
+            # instructors can review it beside the answer it received.
+            stored_feedback["student_question"] = body.question
             session.add(
                 HintInteraction(
                     submission_id=submission.id,
                     hint_level=body.hint_level,
                     feedback=stored_feedback,
+                    data_schema_version=HINT_INTERACTION_SCHEMA_VERSION,
                 )
             )
             session.commit()

@@ -140,6 +140,7 @@ backend/                          FastAPI application
   course_settings.py              Instructor course settings (AI tutor, Old assignments)
   assignment_insights.py          Aggregate per-assignment insights for instructors
   research_service.py             Study sessions, events, summaries, and exports
+  study_data.py                   Instructor Study data tables and CSV (participant codes, no code)
   instructor_dataset.py           Offline instructor AI-evaluation contract and validator
   ai_evaluation_cases/            Server-only, instructor-reviewed tutor evaluation cases
   migrations/                     Alembic production schema history

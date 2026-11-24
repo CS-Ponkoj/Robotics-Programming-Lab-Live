@@ -312,7 +312,8 @@ stored accidentally.
 For `hint_requested`, `interaction_type` distinguishes a progressive hint from
 a `student_question`. Question events store only the question length, hint
 level, and tutor source. The student's question text is not written to the
-learning-event record.
+learning-event record; from 2026-11-24 it is kept in `hint_interactions`
+instead (see below).
 
 `assignment_run` and `assignment_submitted` also store `feedback_mode`, the
 account's mode at that moment, so moving a student to another mode never
@@ -345,7 +346,8 @@ TDD green, TDD + AI teal, each as a gradient); instructors use bronze.
 `simulation_run` is recorded when a signed-in student in a study session presses
 Simulate on an assignment with a `ros2_2d` simulation. It stores only `outcome`
 (`collided`, `never_moved`, `stopped`, `stopped_and_resumed`, `kept_driving`, or
-`error`) and `duration_seconds`. The replay is visual only: it creates no
+`error`), `duration_seconds`, and from 2026-11-24 `feedback_mode` (the account's
+mode at that moment; empty on earlier rows). The replay is visual only: it creates no
 submission, score, or test evidence, and the trace and source code are not stored.
 Demo sessions record nothing.
 
@@ -353,12 +355,36 @@ Demo sessions record nothing.
 
 Connects a structured tutor response and hint level to one submission. The
 response may contain a diagnosis, short answer, debugging steps, guiding
-question, next action, source, and solution-protection flag. For student
-questions, the stored response also records `interaction_type` but does not
-store the raw question. Demo sessions do not create persistent hint rows.
+question, next action, source, and solution-protection flag. Demo sessions do
+not create persistent hint rows.
+
+| `data_schema_version` | What the `feedback` JSON adds |
+|---|---|
+| 1 (until 2026-11-23) | `interaction_type` only on `student_question` rows; the question text was not stored |
+| 2 (from 2026-11-24) | `interaction_type` on every row: `run_hint` (automatic hint after a run), `progressive_hint` (Hint button), or `student_question` (Ask the tutor). `student_question` rows also keep `student_question`, the exact text the student typed (3-500 characters), by owner decision so instructors can review it beside the answer shown |
+
+Questions typed before 2026-11-24 were never stored and cannot be recovered;
+only their length is in the `hint_requested` event. The question text is free
+student writing, so the consent form should say it is kept.
 From 2026-11-18 the daily AI quota counts a student's rows from the current
 UTC day whose stored `source` is `openai`; built-in (`fallback`) answers are
 never counted.
+
+### Instructor Study data page (from 2026-11-24)
+
+Instructors see every table above in the app (Instructor Studio, Study data)
+and can download each filtered table as CSV
+(`GET /admin/study-data/{table}?format=csv`). Tables: participants, AI questions
+and hints, attempts, check results, learning events, time per assignment,
+assignment summary, study sessions, sign-ins, quiz and pre-test attempts, quiz
+answers, course learning per topic, instructor actions, and page feedback.
+Rows use participant codes, never login IDs. The owner's test logins
+(`traditional`, `tdd`, `ai`, and the seeded `student` / `DEMO` row) are hidden
+unless "Include test accounts" is on. Submitted code is never in a table or
+CSV; an instructor can open one attempt's code in the app, which writes a
+`study_data.code_viewed` audit event. Each CSV download writes a
+`study_data.exported` audit event with the table and filters (no participant
+identity). Instructor-action rows drop login IDs and emails from audit details.
 
 ### `course_quiz_attempts`
 

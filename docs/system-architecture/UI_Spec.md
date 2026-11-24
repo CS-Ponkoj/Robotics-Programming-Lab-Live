@@ -29,6 +29,7 @@
 | Course contents | [`course_content_page.dart`](../../frontend/lib/screens/course_content_page.dart) | Signed in | Topic sections and quizzes |
 | My account | [`my_account_page.dart`](../../frontend/lib/screens/my_account_page.dart) | Not demo | Change password |
 | My study progress / Research dashboard | [`research_dashboard_page.dart`](../../frontend/lib/screens/research_dashboard_page.dart) | Student / Instructor | Own progress / class analytics and export |
+| Study data | [`study_data_page.dart`](../../frontend/lib/screens/study_data_page.dart) | Instructor | Table list (dropdown on phones), filters (participant, assignment, mode, dates, test accounts), sortable paged table, record dialog with the attempt's code, Download CSV |
 | Instructor Studio | [`instructor_assignment_admin.dart`](../../frontend/lib/screens/instructor_assignment_admin.dart) | Instructor | Hub for assignments, accounts, research and feedback |
 | Manage accounts | [`student_accounts_page.dart`](../../frontend/lib/screens/student_accounts_page.dart) | Instructor | Add, import, deactivate and reset accounts; set each student's feedback mode (coloured pill on the card, picker in New account and Edit details) |
 | AI tutor settings | [`ai_tutor_settings_page.dart`](../../frontend/lib/screens/ai_tutor_settings_page.dart) | Instructor | Course switch, daily limit, reviewed assignments |

@@ -171,10 +171,19 @@ def test_beam_probe_result_is_bounded_and_optional():
     })
 
 
-def test_simulation_run_event_stores_only_outcome_and_duration():
+def test_simulation_run_event_stores_only_outcome_duration_and_mode():
     assert normalize_event_data("simulation_run", {"outcome": "collided", "duration_seconds": 5.2}) == {
-        "outcome": "collided", "duration_seconds": 5.2,
+        "outcome": "collided", "duration_seconds": 5.2, "feedback_mode": None,
     }
+    assert normalize_event_data(
+        "simulation_run",
+        {"outcome": "collided", "duration_seconds": 5.2, "feedback_mode": "tdd_ai"},
+    )["feedback_mode"] == "tdd_ai"
+    with pytest.raises(ValueError):
+        normalize_event_data(
+            "simulation_run",
+            {"outcome": "collided", "duration_seconds": 1, "feedback_mode": "other"},
+        )
     with pytest.raises(ValueError):
         normalize_event_data("simulation_run", {"outcome": "collided", "duration_seconds": 1, "code": "x"})
 
@@ -248,7 +257,11 @@ def test_student_simulation_returns_a_replay_and_records_only_one_event(sim_clie
     with sim_client.app.state.SessionLocal() as session:
         event = session.scalars(select(LearningEvent).order_by(LearningEvent.id.desc())).first()
         assert event.event_type == "simulation_run"
-        assert event.event_data == {"outcome": "stopped_and_resumed", "duration_seconds": body["simulation"]["duration_seconds"]}
+        assert event.event_data == {
+            "outcome": "stopped_and_resumed",
+            "duration_seconds": body["simulation"]["duration_seconds"],
+            "feedback_mode": "tdd",
+        }
         assert event.assignment_version == 5
     assert sim_client.executor.configs[-1]["mode"] == "simulate"
 

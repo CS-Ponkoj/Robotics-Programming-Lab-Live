@@ -11,6 +11,7 @@ import 'package:iuse_demo/state/feedback_page_tracker.dart';
 import 'package:iuse_demo/screens/feedback_inbox_page.dart';
 import 'package:iuse_demo/screens/student_accounts_page.dart';
 import 'package:iuse_demo/screens/research_dashboard_page.dart';
+import 'package:iuse_demo/screens/study_data_page.dart';
 import 'package:iuse_demo/services/auth_api.dart';
 import 'package:iuse_demo/services/instructor_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
@@ -52,6 +53,14 @@ class InstructorAssignmentAdmin extends StatelessWidget {
         detail: 'Participation, attempts, and privacy-safe research exports.',
         onTap: () => open(
             const InstructorResearchDashboard(), 'Research study dashboard'),
+      ),
+      _StudioLinkCard(
+        key: const Key('studio-study-data-card'),
+        icon: LucideIcons.table,
+        title: 'Study data',
+        detail: 'Every record the app collects, including AI questions and '
+            'hints, as tables you can filter and download as CSV.',
+        onTap: () => open(const StudyDataPage(), 'Study data'),
       ),
       _StudioLinkCard(
         key: const Key('studio-ai-card'),

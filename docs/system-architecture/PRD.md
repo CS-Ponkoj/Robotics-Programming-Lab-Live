@@ -71,6 +71,7 @@ Status key: ✅ live · 🟡 built but switched off · ⬜ not built
 | F12 | Instructor Studio: create, validate, publish | ✅ | |
 | F13 | Account management and CSV import | ✅ | Each student card shows its feedback mode |
 | F14 | Research dashboard and export | ✅ | Uses participant codes, never login IDs, and never exports source code |
+| F20 | Study data tables | ✅ | Instructor Studio page with 14 tables of everything collected (including each AI question, from 2026-11-24, and every hint), filters, CSV download; code viewable per attempt in the app only |
 | F15 | AI tutor | ✅ | Live for TDD + AI accounts on Assignments 7 and 8 (evaluation cases approved by a named instructor). Gated by key, course switch, review, feedback mode and a daily quota; built-in hints remain its fallback |
 | F18 | Feedback modes (study conditions) | ✅ | Traditional (score, counts, plain simulation replay), TDD (details and full simulation, no hints), TDD + AI (adds hints and the tutor). Set per account, enforced on the server, recorded with every attempt; each mode has its own gradient theme |
 | F19 | 2D simulation replay (ROS 2) | ✅ | Visual only, never graded; every mode (Traditional gets the plain replay without the beam probe or links from failed checks) |

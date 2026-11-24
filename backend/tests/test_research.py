@@ -198,10 +198,13 @@ def test_submission_hint_solution_and_ai_status_are_recorded(research_client):
     with research_client.app.state.SessionLocal() as session:
         interactions = session.scalars(select(HintInteraction)).all()
         assert len(interactions) == 2
-        assert all(
-            question_text not in json.dumps(item.feedback)
-            for item in interactions
-        )
+        # Owner decision (2026-11-24): the tutor question is kept in the hint
+        # record for instructors; it stays out of learning events above.
+        by_type = {item.feedback["interaction_type"]: item for item in interactions}
+        assert set(by_type) == {"progressive_hint", "student_question"}
+        assert by_type["student_question"].feedback["student_question"] == question_text
+        assert "student_question" not in by_type["progressive_hint"].feedback
+        assert all(item.data_schema_version == 2 for item in interactions)
     assert mine["attempts"][0]["data_schema_version"] == 1
     assert mine["attempts"][0]["execution_status"] in {
         "completed",

@@ -24,6 +24,9 @@ from pydantic import (
 
 
 CURRENT_DATA_SCHEMA_VERSION = 1
+# Hint and tutor records: version 2 adds interaction_type to every row and the
+# student's own question text to student_question rows.
+HINT_INTERACTION_SCHEMA_VERSION = 2
 
 NonEmptyText = Annotated[str, Field(min_length=1, max_length=500)]
 
@@ -519,6 +522,9 @@ class SimulationRunEventData(ContractModel):
         "collided", "never_moved", "stopped", "stopped_and_resumed", "kept_driving", "error"
     ]
     duration_seconds: float = Field(ge=0, le=10)
+    feedback_mode: str | None = Field(
+        default=None, pattern="^(traditional|tdd|tdd_ai)$"
+    )
 
 
 EVENT_DATA_ADAPTERS = {
