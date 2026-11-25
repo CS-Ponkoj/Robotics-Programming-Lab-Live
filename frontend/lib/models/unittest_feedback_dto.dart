@@ -75,6 +75,10 @@ class UnittestFeedbackDto {
   final String hint;
   final String tutorSource;
 
+  /// A failed run in a mode with hints: the student may ask for one. Runs
+  /// never show a hint by themselves.
+  final bool hintsAvailable;
+
   /// The feedback mode this attempt ran under; traditional has no details.
   final String feedbackMode;
   final String executionStatus;
@@ -98,6 +102,7 @@ class UnittestFeedbackDto {
       required this.execSuccess,
       required this.hint,
       this.tutorSource = '',
+      this.hintsAvailable = false,
       this.feedbackMode = 'tdd',
       this.executionStatus = '',
       this.tutorFeedback = const {},
@@ -137,6 +142,7 @@ class UnittestFeedbackDto {
           tutorSource: json['tutor_feedback'] is Map
               ? ((json['tutor_feedback'] as Map)['source']?.toString() ?? '')
               : '',
+          hintsAvailable: json['hints_available'] == true,
           executionStatus: json['execution_status']?.toString() ?? '',
           feedbackMode: json['feedback_mode']?.toString() ?? 'tdd',
           tutorFeedback: json['tutor_feedback'] is Map

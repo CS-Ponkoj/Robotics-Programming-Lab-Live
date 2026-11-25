@@ -550,3 +550,33 @@ def test_inline_code_backticks_are_removed_for_the_plain_text_ui():
     assert feedback.source == "openai"
     assert "`" not in feedback.diagnosis + "".join(feedback.debugging_steps)
     assert feedback.diagnosis == "In handle_scan(), the robot drove at 0.3 m."
+
+
+def test_provenance_names_the_model_and_prompt_for_ai_answers_only():
+    from tutor import TUTOR_PROMPT_VERSION
+
+    def create(**kwargs):
+        return SimpleNamespace(
+            output_text=json.dumps(_ai_output()), model='gpt-test-2026-11-01'
+        )
+
+    service = TutorService(
+        Settings(openai_hint_model='gpt-test'),
+        client=SimpleNamespace(responses=SimpleNamespace(create=create)),
+    )
+    feedback = service.feedback(_assignment(), _submission(), hint_level=1)
+    assert feedback.source == 'openai'
+    record = service.provenance(_assignment(), feedback)
+    assert record['ai_model'] == 'gpt-test'
+    assert record['ai_model_snapshot'] == 'gpt-test-2026-11-01'
+    assert record['prompt_version'] == TUTOR_PROMPT_VERSION
+    assert len(record['prompt_sha256']) == 16
+    # The fingerprint is stable for the same instructions.
+    assert service.provenance(_assignment(), feedback) == record
+    # Provenance is never part of what the student receives.
+    assert 'ai_model' not in feedback.model_dump()
+
+    built_in = TutorService(Settings()).feedback(
+        _assignment(), _submission(), use_ai_tutor=False
+    )
+    assert set(TutorService(Settings()).provenance(_assignment(), built_in).values()) == {''}

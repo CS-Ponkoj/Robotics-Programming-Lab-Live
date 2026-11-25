@@ -24,6 +24,7 @@ EXPECTED_TABLES = {
     "study_sessions",
     "submissions",
     "users",
+    "workload_surveys",
 }
 
 

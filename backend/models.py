@@ -262,6 +262,81 @@ class CourseQuizAttempt(Base):
     user: Mapped[User] = relationship(back_populates="course_quiz_attempts")
 
 
+class WorkloadSurvey(Base):
+    """One Raw NASA-TLX response per student per study assignment version.
+
+    Ratings are 0-100 in steps of 5; higher is worse on every scale,
+    including performance (0 = good, 100 = poor, NASA's direction, never
+    reversed). An unanswered scale is null; Raw TLX is computed only when
+    all six are present (never imputed).
+    """
+
+    __tablename__ = "workload_surveys"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "assignment_id", "assignment_version",
+            name="uq_workload_surveys_user_assignment_version",
+        ),
+        CheckConstraint(
+            "assignment_version >= 1",
+            name="ck_workload_surveys_assignment_version_positive",
+        ),
+        CheckConstraint(
+            "mental_demand IS NULL OR (mental_demand BETWEEN 0 AND 100 AND mental_demand % 5 = 0)",
+            name="ck_workload_surveys_mental_demand_scale",
+        ),
+        CheckConstraint(
+            "physical_demand IS NULL OR (physical_demand BETWEEN 0 AND 100 AND physical_demand % 5 = 0)",
+            name="ck_workload_surveys_physical_demand_scale",
+        ),
+        CheckConstraint(
+            "temporal_demand IS NULL OR (temporal_demand BETWEEN 0 AND 100 AND temporal_demand % 5 = 0)",
+            name="ck_workload_surveys_temporal_demand_scale",
+        ),
+        CheckConstraint(
+            "performance IS NULL OR (performance BETWEEN 0 AND 100 AND performance % 5 = 0)",
+            name="ck_workload_surveys_performance_scale",
+        ),
+        CheckConstraint(
+            "effort IS NULL OR (effort BETWEEN 0 AND 100 AND effort % 5 = 0)",
+            name="ck_workload_surveys_effort_scale",
+        ),
+        CheckConstraint(
+            "frustration IS NULL OR (frustration BETWEEN 0 AND 100 AND frustration % 5 = 0)",
+            name="ck_workload_surveys_frustration_scale",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    assignment_id: Mapped[int] = mapped_column(Integer, index=True)
+    assignment_version: Mapped[int] = mapped_column(Integer)
+    feedback_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # The student's latest attempt on this version when they submitted.
+    final_attempt_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # "finished_button" or "full_pass_prompt".
+    trigger: Mapped[str] = mapped_column(String(30))
+    form_version: Mapped[str] = mapped_column(String(20))
+    # Browser-reported; bounded on the server to the hour before submitting.
+    opened_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    mental_demand: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    physical_demand: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    temporal_demand: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    performance: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    effort: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    frustration: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    data_schema_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1"
+    )
+
+
 class CodeDraft(Base):
     __tablename__ = "code_drafts"
     __table_args__ = (

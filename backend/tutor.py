@@ -1,4 +1,5 @@
 import ast
+import hashlib
 import json
 import logging
 import re
@@ -36,6 +37,10 @@ _UNDEFINED_NAME_CLAIM = re.compile(
     re.IGNORECASE,
 )
 
+
+# Raise whenever the tutor instructions or the request shape change, so each
+# stored AI answer can be traced to the exact prompt (study RQ1-RQ3).
+TUTOR_PROMPT_VERSION = "2026-11-24.1"
 
 _REASONING_MODEL_PREFIXES = ("gpt-5", "gpt-6", "o1", "o3", "o4")
 
@@ -157,6 +162,25 @@ class TutorService:
     def __init__(self, settings: Settings, client: OpenAI | None = None):
         self.settings = settings
         self.client = client
+        # The model snapshot the provider reports for the last AI answer.
+        self.last_model_snapshot = ""
+
+    def provenance(self, assignment: Assignment, feedback: TutorFeedback) -> dict[str, str]:
+        """Which model and prompt produced an answer; empty for built-in hints.
+
+        Stored server-side with each hint record, never sent to students.
+        """
+        if feedback.source != "openai":
+            return {"ai_model": "", "ai_model_snapshot": "",
+                    "prompt_version": "", "prompt_sha256": ""}
+        return {
+            "ai_model": self.settings.openai_hint_model,
+            "ai_model_snapshot": self.last_model_snapshot,
+            "prompt_version": TUTOR_PROMPT_VERSION,
+            "prompt_sha256": hashlib.sha256(
+                self._instructions(assignment).encode("utf-8")
+            ).hexdigest()[:16],
+        }
 
     def feedback(
         self,
@@ -240,6 +264,7 @@ class TutorService:
                 store=False,
                 **self._model_options(),
             )
+            self.last_model_snapshot = str(getattr(response, "model", "") or "")[:100]
             parsed = TutorGeneratedContent.model_validate_json(response.output_text)
             self._enforce_output_policy(parsed)
             self._enforce_evidence_grounding(parsed, submission.evidence or {})

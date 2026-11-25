@@ -169,6 +169,9 @@ class SubmissionResponse(BaseModel):
     error_frames: list[ErrorFrame] = Field(default_factory=list)
     tutor_feedback: TutorFeedback | None = None
     feedback_mode: str = "tdd"
+    # Hints are given only when the student asks (Hint button or a typed
+    # question); this says whether this failed run may ask for one.
+    hints_available: bool = False
 
 
 class SimulationScan(BaseModel):
@@ -256,6 +259,16 @@ class HintRequest(BaseModel):
     submission_id: str
     hint_level: int = Field(default=1, ge=1, le=4)
     use_ai_tutor: bool = False
+
+
+class WorkloadSurveySubmission(BaseModel):
+    """A Raw NASA-TLX response; ratings are checked in workload_survey."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ratings: dict[str, Any] = Field(max_length=6)
+    trigger: Literal["finished_button", "full_pass_prompt"]
+    opened_at: datetime | None = None
 
 
 class TutorQuestionRequest(BaseModel):

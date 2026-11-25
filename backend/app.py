@@ -13,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from pydantic import BaseModel
 
@@ -72,8 +73,10 @@ from models import (
     StudySession,
     Submission,
     User,
+    WorkloadSurvey,
     utc_now,
 )
+import workload_survey
 from research_service import (
     build_research_dataset,
     csv_bytes,
@@ -121,6 +124,7 @@ from schemas import (
     SimulationResponse,
     SubmissionResponse,
     TutorQuestionRequest,
+    WorkloadSurveySubmission,
 )
 from metric_catalog import implemented_metric_catalog
 from analytics_service import (
@@ -913,16 +917,6 @@ def create_app(
         evidence = submission.evidence
         tests = evidence.get("tests", [])
         mode = submission.feedback_mode or "tdd"
-        if (
-            tutor_feedback is None
-            and not submission.passed
-            and allows_hints(mode, demo=demo)
-        ):
-            # Offer the first built-in hint without making an AI request or
-            # recording a hint request the student did not initiate.
-            tutor_feedback = TutorService(application.state.settings).feedback(
-                assignment, submission, hint_level=1, use_ai_tutor=False
-            )
         response = SubmissionResponse(
             id=assignment.id,
             submission_id=submission.id,
@@ -942,6 +936,10 @@ def create_app(
             evidence=tests,
             error_frames=evidence.get("error_frames", []),
             tutor_feedback=tutor_feedback,
+            # Hints only on request: a run never shows one by itself.
+            hints_available=(
+                not submission.passed and allows_hints(mode, demo=demo)
+            ),
         )
         return shape_submission_response(
             response.model_dump(by_alias=True), mode, demo=demo
@@ -2151,13 +2149,6 @@ def create_app(
             bucket="execution",
             requests_per_minute=request.app.state.settings.execution_requests_per_minute,
         )
-        if body.use_ai_tutor:
-            enforce_rate_limit(
-                request,
-                user,
-                bucket="tutor",
-                requests_per_minute=request.app.state.settings.tutor_requests_per_minute,
-            )
         require_code(body, request)
         assignment = get_assignment_or_404(session, assignment_id)
         study_session = study_session_for_submission(request, session, body, user)
@@ -2179,36 +2170,9 @@ def create_app(
             user=user,
             study_session=study_session,
         )
+        # Hints are given only when the student asks (owner decision
+        # 2026-11-24, study RQ4): a run never generates or stores a hint.
         tutor_feedback = None
-        if (
-            body.use_ai_tutor
-            and not result.passed
-            and allows_hints(
-                submission.feedback_mode or "tdd",
-                demo=is_ephemeral_demo(request, user),
-            )
-        ):
-            access = ai_access(
-                request.app.state.settings, session, assignment, user,
-                demo=is_ephemeral_demo(request, user),
-            )
-            tutor_feedback = TutorService(request.app.state.settings).feedback(
-                assignment, submission, hint_level=1,
-                use_ai_tutor=access.allowed,
-                ai_unavailable_message=access.message,
-            )
-            if not is_ephemeral_demo(request, user):
-                stored_feedback = tutor_feedback.model_dump()
-                stored_feedback["interaction_type"] = "run_hint"
-                session.add(
-                    HintInteraction(
-                        submission_id=submission.id,
-                        hint_level=1,
-                        feedback=stored_feedback,
-                        data_schema_version=HINT_INTERACTION_SCHEMA_VERSION,
-                    )
-                )
-                session.commit()
         record_submission_event(
             session,
             study_session=study_session,
@@ -2280,7 +2244,8 @@ def create_app(
             request.app.state.settings, session, assignment, user,
             demo=is_ephemeral_demo(request, user),
         ) if body.use_ai_tutor else None
-        feedback = TutorService(request.app.state.settings).feedback(
+        tutor = TutorService(request.app.state.settings)
+        feedback = tutor.feedback(
             assignment,
             submission,
             hint_level=body.hint_level,
@@ -2290,6 +2255,7 @@ def create_app(
         if not is_ephemeral_demo(request, user):
             stored_feedback = feedback.model_dump()
             stored_feedback["interaction_type"] = "progressive_hint"
+            stored_feedback.update(tutor.provenance(assignment, feedback))
             session.add(
                 HintInteraction(
                     submission_id=submission.id,
@@ -2351,7 +2317,8 @@ def create_app(
             request.app.state.settings, session, assignment, user,
             demo=is_ephemeral_demo(request, user),
         )
-        feedback = TutorService(request.app.state.settings).feedback(
+        tutor = TutorService(request.app.state.settings)
+        feedback = tutor.feedback(
             assignment,
             submission,
             hint_level=body.hint_level,
@@ -2365,6 +2332,7 @@ def create_app(
             # Owner decision (2026-11-24): keep the student's own question so
             # instructors can review it beside the answer it received.
             stored_feedback["student_question"] = body.question
+            stored_feedback.update(tutor.provenance(assignment, feedback))
             session.add(
                 HintInteraction(
                     submission_id=submission.id,
@@ -2723,6 +2691,116 @@ def create_app(
         session.add(attempt)
         session.commit()
         return {**summary, "saved": True, "attempt_id": attempt.id}
+
+    def workload_survey_target(
+        request: Request, session: Session, user: User, assignment_id: int
+    ) -> tuple[Assignment, bool]:
+        """The assignment, and whether this account may store a survey.
+
+        Demo sessions and instructors never create survey records.
+        """
+        assignment = get_assignment_or_404(session, assignment_id)
+        if assignment.stable_id not in workload_survey.SURVEY_ASSIGNMENTS:
+            raise HTTPException(404, "This assignment has no workload survey.")
+        storable = user.role == "student" and not is_ephemeral_demo(request, user)
+        return assignment, storable
+
+    def latest_attempt_id(session: Session, user: User, assignment: Assignment):
+        return session.scalar(
+            select(Submission.id)
+            .where(Submission.user_id == user.id,
+                   Submission.assignment_id == assignment.id,
+                   Submission.assignment_version == assignment.version)
+            .order_by(Submission.created_at.desc(), Submission.id.desc())
+            .limit(1)
+        )
+
+    @application.get("/assignments/{assignment_id}/workload-survey")
+    def workload_survey_status(
+        assignment_id: int,
+        request: Request,
+        user: User = Depends(current_user),
+        session: Session = Depends(session_dependency),
+    ):
+        """The Raw NASA-TLX form for a study assignment, the same in every mode."""
+        assignment, storable = workload_survey_target(
+            request, session, user, assignment_id
+        )
+        if not storable:
+            return {"offered": False, "completed": False, "has_attempt": False,
+                    "form": None}
+        completed = session.scalar(
+            select(WorkloadSurvey.id)
+            .where(WorkloadSurvey.user_id == user.id,
+                   WorkloadSurvey.assignment_id == assignment.id,
+                   WorkloadSurvey.assignment_version == assignment.version)
+            .limit(1)
+        ) is not None
+        return {
+            "offered": True,
+            "completed": completed,
+            "has_attempt": latest_attempt_id(session, user, assignment) is not None,
+            "form": None if completed else workload_survey.form_payload(),
+        }
+
+    @application.post("/assignments/{assignment_id}/workload-survey", status_code=201)
+    def submit_workload_survey(
+        assignment_id: int,
+        body: WorkloadSurveySubmission,
+        request: Request,
+        user: User = Depends(current_user),
+        session: Session = Depends(session_dependency),
+    ):
+        """One response per student per assignment version; never changes scores."""
+        enforce_rate_limit(
+            request,
+            user,
+            bucket="survey",
+            requests_per_minute=request.app.state.settings.general_requests_per_minute,
+        )
+        assignment, storable = workload_survey_target(
+            request, session, user, assignment_id
+        )
+        if not storable:
+            raise HTTPException(403, "Only study students answer the workload survey.")
+        try:
+            ratings = workload_survey.validate_ratings(body.ratings)
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from error
+        final_attempt = latest_attempt_id(session, user, assignment)
+        if final_attempt is None:
+            raise HTTPException(409, "Run your code at least once before the survey.")
+        exists = session.scalar(
+            select(WorkloadSurvey.id)
+            .where(WorkloadSurvey.user_id == user.id,
+                   WorkloadSurvey.assignment_id == assignment.id,
+                   WorkloadSurvey.assignment_version == assignment.version)
+            .limit(1)
+        )
+        if exists is not None:
+            raise HTTPException(409, "You have already answered this survey.")
+        submitted_at = utc_now()
+        survey = WorkloadSurvey(
+            user_id=user.id,
+            assignment_id=assignment.id,
+            assignment_version=assignment.version,
+            feedback_mode=feedback_mode_for(user),
+            final_attempt_id=final_attempt,
+            trigger=body.trigger,
+            form_version=workload_survey.FORM_VERSION,
+            opened_at=workload_survey.bounded_opened_at(body.opened_at, submitted_at),
+            submitted_at=submitted_at,
+            data_schema_version=1,
+            **ratings,
+        )
+        session.add(survey)
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            raise HTTPException(409, "You have already answered this survey.") from None
+        return {"saved": True, "survey_id": survey.id,
+                "answered": sum(value is not None for value in ratings.values())}
 
     @application.get("/content-assets/{asset_name}")
     def serve_content_asset(asset_name: str):

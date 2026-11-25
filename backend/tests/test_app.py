@@ -2,9 +2,11 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
 from app import create_app
 from config import Settings
+from models import HintInteraction
 
 
 CORRECT_ASSIGNMENT_2 = """
@@ -529,12 +531,22 @@ def test_incorrect_submission_returns_structured_progressive_feedback(client):
     assert body["pass"] is False
     assert body["ex_success"] is True
     assert body["score"] == 0
-    assert body["hint"]
-    assert body["tutor_feedback"]["hint_level"] == 1
-    assert body["tutor_feedback"]["solution_revealed"] is False
+    # Hints only on request: the run offers one but does not show it.
+    assert body["hint"] == ""
+    assert body["tutor_feedback"] is None
+    assert body["hints_available"] is True
     assert all(
         "expected" not in item["message"].lower() for item in body["evidence"]
     )
+
+    first_hint = client.post(
+        "/assignments/2/hint",
+        json={"submission_id": body["submission_id"], "hint_level": 1},
+    )
+    assert first_hint.status_code == 200
+    assert first_hint.json()["hint"]
+    assert first_hint.json()["hint_level"] == 1
+    assert first_hint.json()["solution_revealed"] is False
 
     next_hint = client.post(
         "/assignments/2/hint",
@@ -665,18 +677,23 @@ def test_tutor_question_rate_limit_returns_retry_guidance(tmp_path):
     assert blocked.headers["Retry-After"]
 
 
-def test_ai_tutoring_is_opt_in_for_fast_default_grading(client):
+def test_runs_never_show_or_store_a_hint_by_themselves(client):
     use_ai_mode(client)  # hints belong to the TDD + AI mode
-    response = client.post(
-        "/assignments/2/submit",
-        json={"code": INCORRECT_ASSIGNMENT_2},
-    )
-    body = response.json()
-
-    assert response.status_code == 200
-    assert body["score"] == 0
-    assert body["hint"]
-    assert body["tutor_feedback"]["source"] == "fallback"
+    for use_ai_tutor in (False, True):
+        response = client.post(
+            "/assignments/2/submit",
+            json={"code": INCORRECT_ASSIGNMENT_2, "use_ai_tutor": use_ai_tutor},
+        )
+        body = response.json()
+        assert response.status_code == 200
+        assert body["score"] == 0
+        assert body["hint"] == ""
+        assert body["tutor_feedback"] is None
+        assert body["hints_available"] is True
+    with client.app.state.SessionLocal() as session:
+        assert session.scalar(select(func.count()).select_from(HintInteraction)) == 0
+    passed = client.post("/assignments/2/submit", json={"code": CORRECT_ASSIGNMENT_2})
+    assert passed.json()["hints_available"] is False
 
 
 def _instructor_headers(client) -> dict:

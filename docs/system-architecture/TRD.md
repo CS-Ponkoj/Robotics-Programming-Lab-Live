@@ -124,7 +124,7 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 |---|---|
 | **Health** | `GET /health` |
 | **Auth** | `POST /auth/login` · `POST /auth/demo` · 🔐 `GET /auth/me` · 🔐 `POST /auth/logout` · 🔐 `POST /auth/change-password` · `POST /auth/forgot-password`* · `POST /auth/reset-password`* |
-| **Assignments** 🔐 | `GET /assignments` · `GET /assignments/{id}` · `GET/PUT/DELETE /assignments/{id}/draft` · `POST …/format` · `POST …/run` · `POST …/submit` · `POST …/playground` · `POST …/simulate` (ROS 2D replay, visual only) · `POST …/hint` · `POST …/tutor` · `POST …/solution` · legacy `POST /grade/{id}` |
+| **Assignments** 🔐 | `GET /assignments` · `GET /assignments/{id}` · `GET/PUT/DELETE /assignments/{id}/draft` · `POST …/format` · `POST …/run` · `POST …/submit` · `POST …/playground` · `POST …/simulate` (ROS 2D replay, visual only) · `POST …/hint` · `POST …/tutor` · `GET/POST …/workload-survey` (Raw NASA-TLX, Assignments 7 and 8, students only) · `POST …/solution` · legacy `POST /grade/{id}` |
 | **Progress** 🔐 | `GET /me/assignment-progress` |
 | **Course content** 🔐 | `GET /contents` · `GET /contents/{topic}` · `GET /contents/{topic}/sections/{section}` · `POST /contents/{topic}/quiz/submit` · `GET /contents/{topic}/quiz/attempts` · `GET /contents/{topic}/pretest` · `POST /contents/{topic}/pretest/submit` · `GET /contents/{topic}/sections/{section}/answer` · `GET /content-assets/{name}` · `GET /images/{id}` |
 | **Research** 🔐 | `POST /research/sessions` · `POST …/{sid}/heartbeat` · `POST …/{sid}/events` · `POST …/{sid}/end` · `GET /research/me` · `GET /research/me/attempts` · `GET /research/metrics` |
@@ -132,7 +132,7 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 | **Admin: assignments** 🛡️ | `GET/POST /admin/assignments` · `PUT /admin/assignments/{id}` · `POST …/{id}/validate` · `POST …/{id}/publish` |
 | **Admin: accounts** 🛡️ | `GET/POST /admin/students` (with `feedback_mode`) · `PATCH /admin/students/{id}` (changes `feedback_mode`, audited) · `POST …/{id}/reset-password` · same four for `/admin/instructors` · `POST /admin/accounts/import` · `GET /admin/sign-in-history` |
 | **Admin: research** 🛡️ | `GET /admin/research/summary` · `…/assignments` · `…/students/{id}` · `…/students/{id}/attempts` · `…/export` |
-| **Admin: study data** 🛡️ | `GET /admin/study-data` (tables, participants, assignments) · `GET /admin/study-data/{table}` (filters, sort, pages; `format=csv` downloads, audited) · `GET /admin/study-data/attempts/{id}/code` (one attempt's code, app only, audited); built by `study_data.py` |
+| **Admin: study data** 🛡️ | `GET /admin/study-data` (tables, participants, assignments) · `GET /admin/study-data/{table}` (filters, sort, pages; `format=csv` downloads, audited) · `GET /admin/study-data/attempts/{id}/code` (one attempt's code, app only, audited); built by `study_data.py`, with check groups from `study_checks.py` |
 | **Admin: course settings** 🛡️ | `GET/PUT /admin/course-settings/ai-tutor` · `PUT /admin/course-settings/catalog` |
 | **Admin: email** 🛡️ | `GET /admin/email/status`* · `POST /admin/email/test`* |
 

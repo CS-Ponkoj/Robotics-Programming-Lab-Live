@@ -89,6 +89,7 @@ def test_traditional_gets_only_knowledge_of_results(app_client, accounts):
     assert set(result["unittest_results"]) == {""}
     assert result["tested_vals"] == [] and result["evidence"] == []
     assert result["hint"] == "" and result["tutor_feedback"] is None
+    assert result["hints_available"] is False
     assert result["code_output"] == ""
 
     sid = result["submission_id"]
@@ -116,6 +117,7 @@ def test_tdd_gets_check_feedback_but_no_hints_or_tutor(app_client, accounts):
     assert result["feedback_mode"] == "tdd"
     assert any(result["unittest_results"]) and result["evidence"]
     assert result["hint"] == "" and result["tutor_feedback"] is None
+    assert result["hints_available"] is False
     hint = client.post(
         "/assignments/1/hint", headers=bearer(accounts["tdd"]),
         json={"submission_id": result["submission_id"], "hint_level": 2, "use_ai_tutor": True},
@@ -134,10 +136,11 @@ def test_tdd_hints_come_back_when_the_switch_is_on(app_client, accounts, monkeyp
     monkeypatch.setattr(feedback_modes, "TDD_BUILT_IN_HINTS", True)
     _, client = app_client
     result = run_starter(client, accounts["tdd"])
-    assert result["hint"] and result["tutor_feedback"]["source"] == "fallback"
+    # Hints only on request: the run offers one, the Hint button gets it.
+    assert result["hint"] == "" and result["hints_available"] is True
     hint = client.post(
         "/assignments/1/hint", headers=bearer(accounts["tdd"]),
-        json={"submission_id": result["submission_id"], "hint_level": 2},
+        json={"submission_id": result["submission_id"], "hint_level": 1},
     )
     assert hint.status_code == 200 and hint.json()["source"] == "fallback"
 
@@ -146,8 +149,13 @@ def test_ai_mode_may_ask_the_tutor(app_client, accounts):
     _, client = app_client
     result = run_starter(client, accounts["ai"])
     assert result["feedback_mode"] == "tdd_ai" and result["evidence"]
-    # The built-in hint ladder is the AI mode's fallback.
-    assert result["hint"] and result["tutor_feedback"]["source"] == "fallback"
+    # Hints only on request; the built-in ladder is the AI mode's fallback.
+    assert result["hint"] == "" and result["hints_available"] is True
+    hint = client.post(
+        "/assignments/1/hint", headers=bearer(accounts["ai"]),
+        json={"submission_id": result["submission_id"], "hint_level": 1},
+    )
+    assert hint.status_code == 200 and hint.json()["source"] == "fallback"
     tutor = client.post(
         "/assignments/1/tutor", headers=bearer(accounts["ai"]),
         json={"submission_id": result["submission_id"], "question": "Why does it fail?", "hint_level": 1},

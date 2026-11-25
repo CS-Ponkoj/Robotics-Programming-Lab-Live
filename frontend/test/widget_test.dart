@@ -2156,6 +2156,56 @@ void main() {
     );
   });
 
+  testWidgets('a failed run offers a hint but never shows one by itself', (
+    WidgetTester tester,
+  ) async {
+    const feedback = UnittestFeedbackDto(
+      id: 1,
+      submissionId: 'run-1',
+      testedVals: [],
+      pass: false,
+      unittestFeedback: ['Stop before the wall.'],
+      unittestPassResults: [false],
+      codeExecResult: '',
+      codeOutput: '',
+      execSuccess: true,
+      hint: '',
+      hintsAvailable: true,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: app.Feedback(data: feedback))),
+    );
+
+    expect(find.byKey(const Key('get-hint-button')), findsOneWidget);
+    expect(find.byKey(const Key('guided-hint')), findsNothing);
+    expect(find.byKey(const Key('next-hint-button')), findsNothing);
+  });
+
+  testWidgets('a mode without hints offers no hint button', (
+    WidgetTester tester,
+  ) async {
+    const feedback = UnittestFeedbackDto(
+      id: 1,
+      submissionId: 'run-2',
+      testedVals: [],
+      pass: false,
+      unittestFeedback: ['Stop before the wall.'],
+      unittestPassResults: [false],
+      codeExecResult: '',
+      codeOutput: '',
+      execSuccess: true,
+      hint: '',
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: app.Feedback(data: feedback))),
+    );
+
+    expect(find.byKey(const Key('get-hint-button')), findsNothing);
+    expect(find.byKey(const Key('fix-first-hint')), findsNothing);
+  });
+
   testWidgets('AI responses stay hidden while AI tutoring is off', (
     WidgetTester tester,
   ) async {

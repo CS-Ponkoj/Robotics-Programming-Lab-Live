@@ -337,6 +337,12 @@ grading is identical in all three.
 | `tdd` | TDD | Everything above plus check names and messages, printed output, and the full simulation replay (beam probe and links from failed checks). No hints (since 2026-11-20; the server switch `TDD_BUILT_IN_HINTS` restores the built-in hint ladder), no tutor questions or AI. The public demo is `tdd` but keeps built-in hints |
 | `tdd_ai` | TDD + AI | Everything in `tdd` plus hints: the AI tutor and Ask the tutor, still subject to the AI policy gates, with the built-in hint ladder as the fallback |
 
+From 2026-11-25 hints come only when the student asks (study RQ4): a run
+never shows or stores a hint. A failed run in a mode with hints returns
+`hints_available: true`, and the student uses **Get a hint** (level 1, then
+**Get another hint** up to level 4) or types a question. Earlier runs could
+show a level-1 hint automatically (`run_hint` rows).
+
 Each change is an append-only `student.feedback_mode_changed` audit event with
 the previous and new mode, the instructor, and the time. Research exports carry
 `feedback_mode` on each attempt row and the current mode on the student summary.
@@ -361,7 +367,7 @@ not create persistent hint rows.
 | `data_schema_version` | What the `feedback` JSON adds |
 |---|---|
 | 1 (until 2026-11-23) | `interaction_type` only on `student_question` rows; the question text was not stored |
-| 2 (from 2026-11-24) | `interaction_type` on every row: `run_hint` (automatic hint after a run), `progressive_hint` (Hint button), or `student_question` (Ask the tutor). `student_question` rows also keep `student_question`, the exact text the student typed (3-500 characters), by owner decision so instructors can review it beside the answer shown |
+| 2 (from 2026-11-24) | `interaction_type` on every row: `run_hint` (automatic hint after a run; no new rows from 2026-11-25), `progressive_hint` (Hint button), or `student_question` (Ask the tutor). `student_question` rows also keep `student_question`, the exact text the student typed (3-500 characters), by owner decision so instructors can review it beside the answer shown. From 2026-11-25 every new row also stores `ai_model` (the configured model, such as a fine-tuned model ID), `ai_model_snapshot` (the model version the provider reported), `prompt_version` (`tutor.TUTOR_PROMPT_VERSION`), and `prompt_sha256` (first 16 hex characters of the SHA-256 of the tutor instructions); all four are empty for built-in answers. They are server-only and never sent to students |
 
 Questions typed before 2026-11-24 were never stored and cannot be recovered;
 only their length is in the `hint_requested` event. The question text is free
@@ -377,7 +383,8 @@ and can download each filtered table as CSV
 (`GET /admin/study-data/{table}?format=csv`). Tables: participants, AI questions
 and hints, attempts, check results, learning events, time per assignment,
 assignment summary, study sessions, sign-ins, quiz and pre-test attempts, quiz
-answers, course learning per topic, instructor actions, and page feedback.
+answers, course learning per topic, instructor actions, NASA-TLX workload,
+and page feedback.
 Rows use participant codes, never login IDs. The owner's test logins
 (`traditional`, `tdd`, `ai`, and the seeded `student` / `DEMO` row) are hidden
 unless "Include test accounts" is on. Submitted code is never in a table or
@@ -415,6 +422,51 @@ Table rules (2026-11-24 data review):
   offset (for example `2026-11-24T09:41:59+00:00`).
 - A CSV larger than 200,000 rows is refused with a message to narrow the
   filters; it is never cut short.
+
+Study measures (2026-11-25):
+
+- Check results carry `check_group`: `setup`, `behavior`, or `code_style`,
+  from the server-only research list `backend/study_checks.py`, keyed by
+  stable assignment ID and version (Assignment 7 v5: 5 setup, 9 behavior, 7
+  code style; Assignment 8 v3: 4, 7, 3). It never changes grading. Other
+  assignments and unmapped versions have an empty group.
+- Attempts carry `behavior_checks_passed`, `behavior_checks_total`, and
+  `full_behavior_pass` (the run executed and every behavior check passed).
+- Time per assignment adds `full_behavior_pass_at` (the first such attempt),
+  `seconds_to_full_behavior_pass` (clock time from the first activity on the
+  assignment version), `active_seconds_to_full_behavior_pass`, and
+  `behavior_checks_mapped`. The app has no task time limit; apply the study's
+  cap in analysis.
+- The AI questions and hints table carries `ai_model`, `ai_model_snapshot`,
+  `prompt_version`, and `prompt_sha256` (empty for built-in answers and rows
+  before 2026-11-25).
+- NASA-TLX workload lists `workload_surveys` rows with the six ratings,
+  `raw_tlx`, and `answered`.
+
+### `workload_surveys` (from 2026-11-25)
+
+One Raw NASA-TLX response per student per study assignment version (study
+RQ6), offered only on Assignments 7 and 8 and identical in every mode. Demo
+sessions and instructors never create rows. A student must have run the
+assignment at least once; a second response is refused.
+
+| Field | Meaning |
+|---|---|
+| `id` | Unique response identifier |
+| `user_id` | Student account |
+| `assignment_id`, `assignment_version` | The study assignment version answered about |
+| `feedback_mode` | The account's mode when answering |
+| `final_attempt_id` | The student's latest attempt on this version at that moment |
+| `trigger` | `finished_button` (the student pressed I'm finished) or `full_pass_prompt` (offered once per visit after a passing run) |
+| `form_version` | `tlx-raw-1`: NASA's six scales with their manual definitions |
+| `opened_at` | When the form opened, as the browser reports it; kept only inside the hour before submitting, otherwise null |
+| `submitted_at` | UTC time saved |
+| `mental_demand`, `physical_demand`, `temporal_demand`, `performance`, `effort`, `frustration` | 0-100 in steps of 5, or null when not rated. Higher is worse on every scale; Performance is 0 = good, 100 = poor (NASA's direction, never reversed) |
+| `data_schema_version` | 1 |
+
+Raw TLX is the mean of the six ratings, computed on read (Study data
+`raw_tlx`) and only when all six are present; missing ratings are never
+imputed. Routes: `GET` and `POST /assignments/{id}/workload-survey`.
 
 ### `course_quiz_attempts`
 
@@ -538,6 +590,9 @@ configuration explicitly. All assignment files declare
   changing any existing table.
 - Alembic migration `0009_course_settings` adds the `course_settings` table
   without changing any existing table.
+- Alembic migration `0012_workload_surveys` adds the `workload_surveys`
+  table without changing any existing table; its downgrade drops that table,
+  so dump the database first.
 - Alembic migration `0008_session_device` adds a nullable `device` column
   (`phone`, `tablet`, or `computer`) to `auth_sessions`. Only that category is
   derived from the sign-in browser; the full User-Agent is never stored.

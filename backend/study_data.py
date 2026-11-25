@@ -31,8 +31,11 @@ from models import (
     StudySession,
     Submission,
     User,
+    WorkloadSurvey,
 )
 from research_service import csv_bytes
+from study_checks import behavior_checks, behavior_summary, check_group
+from workload_survey import KEYS as TLX_KEYS, PERFORMANCE_DIRECTION, raw_tlx
 
 # The owner's shared test logins and the seeded demo row. They are hidden
 # unless the instructor asks to include test accounts.
@@ -120,7 +123,9 @@ class _Context:
         numbers = course_numbers()
         self.assignments: dict[int, str] = {}
         self.course_assignment_ids: set[int] = set()
+        self.stable_ids: dict[int, str] = {}
         for assignment in session.scalars(select(Assignment)).all():
+            self.stable_ids[assignment.id] = assignment.stable_id
             number = numbers.get(assignment.stable_id)
             if number:
                 self.course_assignment_ids.add(assignment.id)
@@ -172,11 +177,15 @@ class _Context:
         return self.in_range(when)
 
 
+def _aware(value: datetime) -> datetime:
+    """Stored times are UTC; SQLite returns them without a zone."""
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
 def iso_utc(value: datetime | None) -> str:
     if value is None:
         return ""
-    moment = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
-    return moment.astimezone(timezone.utc).isoformat(timespec="seconds")
+    return _aware(value).astimezone(timezone.utc).isoformat(timespec="seconds")
 
 
 def _submissions(ctx: _Context) -> list[Submission]:
@@ -295,8 +304,31 @@ def _assignment_time(ctx: _Context):
     rows = ctx.session.scalars(
         select(AssignmentActivity).where(AssignmentActivity.user_id.in_(ctx.user_ids))
     ).all()
+    # First attempt per student, assignment and version in which every
+    # behavior check passed (study RQ4), oldest first.
+    first_full: dict[tuple[str, int, int], Submission] = {}
+    for submission in _submissions(ctx):
+        key = (submission.user_id, submission.assignment_id, submission.assignment_version)
+        if key in first_full:
+            continue
+        summary = behavior_summary(
+            ctx.stable_ids.get(submission.assignment_id, ""),
+            submission.assignment_version,
+            (submission.evidence or {}).get("tests"),
+            submission.execution_succeeded,
+        )
+        if summary is not None and summary[2]:
+            first_full[key] = submission
     for item in rows:
         mode = ctx.account_mode(item.user_id)
+        mapped = bool(behavior_checks(
+            ctx.stable_ids.get(item.assignment_id, ""), item.assignment_version
+        ))
+        full = first_full.get((item.user_id, item.assignment_id, item.assignment_version))
+        clock = None
+        if full is not None and item.first_active_at is not None:
+            clock = max(0, int((_aware(full.created_at) - _aware(item.first_active_at))
+                               .total_seconds()))
         if not ctx.keep(mode=mode, assignment_id=item.assignment_id,
                         when=item.first_active_at, has_assignment=True):
             continue
@@ -311,6 +343,12 @@ def _assignment_time(ctx: _Context):
             "active_seconds": item.active_seconds,
             "first_completed_at": iso_utc(item.first_completed_at),
             "active_seconds_to_completion": item.active_seconds_to_completion,
+            "full_behavior_pass_at": iso_utc(full.created_at if full else None),
+            "seconds_to_full_behavior_pass": clock,
+            "active_seconds_to_full_behavior_pass": (
+                full.active_seconds_at_attempt if full else None
+            ),
+            "behavior_checks_mapped": mapped,
         }
 
 
@@ -323,6 +361,10 @@ def _attempts(ctx: _Context):
                         when=item.created_at, has_assignment=True):
             continue
         tests = (item.evidence or {}).get("tests") or []
+        behavior = behavior_summary(
+            ctx.stable_ids.get(item.assignment_id, ""), item.assignment_version,
+            tests, item.execution_succeeded,
+        )
         yield {
             "participant_code": ctx.code(item.user_id),
             "feedback_mode": item.feedback_mode or "",
@@ -337,6 +379,9 @@ def _attempts(ctx: _Context):
             "execution_status": item.execution_status or "",
             "checks_passed": sum(1 for test in tests if test.get("passed") is True),
             "checks_total": len(tests),
+            "behavior_checks_passed": behavior[0] if behavior else None,
+            "behavior_checks_total": behavior[1] if behavior else None,
+            "full_behavior_pass": behavior[2] if behavior else None,
             "active_seconds_at_attempt": item.active_seconds_at_attempt,
             "created_at": iso_utc(item.created_at),
         }
@@ -358,6 +403,11 @@ def _check_results(ctx: _Context):
                 "created_at": iso_utc(item.created_at),
                 "check_id": str(test.get("test_id") or ""),
                 "check": str(test.get("label") or ""),
+                "check_group": check_group(
+                    ctx.stable_ids.get(item.assignment_id, ""),
+                    item.assignment_version,
+                    str(test.get("test_id") or ""),
+                ),
                 "result": _check_result(test),
                 "points_earned": _points_earned(test),
                 "points_possible": test.get("weight"),
@@ -433,6 +483,10 @@ def _ai_questions_and_hints(ctx: _Context):
             "student_question": str(feedback.get("student_question") or ""),
             "answer_shown": _answer_text(feedback),
             "mistake_label": str(feedback.get("misconception") or ""),
+            "ai_model": str(feedback.get("ai_model") or ""),
+            "ai_model_snapshot": str(feedback.get("ai_model_snapshot") or ""),
+            "prompt_version": str(feedback.get("prompt_version") or ""),
+            "prompt_sha256": str(feedback.get("prompt_sha256") or ""),
         }
 
 
@@ -618,6 +672,35 @@ def _instructor_actions(ctx: _Context):
         }
 
 
+def _workload_tlx(ctx: _Context):
+    if not ctx.user_ids:
+        return
+    query = select(WorkloadSurvey).where(WorkloadSurvey.user_id.in_(ctx.user_ids))
+    if ctx.filters.assignment_id is not None:
+        query = query.where(WorkloadSurvey.assignment_id == ctx.filters.assignment_id)
+    for item in ctx.session.scalars(query.order_by(WorkloadSurvey.submitted_at)).all():
+        if not ctx.keep(mode=item.feedback_mode, assignment_id=item.assignment_id,
+                        when=item.submitted_at, has_assignment=True):
+            continue
+        ratings = {key: getattr(item, key) for key in TLX_KEYS}
+        yield {
+            "participant_code": ctx.code(item.user_id),
+            "feedback_mode": item.feedback_mode or "",
+            "assignment": ctx.assignment(item.assignment_id),
+            "assignment_id": item.assignment_id,
+            "assignment_version": item.assignment_version,
+            **ratings,
+            "raw_tlx": raw_tlx(ratings),
+            "answered": sum(value is not None for value in ratings.values()),
+            "trigger": item.trigger,
+            "opened_at": iso_utc(item.opened_at),
+            "submitted_at": iso_utc(item.submitted_at),
+            "final_attempt_id": item.final_attempt_id or "",
+            "form_version": item.form_version,
+            "performance_direction": PERFORMANCE_DIRECTION,
+        }
+
+
 def _page_feedback(ctx: _Context):
     rows = ctx.session.scalars(select(PageFeedback).order_by(PageFeedback.created_at)).all()
     for item in rows:
@@ -665,13 +748,17 @@ TABLES: tuple[Table, ...] = (
           "Every question a student asked the tutor and every hint they got, with the answer shown.",
           (_P, _M, _A,
            Column("asked_at", "When", "Time of the hint or question (UTC)."),
-           Column("type", "Type", "Automatic hint after a run, Hint button, or Question to the tutor."),
+           Column("type", "Type", "Hint button or Question to the tutor (automatic hints after a run ended 2026-11-24)."),
            Column("source", "Source", "AI (OpenAI) or Built-in (fallback ladder)."),
            Column("student_question", "Student question", "Exactly what the student typed; recorded from 2026-11-24."),
            Column("answer_shown", "Answer shown", "The text the student saw."),
            Column("hint_level", "Level", "Hint level 1-4."),
            Column("mistake_label", "Mistake label", "Misconception named in the answer, if any."),
            Column("attempt_score", "Attempt score", "Score of that attempt (0-100)."),
+           Column("ai_model", "AI model", "Configured model for AI answers; empty for built-in. Recorded from 2026-11-24."),
+           Column("ai_model_snapshot", "Model snapshot", "Exact model version the provider reported."),
+           Column("prompt_version", "Prompt version", "Tutor prompt version used for the AI answer."),
+           Column("prompt_sha256", "Prompt fingerprint", "First 16 hex characters of the SHA-256 of the tutor instructions."),
            _V, _AID,
            Column("attempt_id", "Attempt", "The attempt the hint or question belongs to.")),
           "asked_at", _ai_questions_and_hints, has_assignment=True),
@@ -686,6 +773,9 @@ TABLES: tuple[Table, ...] = (
            Column("execution_status", "Status", "completed, syntax_error, runtime_error, timeout, ..."),
            Column("checks_passed", "Checks passed", "Checks that passed."),
            Column("checks_total", "Checks", "Checks in this attempt."),
+           Column("behavior_checks_passed", "Behavior passed", "Behavior checks that passed (empty if the version has no check groups)."),
+           Column("behavior_checks_total", "Behavior checks", "Behavior checks of this assignment version."),
+           Column("full_behavior_pass", "Full behavior pass", "The run executed and every behavior check passed."),
            Column("active_seconds_at_attempt", "Active seconds", "Active time on the assignment before this attempt."),
            Column("created_at", "When", "Time of the attempt (UTC).")),
           "created_at", _attempts, has_assignment=True),
@@ -696,6 +786,9 @@ TABLES: tuple[Table, ...] = (
            Column("created_at", "When", "Time of the attempt (UTC)."),
            Column("check_id", "Check ID", "Stable check identifier."),
            Column("check", "Check", "Check name students see."),
+           Column("check_group", "Group",
+                  "setup, behavior, or code_style (research grouping of the study "
+                  "assignments; empty for other assignments)."),
            Column("result", "Result", "passed, failed, or not run."),
            Column("points_earned", "Points", "Points this check gave (0 while setup credit is held back)."),
            Column("points_possible", "Out of", "Points this check is worth."),
@@ -722,7 +815,14 @@ TABLES: tuple[Table, ...] = (
            Column("last_active_at", "Last active", "Latest activity (UTC)."),
            Column("active_seconds", "Active seconds", "Total active time."),
            Column("first_completed_at", "Completed", "First passing attempt (UTC)."),
-           Column("active_seconds_to_completion", "Seconds to complete", "Active time until the first pass.")),
+           Column("active_seconds_to_completion", "Seconds to complete", "Active time until the first pass."),
+           Column("full_behavior_pass_at", "Full behavior pass", "First attempt in which every behavior check passed (UTC)."),
+           Column("seconds_to_full_behavior_pass", "Seconds to behavior pass",
+                  "Clock time from first activity to that attempt; not capped (apply the study's task limit in analysis)."),
+           Column("active_seconds_to_full_behavior_pass", "Active seconds to behavior pass",
+                  "Active time on the assignment before that attempt."),
+           Column("behavior_checks_mapped", "Behavior checks defined",
+                  "False when this assignment version has no reviewed check groups, so the behavior columns are empty.")),
           "first_active_at", _assignment_time, has_assignment=True),
     Table("assignment_summary", "Assignment summary",
           "Per student and assignment of this course: attempts, scores, hints, and completion. "
@@ -793,6 +893,26 @@ TABLES: tuple[Table, ...] = (
            Column("about", "About", "Participant code or the setting changed."),
            Column("details", "Details", "Safe details; login IDs and emails are left out.")),
           "created_at", _instructor_actions),
+    Table("workload_tlx", "NASA-TLX workload",
+          "Raw NASA-TLX after each study assignment: six ratings and their mean. "
+          "Higher is worse on every scale, including Performance (0 = good).",
+          (_P, _M, _A,
+           Column("mental_demand", "Mental", "0-100, steps of 5."),
+           Column("physical_demand", "Physical", "0-100, steps of 5."),
+           Column("temporal_demand", "Temporal", "0-100, steps of 5."),
+           Column("performance", "Performance", "0 = good, 100 = poor (not reversed)."),
+           Column("effort", "Effort", "0-100, steps of 5."),
+           Column("frustration", "Frustration", "0-100, steps of 5."),
+           Column("raw_tlx", "Raw TLX", "Mean of the six ratings; empty when any is unanswered (never imputed)."),
+           Column("answered", "Answered", "How many of the six scales were rated."),
+           Column("trigger", "Shown by", "finished_button (I'm finished) or full_pass_prompt (offered at the first full pass)."),
+           Column("opened_at", "Opened", "When the form opened (browser time, kept only within the hour before submitting)."),
+           Column("submitted_at", "Submitted", "UTC."),
+           Column("final_attempt_id", "Final attempt", "The student's latest attempt on this version when they answered."),
+           _V, _AID,
+           Column("form_version", "Form version", "Survey form version."),
+           Column("performance_direction", "Performance scale", "Direction of the Performance scale.")),
+          "submitted_at", _workload_tlx, has_assignment=True),
     Table("page_feedback", "Page feedback",
           "Messages sent with the Feedback button.",
           (Column("created_at", "When", "UTC."), _P,

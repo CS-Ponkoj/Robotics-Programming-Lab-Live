@@ -19,6 +19,7 @@ import 'package:iuse_demo/models/simulation_trace.dart';
 import 'package:iuse_demo/models/unittest_feedback_dto.dart';
 import 'package:iuse_demo/services/assignment_api.dart';
 import 'package:iuse_demo/services/research_api.dart';
+import 'package:iuse_demo/services/workload_survey_api.dart';
 import 'package:iuse_demo/state/app_learning_progress.dart';
 import 'package:iuse_demo/state/learning_progress_store.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
@@ -28,6 +29,7 @@ import 'package:iuse_demo/widgets/earlier_draft_banner.dart';
 import 'package:iuse_demo/widgets/playground_dialog.dart';
 import 'package:iuse_demo/widgets/robot_sim_panel.dart';
 import 'package:iuse_demo/widgets/run_terminal.dart';
+import 'package:iuse_demo/widgets/workload_survey_dialog.dart';
 import 'package:highlight/languages/python.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -36,9 +38,15 @@ class MyHomePage extends StatefulWidget {
     required this.title,
     required this.id,
     this.displayNumber,
+    this.surveyStatusLoader = fetchWorkloadSurveyStatus,
+    this.surveySubmitter = submitWorkloadSurvey,
   });
   final String title;
   final int id;
+
+  /// Workload survey calls; replaced in tests.
+  final Future<WorkloadSurveyStatus?> Function(int) surveyStatusLoader;
+  final WorkloadSubmitter surveySubmitter;
 
   /// The course number students see; null shows the ID.
   final int? displayNumber;
@@ -142,6 +150,11 @@ class _MyHomePageState extends State<MyHomePage> {
   // The moment and view a failed check asked the replay to show.
   SimFocus? _simFocus;
   int _simFocusToken = 0;
+  // Raw NASA-TLX survey of a study assignment (null: none offered).
+  WorkloadSurveyStatus? _survey;
+  // The survey is offered at most once per visit after a passing run.
+  bool _surveyPrompted = false;
+  bool _surveyOpen = false;
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
   // Playground runs for the current code only; memory only, never sent.
@@ -159,6 +172,7 @@ class _MyHomePageState extends State<MyHomePage> {
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     _assignment = _loadAssignment();
     unawaited(_trackAssignmentOpened());
+    unawaited(_loadWorkloadSurvey());
     _feedback = fetchUnittestFeedback(widget.id, "");
     _submissionId = learningProgress.submissionIds[widget.id] ?? '';
     if (solutionRevealedAssignments.contains(widget.id) &&
@@ -192,6 +206,34 @@ class _MyHomePageState extends State<MyHomePage> {
       // Local drafts remain a reliable fallback while the API is unavailable.
     }
     return assignment;
+  }
+
+  Future<void> _loadWorkloadSurvey() async {
+    final status = await widget.surveyStatusLoader(widget.id);
+    if (mounted && status != null && status.offered) {
+      setState(() => _survey = status);
+    }
+  }
+
+  /// Opens the workload survey; it never blocks or changes the assignment.
+  Future<void> _openWorkloadSurvey(String trigger) async {
+    final survey = _survey;
+    final form = survey?.form;
+    if (survey == null || form == null || !survey.open || _surveyOpen) return;
+    _surveyOpen = true;
+    final saved = await showWorkloadSurveyDialog(
+      context,
+      assignmentId: widget.id,
+      form: form,
+      trigger: trigger,
+      submitter: widget.surveySubmitter,
+    );
+    _surveyOpen = false;
+    if (!mounted || !saved) return;
+    setState(() => _survey = survey.copyWith(completed: true));
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(content: Text('Thank you. Your answers were saved.')),
+    );
   }
 
   Future<void> _trackAssignmentOpened() async {
@@ -449,6 +491,14 @@ class _MyHomePageState extends State<MyHomePage> {
         unawaited(
           learningProgress.recordSubmission(widget.id, feedback.submissionId),
         );
+        final survey = _survey;
+        if (survey != null && feedback.submissionId.isNotEmpty) {
+          setState(() => _survey = survey.copyWith(hasAttempt: true));
+          if (feedback.pass && survey.open && !_surveyPrompted) {
+            _surveyPrompted = true;
+            unawaited(_openWorkloadSurvey('full_pass_prompt'));
+          }
+        }
         unawaited(learningProgress.recordAttempt(widget.id, score));
         if (summarizeChecks(feedback) case final checks?) {
           unawaited(learningProgress.recordCheckSummary(
@@ -1078,6 +1128,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                       _openLineInEditor(line);
                                     },
                                     aiTutorEnabled: _aiTutorOn,
+                                    onFinished: (_survey?.open ?? false) &&
+                                            snap.data!.submissionId.isNotEmpty
+                                        ? () => _openWorkloadSurvey(
+                                            'finished_button')
+                                        : null,
                                     onWatchInSimulation: _hasRobotSimulation
                                         ? _watchInSimulation
                                         : null);
@@ -4573,6 +4628,51 @@ typedef TutorQuestionRequester = Future<Map<String, dynamic>> Function(
   int hintLevel,
 );
 
+/// Asks for the workload survey when the student is done with the assignment.
+class _FinishedCard extends StatelessWidget {
+  const _FinishedCard({required this.onFinished});
+
+  final VoidCallback onFinished;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: const Key('finished-card'),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Done with this assignment?',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Tell us how demanding it was: six quick ratings, about a '
+            'minute. Your answers do not change your score, and you can '
+            'keep working afterwards.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          FilledButton.tonalIcon(
+            style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
+            key: const Key('finished-button'),
+            onPressed: onFinished,
+            icon: const Icon(LucideIcons.clipboardCheck, size: 18),
+            label: const Text("I'm finished"),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class Feedback extends StatefulWidget {
   const Feedback({
     super.key,
@@ -4585,7 +4685,11 @@ class Feedback extends StatefulWidget {
     this.onGoToLine,
     this.previousPassed,
     this.runNumber,
+    this.onFinished,
   });
+
+  /// Opens the workload survey of a study assignment; null hides the card.
+  final VoidCallback? onFinished;
 
   /// The score before this run; null on a first run.
   final int? previousScore;
@@ -4651,8 +4755,11 @@ class _FeedbackState extends State<Feedback> {
     // Traditional accounts get the score and counts only (server-enforced).
     final resultsOnly = data.feedbackMode == FeedbackMode.traditional.wire;
     final tutorAvailable = aiTutorEnabled && data.submissionId.isNotEmpty;
-    final showHint = data.hint.isNotEmpty &&
-        (aiTutorEnabled || data.tutorSource != 'openai');
+    // Hints come only when the student asks; a failed run offers them.
+    final showHint =
+        (data.hintsAvailable && data.submissionId.isNotEmpty) ||
+            (data.hint.isNotEmpty &&
+                (aiTutorEnabled || data.tutorSource != 'openai'));
 
     final orderedChecks = data.unittestFeedback.asMap().entries.toList()
       ..sort((a, b) {
@@ -4755,6 +4862,10 @@ class _FeedbackState extends State<Feedback> {
             previousPassed: widget.previousPassed,
             runNumber: widget.runNumber,
           ),
+          if (widget.onFinished != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _FinishedCard(onFinished: widget.onFinished!),
+          ],
           // With check details, the first failed check leads with ways to
           // act on it; otherwise a short next step.
           if (data.execSuccess && !resultsOnly && firstFailed != null) ...[
@@ -5968,7 +6079,8 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
     }
     _hint = widget.data.hint;
     _source = widget.data.tutorSource;
-    _hintLevel = 1;
+    // No hint yet means the next request is level 1.
+    _hintLevel = _hint.isEmpty ? 0 : 1;
     _loading = false;
     _asking = false;
     // The run's tutor reply belongs to the hint; the answer card is only for
@@ -6054,7 +6166,9 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'The next hint is temporarily unavailable. Try again.';
+          _error = _hintLevel == 0
+              ? 'A hint is temporarily unavailable. Try again.'
+              : 'The next hint is temporarily unavailable. Try again.';
         });
       }
     }
@@ -6098,6 +6212,22 @@ class _TutorHintPanelState extends State<_TutorHintPanel> {
                 ),
               ),
             ],
+          ),
+        if (_hint.isEmpty && widget.data.hintsAvailable)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              style: const ButtonStyle(backgroundBuilder: plainButtonBackground),
+              key: const Key('get-hint-button'),
+              onPressed: _loading ? null : _requestNextHint,
+              icon: _loading
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(LucideIcons.lightbulb, size: 18),
+              label: const Text('Get a hint'),
+            ),
           ),
         if (_error != null) ...[
           const SizedBox(height: AppSpacing.xs),
