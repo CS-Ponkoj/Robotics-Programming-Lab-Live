@@ -121,3 +121,34 @@ Future<Map<String, dynamic>> fetchAttemptCode(String attemptId) async {
       .timeout(_studyDataTimeout);
   return _decode(response);
 }
+
+/// One participant's study sessions, each with its timeline of activity.
+Future<Map<String, dynamic>> fetchParticipantSessions(String studentId) async {
+  final response = await http
+      .get(
+        Uri.parse(
+            '$apiBaseUrl/admin/study-data/participants/$studentId/sessions'),
+        headers: AuthApi.authorizedHeaders(),
+      )
+      .timeout(_studyDataTimeout);
+  return _decode(response);
+}
+
+/// Downloads one participant's session timelines as CSV.
+Future<bool> downloadParticipantSessionsCsv(
+  String studentId,
+  String fileLabel,
+) async {
+  final uri = Uri.parse(
+          '$apiBaseUrl/admin/study-data/participants/$studentId/sessions')
+      .replace(queryParameters: {'format': 'csv'});
+  final response = await http
+      .get(uri, headers: AuthApi.authorizedHeaders())
+      .timeout(const Duration(seconds: 60));
+  if (response.statusCode != 200) {
+    throw Exception(AuthApi.errorMessage(response));
+  }
+  final safe = fileLabel.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+  return saveResearchDownload(
+      response.bodyBytes, 'sessions_$safe.csv', 'text/csv');
+}

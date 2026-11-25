@@ -122,6 +122,7 @@ class _MyAppState extends State<MyApp> {
     }
     _expiryDialogOpen = true;
     final demo = _user!.isDemo;
+    final instructor = _user!.isInstructor;
     await showDialog<void>(
       context: navigatorContext,
       barrierDismissible: false,
@@ -132,9 +133,14 @@ class _MyAppState extends State<MyApp> {
           demo
               ? 'The demo session has ended. Start a new demo from the '
                   'sign-in page.'
-              : 'Your sign-in has expired, so nothing more can be graded or '
-                  'saved until you sign in again. Your latest code is kept on '
-                  'this device and returns when you open the assignment again.',
+              : instructor
+                  ? 'Your sign-in has expired or was signed out in another '
+                      'tab. Sign in again to keep working in Instructor '
+                      'Studio.'
+                  : 'Your sign-in has expired, so nothing more can be graded '
+                      'or saved until you sign in again. Your latest code is '
+                      'kept on this device and returns when you open the '
+                      'assignment again.',
         ),
         actions: [
           FilledButton(

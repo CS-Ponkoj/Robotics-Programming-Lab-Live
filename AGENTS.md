@@ -140,7 +140,8 @@ backend/                          FastAPI application
   course_settings.py              Instructor course settings (AI tutor, Old assignments)
   assignment_insights.py          Aggregate per-assignment insights for instructors
   research_service.py             Study sessions, events, summaries, and exports
-  study_data.py                   Instructor Study data tables and CSV (participant codes, no code)
+  study_data.py                   Instructor Study data tables and CSV (participant code + login ID, no code)
+  participant_sessions.py         One participant's study sessions, each as a timeline (no code)
   study_checks.py                 Research check groups (setup/behavior/code style) per study assignment version
   workload_survey.py              Raw NASA-TLX form, validation and scoring (Assignments 7 and 8)
   instructor_dataset.py           Offline instructor AI-evaluation contract and validator
@@ -543,6 +544,10 @@ Treat every submission as hostile input.
 ## Research data and privacy rules
 
 - Use participant codes in research screens and exports, not login IDs.
+  Owner-approved exception (2026-11-25): the instructor Study data page and
+  its CSV downloads (including participant session timelines) also show each
+  student's login ID beside the participant code. The Research dashboard
+  exports stay code-only. Treat Study data CSV files as identifiable data.
 - Never export passwords, hashes, temporary credentials, auth tokens, API keys,
   hidden tests, official solutions, or submitted source code.
 - Preserve event allowlists, metadata size limits, heartbeat caps, and

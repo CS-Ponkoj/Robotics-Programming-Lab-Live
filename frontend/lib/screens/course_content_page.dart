@@ -1169,7 +1169,15 @@ class _CourseSectionViewState extends State<_CourseSectionView> {
         .allMatches(html.replaceAll(RegExp(r'<[^>]*>'), ' '))
         .length;
     final minutes = (words / 200).ceil().clamp(1, 600);
-    final sectionCount = RegExp(r'<h2[\s>]').allMatches(html).length;
+    // Same rule as the "Section N of M" labels: References is not a section.
+    final sectionCount = RegExp(r'<h2[^>]*>([\s\S]*?)</h2>')
+        .allMatches(html)
+        .map((match) => (match.group(1) ?? '')
+            .replaceAll(RegExp(r'<[^>]+>'), '')
+            .trim()
+            .toLowerCase())
+        .where((title) => title.isNotEmpty && title != 'references')
+        .length;
     return Card(
       margin: EdgeInsets.zero,
       color: theme.colorScheme.surface,

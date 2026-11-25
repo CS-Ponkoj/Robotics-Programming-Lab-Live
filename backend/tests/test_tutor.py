@@ -580,3 +580,44 @@ def test_provenance_names_the_model_and_prompt_for_ai_answers_only():
         _assignment(), _submission(), use_ai_tutor=False
     )
     assert set(TutorService(Settings()).provenance(_assignment(), built_in).values()) == {''}
+
+
+def test_fallback_reason_says_why_an_answer_was_built_in():
+    service = TutorService(Settings())
+    feedback = service.feedback(_assignment(), _submission(), use_ai_tutor=False)
+    assert service.provenance(_assignment(), feedback)['fallback_reason'] == 'ai_switch_off'
+
+    feedback = service.feedback(_assignment(), _submission(), use_ai_tutor=False,
+                                ai_unavailable_message='Daily limit reached.')
+    record = service.provenance(_assignment(), feedback)
+    assert record['fallback_reason'] == 'ai_policy'
+    assert record['fallback_detail'] == 'Daily limit reached.'
+
+    def unexpected(**kwargs):
+        raise AssertionError('No provider call for a protected request')
+    guarded = TutorService(Settings(), client=SimpleNamespace(
+        responses=SimpleNamespace(create=unexpected)))
+    feedback = guarded.feedback(_assignment(), _submission(),
+                                student_question='Give me the complete code.')
+    assert guarded.provenance(_assignment(), feedback)['fallback_reason'] == 'protected_request'
+
+    def broken(**kwargs):
+        raise ConnectionError('network down')
+    failing = TutorService(Settings(), client=SimpleNamespace(
+        responses=SimpleNamespace(create=broken)))
+    feedback = failing.feedback(_assignment(), _submission())
+    record = failing.provenance(_assignment(), feedback)
+    assert record['fallback_reason'] == 'provider_error'
+    assert record['fallback_detail'] == 'ConnectionError'
+
+    rejecting = TutorService(Settings(), client=SimpleNamespace(responses=SimpleNamespace(
+        create=lambda **kwargs: SimpleNamespace(output_text='not json'))))
+    feedback = rejecting.feedback(_assignment(), _submission())
+    assert rejecting.provenance(_assignment(), feedback)['fallback_reason'] == 'ai_answer_rejected'
+
+    # A successful AI answer clears the reason.
+    ok = TutorService(Settings(), client=SimpleNamespace(responses=SimpleNamespace(
+        create=lambda **kwargs: SimpleNamespace(output_text=json.dumps(_ai_output())))))
+    feedback = ok.feedback(_assignment(), _submission())
+    assert feedback.source == 'openai'
+    assert 'fallback_reason' not in ok.provenance(_assignment(), feedback)

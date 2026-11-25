@@ -63,6 +63,7 @@ from graders.python_function import PlaygroundInputError, parse_playground_argum
 from playground_inputs import parameter_problems
 from progress_service import student_assignment_progress
 import study_data
+import participant_sessions
 from models import (
     Assignment,
     AuthSession,
@@ -1662,6 +1663,42 @@ def create_app(
             "created_at": study_data.iso_utc(submission.created_at),
             "code": submission.code,
         }
+
+    @application.get("/admin/study-data/participants/{student_id}/sessions")
+    def admin_study_data_participant_sessions(
+        student_id: str,
+        format: str = Query(default="json", pattern="^(json|csv)$"),
+        session: Session = Depends(session_dependency),
+        actor: User | None = Depends(admin_dependency),
+    ):
+        """One student's study sessions, each as a timeline (no code)."""
+        student = session.get(User, student_id[:36])
+        if student is None or student.role != "student" or student.is_demo:
+            raise HTTPException(404, "Participant not found.")
+        payload = participant_sessions.participant_sessions(session, student)
+        if format == "json":
+            return payload
+        record_audit(
+            session,
+            action="study_data.exported",
+            resource_type="study_data_table",
+            resource_id="participant_sessions",
+            actor_user_id=actor.id if actor else None,
+            details={"one_participant": True},
+        )
+        name = "".join(
+            char if char.isalnum() or char in "-_" else "_"
+            for char in student.login_id
+        )[:60]
+        return Response(
+            content=participant_sessions.participant_sessions_csv(payload),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="sessions_{name}.csv"'
+                )
+            },
+        )
 
     @application.get("/admin/study-data/{table_name}")
     def admin_study_data_table(

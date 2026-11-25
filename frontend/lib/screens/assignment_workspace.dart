@@ -155,6 +155,8 @@ class _MyHomePageState extends State<MyHomePage> {
   // The survey is offered at most once per visit after a passing run.
   bool _surveyPrompted = false;
   bool _surveyOpen = false;
+  // Shown in Results after saving: a SnackBar sits under the Results panel.
+  bool _surveySavedNotice = false;
   // Kept in memory only so reopening the playground restores the last inputs.
   String _playgroundArguments = '';
   // Playground runs for the current code only; memory only, never sent.
@@ -230,7 +232,10 @@ class _MyHomePageState extends State<MyHomePage> {
     );
     _surveyOpen = false;
     if (!mounted || !saved) return;
-    setState(() => _survey = survey.copyWith(completed: true));
+    setState(() {
+      _survey = survey.copyWith(completed: true);
+      _surveySavedNotice = true;
+    });
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       const SnackBar(content: Text('Thank you. Your answers were saved.')),
     );
@@ -1128,6 +1133,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                       _openLineInEditor(line);
                                     },
                                     aiTutorEnabled: _aiTutorOn,
+                                    surveySaved: _surveySavedNotice,
                                     onFinished: (_survey?.open ?? false) &&
                                             snap.data!.submissionId.isNotEmpty
                                         ? () => _openWorkloadSurvey(
@@ -1542,6 +1548,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                   running: _isRunning,
                                   lines: _terminalLines,
                                   requestError: _terminalRequestError,
+                                  showsPrintedOutput:
+                                      currentFeedbackMode.value !=
+                                          FeedbackMode.traditional,
                                   codeChanged: _terminalSimulatedCode == null
                                       ? _hasUnrunChanges
                                       : _terminalSimulatedCode != _code,
@@ -1911,7 +1920,9 @@ class _AssignmentInstructionsState extends State<AssignmentInstructions> {
             key: const Key('instruction-support-section'),
             icon: LucideIcons.lightbulb,
             title: 'Rules, scoring, and checks',
-            subtitle: 'Rules, scoring, given data, and hints',
+            subtitle: currentFeedbackMode.value == FeedbackMode.tddAi
+                ? 'Rules, scoring, given data, and hints'
+                : 'Rules, scoring, and given data',
             html: sections.support,
           ),
         ],
@@ -4686,10 +4697,14 @@ class Feedback extends StatefulWidget {
     this.previousPassed,
     this.runNumber,
     this.onFinished,
+    this.surveySaved = false,
   });
 
   /// Opens the workload survey of a study assignment; null hides the card.
   final VoidCallback? onFinished;
+
+  /// The workload survey was just saved: Results confirms it.
+  final bool surveySaved;
 
   /// The score before this run; null on a first run.
   final int? previousScore;
@@ -4865,6 +4880,22 @@ class _FeedbackState extends State<Feedback> {
           if (widget.onFinished != null) ...[
             const SizedBox(height: AppSpacing.sm),
             _FinishedCard(onFinished: widget.onFinished!),
+          ] else if (widget.surveySaved) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Semantics(
+              liveRegion: true,
+              child: Row(
+                key: const Key('survey-saved'),
+                children: [
+                  Icon(LucideIcons.circleCheck,
+                      size: 18, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: AppSpacing.xs),
+                  const Expanded(
+                    child: Text('Thank you. Your workload answers were saved.'),
+                  ),
+                ],
+              ),
+            ),
           ],
           // With check details, the first failed check leads with ways to
           // act on it; otherwise a short next step.

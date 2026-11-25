@@ -189,5 +189,12 @@ void main() {
       home: Scaffold(body: app.Feedback(data: data)),
     ));
     expect(find.byKey(const Key('finished-card')), findsNothing);
+    expect(find.byKey(const Key('survey-saved')), findsNothing);
+
+    // After saving, Results confirms it (a SnackBar sits under the panel).
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(body: app.Feedback(data: data, surveySaved: true)),
+    ));
+    expect(find.byKey(const Key('survey-saved')), findsOneWidget);
   });
 }

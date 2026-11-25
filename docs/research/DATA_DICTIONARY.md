@@ -367,7 +367,7 @@ not create persistent hint rows.
 | `data_schema_version` | What the `feedback` JSON adds |
 |---|---|
 | 1 (until 2026-11-23) | `interaction_type` only on `student_question` rows; the question text was not stored |
-| 2 (from 2026-11-24) | `interaction_type` on every row: `run_hint` (automatic hint after a run; no new rows from 2026-11-25), `progressive_hint` (Hint button), or `student_question` (Ask the tutor). `student_question` rows also keep `student_question`, the exact text the student typed (3-500 characters), by owner decision so instructors can review it beside the answer shown. From 2026-11-25 every new row also stores `ai_model` (the configured model, such as a fine-tuned model ID), `ai_model_snapshot` (the model version the provider reported), `prompt_version` (`tutor.TUTOR_PROMPT_VERSION`), and `prompt_sha256` (first 16 hex characters of the SHA-256 of the tutor instructions); all four are empty for built-in answers. They are server-only and never sent to students |
+| 2 (from 2026-11-24) | `interaction_type` on every row: `run_hint` (automatic hint after a run; no new rows from 2026-11-25), `progressive_hint` (Hint button), or `student_question` (Ask the tutor). `student_question` rows also keep `student_question`, the exact text the student typed (3-500 characters), by owner decision so instructors can review it beside the answer shown. From 2026-11-25 every new row also stores `ai_model` (the configured model, such as a fine-tuned model ID), `ai_model_snapshot` (the model version the provider reported), `prompt_version` (`tutor.TUTOR_PROMPT_VERSION`), and `prompt_sha256` (first 16 hex characters of the SHA-256 of the tutor instructions); all four are empty for built-in answers. They are server-only and never sent to students. Built-in answers also store `fallback_reason` (`ai_switch_off`, `ai_policy`, `no_server_key`, `protected_request`, `ai_answer_rejected` when a safety check refused the generated answer, or `provider_error`) and `fallback_detail` (the policy message or error type), from 2026-11-25 |
 
 Questions typed before 2026-11-24 were never stored and cannot be recovered;
 only their length is in the `hint_requested` event. The question text is free
@@ -385,7 +385,19 @@ and hints, attempts, check results, learning events, time per assignment,
 assignment summary, study sessions, sign-ins, quiz and pre-test attempts, quiz
 answers, course learning per topic, instructor actions, NASA-TLX workload,
 and page feedback.
-Rows use participant codes, never login IDs. The owner's test logins
+Rows show the participant code and, by owner decision (2026-11-25), the
+student's login ID right after it, on screen and in every Study data CSV, so
+those files are identifiable data (the Research dashboard exports stay
+code-only). **Sessions by participant** (`GET
+/admin/study-data/participants/{id}/sessions`, `format=csv` audited as
+`study_data.exported` with table `participant_sessions`) shows one student's
+study sessions, each as a table in time order: test runs (score, checks,
+behavior checks, status, mode), Hint-button hints and tutor questions (level,
+AI or built-in, question and answer), simulations, assignment opens, AI switch
+changes, pre-test and quiz attempts, and NASA-TLX responses. Runs and learning
+events store their session; hints, quiz attempts and NASA-TLX responses do not,
+so they are placed in the latest session that started at or before them.
+Code is never included. The owner's test logins
 (`traditional`, `tdd`, `ai`, and the seeded `student` / `DEMO` row) are hidden
 unless "Include test accounts" is on. Submitted code is never in a table or
 CSV; an instructor can open one attempt's code in the app, which writes a
@@ -415,8 +427,9 @@ Table rules (2026-11-24 data review):
 - Assignment summary help counts come from learning events:
   `built_in_hint_count` is Hint button requests answered by built-in hints
   (automatic run hints and tutor questions are not counted), and
-  `ai_interaction_count` is runs made with the AI switch on plus hints the AI
-  answered. For every help row, use AI questions and hints.
+  `ai_interaction_count` is answers the AI gave (Hint button hints and tutor
+  questions; until 2026-11-25 it also counted runs made with the AI switch on,
+  which inflated it). For every help row, use AI questions and hints.
 - Quiz attempts carry `attempt_id`, which joins to quiz answers.
 - Every `*_at` value in every table is UTC ISO 8601 to the second with an
   offset (for example `2026-11-24T09:41:59+00:00`).

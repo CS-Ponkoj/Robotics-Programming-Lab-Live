@@ -304,9 +304,13 @@ class RunTerminalPanel extends StatelessWidget {
     this.onOpenLine,
     this.requestError,
     this.codeChanged = false,
+    this.showsPrintedOutput = true,
   });
 
   final bool expanded;
+
+  /// False for Traditional, whose terminal never shows printed output.
+  final bool showsPrintedOutput;
 
   /// The code was edited or replaced after the shown run.
   final bool codeChanged;
@@ -488,8 +492,9 @@ class RunTerminalPanel extends StatelessWidget {
               style: mono.copyWith(color: _lineColor(TerminalLineKind.command)),
             ),
             TextSpan(
-              text:
-                  'Run tests to see what your program prints and any error here.',
+              text: showsPrintedOutput
+                  ? 'Run tests to see what your program prints and any error here.'
+                  : 'Run tests to see your score summary and any error here.',
               style: mono.copyWith(color: _lineColor(TerminalLineKind.info)),
             ),
           ]),

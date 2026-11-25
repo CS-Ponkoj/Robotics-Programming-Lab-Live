@@ -77,23 +77,64 @@ def test_only_instructors_can_read_study_data(client):
                       headers=headers).status_code == 403
 
 
-def test_every_table_loads_without_login_ids_or_secrets(client):
+def test_every_table_loads_with_login_ids_and_no_secrets(client):
     _activity(client)
     instructor = _instructor(client)
     catalog = client.get("/admin/study-data", headers=instructor).json()
     assert [table["name"] for table in catalog["tables"]] == [t.name for t in TABLES]
     assert [p["participant_code"] for p in catalog["participants"]] == ["P-001"]
+    # Owner decision (2026-11-25): the login ID is shown beside the code.
+    assert [p["login_id"] for p in catalog["participants"]] == [STUDENT_LOGIN]
     for table in TABLES:
         response = client.get(f"/admin/study-data/{table.name}", headers=instructor)
         assert response.status_code == 200, (table.name, response.text)
-        body = json.dumps(response.json())
-        assert STUDENT_LOGIN not in body, table.name
+        payload = response.json()
+        body = json.dumps(payload)
         for secret in ("password", "token_hash", "starter_code", '"code"'):
             assert secret not in body, (table.name, secret)
+        keys = [column["key"] for column in payload["columns"]]
+        if "participant_code" in keys:
+            assert keys[keys.index("participant_code") + 1] == "login_id", table.name
+            assert all(row["login_id"] == STUDENT_LOGIN for row in payload["rows"]
+                       if row.get("participant_code") == "P-001"), table.name
         exported = client.get(f"/admin/study-data/{table.name}",
                               params={"format": "csv"}, headers=instructor)
         assert exported.status_code == 200
-        assert STUDENT_LOGIN not in exported.text
+        if "participant_code" in keys and payload["rows"]:
+            assert STUDENT_LOGIN in exported.text, table.name
+
+
+def test_participant_sessions_timeline(client):
+    headers, user, attempt_id, _code = _activity(client)
+    url = f"/admin/study-data/participants/{user['id']}/sessions"
+    assert client.get(url).status_code == 401
+    assert client.get(url, headers=headers).status_code == 403
+    instructor = _instructor(client)
+    assert client.get("/admin/study-data/participants/missing/sessions",
+                      headers=instructor).status_code == 404
+    data = client.get(url, headers=instructor).json()
+    assert data["participant"]["login_id"] == STUDENT_LOGIN
+    assert data["participant"]["participant_code"] == "P-001"
+    assert len(data["sessions"]) == 1
+    rows = data["sessions"][0]["rows"]
+    activities = [row["activity"] for row in rows]
+    assert "Test run" in activities and "Hint button" in activities
+    question = next(row for row in rows if row["activity"] == "Tutor question")
+    assert QUESTION in question["details"]
+    assert all(row["attempt_id"] == attempt_id for row in rows
+               if row["activity"] in {"Test run", "Hint button", "Tutor question"})
+    assert [row["time"] for row in rows] == sorted(row["time"] for row in rows)
+    assert '"code"' not in json.dumps(data)
+    exported = client.get(url, params={"format": "csv"}, headers=instructor)
+    assert exported.status_code == 200
+    assert exported.headers["content-disposition"].endswith(
+        f'filename="sessions_{STUDENT_LOGIN}.csv"')
+    assert STUDENT_LOGIN in exported.text and QUESTION in exported.text
+    with client.app.state.SessionLocal() as session:
+        audit = session.scalars(select(AuditEvent).where(
+            AuditEvent.action == "study_data.exported",
+            AuditEvent.resource_id == "participant_sessions")).all()
+        assert len(audit) == 1
 
 
 def test_ai_questions_and_hints_show_question_and_answer(client):
@@ -290,7 +331,7 @@ def test_followups_ids_times_definitions_and_large_csv(client, monkeypatch):
     summary = table("assignment_summary")
     helps = {column["key"]: column["help"] for column in summary["columns"]}
     assert "Hint button" in helps["built_in_hint_count"]
-    assert "AI switch" in helps["ai_interaction_count"]
+    assert "AI gave" in helps["ai_interaction_count"]
 
     # A CSV past the safety bound is refused, never cut short.
     monkeypatch.setattr(study_data, "MAX_TABLE_ROWS", 2)

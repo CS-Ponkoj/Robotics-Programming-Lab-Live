@@ -1,8 +1,9 @@
 """Instructor "Study data" tables: everything the app collects, row by row.
 
 Each table is built from the stored records with the same filters, sorted,
-paged for the screen, or written whole as CSV. Rows use participant codes,
-never login IDs, and never carry passwords, tokens, hidden tests, answers,
+paged for the screen, or written whole as CSV. Rows carry the participant
+code and, by owner decision (2026-11-25), the student's login ID, and never
+carry passwords, tokens, hidden tests, answers,
 grader settings, or submitted code (code is viewable one attempt at a time
 in the app, never in a table or a CSV).
 """
@@ -327,8 +328,9 @@ def _assignment_time(ctx: _Context):
         full = first_full.get((item.user_id, item.assignment_id, item.assignment_version))
         clock = None
         if full is not None and item.first_active_at is not None:
-            clock = max(0, int((_aware(full.created_at) - _aware(item.first_active_at))
-                               .total_seconds()))
+            # Rounded like the assignment summary's elapsed time.
+            clock = max(0, round((_aware(full.created_at) - _aware(item.first_active_at))
+                                 .total_seconds()))
         if not ctx.keep(mode=mode, assignment_id=item.assignment_id,
                         when=item.first_active_at, has_assignment=True):
             continue
@@ -487,6 +489,8 @@ def _ai_questions_and_hints(ctx: _Context):
             "ai_model_snapshot": str(feedback.get("ai_model_snapshot") or ""),
             "prompt_version": str(feedback.get("prompt_version") or ""),
             "prompt_sha256": str(feedback.get("prompt_sha256") or ""),
+            "fallback_reason": str(feedback.get("fallback_reason") or ""),
+            "fallback_detail": str(feedback.get("fallback_detail") or ""),
         }
 
 
@@ -723,7 +727,8 @@ def _page_feedback(ctx: _Context):
 
 # --- Table catalog --------------------------------------------------------
 
-_P = Column("participant_code", "Participant", "Research code of the student, never the login ID.")
+_P = Column("participant_code", "Participant", "Research code of the student.")
+_LOGIN = Column("login_id", "Login ID", "The student's sign-in name (shown by owner decision, 2026-11-25).")
 _M = Column("feedback_mode", "Mode", "Feedback mode: traditional, tdd, or tdd_ai.")
 _A = Column("assignment", "Assignment", "The number students see; older assignments show their ID.")
 _AID = Column("assignment_id", "Assignment ID", "Stable internal ID used in every record.")
@@ -759,6 +764,10 @@ TABLES: tuple[Table, ...] = (
            Column("ai_model_snapshot", "Model snapshot", "Exact model version the provider reported."),
            Column("prompt_version", "Prompt version", "Tutor prompt version used for the AI answer."),
            Column("prompt_sha256", "Prompt fingerprint", "First 16 hex characters of the SHA-256 of the tutor instructions."),
+           Column("fallback_reason", "Why built-in",
+                  "For built-in answers: ai_switch_off, ai_policy, no_server_key, protected_request, "
+                  "ai_answer_rejected (a safety check refused the AI answer) or provider_error. Recorded from 2026-11-25."),
+           Column("fallback_detail", "Built-in detail", "The policy message or error type behind the fallback."),
            _V, _AID,
            Column("attempt_id", "Attempt", "The attempt the hint or question belongs to.")),
           "asked_at", _ai_questions_and_hints, has_assignment=True),
@@ -832,7 +841,7 @@ TABLES: tuple[Table, ...] = (
                   "Hint button requests answered by built-in hints (from learning "
                   "events; automatic run hints and tutor questions are not counted)."),
            Column("ai_interaction_count", "AI interactions",
-                  "Runs made with the AI switch on, plus hints the AI answered.")),
+                  "Answers the AI gave: Hint button hints and tutor questions.")),
           "assignment_id", _assignment_summary, has_assignment=True,
           has_dates=False),
     Table("study_sessions", "Study sessions",
@@ -884,7 +893,17 @@ TABLES: tuple[Table, ...] = (
           "submitted_at", _quiz_answers),
     Table("course_learning", "Course learning per topic",
           "Pre-test score, first quiz score, and the gain between them (from the correct counts).",
-          (_P, _M), "topic_id", _course_learning, has_dates=False),
+          (_P, _M,
+           Column("topic_id", "Topic", "Course topic."),
+           Column("pretest_score", "Pre-test %", "The single pre-test attempt."),
+           Column("quiz_score", "Quiz % (first)", "The first submitted quiz attempt (the scored one)."),
+           Column("learning_gain", "Gain (points)",
+                  "Percentage points: first quiz % minus pre-test %, from the correct counts. "
+                  "Not a normalized gain."),
+           Column("quiz_version", "Quiz version", "Exact quiz version."),
+           Column("quiz_attempts", "Quiz attempts", "First attempt plus practice retakes."),
+           Column("best_quiz_score", "Best quiz %", "Highest attempt, including retakes (not the score).")),
+          "topic_id", _course_learning, has_dates=False),
     Table("instructor_actions", "Instructor actions",
           "Account, mode, and setting changes from the audit log (sign-ins are in Sign-ins).",
           (Column("created_at", "When", "UTC."),
@@ -953,8 +972,13 @@ def build_rows(session: Session, table: Table, filters: Filters,
                sort: str | None = None, descending: bool = True) -> list[dict[str, Any]]:
     """All rows of one table after filters, sorted (newest first by default)."""
     ctx = _Context(session, filters)
+    # Owner decision (2026-11-25): instructors see each student's login ID
+    # beside the participant code, on screen and in CSV.
+    logins = {participant_label(user): user.login_id for user in ctx.users.values()}
     rows = []
     for row in table.build(ctx):
+        if "participant_code" in row:
+            row = _with_login(row, logins.get(row["participant_code"], ""))
         rows.append(row)
         if len(rows) >= MAX_TABLE_ROWS:
             break
@@ -972,9 +996,23 @@ def build_rows(session: Session, table: Table, filters: Filters,
     return rows
 
 
+def _with_login(row: dict[str, Any], login_id: str) -> dict[str, Any]:
+    """The row with login_id placed right after participant_code."""
+    result: dict[str, Any] = {}
+    for key, value in row.items():
+        result[key] = value
+        if key == "participant_code":
+            result["login_id"] = login_id
+    return result
+
+
 def table_columns(table: Table, rows: list[dict[str, Any]]) -> list[dict[str, str]]:
     """Declared columns first, then any extra keys the rows carry."""
-    declared = [column for column in table.columns]
+    declared = []
+    for column in table.columns:
+        declared.append(column)
+        if column.key == "participant_code":
+            declared.append(_LOGIN)
     known = {column.key for column in declared}
     extra = []
     if rows:
@@ -1031,6 +1069,7 @@ def catalog_payload(session: Session, include_test_accounts: bool) -> dict[str, 
         {
             "id": user.id,
             "participant_code": participant_label(user),
+            "login_id": user.login_id,
             "feedback_mode": user.feedback_mode or "",
             "test_account": is_test_account(user),
         }

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:iuse_demo/screens/participant_sessions_page.dart';
 import 'package:iuse_demo/services/study_data_api.dart';
 import 'package:iuse_demo/theme/app_theme.dart';
 import 'package:iuse_demo/widgets/floating_app_bar.dart';
@@ -215,6 +216,19 @@ class _StudyDataPageState extends State<StudyDataPage> {
         flexibleSpace: const BrandHeaderGradient(),
         title: const Text('Study data'),
         actions: [
+          IconButton(
+            key: const Key('study-data-sessions'),
+            tooltip: 'Sessions by participant',
+            onPressed: _catalogLoading || _participants.isEmpty
+                ? null
+                : () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => ParticipantSessionsPage(
+                        participants: _participants,
+                        initialParticipantId: _filters.studentId,
+                      ),
+                    )),
+            icon: const Icon(LucideIcons.calendarClock),
+          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: _loading ? null : _loadTable,
@@ -599,7 +613,7 @@ class _FilterBar extends StatelessWidget {
                 for (final participant in participants)
                   DropdownMenuItem<String?>(
                     value: participant['id'] as String,
-                    child: Text(participant['participant_code'] as String,
+                    child: Text(participantOptionLabel(participant),
                         overflow: TextOverflow.ellipsis),
                   ),
               ],
@@ -784,7 +798,11 @@ class _DataGrid extends StatelessWidget {
     }
     // Long record IDs: the first block is enough to tell rows apart here;
     // the record dialog and the CSV keep the full ID.
-    if (key.endsWith('_id') && value is String && value.length > 12) {
+    // Long record IDs are shortened; login IDs are names, shown in full.
+    if (key.endsWith('_id') &&
+        key != 'login_id' &&
+        value is String &&
+        value.length > 12) {
       return '${value.substring(0, 8)}…';
     }
     return formatCell(value);

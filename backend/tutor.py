@@ -164,6 +164,11 @@ class TutorService:
         self.client = client
         # The model snapshot the provider reports for the last AI answer.
         self.last_model_snapshot = ""
+        # Why the last answer came from the built-in ladder (study RQ1):
+        # ai_switch_off, ai_policy, no_server_key, protected_request,
+        # ai_answer_rejected (a safety check refused it) or provider_error.
+        self.last_fallback_reason = ""
+        self.last_fallback_detail = ""
 
     def provenance(self, assignment: Assignment, feedback: TutorFeedback) -> dict[str, str]:
         """Which model and prompt produced an answer; empty for built-in hints.
@@ -172,7 +177,9 @@ class TutorService:
         """
         if feedback.source != "openai":
             return {"ai_model": "", "ai_model_snapshot": "",
-                    "prompt_version": "", "prompt_sha256": ""}
+                    "prompt_version": "", "prompt_sha256": "",
+                    "fallback_reason": self.last_fallback_reason,
+                    "fallback_detail": self.last_fallback_detail[:200]}
         return {
             "ai_model": self.settings.openai_hint_model,
             "ai_model_snapshot": self.last_model_snapshot,
@@ -198,7 +205,16 @@ class TutorService:
             hint_level,
             student_question=normalized_question,
         )
+        self.last_fallback_reason = ""
+        self.last_fallback_detail = ""
         if not use_ai_tutor or (self.client is None and not self.settings.openai_api_key):
+            if not use_ai_tutor:
+                self.last_fallback_reason = (
+                    "ai_policy" if ai_unavailable_message else "ai_switch_off"
+                )
+                self.last_fallback_detail = ai_unavailable_message
+            else:
+                self.last_fallback_reason = "no_server_key"
             if normalized_question:
                 return fallback.model_copy(update={
                     "answer": (
@@ -210,6 +226,7 @@ class TutorService:
                 })
             return fallback
         if _PROTECTED_REQUEST.search(normalized_question):
+            self.last_fallback_reason = "protected_request"
             return fallback.model_copy(update={
                 "answer": "I cannot provide completed code or private assessment material. "
                           "I can help you understand the task and debug one step at a time.",
@@ -300,6 +317,15 @@ class TutorService:
                 "AI tutor unavailable; using deterministic feedback (%s)",
                 type(error).__name__,
             )
+            # The guards raise ValueError (and the strict schema
+            # ValidationError) when they refuse a generated answer; anything
+            # else is the provider or the network.
+            self.last_fallback_reason = (
+                "ai_answer_rejected"
+                if isinstance(error, (ValueError, ValidationError))
+                else "provider_error"
+            )
+            self.last_fallback_detail = type(error).__name__
             return fallback
 
     @staticmethod

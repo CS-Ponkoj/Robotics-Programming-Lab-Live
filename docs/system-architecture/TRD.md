@@ -132,7 +132,7 @@ All routes are served under `/api` on the public address. 🔐 = signed-in user,
 | **Admin: assignments** 🛡️ | `GET/POST /admin/assignments` · `PUT /admin/assignments/{id}` · `POST …/{id}/validate` · `POST …/{id}/publish` |
 | **Admin: accounts** 🛡️ | `GET/POST /admin/students` (with `feedback_mode`) · `PATCH /admin/students/{id}` (changes `feedback_mode`, audited) · `POST …/{id}/reset-password` · same four for `/admin/instructors` · `POST /admin/accounts/import` · `GET /admin/sign-in-history` |
 | **Admin: research** 🛡️ | `GET /admin/research/summary` · `…/assignments` · `…/students/{id}` · `…/students/{id}/attempts` · `…/export` |
-| **Admin: study data** 🛡️ | `GET /admin/study-data` (tables, participants, assignments) · `GET /admin/study-data/{table}` (filters, sort, pages; `format=csv` downloads, audited) · `GET /admin/study-data/attempts/{id}/code` (one attempt's code, app only, audited); built by `study_data.py`, with check groups from `study_checks.py` |
+| **Admin: study data** 🛡️ | `GET /admin/study-data` (tables, participants, assignments) · `GET /admin/study-data/{table}` (filters, sort, pages; `format=csv` downloads, audited) · `GET /admin/study-data/attempts/{id}/code` (one attempt's code, app only, audited) · `GET /admin/study-data/participants/{id}/sessions` (one student's sessions as timelines; `format=csv` audited) by `participant_sessions.py`; built by `study_data.py`, with check groups from `study_checks.py` |
 | **Admin: course settings** 🛡️ | `GET/PUT /admin/course-settings/ai-tutor` · `PUT /admin/course-settings/catalog` |
 | **Admin: email** 🛡️ | `GET /admin/email/status`* · `POST /admin/email/test`* |
 

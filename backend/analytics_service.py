@@ -293,15 +293,12 @@ def build_student_assignment_summaries(
             and item.event_data.get("source", "fallback") != "openai"
             for item in delivered_hint_events
         )
+        # Answers the AI actually gave (Hint button or a tutor question).
+        # Runs no longer produce hints (hints only on request, 2026-11-25),
+        # so a run with the AI switch on is not an AI interaction.
         ai_interactions = sum(
-            (
-                item.event_type in {"assignment_run", "assignment_submitted"}
-                and bool(item.event_data.get("ai_tutor_requested"))
-            )
-            or (
-                item.event_type == "hint_requested"
-                and item.event_data.get("source") == "openai"
-            )
+            item.event_type == "hint_requested"
+            and item.event_data.get("source") == "openai"
             for item in assignment_events
         )
         status = (

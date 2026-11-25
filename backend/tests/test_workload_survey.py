@@ -106,7 +106,7 @@ def test_student_answers_once_after_an_attempt(client):
     assert rows[0]["performance_direction"] == "0 = good, 100 = poor"
     csv_text = client.get("/admin/study-data/workload_tlx", params={"format": "csv"},
                           headers=instructor).text
-    assert "42.5" in csv_text and STUDENT_LOGIN not in csv_text
+    assert "42.5" in csv_text and STUDENT_LOGIN in csv_text
 
 
 def test_partial_answers_are_kept_without_a_raw_score(client):
